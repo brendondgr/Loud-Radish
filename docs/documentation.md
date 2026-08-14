@@ -1,6 +1,6 @@
 # TranscriberPrototype — Project Documentation
 
-*Last updated: 2026-08-14 (Phase 1 — foundations)*
+*Last updated: 2026-08-14 (Phase 2 — audio capture)*
 
 ## Purpose
 
@@ -26,7 +26,7 @@ build step.
 | Python environment (`uv`) | ✅ Dependencies added; optional groups defined |
 | Application skeleton + `GET /api/health` | ✅ Phase 1 |
 | Configuration system | ✅ Phase 1 — layers, presets, hot-swap classes, credentials |
-| Audio capture | ⛔ Phase 2 |
+| Audio capture | ✅ Phase 2 — formats, resampling, ring buffer, preprocessing, devices, sources |
 | Voice activity detection | ⛔ Phase 3 |
 | ASR abstraction (Seam A) | ⛔ Phase 4 |
 | Streaming engine | ⛔ Phase 5 |

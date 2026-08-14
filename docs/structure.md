@@ -1,6 +1,6 @@
 # Repository Structure
 
-*Last updated: 2026-08-14 (Phase 1 — foundations)*
+*Last updated: 2026-08-14 (Phase 2 — audio capture)*
 
 Canonical map of TranscriberPrototype. This file documents **purpose**, not source code. Update it in
 the same change that adds, moves, renames, or removes a directory or significant file.
@@ -48,6 +48,14 @@ TranscriberPrototype/
 │   │   ├── routes/                # HTTP endpoints — thin, delegate to services
 │   │   │   └── health.py          # Liveness plus installed optional groups
 │   │   ├── services/              # The pipeline. Where real work happens.
+│   │   │   └── audio/             # Capture — the canonical-format boundary
+│   │   │       ├── formats.py     # 16 kHz mono float32; conversion into it
+│   │   │       ├── resample.py    # Band-limited rate conversion (soxr)
+│   │   │       ├── ring_buffer.py # Fixed-capacity buffer; drop-oldest, counted
+│   │   │       ├── level.py       # RMS, peak, clipping for the input meter
+│   │   │       ├── preprocess.py  # High-pass filter and gain normalisation
+│   │   │       ├── devices.py     # Merged microphone + loopback enumeration
+│   │   │       └── sources/       # base, file (real-time WAV), device, synthetic
 │   │   ├── models/                # Persistence shape
 │   │   └── schemas/               # Request/response validation
 │   ├── frontend/                  # Server-rendered UI (templates + static assets)
@@ -61,6 +69,7 @@ TranscriberPrototype/
 │   ├── data/                      # Transcript store, search, export
 │   └── utils/                     # Configuration and standalone helpers
 ├── scripts/                       # Developer and operational scripts
+│   └── make_fixture_wav.py        # Generates synthetic WAV fixtures for pipeline tests
 ├── data/                          # Sessions, config file, audio (gitignored)
 ├── logs/                          # Runtime logs (gitignored)
 │
@@ -80,7 +89,6 @@ intended shape is legible before the code lands; **none of these exist yet.**
 ```text
 web/backend/app/
 ├── services/
-│   ├── audio/       # formats, resample, ring_buffer, level, preprocess, devices, sources/   Phase 2
 │   ├── vad/         # base, energy, silero, hysteresis                                       Phase 3
 │   ├── asr/         # contract, registry, mock, faster_whisper, prompting, lifecycle         Phase 4
 │   ├── streaming/   # agreement, buffer, guards, segmenter, passthrough, engine              Phase 5
