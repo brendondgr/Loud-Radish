@@ -1,6 +1,6 @@
 # Repository Structure
 
-*Last updated: 2026-08-14 (Phase 3 — voice activity detection)*
+*Last updated: 2026-08-14 (Phase 4 — ASR abstraction)*
 
 Canonical map of TranscriberPrototype. This file documents **purpose**, not source code. Update it in
 the same change that adds, moves, renames, or removes a directory or significant file.
@@ -61,6 +61,13 @@ TranscriberPrototype/
 │   │   │       ├── energy.py      # Dependency-free default, adaptive noise floor
 │   │   │       ├── silero.py      # Optional learned detector, same interface
 │   │   │       └── hysteresis.py  # Shared debouncing and pause-event emission
+│   │   │   └── asr/               # SEAM A — the pluggable speech model
+│   │   │       ├── contract.py    # Interface, word tokens, capability declaration
+│   │   │       ├── registry.py    # Backend registration and construction
+│   │   │       ├── mock.py        # Scripted backend; what makes the engine testable
+│   │   │       ├── faster_whisper.py  # The real default, optional dependency
+│   │   │       ├── prompting.py   # Session and rolling-context term biasing
+│   │   │       └── lifecycle.py   # Async load, warm-up, swap, unload
 │   │   ├── models/                # Persistence shape
 │   │   └── schemas/               # Request/response validation
 │   ├── frontend/                  # Server-rendered UI (templates + static assets)
@@ -94,7 +101,6 @@ intended shape is legible before the code lands; **none of these exist yet.**
 ```text
 web/backend/app/
 ├── services/
-│   ├── asr/         # contract, registry, mock, faster_whisper, prompting, lifecycle         Phase 4
 │   ├── streaming/   # agreement, buffer, guards, segmenter, passthrough, engine              Phase 5
 │   ├── transcript/  # store, schema.sql, queries, export                                     Phase 6
 │   ├── session/     # manager, workers, metrics, degradation                                 Phase 7
