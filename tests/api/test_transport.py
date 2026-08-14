@@ -361,16 +361,23 @@ class TestWebSocket:
             cutoff = segments[0]["id"]
             with client.websocket_connect("/ws") as socket:
                 socket.send_json({"type": "hello", "since": cutoff})
-                assert socket.receive_json()["event"] == "session.state"
 
-                replayed = []
-                for _ in range(len(segments)):
+                # Frame order is not part of the contract, and cannot be: a client is registered
+                # the moment it connects, so live events may already be queued when its `hello`
+                # arrives. Both the frontend and this test therefore read the stream by event
+                # type rather than by position.
+                saw_state = False
+                replayed: list[int] = []
+                for _ in range(len(segments) + 10):
                     frame = socket.receive_json()
-                    if frame["event"] == "transcript.committed":
+                    if frame["event"] == "session.state":
+                        saw_state = True
+                    elif frame["event"] == "transcript.committed":
                         replayed.append(frame["data"]["id"])
-                    if len(replayed) >= len(segments) - 1:
+                    if saw_state and len(replayed) >= len(segments) - 1:
                         break
 
+                assert saw_state, "the client never received the session state"
                 assert cutoff not in replayed, "replayed a segment the client already had"
                 assert replayed == sorted(replayed)
         finally:

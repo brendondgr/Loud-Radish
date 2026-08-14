@@ -1,6 +1,6 @@
 # Repository Structure
 
-*Last updated: 2026-08-14 (Phase 11 — frontend foundation)*
+*Last updated: 2026-08-14 (root launcher on port 8395)*
 
 Canonical map of TranscriberPrototype. This file documents **purpose**, not source code. Update it in
 the same change that adds, moves, renames, or removes a directory or significant file.
@@ -123,6 +123,7 @@ TranscriberPrototype/
 ├── logs/                          # Runtime logs (gitignored)
 │
 ├── .claude/skills/ · .agents/skills/ · .cursor/rules/   # Pointers → docs/skills/
+├── app.py                         # Launcher: starts everything on port 8395
 ├── pyproject.toml                 # Python project, optional groups, tool configuration
 ├── uv.lock                        # Committed, authoritative Python lockfile
 ├── .env.example                   # Every environment variable, with safe placeholders
@@ -173,6 +174,7 @@ web/frontend/templates/partials/
 | `data/` | Sessions, the user config file, and optionally retained audio. Gitignored: large, local, and often sensitive. |
 | `logs/` | Runtime log output. Gitignored. Never contains transcript content. |
 | `.claude/`, `.agents/`, `.cursor/` | Tool-specific pointer files. Frontmatter plus a reading list aimed at `docs/`. Never rule content. |
+| `app.py` | The entry point: `uv run python app.py`. A launcher only — it loads `.env`, prepares directories, checks the port, and starts the server. It is not an exception to "web application code lives under `web/`", because it contains none: everything it starts lives under `web/`. |
 
 ## Test Layout
 
@@ -197,6 +199,9 @@ Use `tests/<area>/test_<behavior>.py`. Keep shared fixtures close to the area th
 ## Rules
 
 - **Maximum file length 800 lines; target under 500.** Split rather than grow.
+- **`app.py` stays a launcher.** Anything with behaviour belongs under `web/backend/app/`. The
+  root file exists so there is one obvious way to start the application, not as a second home for
+  application code.
 - Every Python sub-package needs an `__init__.py`.
 - Documentation lives only in `docs/`. Web application code lives only in `web/`.
 - New environment variables go into `.env.example` in the same change that introduces them.

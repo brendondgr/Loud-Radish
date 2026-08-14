@@ -1,6 +1,6 @@
 # Workflow
 
-*Last updated: 2026-08-14 (Phase 5 — streaming engine)*
+*Last updated: 2026-08-14 (root launcher on port 8395)*
 
 Every command needed to work in TranscriberPrototype. If a command here is wrong, fix this file in the
 same change — do not work around it silently.
@@ -67,14 +67,41 @@ uv add --optional <group> <package>
 
 ## Run
 
-The application server — API, WebSocket, and the frontend, from one process:
+One command starts everything — API, WebSocket, and the browser interface, from a single process:
 
 ```bash
-uv run uvicorn app.main:app --reload --app-dir web/backend --port 8000
+uv run python app.py
+```
+
+Then open <http://127.0.0.1:8395>.
+
+`app.py` is a launcher and holds no application logic. It loads `.env`, creates `data/` and
+`logs/`, reports which optional dependency groups are installed, checks the port is free, and
+starts the server.
+
+| Flag | Effect |
+|---|---|
+| `--port N` | Serve on another port (default 8395, or `API_PORT`) |
+| `--host H` | Bind another interface (default `127.0.0.1`) |
+| `--reload` | Restart when anything under `web/backend/app/` changes |
+| `--open` | Open the interface in a browser |
+| `--log-level L` | `critical`, `error`, `warning`, `info`, or `debug` |
+
+For development, with auto-restart:
+
+```bash
+uv run python app.py --reload
 ```
 
 It binds to `127.0.0.1`. That is deliberate: the application is single-user and unauthenticated, so
 exposing it on a network interface would publish an unauthenticated transcript of a private room.
+The launcher prints a warning if `--host` is set to anything else.
+
+Uvicorn can still be driven directly, which is what `app.py` does underneath:
+
+```bash
+uv run uvicorn app.main:app --app-dir web/backend --port 8395
+```
 
 Any Python command runs inside the project environment via `uv run`:
 

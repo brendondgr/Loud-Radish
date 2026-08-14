@@ -49,4 +49,10 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["web/backend", "."]
+# Only the backend. The repository root is deliberately absent: `app.py` lives there, and with the
+# root on the path it shadows the `web/backend/app` package — every `from app.config import ...`
+# then fails with "'app' is not a package".
+pythonpath = ["web/backend"]
+# `importlib` rather than the default `prepend`, which inserts the rootdir at the front of sys.path
+# for each test module and would reintroduce that shadowing regardless of `pythonpath`.
+addopts = "--import-mode=importlib"

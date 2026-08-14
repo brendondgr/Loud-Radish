@@ -4,8 +4,8 @@
     {
       "name": "transcriber",
       "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "uvicorn", "app.main:app", "--app-dir", "web/backend", "--port", "8000"],
-      "port": 8000
+      "runtimeArgs": ["run", "python", "app.py"],
+      "port": 8395
     }
   ]
 }
