@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-08-14 (Phase 1 — foundations)*
+*Last updated: 2026-08-14 (Phase 11 — frontend foundation)*
 
 The active work list for TranscriberPrototype. Update it whenever a task is finished or new work is
 discovered.
@@ -57,7 +57,31 @@ Each of these was open at initialization and is now settled. Rationale is in the
 
 ---
 
-## Part 3 — Still Open
+## Part 3 — Remaining Build Phases
+
+Nine of the plan's fourteen phases are complete. The backend runs end to end and the application is
+usable: it records, transcribes, persists, and renders a live transcript in the browser.
+
+- [ ] **Phase 9 — LLM abstraction (Seam B).** OpenAI-compatible client, native Anthropic client,
+      the four-way error taxonomy, connection testing, credential handling. `docs/routes.md` lists
+      the `/api/llm/*` surface it fills in.
+- [ ] **Phase 10 — Chat orchestration and the context pipeline.** Priority-ordered context
+      assembly under a token budget, quick actions, streaming answers with cancellation, rolling
+      summaries, and glossary extraction. The store, the `summary.added` and `glossary.added`
+      events, and the `/api/transcript/{summaries,glossary}` endpoints already exist and return
+      empty until this lands.
+- [ ] **Phase 12 — Settings interface.** The five-tab modal over the existing `/api/config`
+      surface, which already reports the hot-swap cost of every change. The header's settings
+      buttons currently show a banner saying it is not built.
+- [ ] **Phase 13 — Chat interface.** Chat pane, quick actions, streaming responses, the glossary
+      panel, ask-about-selection, and citation timestamps. The transcript pane already exposes
+      `scrollToTime`, and the selection menu partial is in place but unwired.
+- [ ] **Phase 14 — Hardening.** Degradation paths under test, the accelerated soak, transcript
+      export in the UI, the sessions page, and a final documentation pass.
+
+---
+
+## Part 4 — Still Open
 
 - [ ] **Default ASR model and compute device.** Depends entirely on the user's hardware. A
       conservative default ships (`small`, `int8`, auto device); benchmark locally and re-tune. The
@@ -66,10 +90,10 @@ Each of these was open at initialization and is now settled. Rationale is in the
       into a Tauri/Electron/Qt shell. The chosen contract keeps both open, so nothing is blocked.
 - [ ] **Deployment documentation.** `docs/deployment.md` still describes a generic web deployment and
       needs rewriting for a locally-run desktop-style application. Due in Phase 14.
-- [ ] **Design tokens.** The token table in `docs/design-system.md` is filled in during Phase 11, from
-      the palette and type scale in the supplied design mock.
+- [ ] **Design tokens.** `web/frontend/static/css/tokens.css` is the working source of truth; the
+      token table in `docs/design-system.md` still needs to be filled in from it.
 - [ ] **Component map.** `docs/component-map.md` still describes React component ownership and needs
-      rewriting for the template-and-module model. Due in Phase 11.
+      rewriting for the template-and-module model. Overdue — Phase 11 landed without it.
 - [ ] **Automated accessibility tooling.** Not selected. Manual keyboard, contrast, and 320 px passes
       are specified per phase in the plan; an automated check would complement them.
 - [ ] **Embeddings-based retrieval.** Deferred. Keyword search over FTS5 is expected to suffice for
@@ -80,7 +104,7 @@ Each of these was open at initialization and is now settled. Rationale is in the
 
 ---
 
-## Part 4 — Verification Debt
+## Part 5 — Verification Debt
 
 Things the plan's phases cannot verify in a headless environment. Each needs a manual pass on the
 user's own machine, and none may be reported as passing until it has had one.

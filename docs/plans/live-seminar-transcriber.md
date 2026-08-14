@@ -1,6 +1,19 @@
 # Live Seminar Transcriber — Implementation Plan
 
-*Created: 2026-08-14 · Status: **In progress** — Phases 1–8 and 11 complete*
+*Created: 2026-08-14 · Status: **In progress** — nine of fourteen phases complete.*
+
+**Where this stands.** The backend is complete and tested end to end, and the application runs: a
+session captures audio, transcribes it, persists the transcript, and streams it to a browser that
+renders it correctly. Phases 1–8 and 11 are done. What remains is the language model (9), chat and
+the context pipeline (10), the settings interface (12), the chat interface (13), and hardening (14).
+
+**Phase 11 was taken ahead of 9–10** because the transport layer unblocked it and a visible,
+running application was worth more at that point than two further backend seams. Nothing in 12–14
+depends on that reordering; resume at Phase 9.
+
+**To resume:** read this plan and `docs/checklist.md`, then start at Phase 9 below. Everything the
+remaining phases build against — the event contract, the configuration system, the transcript
+store, the segment shape — is implemented and has tests describing how it behaves.
 
 **Source specifications** (external, read-only inputs to this plan):
 
