@@ -1,6 +1,6 @@
 # Repository Structure
 
-*Last updated: 2026-08-14 (Phase 5 — streaming engine)*
+*Last updated: 2026-08-14 (Phase 6 — transcript store)*
 
 Canonical map of TranscriberPrototype. This file documents **purpose**, not source code. Update it in
 the same change that adds, moves, renames, or removes a directory or significant file.
@@ -76,8 +76,13 @@ TranscriberPrototype/
 │   │   │       ├── events.py      # The committed / hypothesis output contract
 │   │   │       ├── engine.py      # Orchestrator for offline models
 │   │   │       └── passthrough.py # Bypass path for streaming-native models
+│   │   │   └── transcript/        # The durable record
+│   │   │       ├── schema.sql     # SQLite tables, FTS5 index, and its triggers
+│   │   │       ├── store.py       # Append-only writes, the four queries, search
+│   │   │       └── export.py      # Text, Markdown, SRT, VTT, JSON
 │   │   ├── models/                # Persistence shape
-│   │   │   └── segment.py         # The unit engine, store, and frontend all agree on
+│   │   │   ├── segment.py         # The unit engine, store, and frontend all agree on
+│   │   │   └── session.py         # Metadata, summaries, glossary terms, chat turns
 │   │   └── schemas/               # Request/response validation
 │   ├── frontend/                  # Server-rendered UI (templates + static assets)
 │   └── shared/contracts/          # OpenAPI spec and WebSocket event schema
@@ -111,7 +116,6 @@ intended shape is legible before the code lands; **none of these exist yet.**
 ```text
 web/backend/app/
 ├── services/
-│   ├── transcript/  # store, schema.sql, queries, export                                     Phase 6
 │   ├── session/     # manager, workers, metrics, degradation                                 Phase 7
 │   ├── llm/         # contract, openai_compatible, anthropic, registry, connection           Phase 9
 │   ├── context/     # summariser, glossary, chunks, pipeline                                Phase 10

@@ -1,6 +1,6 @@
 # TranscriberPrototype — Project Documentation
 
-*Last updated: 2026-08-14 (Phase 5 — streaming engine)*
+*Last updated: 2026-08-14 (Phase 6 — transcript store)*
 
 ## Purpose
 
@@ -30,7 +30,7 @@ build step.
 | Voice activity detection | ✅ Phase 3 — energy and optional Silero detectors, shared hysteresis |
 | ASR abstraction (Seam A) | ✅ Phase 4 — contract, registry, mock, faster-whisper, biasing, lifecycle |
 | Streaming engine | ✅ Phase 5 — LocalAgreement-2, trimming, rebasing, six guards, segmentation, bypass |
-| Transcript store | ⛔ Phase 6 |
+| Transcript store | ✅ Phase 6 — SQLite, FTS5 search, query surface, five export formats |
 | Session manager and metrics | ⛔ Phase 7 |
 | Transport (HTTP + WebSocket) | ⛔ Phase 8 |
 | LLM abstraction (Seam B) | ⛔ Phase 9 |
