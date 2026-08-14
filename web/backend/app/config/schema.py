@@ -45,6 +45,8 @@ class VadConfig(_Base):
 
     enabled: bool = True
     detector: VadDetector = "energy"
+    #: Path to ``silero_vad.onnx``. Only consulted when ``detector`` is ``silero``.
+    model_path: str | None = None
     sensitivity: float = Field(default=0.6, ge=0.0, le=1.0)
     enter_frames: int = Field(default=3, ge=1, le=20)
     leave_frames: int = Field(default=10, ge=1, le=100)

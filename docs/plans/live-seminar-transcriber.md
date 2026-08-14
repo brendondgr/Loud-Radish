@@ -1,6 +1,6 @@
 # Live Seminar Transcriber — Implementation Plan
 
-*Created: 2026-08-14 · Status: **In progress** — Phase 2 of 14 complete*
+*Created: 2026-08-14 · Status: **In progress** — Phase 3 of 14 complete*
 
 **Source specifications** (external, read-only inputs to this plan):
 
@@ -501,7 +501,7 @@ Update this table as each phase lands. Do not delete completed rows.
 |---|---|---|
 | 1 | Foundations — deps, app skeleton, config, docs pivot | ✅ Complete |
 | 2 | Audio capture layer | ✅ Complete |
-| 3 | Voice activity detection | Not started |
+| 3 | Voice activity detection | ✅ Complete |
 | 4 | ASR abstraction (Seam A) | Not started |
 | 5 | Streaming engine | Not started |
 | 6 | Transcript store | Not started |

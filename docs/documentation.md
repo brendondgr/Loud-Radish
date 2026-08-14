@@ -1,6 +1,6 @@
 # TranscriberPrototype — Project Documentation
 
-*Last updated: 2026-08-14 (Phase 2 — audio capture)*
+*Last updated: 2026-08-14 (Phase 3 — voice activity detection)*
 
 ## Purpose
 
@@ -27,7 +27,7 @@ build step.
 | Application skeleton + `GET /api/health` | ✅ Phase 1 |
 | Configuration system | ✅ Phase 1 — layers, presets, hot-swap classes, credentials |
 | Audio capture | ✅ Phase 2 — formats, resampling, ring buffer, preprocessing, devices, sources |
-| Voice activity detection | ⛔ Phase 3 |
+| Voice activity detection | ✅ Phase 3 — energy and optional Silero detectors, shared hysteresis |
 | ASR abstraction (Seam A) | ⛔ Phase 4 |
 | Streaming engine | ⛔ Phase 5 |
 | Transcript store | ⛔ Phase 6 |

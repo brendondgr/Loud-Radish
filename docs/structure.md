@@ -1,6 +1,6 @@
 # Repository Structure
 
-*Last updated: 2026-08-14 (Phase 2 — audio capture)*
+*Last updated: 2026-08-14 (Phase 3 — voice activity detection)*
 
 Canonical map of TranscriberPrototype. This file documents **purpose**, not source code. Update it in
 the same change that adds, moves, renames, or removes a directory or significant file.
@@ -56,6 +56,11 @@ TranscriberPrototype/
 │   │   │       ├── preprocess.py  # High-pass filter and gain normalisation
 │   │   │       ├── devices.py     # Merged microphone + loopback enumeration
 │   │   │       └── sources/       # base, file (real-time WAV), device, synthetic
+│   │   │   └── vad/               # Speech detection and pause events
+│   │   │       ├── base.py        # The one-question-per-frame detector interface
+│   │   │       ├── energy.py      # Dependency-free default, adaptive noise floor
+│   │   │       ├── silero.py      # Optional learned detector, same interface
+│   │   │       └── hysteresis.py  # Shared debouncing and pause-event emission
 │   │   ├── models/                # Persistence shape
 │   │   └── schemas/               # Request/response validation
 │   ├── frontend/                  # Server-rendered UI (templates + static assets)
@@ -89,7 +94,6 @@ intended shape is legible before the code lands; **none of these exist yet.**
 ```text
 web/backend/app/
 ├── services/
-│   ├── vad/         # base, energy, silero, hysteresis                                       Phase 3
 │   ├── asr/         # contract, registry, mock, faster_whisper, prompting, lifecycle         Phase 4
 │   ├── streaming/   # agreement, buffer, guards, segmenter, passthrough, engine              Phase 5
 │   ├── transcript/  # store, schema.sql, queries, export                                     Phase 6
