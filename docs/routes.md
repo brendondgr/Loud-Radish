@@ -2,9 +2,9 @@
 
 *Last updated: 2026-08-14 (Phase 8 — transport layer)*
 
-> **Status column is authoritative.** Only `GET /api/health` is implemented. Everything else is the
-> agreed surface, landing in the phase named beside it. Update this file in the same change that adds,
-> removes, or changes any route or page.
+> **Status column is authoritative.** Session, audio, ASR, transcript, and configuration are
+> implemented and tested, as is the WebSocket. The language-model and chat groups land in the phase
+> named beside them. Update this file in the same change that adds, removes, or changes any route.
 
 The upload-and-poll job routes recorded at initialization are **gone** — see Decision D-010 in
 `docs/documentation.md`. There is no `/api/transcriptions` surface.
@@ -44,7 +44,7 @@ Served by `web/backend/app/routes/`. All paths are prefixed `/api`.
 | `POST` | `/api/session/start` | Begin capture and transcription | **Implemented** |
 | `POST` | `/api/session/stop` | End the session and return final statistics | **Implemented** |
 | `GET` | `/api/session` | Current session state and metadata | **Implemented** |
-| `GET` | `/api/session/list` | Past sessions | Phase 8 |
+| `GET` | `/api/session/list` | Past sessions | Phase 14 (with the sessions page) |
 
 ### Audio
 
@@ -52,7 +52,7 @@ Served by `web/backend/app/routes/`. All paths are prefixed `/api`.
 |---|---|---|---|
 | `GET` | `/api/audio/devices` | Input and loopback devices in one merged list, each tagged with its type | **Implemented** |
 | `POST` | `/api/audio/device` | Select the capture device | **Implemented** |
-| `POST` | `/api/audio/preprocess` | Set gain normalisation and high-pass toggles | Phase 8 |
+| `POST` | `/api/audio/preprocess` | Set gain normalisation and high-pass toggles | Use `PATCH /api/config` — these are ordinary live settings |
 
 ### Speech recognition
 
