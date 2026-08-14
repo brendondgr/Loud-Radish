@@ -33,6 +33,9 @@ class AudioConfig(_Base):
     source_type: SourceType = "microphone"
     device_id: str | None = None
     file_path: str | None = None
+    #: Replay speed for the file source. 1.0 is real time; 0 is as fast as the pipeline accepts.
+    #: Above 1.0 drives the accelerated soak run, and lets a long recording be reprocessed quickly.
+    file_speed: float = Field(default=1.0, ge=0.0, le=100.0)
     frame_ms: int = Field(default=32, ge=10, le=200)
     normalise_gain: bool = False
     gain_db: float = Field(default=0.0, ge=-24.0, le=24.0)

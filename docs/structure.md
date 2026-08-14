@@ -1,6 +1,6 @@
 # Repository Structure
 
-*Last updated: 2026-08-14 (Phase 6 — transcript store)*
+*Last updated: 2026-08-14 (Phase 7 — session manager)*
 
 Canonical map of TranscriberPrototype. This file documents **purpose**, not source code. Update it in
 the same change that adds, moves, renames, or removes a directory or significant file.
@@ -80,6 +80,11 @@ TranscriberPrototype/
 │   │   │       ├── schema.sql     # SQLite tables, FTS5 index, and its triggers
 │   │   │       ├── store.py       # Append-only writes, the four queries, search
 │   │   │       └── export.py      # Text, Markdown, SRT, VTT, JSON
+│   │   │   └── session/           # Wiring, workers, health, degradation
+│   │   │       ├── workers.py     # Drop-oldest queue and the threads draining it
+│   │   │       ├── metrics.py     # Pipeline health, gathered in one place
+│   │   │       ├── degradation.py # What each failure means and what to do
+│   │   │       └── manager.py     # capture → VAD → engine → store → transport
 │   │   ├── models/                # Persistence shape
 │   │   │   ├── segment.py         # The unit engine, store, and frontend all agree on
 │   │   │   └── session.py         # Metadata, summaries, glossary terms, chat turns
@@ -116,7 +121,6 @@ intended shape is legible before the code lands; **none of these exist yet.**
 ```text
 web/backend/app/
 ├── services/
-│   ├── session/     # manager, workers, metrics, degradation                                 Phase 7
 │   ├── llm/         # contract, openai_compatible, anthropic, registry, connection           Phase 9
 │   ├── context/     # summariser, glossary, chunks, pipeline                                Phase 10
 │   └── chat/        # assembly, quick_actions, orchestrator                                 Phase 10

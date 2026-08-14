@@ -62,6 +62,21 @@ def decode_position(audio: np.ndarray, sample_rate: int = SAMPLE_RATE) -> float 
     return float(audio[index] - POSITION_BASE) * POSITION_SCALE - index / sample_rate
 
 
+#: What the mock says when nothing else is scripted. A backend whose purpose is "run the pipeline
+#: without a real model" is useless if it produces nothing, so the default is a plausible stretch of
+#: seminar speech rather than an empty list.
+DEFAULT_SCRIPT_TEXT = (
+    "the central claim is that these two operators commute only on the dense subspace "
+    "where both are essentially self adjoint. outside it the bracket simply is not defined. "
+    "that sounds like a technicality but it is not. almost every physical argument you have "
+    "seen for the uncertainty relation quietly assumes the bracket exists everywhere. "
+    "so let me set the counterexample up properly. take the position operator on the half "
+    "line and take the generator of dilations alongside it. both are symmetric on smooth "
+    "compactly supported functions. neither is self adjoint there and the deficiency indices "
+    "differ which is the whole point of this example."
+)
+
+
 @dataclass
 class MockScript:
     """What the mock will produce, and how it will misbehave.
@@ -280,6 +295,11 @@ class MockAsrBackend(AsrBackend):
         if array.size == 0:
             return True
         return float(np.max(np.abs(array))) < 1e-4
+
+
+def default_script() -> MockScript:
+    """The script the registry's mock backend uses when nothing else is set."""
+    return MockScript(words=DEFAULT_SCRIPT_TEXT.split(), words_per_second=2.6)
 
 
 def scripted(text: str, **kwargs: object) -> MockAsrBackend:

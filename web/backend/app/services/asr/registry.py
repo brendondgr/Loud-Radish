@@ -90,9 +90,9 @@ def build_backend(config: AsrConfig) -> AsrBackend:
 
 
 def _build_mock(config: AsrConfig) -> AsrBackend:
-    from .mock import MockAsrBackend, MockScript
+    from .mock import MockAsrBackend, default_script
 
-    return MockAsrBackend(MockScript(), model_id=f"mock:{config.model}")
+    return MockAsrBackend(default_script(), model_id=f"mock:{config.model}")
 
 
 def _mock_info() -> BackendInfo:
