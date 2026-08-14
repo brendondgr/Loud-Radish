@@ -11,6 +11,7 @@ unauthenticated transcript of a private room on that network.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from collections.abc import AsyncIterator
@@ -23,6 +24,8 @@ from fastapi.templating import Jinja2Templates
 from . import paths
 from .config import ConfigStore, CredentialStore
 from .routes import build_router
+from .services.session import SessionManager
+from .transport import EventHub, ws_router
 
 logger = logging.getLogger(__name__)
 
@@ -44,10 +47,15 @@ def configure_logging() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Load configuration on startup; release pipeline resources on shutdown."""
+    """Load configuration and bind the event loop; release everything on shutdown."""
     config: ConfigStore = app.state.config
     config.load()
     logger.info("Configuration resolved from %s", config.path)
+
+    # The hub needs the running loop so the pipeline's worker threads can hand it events. This is
+    # the only place asyncio and the audio path meet.
+    app.state.hub.bind_loop(asyncio.get_running_loop())
+
     try:
         yield
     finally:
@@ -76,7 +84,13 @@ def create_app(config: ConfigStore | None = None) -> FastAPI:
     app.state.credentials = CredentialStore()
     app.state.templates = _build_templates()
 
+    # The hub is the seam between the pipeline's threads and the event loop: the manager emits by
+    # calling `hub.emit` from whichever thread produced the event, and the hub marshals.
+    app.state.hub = EventHub()
+    app.state.session_manager = SessionManager(app.state.config, emit=app.state.hub.emit)
+
     app.include_router(build_router())
+    app.include_router(ws_router)
     _mount_static(app)
 
     return app

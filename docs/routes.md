@@ -1,6 +1,6 @@
 # Route Map
 
-*Last updated: 2026-08-14 (Phase 1 — foundations)*
+*Last updated: 2026-08-14 (Phase 8 — transport layer)*
 
 > **Status column is authoritative.** Only `GET /api/health` is implemented. Everything else is the
 > agreed surface, landing in the phase named beside it. Update this file in the same change that adds,
@@ -22,7 +22,7 @@ Server-rendered from `web/frontend/templates/` by `web/backend/app/routes/pages.
 
 | Path | Purpose | Status |
 |---|---|---|
-| `/ws` | The live event stream. Accepts a `since` segment id on connect and replays everything after it. | Phase 8 |
+| `/ws` | The live event stream. Accepts a `since` segment id on connect and replays everything after it. | **Implemented** |
 
 Event envelopes are specified in [api-contract.md](api-contract.md) and machine-readably in
 `web/shared/contracts/ws-events.json`.
@@ -41,27 +41,27 @@ Served by `web/backend/app/routes/`. All paths are prefixed `/api`.
 
 | Method | Path | Purpose | Status |
 |---|---|---|---|
-| `POST` | `/api/session/start` | Begin capture and transcription | Phase 8 |
-| `POST` | `/api/session/stop` | End the session and return final statistics | Phase 8 |
-| `GET` | `/api/session` | Current session state and metadata | Phase 8 |
+| `POST` | `/api/session/start` | Begin capture and transcription | **Implemented** |
+| `POST` | `/api/session/stop` | End the session and return final statistics | **Implemented** |
+| `GET` | `/api/session` | Current session state and metadata | **Implemented** |
 | `GET` | `/api/session/list` | Past sessions | Phase 8 |
 
 ### Audio
 
 | Method | Path | Purpose | Status |
 |---|---|---|---|
-| `GET` | `/api/audio/devices` | Input and loopback devices in one merged list, each tagged with its type | Phase 8 |
-| `POST` | `/api/audio/device` | Select the capture device | Phase 8 |
+| `GET` | `/api/audio/devices` | Input and loopback devices in one merged list, each tagged with its type | **Implemented** |
+| `POST` | `/api/audio/device` | Select the capture device | **Implemented** |
 | `POST` | `/api/audio/preprocess` | Set gain normalisation and high-pass toggles | Phase 8 |
 
 ### Speech recognition
 
 | Method | Path | Purpose | Status |
 |---|---|---|---|
-| `GET` | `/api/asr/models` | Available models with their declared capabilities and measured speed | Phase 8 |
-| `POST` | `/api/asr/load` | Load a model — asynchronous, with progress over the WebSocket | Phase 8 |
-| `POST` | `/api/asr/unload` | Free the model and its device memory | Phase 8 |
-| `POST` | `/api/asr/prompt` | Set the session biasing prompt | Phase 8 |
+| `GET` | `/api/asr/models` | Available models with their declared capabilities | **Implemented** |
+| `POST` | `/api/asr/load` | Load a model — asynchronous, with progress over the WebSocket | **Implemented** |
+| `POST` | `/api/asr/unload` | Free the model and its device memory | **Implemented** |
+| `POST` | `/api/asr/prompt` | Set the session biasing prompt | **Implemented** |
 
 ### Language model
 
@@ -88,21 +88,21 @@ Served by `web/backend/app/routes/`. All paths are prefixed `/api`.
 
 | Method | Path | Purpose | Status |
 |---|---|---|---|
-| `GET` | `/api/transcript/since/{segment_id}` | Everything after a segment id — the reconnection path | Phase 8 |
-| `GET` | `/api/transcript/range` | Everything in a time range | Phase 8 |
-| `GET` | `/api/transcript/search` | Full-text search over the session | Phase 8 |
-| `GET` | `/api/transcript/export` | Export as text, Markdown, SRT, VTT, or JSON | Phase 8 |
-| `GET` | `/api/transcript/glossary` | The session glossary | Phase 10 |
-| `GET` | `/api/transcript/summaries` | The rolling outline | Phase 10 |
+| `GET` | `/api/transcript/since/{segment_id}` | Everything after a segment id — the reconnection path | **Implemented** |
+| `GET` | `/api/transcript/range` | Everything in a time range | **Implemented** |
+| `GET` | `/api/transcript/search` | Full-text search over the session | **Implemented** |
+| `GET` | `/api/transcript/export` | Export as text, Markdown, SRT, VTT, or JSON | **Implemented** |
+| `GET` | `/api/transcript/glossary` | The session glossary | **Implemented** (empty until Phase 10) |
+| `GET` | `/api/transcript/summaries` | The rolling outline | **Implemented** (empty until Phase 10) |
 
 ### Configuration
 
 | Method | Path | Purpose | Status |
 |---|---|---|---|
-| `GET` | `/api/config` | The full resolved configuration | Phase 8 |
-| `PATCH` | `/api/config` | Apply dotted-path changes; returns the hot-swap class of the change | Phase 8 |
-| `POST` | `/api/config/preset` | Apply a named preset | Phase 8 |
-| `POST` | `/api/config/save` | Persist runtime changes to the user config file | Phase 8 |
+| `GET` | `/api/config` | The full resolved configuration | **Implemented** |
+| `PATCH` | `/api/config` | Apply dotted-path changes; returns the hot-swap class of the change | **Implemented** |
+| `POST` | `/api/config/preset` | Apply a named preset | **Implemented** |
+| `POST` | `/api/config/save` | Persist runtime changes to the user config file | **Implemented** |
 
 ## Conventions
 

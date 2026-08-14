@@ -1,6 +1,6 @@
 # Repository Structure
 
-*Last updated: 2026-08-14 (Phase 7 — session manager)*
+*Last updated: 2026-08-14 (Phase 8 — transport layer)*
 
 Canonical map of TranscriberPrototype. This file documents **purpose**, not source code. Update it in
 the same change that adds, moves, renames, or removes a directory or significant file.
@@ -46,7 +46,14 @@ TranscriberPrototype/
 │   │   │   ├── store.py           # Layer resolution, validation, persistence
 │   │   │   └── credentials.py     # OS credential store; never a config file
 │   │   ├── routes/                # HTTP endpoints — thin, delegate to services
-│   │   │   └── health.py          # Liveness plus installed optional groups
+│   │   │   ├── health.py          # Liveness plus installed optional groups
+│   │   │   ├── session.py         # Start/stop, devices, model loading, prompts
+│   │   │   ├── transcript.py      # Replay, ranges, search, summaries, export
+│   │   │   └── config.py          # Read, patch with hot-swap cost, presets, save
+│   │   ├── transport/             # The push channel — separate from routes/
+│   │   │   ├── events.py          # The event vocabulary and coalescing rules
+│   │   │   ├── hub.py             # Fan-out, per-client backpressure, loop marshalling
+│   │   │   └── ws.py              # The WebSocket endpoint and reconnection replay
 │   │   ├── services/              # The pipeline. Where real work happens.
 │   │   │   └── audio/             # Capture — the canonical-format boundary
 │   │   │       ├── formats.py     # 16 kHz mono float32; conversion into it
@@ -88,9 +95,10 @@ TranscriberPrototype/
 │   │   ├── models/                # Persistence shape
 │   │   │   ├── segment.py         # The unit engine, store, and frontend all agree on
 │   │   │   └── session.py         # Metadata, summaries, glossary terms, chat turns
-│   │   └── schemas/               # Request/response validation
+│   │   └── schemas/
+│   │       └── api.py             # Request/response shapes for every route
 │   ├── frontend/                  # Server-rendered UI (templates + static assets)
-│   └── shared/contracts/          # OpenAPI spec and WebSocket event schema
+│   └── shared/contracts/          # Generated: openapi.json, ws-events.json
 │
 ├── libs/                          # Internal packages with more than one consumer
 ├── utils/                         # Standalone helpers not specific to the web app
@@ -101,7 +109,8 @@ TranscriberPrototype/
 │   └── utils/                     # Configuration and standalone helpers
 ├── scripts/                       # Developer and operational scripts
 │   ├── make_fixture_wav.py        # Generates synthetic WAV fixtures for pipeline tests
-│   └── run_file_session.py        # Console-only pipeline run over a WAV file (BE M4)
+│   ├── run_file_session.py        # Console-only pipeline run over a WAV file (BE M4)
+│   └── generate_contracts.py      # Writes openapi.json and ws-events.json
 ├── data/                          # Sessions, config file, audio (gitignored)
 ├── logs/                          # Runtime logs (gitignored)
 │
@@ -124,7 +133,6 @@ web/backend/app/
 │   ├── llm/         # contract, openai_compatible, anthropic, registry, connection           Phase 9
 │   ├── context/     # summariser, glossary, chunks, pipeline                                Phase 10
 │   └── chat/        # assembly, quick_actions, orchestrator                                 Phase 10
-└── transport/       # events, hub, ws                                                        Phase 8
 
 web/frontend/
 ├── templates/       # base.html, pages/, partials/{transcript,chat,settings}/, macros/  Phases 11-13

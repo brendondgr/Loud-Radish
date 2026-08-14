@@ -1,19 +1,22 @@
 """HTTP route modules.
 
 Routes stay thin: they validate input, call a service, and shape the response. Business logic lives
-in ``app/services/``. Modules are added here as each phase of
-``docs/plans/live-seminar-transcriber.md`` lands.
+in ``app/services/``. The WebSocket lives in ``app/transport/`` rather than here, because a push
+channel with a replay contract is a different thing from a request/response endpoint.
 """
 
 from fastapi import APIRouter
 
-from . import health
+from . import config, health, session, transcript
 
 
 def build_router() -> APIRouter:
     """Aggregate every route module into a single router for the app factory."""
     router = APIRouter()
     router.include_router(health.router)
+    router.include_router(session.router)
+    router.include_router(transcript.router)
+    router.include_router(config.router)
     return router
 
 

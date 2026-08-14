@@ -1,6 +1,6 @@
 # Live Seminar Transcriber — Implementation Plan
 
-*Created: 2026-08-14 · Status: **In progress** — Phase 7 of 14 complete*
+*Created: 2026-08-14 · Status: **In progress** — Phase 8 of 14 complete*
 
 **Source specifications** (external, read-only inputs to this plan):
 
@@ -506,7 +506,7 @@ Update this table as each phase lands. Do not delete completed rows.
 | 5 | Streaming engine | ✅ Complete |
 | 6 | Transcript store | ✅ Complete |
 | 7 | Session manager, workers, metrics | ✅ Complete |
-| 8 | Transport layer | Not started |
+| 8 | Transport layer | ✅ Complete |
 | 9 | LLM abstraction (Seam B) | Not started |
 | 10 | Chat orchestration and context pipeline | Not started |
 | 11 | Frontend foundation and transcript pane | Not started |

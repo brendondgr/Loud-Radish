@@ -132,6 +132,10 @@ class MockAsrBackend(AsrBackend):
         self._model_id = model_id
         self._loaded = False
         self._pass_count = 0
+        #: Fallback-mode bookkeeping: how far into the script the buffer currently starts, and how
+        #: long the last submitted buffer was. See :meth:`_words_for`.
+        self._script_position = 0.0
+        self._last_seconds = 0.0
         #: Every prompt the engine supplied, so term-biasing behaviour can be asserted.
         self.prompts_seen: list[str | None] = []
         #: Duration in seconds of every array submitted, for buffer-trimming assertions.
@@ -174,6 +178,8 @@ class MockAsrBackend(AsrBackend):
         """Release the backend and reset its pass counter."""
         self._loaded = False
         self._pass_count = 0
+        self._script_position = 0.0
+        self._last_seconds = 0.0
 
     def set_script(self, script: MockScript) -> None:
         """Replace the script mid-test, e.g. to switch to degenerate output."""
@@ -258,21 +264,19 @@ class MockAsrBackend(AsrBackend):
         ]
 
     def _words_for(self, seconds: float) -> list[WordToken]:
-        """Duration-only fallback for audio that carries no position encoding."""
-        script = self._script
+        """Fallback for audio that carries no position encoding — a real recording.
 
-        if script.repeat_ngram and self._pass_count > script.repeat_after_pass:
-            return self._timed(script.repeat_ngram * 8, seconds)
+        Without an encoded position the mock cannot know which slice of the session it holds, so it
+        infers progress the same way the audio does: **the buffer shrinking means the engine
+        trimmed**, and the trimmed duration is how far the script has advanced. Without this the
+        mock returns the opening of its script forever and the transcript never moves past the
+        first sentence.
+        """
+        if seconds < self._last_seconds:
+            self._script_position += self._last_seconds - seconds
+        self._last_seconds = seconds
 
-        count = min(len(script.words), max(0, int(seconds * script.words_per_second)))
-        chosen = list(script.words[:count])
-
-        if script.revise_last > 0 and chosen:
-            revise_from = max(0, len(chosen) - script.revise_last)
-            for i in range(revise_from, len(chosen)):
-                chosen[i] = f"{chosen[i]}{script.revision_suffix}"
-
-        return self._timed(chosen, seconds)
+        return self._words_in_window(self._script_position, seconds)
 
     def _timed(self, words: list[str], seconds: float) -> list[WordToken]:
         """Spread ``words`` evenly across the submitted audio, with relative timestamps."""

@@ -108,6 +108,14 @@ Replay faster than real time for a long recording:
 uv run python scripts/run_file_session.py talk.wav --speed 10
 ```
 
+## Regenerating the shared contracts
+
+Run this whenever a route or a WebSocket event changes, and commit the result:
+
+```bash
+uv run python scripts/generate_contracts.py
+```
+
 ## Test
 
 ```bash

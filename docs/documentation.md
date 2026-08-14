@@ -1,6 +1,6 @@
 # TranscriberPrototype — Project Documentation
 
-*Last updated: 2026-08-14 (Phase 7 — session manager)*
+*Last updated: 2026-08-14 (Phase 8 — transport layer)*
 
 ## Purpose
 
@@ -32,7 +32,7 @@ build step.
 | Streaming engine | ✅ Phase 5 — LocalAgreement-2, trimming, rebasing, six guards, segmentation, bypass |
 | Transcript store | ✅ Phase 6 — SQLite, FTS5 search, query surface, five export formats |
 | Session manager and metrics | ✅ Phase 7 — worker wiring, bounded queues, health telemetry, degradation |
-| Transport (HTTP + WebSocket) | ⛔ Phase 8 |
+| Transport (HTTP + WebSocket) | ✅ Phase 8 — event hub, reconnection replay, full HTTP surface |
 | LLM abstraction (Seam B) | ⛔ Phase 9 |
 | Chat and context pipeline | ⛔ Phase 10 |
 | Frontend | ⛔ Phases 11–13 |
