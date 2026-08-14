@@ -1,0 +1,88 @@
+/* Error banners — three tiers, never a modal.
+ *
+ * A modal during a live talk blocks the transcript, which is the one thing that must stay
+ * readable when something goes wrong (FE §6.3).
+ */
+
+.banners {
+  flex: 0 0 auto;
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-5) var(--space-9);
+  border-bottom: 1px solid var(--border-default);
+  font-size: var(--text-md);
+}
+
+.banner__message {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.banner__icon {
+  flex: 0 0 auto;
+}
+
+.banner__action {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: var(--space-3) var(--space-6);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: 500;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.banner__dismiss {
+  flex: 0 0 auto;
+  margin-left: auto;
+  min-height: 32px;
+  padding: var(--space-3) var(--space-5);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.banner__dismiss:hover {
+  color: var(--text-primary);
+}
+
+/* Warning: dismissible, transcription continues. */
+.banner[data-severity="warning"] {
+  background: var(--warning-wash);
+  border-bottom-color: var(--warning-border);
+  color: var(--warning-text);
+}
+
+.banner[data-severity="warning"] .banner__action {
+  color: var(--surface-base);
+  background: var(--warning);
+}
+
+/* Critical: carries an explicit recovery action. Still not a modal. */
+.banner[data-severity="critical"] {
+  background: var(--danger-wash);
+  border-bottom-color: var(--danger-border);
+  color: var(--danger-text);
+}
+
+.banner[data-severity="critical"] .banner__action {
+  color: var(--text-primary);
+  background: #2a1f1e;
+  border: 1px solid #4a302d;
+}
+
+/* Info: quiet, and never blocks anything. */
+.banner[data-severity="info"] {
+  background: var(--surface-control);
+  color: var(--text-muted);
+}

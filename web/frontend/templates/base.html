@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}Live Seminar Transcriber{% endblock %}</title>
+    <meta name="color-scheme" content="dark" />
+    <meta
+      name="description"
+      content="Live transcription of a talk, with an assistant that can answer questions about it."
+    />
+
+    {# Stylesheets are loaded individually rather than bundled. There is no build step, and a
+       handful of files over a loopback connection costs nothing. #}
+    <link rel="stylesheet" href="/static/css/tokens.css" />
+    <link rel="stylesheet" href="/static/css/base.css" />
+    <link rel="stylesheet" href="/static/css/layout.css" />
+    <link rel="stylesheet" href="/static/css/components/buttons.css" />
+    <link rel="stylesheet" href="/static/css/components/header.css" />
+    <link rel="stylesheet" href="/static/css/components/status-bar.css" />
+    <link rel="stylesheet" href="/static/css/components/banner.css" />
+    <link rel="stylesheet" href="/static/css/components/transcript.css" />
+    {% block styles %}{% endblock %}
+  </head>
+  <body>
+    {% block body %}{% endblock %}
+
+    {# ES modules, so the browser resolves the import graph and nothing needs bundling. #}
+    <script type="module" src="/static/js/{% block entry %}main{% endblock %}.js"></script>
+  </body>
+</html>

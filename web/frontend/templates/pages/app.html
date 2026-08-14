@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block body %}
+<div class="app">
+  {% include "partials/header.html" %}
+  {% include "partials/banners.html" %}
+
+  {# Below 900px the panes become tabs rather than a vertical stack: both need their own vertical
+     scroll, and stacking makes both unusable (FE §3.3). #}
+  <nav class="tabs" data-pane-tabs aria-label="Panes">
+    <button type="button" class="tabs__tab" data-pane-tab="transcript" aria-selected="true">
+      Transcript
+    </button>
+    <button type="button" class="tabs__tab" data-pane-tab="chat" aria-selected="false">
+      Assistant
+      <span class="badge badge--muted" data-chat-badge hidden>0</span>
+    </button>
+  </nav>
+
+  <main class="app__main" data-active-pane="transcript">
+    {% include "partials/transcript/pane.html" %}
+  </main>
+
+  {% include "partials/status_bar.html" %}
+</div>
+{% endblock %}

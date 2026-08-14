@@ -1,0 +1,42 @@
+{% import "macros/icons.html" as icons %}
+
+{# Transcript pane header: search, text size, and the glossary toggle. #}
+
+<div class="pane-header">
+  <div class="pane-header__group">
+    <span class="label">Transcript</span>
+    <span class="numeric" data-segment-count style="color: var(--text-dim)">0 segments</span>
+  </div>
+
+  <div class="pane-header__group">
+    <label class="visually-hidden" for="transcript-search">Search transcript</label>
+    <div class="search-field">
+      {{ icons.search() }}
+      <input
+        id="transcript-search"
+        type="search"
+        class="search-field__input"
+        placeholder="Search transcript"
+        data-transcript-search
+        autocomplete="off"
+      />
+      <span class="kbd" aria-hidden="true">⌘F</span>
+    </div>
+
+    {# Transcript size adjusts independently of the rest of the interface: this is the text read
+       for two hours (FE §13). #}
+    <div class="segmented" role="group" aria-label="Transcript text size">
+      <button type="button" class="segmented__button segmented__button--serif" data-text-size="-1" aria-label="Smaller transcript text">
+        <span style="font-size: 12px" aria-hidden="true">A</span>
+      </button>
+      <button type="button" class="segmented__button segmented__button--serif" data-text-size="1" aria-label="Larger transcript text">
+        <span style="font-size: 16px" aria-hidden="true">A</span>
+      </button>
+    </div>
+
+    <button type="button" class="button" data-toggle-glossary aria-expanded="false">
+      <span>Glossary</span>
+      <span class="badge" data-glossary-count>0</span>
+    </button>
+  </div>
+</div>

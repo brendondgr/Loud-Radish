@@ -1,0 +1,47 @@
+{% import "macros/icons.html" as icons %}
+
+{# The header: session control and identity.
+
+   One primary control, and stopping asks first — an accidental stop mid-talk is costly (FE §6.1).
+   The privacy indicator sits here rather than in settings because it is what a user checks before
+   pressing record in a room full of people (FE §7.6). #}
+
+<header class="header">
+  <div class="header__group">
+    <div class="record-state" data-record-state data-state="idle">
+      <span class="record-state__dot" aria-hidden="true"></span>
+      <span class="record-state__label" data-record-label>Not recording</span>
+    </div>
+
+    <span class="clock numeric" data-clock aria-label="Session duration">00:00:00</span>
+
+    <button type="button" class="button button--primary" data-session-toggle>Start recording</button>
+  </div>
+
+  <div class="header__group">
+    <div
+      class="privacy"
+      data-privacy
+      data-state="local"
+      title="Where audio and transcript text are processed"
+    >
+      {{ icons.shield() }}
+      <span class="privacy__label" data-privacy-label>Fully local</span>
+    </div>
+
+    <button type="button" class="model-identity" data-open-settings="asr">
+      <span data-model-name>No model loaded</span>
+      <span class="model-identity__separator" aria-hidden="true">·</span>
+      <span data-llm-name>Assistant not set up</span>
+    </button>
+
+    <button
+      type="button"
+      class="button button--icon"
+      data-open-settings="audio"
+      aria-label="Settings"
+    >
+      {{ icons.settings() }}
+    </button>
+  </div>
+</header>

@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "envelope": {
+    "event": "string",
+    "data": "object"
+  },
+  "client_frames": {
+    "hello": {
+      "since": "last received segment id, or null for a fresh client",
+      "note": "Sent on every connect. The server replays everything after `since`."
+    },
+    "ping": {
+      "note": "Keepalive. Answered with a `pong` event."
+    }
+  },
+  "reconnection": [
+    "Detect the disconnect and show it. DO NOT clear the transcript.",
+    "Reconnect with exponential backoff.",
+    "Send hello with the last segment id received.",
+    "Append the replayed segments.",
+    "Ignore any segment id already held \u2014 this makes the replay idempotent."
+  ],
+  "events": {
+    "session.started": {
+      "action": "set",
+      "note": "Capture began. Carries a config snapshot.",
+      "critical": true,
+      "coalescing": false
+    },
+    "session.stopped": {
+      "action": "set",
+      "note": "Capture ended. Carries final statistics.",
+      "critical": true,
+      "coalescing": false
+    },
+    "transcript.committed": {
+      "action": "append",
+      "note": "Append permanently. Never modify an existing entry. Order by id, not arrival.",
+      "critical": true,
+      "coalescing": false
+    },
+    "transcript.hypothesis": {
+      "action": "replace",
+      "note": "Replace the tentative tail wholly. NOT a list entry \u2014 treating it as one duplicates text on screen. An empty text means clear the tail.",
+      "critical": false,
+      "coalescing": true
+    },
+    "audio.level": {
+      "action": "replace",
+      "note": "Drives the input meter.",
+      "critical": false,
+      "coalescing": true
+    },
+    "vad.state": {
+      "action": "replace",
+      "note": "Drives the speaking indicator.",
+      "critical": false,
+      "coalescing": true
+    },
+    "status": {
+      "action": "replace",
+      "note": "Health telemetry. rtf below 1.0 must show as a problem.",
+      "critical": false,
+      "coalescing": true
+    },
+    "asr.progress": {
+      "action": "replace",
+      "note": "Model load progress, with a named state.",
+      "critical": false,
+      "coalescing": false
+    },
+    "summary.added": {
+      "action": "append",
+      "note": "A new entry in the running outline.",
+      "critical": false,
+      "coalescing": false
+    },
+    "glossary.added": {
+      "action": "append",
+      "note": "A newly identified term.",
+      "critical": false,
+      "coalescing": false
+    },
+    "chat.delta": {
+      "action": "append",
+      "note": "One fragment of a streaming answer.",
+      "critical": true,
+      "coalescing": false
+    },
+    "chat.done": {
+      "action": "set",
+      "note": "The answer is complete. Carries usage and citations.",
+      "critical": true,
+      "coalescing": false
+    },
+    "error": {
+      "action": "notify",
+      "note": "severity is info | warning | critical. Never a modal.",
+      "critical": true,
+      "coalescing": false
+    }
+  }
+}

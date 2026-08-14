@@ -17,8 +17,6 @@ conventions in [../skills/planner/SKILL.md](../skills/planner/SKILL.md).
 
 ## Index
 
-*No plans yet.* Add each one here as it is created.
-
 | Plan | Topic | Status |
 |---|---|---|
-| — | — | — |
+| [live-seminar-transcriber.md](live-seminar-transcriber.md) | Full vertical slice — live audio capture, streaming ASR, transcript store, LLM chat, and the Jinja2 + ES module frontend | In progress (9 / 14 phases: 1–8 and 11) |

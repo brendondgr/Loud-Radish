@@ -1,0 +1,163 @@
+/* The header: recording state, elapsed time, the one primary control, and identity. */
+
+.header {
+  flex: 0 0 auto;
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-10);
+  padding: 0 var(--space-9);
+  border-bottom: 1px solid var(--border-default);
+  background: var(--surface-raised);
+}
+
+.header__group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-7);
+  min-width: 0;
+}
+
+/* -- recording state ----------------------------------------------------------------------
+ * Unambiguous at a glance, and never colour alone: the dot is paired with a word (FE §13).
+ */
+
+.record-state {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5) var(--space-3) var(--space-4);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius);
+  background: var(--surface-control);
+  white-space: nowrap;
+}
+
+.record-state__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  flex: 0 0 auto;
+}
+
+.record-state__label {
+  font-size: var(--text-base);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+
+.record-state[data-state="recording"] {
+  border-color: var(--danger-border);
+  background: var(--danger-wash);
+}
+
+.record-state[data-state="recording"] .record-state__dot {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px rgba(217, 86, 75, 0.16);
+}
+
+.record-state[data-state="recording"] .record-state__label {
+  color: var(--danger-text);
+}
+
+.clock {
+  font-size: var(--text-lg);
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+/* -- identity and privacy -------------------------------------------------------------------
+ * The privacy indicator lives here rather than in settings because it is what a user needs to
+ * confirm at a glance before pressing record in a room full of people (FE §7.6).
+ */
+
+.privacy {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid #24322f;
+  border-radius: var(--radius);
+  background: rgba(111, 176, 166, 0.07);
+  white-space: nowrap;
+}
+
+.privacy__label {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--accent-dim);
+}
+
+.privacy[data-state="remote"] {
+  border-color: var(--warning-border);
+  background: var(--warning-wash);
+}
+
+.privacy[data-state="remote"] .privacy__label {
+  color: var(--warning-text);
+}
+
+.model-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-2) 0;
+  min-height: 36px;
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.model-identity:hover {
+  color: var(--text-primary);
+}
+
+.model-identity__separator {
+  color: var(--text-dim);
+}
+
+/* -- narrow chrome ----------------------------------------------------------------------------
+ * Below roughly 700px the header carries more than fits. Rather than scrolling sideways — which
+ * would push the primary control off-screen — it sheds what is least needed mid-talk: the model
+ * identity, which lives in settings anyway, and the privacy wording, which the icon and its colour
+ * already carry.
+ *
+ * What survives at every width: the recording state, the clock, and the one primary control.
+ *
+ * These live here rather than in layout.css because this file loads later, and at equal
+ * specificity source order decides. A responsive rule for a component belongs with the component.
+ */
+@media (max-width: 700px) {
+  .header {
+    height: auto;
+    min-height: var(--header-height);
+    flex-wrap: wrap;
+    padding: var(--space-4) var(--space-5);
+    gap: var(--space-5);
+  }
+
+  .header__group {
+    gap: var(--space-5);
+    min-width: 0;
+  }
+
+  .model-identity {
+    display: none;
+  }
+
+  .privacy__label {
+    display: none;
+  }
+
+  .privacy {
+    padding: var(--space-3);
+  }
+}
