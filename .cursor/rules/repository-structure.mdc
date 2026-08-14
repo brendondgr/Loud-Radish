@@ -1,0 +1,20 @@
+---
+description: Use this rule when working with repository setup, layout, structure documentation, or project organization — creating directories, deciding where a new file belongs, splitting an oversized module, or organizing tests.
+globs: ["**/*"]
+alwaysApply: false
+---
+
+# Repository Structure
+
+This is a pointer. The canonical layout contract lives in `docs/`.
+
+Read `docs/skills/global-project-rules/SKILL.md` first, then:
+
+1. `docs/skills/repository-structure/SKILL.md`
+2. `docs/structure.md`
+3. `docs/workflow.md`
+
+Supporting references:
+
+- `docs/skills/repository-structure/SETUP.md` — recorded layout decisions
+- `docs/skills/repository-structure/structures/web-interfaces.md` — the active reference (Mode G)

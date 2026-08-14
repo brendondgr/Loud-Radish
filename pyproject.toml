@@ -1,0 +1,24 @@
+[project]
+name = "transcriber-prototype"
+version = "0.1.0"
+description = "Web application for audio transcription — Python API and transcription pipeline."
+requires-python = ">=3.11"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [".venv", "web/frontend", "data", "logs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["web/backend", "."]
