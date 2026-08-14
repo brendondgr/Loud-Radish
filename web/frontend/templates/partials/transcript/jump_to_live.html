@@ -1,0 +1,11 @@
+{% import "macros/icons.html" as icons %}
+
+{# Shown only while auto-follow is disengaged, with a count of what arrived since. #}
+
+<div class="jump-to-live" data-jump-to-live hidden>
+  <button type="button" class="jump-to-live__button">
+    {{ icons.chevron_down() }}
+    <span>Jump to live</span>
+    <span class="jump-to-live__count numeric" hidden></span>
+  </button>
+</div>

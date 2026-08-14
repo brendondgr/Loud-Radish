@@ -1,0 +1,132 @@
+/* The application frame: header, two panes, status bar.
+ *
+ * The transcript is the document and the chat is a tool, so the transcript takes the flexible
+ * space and the chat a fixed column (FE §P1). Below 900px the two-pane layout stops working and
+ * becomes tabs — *not* a vertical stack, because both panes need their own vertical scroll and
+ * stacking makes both unusable (FE §3.3).
+ */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh; /* accounts for mobile browser chrome */
+  overflow: hidden;
+  background: var(--surface-base);
+}
+
+.app__main {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+/* -- transcript side ------------------------------------------------------------------- */
+
+.pane-transcript {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-document);
+}
+
+.pane-transcript__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.pane-transcript__scroller-wrap {
+  flex: 1 1 auto;
+  min-width: var(--transcript-min-width);
+  position: relative;
+}
+
+/* -- chat side --------------------------------------------------------------------------- */
+
+.pane-chat {
+  flex: 0 0 var(--chat-width);
+  width: var(--chat-width);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border-default);
+  background: var(--surface-panel);
+}
+
+.pane-chat--collapsed {
+  flex-basis: var(--chat-collapsed-width);
+  width: var(--chat-collapsed-width);
+}
+
+/* -- shared pane header ------------------------------------------------------------------ */
+
+.pane-header {
+  flex: 0 0 auto;
+  height: var(--pane-header-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+  padding: 0 var(--space-10);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.pane-header__group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+/* -- narrow layout -------------------------------------------------------------------------
+ * One pane at a time, chosen by a tab. The inactive tab carries an indicator when new content
+ * arrives, so a user reading the chat still knows the transcript is moving.
+ */
+.tabs {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .tabs {
+    display: flex;
+    flex: 0 0 auto;
+    border-bottom: 1px solid var(--border-default);
+    background: var(--surface-raised);
+  }
+
+  .app__main[data-active-pane="transcript"] .pane-chat,
+  .app__main[data-active-pane="chat"] .pane-transcript {
+    display: none;
+  }
+
+  .pane-chat {
+    flex: 1 1 auto;
+    width: auto;
+    border-left: none;
+  }
+
+  .pane-transcript__scroller-wrap {
+    min-width: 0;
+  }
+
+  .glossary-panel {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+  }
+}
+
+/* At very narrow widths the transcript still has to be readable, and nothing may scroll sideways. */
+@media (max-width: 480px) {
+  :root {
+    --transcript-size: 17px;
+  }
+
+  .pane-transcript__scroller-wrap {
+    min-width: 0;
+  }
+}

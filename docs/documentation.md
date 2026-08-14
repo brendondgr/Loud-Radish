@@ -1,6 +1,6 @@
 # TranscriberPrototype — Project Documentation
 
-*Last updated: 2026-08-14 (Phase 8 — transport layer)*
+*Last updated: 2026-08-14 (Phase 11 — frontend foundation)*
 
 ## Purpose
 
@@ -35,7 +35,8 @@ build step.
 | Transport (HTTP + WebSocket) | ✅ Phase 8 — event hub, reconnection replay, full HTTP surface |
 | LLM abstraction (Seam B) | ⛔ Phase 9 |
 | Chat and context pipeline | ⛔ Phase 10 |
-| Frontend | ⛔ Phases 11–13 |
+| Frontend foundation | ✅ Phase 11 — templates, tokens, transport, transcript pane |
+| Frontend chrome, settings, chat | ⛔ Phases 12–13 |
 | Hardening and soak | ⛔ Phase 14 |
 
 Open work is tracked in [checklist.md](checklist.md); phase status in

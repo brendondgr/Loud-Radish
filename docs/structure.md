@@ -1,6 +1,6 @@
 # Repository Structure
 
-*Last updated: 2026-08-14 (Phase 8 — transport layer)*
+*Last updated: 2026-08-14 (Phase 11 — frontend foundation)*
 
 Canonical map of TranscriberPrototype. This file documents **purpose**, not source code. Update it in
 the same change that adds, moves, renames, or removes a directory or significant file.
@@ -97,7 +97,15 @@ TranscriberPrototype/
 │   │   │   └── session.py         # Metadata, summaries, glossary terms, chat turns
 │   │   └── schemas/
 │   │       └── api.py             # Request/response shapes for every route
-│   ├── frontend/                  # Server-rendered UI (templates + static assets)
+│   ├── frontend/                  # Server-rendered UI — no build step, no npm
+│   │   ├── templates/
+│   │   │   ├── base.html          # Document shell; loads the stylesheets and the entry module
+│   │   │   ├── pages/app.html     # The live application
+│   │   │   ├── macros/icons.html  # Inline SVG icons, inheriting currentColor
+│   │   │   └── partials/          # header, status_bar, banners, transcript/, chat/
+│   │   └── static/
+│   │       ├── css/               # tokens, base, layout + one file per component
+│   │       └── js/                # main + core/, transport/, stores/, components/
 │   └── shared/contracts/          # Generated: openapi.json, ws-events.json
 │
 ├── libs/                          # Internal packages with more than one consumer
@@ -134,11 +142,9 @@ web/backend/app/
 │   ├── context/     # summariser, glossary, chunks, pipeline                                Phase 10
 │   └── chat/        # assembly, quick_actions, orchestrator                                 Phase 10
 
-web/frontend/
-├── templates/       # base.html, pages/, partials/{transcript,chat,settings}/, macros/  Phases 11-13
-└── static/
-    ├── css/         # tokens, base, layout, themes, components/                         Phases 11-13
-    └── js/          # main, core/, transport/, stores/, components/, a11y/              Phases 11-13
+web/frontend/templates/partials/
+├── chat/            # pane, quick_actions, message, composer, collapsed              Phase 13
+└── settings/        # modal, nav, audio, asr, llm, context, storage                  Phase 12
 ```
 
 ## Top-Level Directory Purposes
@@ -186,9 +192,7 @@ Use `tests/<area>/test_<behavior>.py`. Keep shared fixtures close to the area th
 |---|---|
 | `__init__.py` (required for Python packages) | `libs/`, `utils/`, `tests/` and its four sub-directories, `web/backend/app/{models,schemas}` |
 | `.gitkeep` | `data/`, `logs/` |
-| `README.md` explaining what belongs there | `web/frontend/`, `web/shared/contracts/`, `docs/plans/` |
-
-`web/frontend/README.md` is deleted in Phase 11, when the template tree replaces it.
+| `README.md` explaining what belongs there | `web/shared/contracts/`, `docs/plans/` |
 
 ## Rules
 

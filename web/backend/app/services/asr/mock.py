@@ -50,16 +50,29 @@ def positional_audio(
 def decode_position(audio: np.ndarray, sample_rate: int = SAMPLE_RATE) -> float | None:
     """Recover the absolute session time of sample zero, or ``None`` if unencoded.
 
-    Scans for the first encoded sample rather than assuming index zero: a buffer can begin with
-    genuine silence that was appended while the speaker was quiet.
+    The encoding must be impossible to confuse with real audio, and a value in the right *range*
+    is not enough — a loud recording reaches 0.7 and would decode as a plausible timestamp,
+    silently sending the mock hunting for words hundreds of seconds into its script. So the check
+    is on shape rather than magnitude: encoded audio is a **monotonically non-decreasing ramp**
+    whose span matches its own duration. Speech is never non-decreasing across a whole buffer.
     """
-    if audio.size == 0:
+    if audio.size < 2:
         return None
-    encoded = np.flatnonzero(audio >= POSITION_BASE * 0.9)
-    if encoded.size == 0:
+
+    first = float(audio[0])
+    if not (POSITION_BASE - 1e-3) <= first <= (POSITION_BASE + 1.0):
         return None
-    index = int(encoded[0])
-    return float(audio[index] - POSITION_BASE) * POSITION_SCALE - index / sample_rate
+
+    # A ramp, not a waveform. One sample out of order is enough to rule it out.
+    if np.any(np.diff(audio) < -1e-7):
+        return None
+
+    expected_span = (audio.size - 1) / (sample_rate * POSITION_SCALE)
+    actual_span = float(audio[-1]) - first
+    if abs(actual_span - expected_span) > max(1e-6, expected_span * 0.05):
+        return None
+
+    return (first - POSITION_BASE) * POSITION_SCALE
 
 
 #: What the mock says when nothing else is scripted. A backend whose purpose is "run the pipeline

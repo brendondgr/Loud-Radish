@@ -109,12 +109,29 @@ def _build_templates() -> Jinja2Templates | None:
     return templates
 
 
+class _NoCacheStatic(StaticFiles):
+    """Static files served with caching disabled.
+
+    Everything here is fetched over loopback from the same machine, so caching buys nothing
+    measurable — while a stale stylesheet after an edit costs real time and is easy to mistake for
+    a code bug. Correctness over a saving that does not exist.
+    """
+
+    def is_not_modified(self, response_headers, request_headers) -> bool:  # noqa: ANN001
+        return False
+
+    async def get_response(self, path: str, scope):  # noqa: ANN001, ANN201
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-store, must-revalidate"
+        return response
+
+
 def _mount_static(app: FastAPI) -> None:
     """Serve the frontend's CSS and JS, once that tree exists."""
     if not paths.STATIC_DIR.is_dir():
         logger.info("No static directory at %s yet; skipping mount", paths.STATIC_DIR)
         return
-    app.mount("/static", StaticFiles(directory=str(paths.STATIC_DIR)), name="static")
+    app.mount("/static", _NoCacheStatic(directory=str(paths.STATIC_DIR)), name="static")
 
 
 app = create_app()

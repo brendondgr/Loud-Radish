@@ -15,7 +15,7 @@ Server-rendered from `web/frontend/templates/` by `web/backend/app/routes/pages.
 
 | Path | Purpose | Template | Status |
 |---|---|---|---|
-| `/` | The live application — transcript pane, chat pane, header, status bar | `pages/app.html` | Phase 11 |
+| `/` | The live application — transcript pane, header, status bar | `pages/app.html` | **Implemented** |
 | `/sessions` | Past sessions, with export | `pages/sessions.html` | Phase 14 |
 
 ## WebSocket

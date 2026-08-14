@@ -1,0 +1,14 @@
+{# The tentative tail.
+
+   ONE element, always last, replaced wholly on every update. Deliberately outside the segment list:
+   modelling it as the final list entry is what duplicates text on screen (FE §4.1).
+
+   It is not inside the live region, because announcing text that is rewritten once a second would
+   make a screen reader unusable (FE §13). #}
+
+<div class="hypothesis" data-hypothesis>
+  <p class="hypothesis__text" data-hypothesis-text></p>
+  <div class="hypothesis__note" data-hypothesis-note hidden>
+    <span>Tentative — may still change</span>
+  </div>
+</div>

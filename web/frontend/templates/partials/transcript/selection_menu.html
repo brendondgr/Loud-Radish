@@ -1,0 +1,14 @@
+{% import "macros/icons.html" as icons %}
+
+{# "Ask about this" — reading something confusing and asking about it in one gesture is the
+   highest-value interaction in the application (FE §4.5). #}
+
+<div class="selection-menu" data-selection-menu hidden role="menu">
+  <button type="button" class="selection-menu__action" data-ask-about-selection role="menuitem">
+    {{ icons.quote() }}
+    <span>Ask about this</span>
+  </button>
+  <button type="button" class="selection-menu__action" data-copy-selection role="menuitem">
+    Copy with timestamp
+  </button>
+</div>

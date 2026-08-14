@@ -1,0 +1,112 @@
+/* The status bar — the answer to "did it break while I was listening?" (FE §6.2).
+ *
+ * Always visible, never scrolls away, readable in a glance. Real-time factor gets special
+ * treatment because it is the backend's single most important health metric, and a user who does
+ * not understand the number still understands red — but it is never red *alone*, because colour
+ * by itself is not an accessible signal.
+ */
+
+.status-bar {
+  flex: 0 0 auto;
+  min-height: var(--status-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-10);
+  padding: 0 var(--space-9);
+  border-top: 1px solid var(--border-default);
+  background: var(--surface-raised);
+  flex-wrap: wrap;
+}
+
+.status-bar__group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  flex-wrap: wrap;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.status-item__value {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+/* -- level meter ------------------------------------------------------------------------
+ * A flat line means no audio is arriving — the difference between "working, nobody is talking"
+ * and "broken".
+ */
+
+.level-meter {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+}
+
+.level-meter__bar {
+  width: 3px;
+  height: 3px;
+  background: var(--accent);
+  opacity: 0.25;
+  transition:
+    height 180ms linear,
+    opacity 180ms linear;
+}
+
+/* -- indicators ---------------------------------------------------------------------------- */
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  flex: 0 0 auto;
+  transition: background var(--duration-fast) linear;
+}
+
+.status-dot[data-state="active"] {
+  background: var(--accent);
+}
+
+.status-dot[data-state="warning"] {
+  background: var(--warning);
+}
+
+.status-dot[data-state="error"] {
+  background: var(--danger);
+}
+
+/* Real-time factor below 1.0. Red, plus an icon and a word — never colour alone. */
+.status-item--rtf .status-item__value[data-health="bad"] {
+  color: var(--danger);
+}
+
+.status-item--rtf .status-item__value[data-health="good"] {
+  color: var(--accent-dim);
+}
+
+.status-item__warning-icon {
+  color: var(--danger);
+}
+
+@media (max-width: 700px) {
+  .status-bar {
+    padding: var(--space-3) var(--space-5);
+    gap: var(--space-5);
+  }
+
+  .status-bar__group {
+    gap: var(--space-5);
+  }
+}

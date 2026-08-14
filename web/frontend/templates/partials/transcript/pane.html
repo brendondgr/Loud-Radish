@@ -1,0 +1,32 @@
+{# The transcript pane: the document the application exists to produce. #}
+
+{# The pane element carries data-transcript-pane, not the scroller: the toolbar's
+   segment count lives above the scroller and the component needs to reach it too. #}
+<section class="pane-transcript" data-transcript-pane aria-label="Transcript">
+  {% include "partials/transcript/toolbar.html" %}
+
+  <div class="pane-transcript__body">
+    <div class="pane-transcript__scroller-wrap">
+      <div class="transcript__scroller" data-transcript-scroller tabindex="0">
+        <div class="transcript__column">
+          {% include "partials/transcript/empty_state.html" %}
+
+          {# Committed text only is announced. The hypothesis sits outside this region. #}
+          <div
+            class="transcript__segments"
+            data-transcript-segments
+            role="log"
+            aria-live="polite"
+            aria-relevant="additions"
+            aria-label="Committed transcript"
+          ></div>
+
+          {% include "partials/transcript/hypothesis.html" %}
+        </div>
+      </div>
+
+      {% include "partials/transcript/jump_to_live.html" %}
+      {% include "partials/transcript/selection_menu.html" %}
+    </div>
+  </div>
+</section>

@@ -254,3 +254,41 @@ class TestPromptBuilder:
         builder = PromptBuilder(AsrConfig(session_prompt="first"))
         builder.update_config(AsrConfig(session_prompt="second"))
         assert builder.build() == "second"
+
+
+class TestPositionEncoding:
+    """The mock's position encoding must be impossible to confuse with a real recording.
+
+    A check on magnitude alone is not enough: loud speech reaches 0.7, which sits inside the
+    encoded range and decodes as a plausible timestamp — sending the mock hunting for words
+    hundreds of seconds into its script, and producing an empty transcript with no error anywhere.
+    """
+
+    def test_encoded_audio_round_trips(self) -> None:
+        from app.services.asr.mock import decode_position, positional_audio
+
+        for start in (0.0, 12.5, 240.75):
+            decoded = decode_position(positional_audio(start, 0.5))
+            assert decoded == pytest.approx(start, abs=0.01)
+
+    def test_a_loud_recording_is_not_mistaken_for_an_encoding(self) -> None:
+        from app.services.asr.mock import decode_position
+
+        assert decode_position(audio(1.0, amplitude=0.7)) is None
+        assert decode_position(audio(1.0, amplitude=0.55)) is None
+
+    def test_silence_is_not_mistaken_for_an_encoding(self) -> None:
+        from app.services.asr.mock import decode_position
+
+        assert decode_position(silence(1.0)) is None
+
+    def test_a_constant_signal_in_range_is_rejected(self) -> None:
+        """Non-decreasing, but with no span — it carries no time."""
+        from app.services.asr.mock import decode_position
+
+        assert decode_position(np.full(8000, 0.5, dtype=np.float32)) is None
+
+    def test_a_backend_given_a_real_recording_still_produces_words(self) -> None:
+        """The failure this guards: the whole pipeline running and committing nothing."""
+        backend = scripted("alpha beta gamma delta epsilon zeta eta theta")
+        assert not backend.transcribe(audio(3.0, amplitude=0.7)).is_empty()

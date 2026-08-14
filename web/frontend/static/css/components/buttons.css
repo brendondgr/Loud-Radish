@@ -1,0 +1,133 @@
+/* Buttons and small controls.
+ *
+ * Every interactive target is at least 36px in its smaller dimension and 44px where it stands
+ * alone, per the touch baseline in docs/design-system.md. Icon-only controls always carry an
+ * accessible name.
+ */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  min-height: 36px;
+  padding: var(--space-3) var(--space-7);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--surface-control);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius);
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    color var(--duration-fast) ease;
+}
+
+.button:hover {
+  background: var(--surface-control-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.button--primary {
+  color: var(--text-primary);
+  background: #1e2425;
+  border-color: #333b3d;
+}
+
+.button--primary:hover {
+  background: #262d2e;
+}
+
+.button--danger {
+  color: var(--danger-text);
+  background: var(--danger-wash);
+  border-color: var(--danger-border);
+}
+
+.button--quiet {
+  background: none;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+
+.button--quiet:hover {
+  background: var(--surface-control);
+  color: var(--text-primary);
+}
+
+.button--icon {
+  width: 36px;
+  min-width: 36px;
+  padding: 0;
+}
+
+/* A compact segmented control — the transcript text-size stepper. */
+.segmented {
+  display: flex;
+  align-items: center;
+  border: 1px solid #232829;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.segmented__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  min-height: 34px;
+  color: var(--text-muted);
+  background: var(--surface-panel);
+  border: none;
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) ease,
+    background var(--duration-fast) ease;
+}
+
+.segmented__button:hover {
+  color: var(--text-primary);
+  background: #161b1c;
+}
+
+.segmented__button + .segmented__button {
+  border-left: 1px solid #232829;
+}
+
+.segmented__button--serif {
+  font-family: var(--font-transcript);
+}
+
+/* A count attached to a control, e.g. the glossary term count. */
+.badge {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-dim);
+  background: rgba(111, 176, 166, 0.12);
+  border-radius: var(--radius-pill);
+  padding: 1px var(--space-3);
+}
+
+.badge--muted {
+  color: var(--text-faint);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Keyboard hint shown beside a control. */
+.kbd {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+  white-space: nowrap;
+}

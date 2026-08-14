@@ -1,0 +1,342 @@
+/* The transcript — the document the whole application exists to produce.
+ *
+ * Optimised for sustained reading rather than density: a serif face, generous leading, and a
+ * measure of roughly 68 characters. This is the one place where the type choice materially
+ * affects whether the application is pleasant to use over two hours (FE §14).
+ */
+
+.transcript__scroller {
+  position: absolute;
+  inset: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: var(--space-12) 0 70px;
+  scrollbar-gutter: stable;
+}
+
+.transcript__column {
+  max-width: var(--transcript-measure);
+  margin: 0 auto;
+  padding: 0 var(--space-10);
+}
+
+/* -- committed segments ------------------------------------------------------------------
+ * Full contrast, normal weight. Appended and never modified.
+ */
+
+.segment {
+  margin-bottom: var(--space-10);
+}
+
+.segment__time {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  margin-bottom: var(--space-3);
+  display: block;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: default;
+}
+
+/* Timestamps appear at intervals, not on every segment: one per line is a wall of noise
+ * (FE §4.2). The JS adds this class to segments that should show one. */
+.segment:not(.segment--timed) .segment__time {
+  display: none;
+}
+
+.segment__text {
+  margin: 0;
+  font-family: var(--font-transcript);
+  font-size: var(--transcript-size);
+  font-weight: 350;
+  line-height: var(--transcript-leading);
+  color: var(--text-transcript);
+  text-wrap: pretty;
+}
+
+/* A segment matching the active search. Highlighted rather than filtered, so the transcript
+ * keeps its shape and the user does not lose their place. */
+.segment--match .segment__text {
+  background: var(--accent-wash);
+  box-shadow: 0 0 0 var(--space-2) var(--accent-wash);
+  border-radius: var(--radius-sm);
+}
+
+.segment--current-match .segment__text {
+  background: var(--accent-wash-strong);
+  box-shadow: 0 0 0 var(--space-2) var(--accent-wash-strong);
+}
+
+/* -- the hypothesis tail -------------------------------------------------------------------
+ * One element, always last, replaced wholly on every update. It is deliberately NOT a segment:
+ * modelling it as the last list entry is what duplicates text on screen (FE §4.1).
+ *
+ * Reduced contrast and italic, so committed and tentative text are distinguishable at a glance
+ * without reading either. Not animated — it updates about once a second for two hours.
+ */
+
+.hypothesis {
+  min-height: 34px;
+}
+
+.hypothesis__text {
+  margin: 0;
+  font-family: var(--font-transcript);
+  font-size: var(--transcript-size);
+  font-weight: 350;
+  font-style: italic;
+  line-height: var(--transcript-leading);
+  color: var(--text-hypothesis);
+  text-wrap: pretty;
+}
+
+.hypothesis__note {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* -- jump to live ---------------------------------------------------------------------------
+ * Shown only while auto-follow is disengaged, with a count of what has arrived since.
+ */
+
+.jump-to-live {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--space-9);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.jump-to-live__button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-8);
+  min-height: 36px;
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--text-primary);
+  background: #1a2022;
+  border: 1px solid #333b3d;
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-pill);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background var(--duration-fast) ease;
+}
+
+.jump-to-live__button:hover {
+  background: #212829;
+}
+
+.jump-to-live__count {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-dim);
+}
+
+/* -- empty states ----------------------------------------------------------------------------
+ * Never a blank rectangle. Each explains what happens next (FE §10).
+ */
+
+.transcript-empty {
+  max-width: 46ch;
+  margin: 12vh auto 0;
+  padding: 0 var(--space-10);
+  text-align: left;
+}
+
+.transcript-empty__title {
+  margin: 0 0 var(--space-5);
+  font-family: var(--font-transcript);
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.transcript-empty__body {
+  margin: 0 0 var(--space-5);
+  font-size: var(--text-md);
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+.transcript-empty__hint {
+  font-size: var(--text-sm);
+  color: var(--text-faint);
+}
+
+/* -- selection menu ---------------------------------------------------------------------------
+ * "Ask about this" — reading something confusing and asking about it in one gesture is the
+ * highest-value interaction in the application (FE §4.5).
+ */
+
+.selection-menu {
+  position: fixed;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  background: #171c1e;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-popover);
+  overflow: hidden;
+}
+
+.selection-menu__action {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  min-height: 36px;
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--accent-bright);
+  background: none;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--duration-fast) ease;
+}
+
+.selection-menu__action:hover {
+  background: var(--accent-wash-strong);
+}
+
+.selection-menu__action + .selection-menu__action {
+  color: var(--text-muted);
+  border-left: 1px solid var(--accent-border);
+}
+
+.selection-menu__action + .selection-menu__action:hover {
+  color: var(--text-primary);
+}
+
+/* -- search field ---------------------------------------------------------------------------
+ * In-pane, and searching never disengages the live stream: the transcript keeps accumulating
+ * behind the filter (FE §4.4).
+ */
+
+.search-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex: 0 1 210px;
+  min-width: 150px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-panel);
+  border: 1px solid #232829;
+  border-radius: var(--radius);
+  color: var(--text-faint);
+  transition: border-color var(--duration-fast) ease;
+}
+
+.search-field:focus-within {
+  border-color: var(--border-strong);
+}
+
+.search-field__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 28px;
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  background: none;
+  border: none;
+  outline: none;
+}
+
+.search-field__input::placeholder {
+  color: var(--text-faint);
+}
+
+/* -- pane tabs, narrow layout only ------------------------------------------------------------ */
+
+.tabs__tab {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  min-height: 44px;
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.tabs__tab[aria-selected="true"] {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+}
+
+/* -- narrow chrome ---------------------------------------------------------------------------- */
+
+@media (max-width: 700px) {
+  .pane-header {
+    padding: 0 var(--space-5);
+    gap: var(--space-4);
+  }
+
+  .pane-header [data-segment-count] {
+    display: none;
+  }
+
+  .search-field {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .search-field .kbd {
+    display: none;
+  }
+
+  /* A touch target, not just a text box. The field is what the finger lands on, so it — and the
+     input filling it — carry the height rather than the visual padding. */
+  .search-field {
+    min-height: 44px;
+  }
+
+  .search-field__input {
+    min-height: 38px;
+  }
+
+  .transcript__column {
+    padding: 0 var(--space-5);
+  }
+}
+
+/* At the narrowest supported width the transcript must still not scroll sideways, so the text-size
+ * stepper goes too — it is a comfort control, not one needed mid-talk. */
+@media (max-width: 480px) {
+  .segmented {
+    display: none;
+  }
+
+  /* The pane tab above already says which pane this is, so the heading is pure duplication at
+     this width — and dropping it gives the search field and glossary button room to fit. */
+  .pane-transcript .pane-header__group:first-child {
+    display: none;
+  }
+}

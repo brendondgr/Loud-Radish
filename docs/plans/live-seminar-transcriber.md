@@ -1,6 +1,6 @@
 # Live Seminar Transcriber — Implementation Plan
 
-*Created: 2026-08-14 · Status: **In progress** — Phase 8 of 14 complete*
+*Created: 2026-08-14 · Status: **In progress** — Phases 1–8 and 11 complete*
 
 **Source specifications** (external, read-only inputs to this plan):
 
@@ -509,7 +509,7 @@ Update this table as each phase lands. Do not delete completed rows.
 | 8 | Transport layer | ✅ Complete |
 | 9 | LLM abstraction (Seam B) | Not started |
 | 10 | Chat orchestration and context pipeline | Not started |
-| 11 | Frontend foundation and transcript pane | Not started |
+| 11 | Frontend foundation and transcript pane | ✅ Complete (taken ahead of 9–10) |
 | 12 | Frontend chrome and settings | Not started |
 | 13 | Frontend chat, glossary, cross-pane, states | Not started |
 | 14 | Hardening, soak, merge | Not started |
