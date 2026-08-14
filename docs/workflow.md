@@ -1,6 +1,6 @@
 # Workflow
 
-*Last updated: 2026-08-14 (Phase 1 — foundations)*
+*Last updated: 2026-08-14 (Phase 5 — streaming engine)*
 
 Every command needed to work in TranscriberPrototype. If a command here is wrong, fix this file in the
 same change — do not work around it silently.
@@ -80,6 +80,32 @@ Any Python command runs inside the project environment via `uv run`:
 
 ```bash
 uv run python -c "import sys; print(sys.version)"
+```
+
+## Running the pipeline without a UI
+
+The streaming engine can be driven end to end over a recorded file, with console output only. This
+is the validation the architecture calls for before any interface exists — and it is how the commit
+policy's behaviour, including its inherent 2–4 second latency, is inspected directly.
+
+```bash
+uv run python scripts/make_fixture_wav.py --out data/fixtures
+```
+
+```bash
+uv run python scripts/run_file_session.py data/fixtures/alternating-20s.wav
+```
+
+With a real model, once the optional group is installed:
+
+```bash
+uv run python scripts/run_file_session.py talk.wav --backend faster-whisper --model small
+```
+
+Replay faster than real time for a long recording:
+
+```bash
+uv run python scripts/run_file_session.py talk.wav --speed 10
 ```
 
 ## Test

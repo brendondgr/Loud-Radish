@@ -27,6 +27,10 @@ sys.path.insert(0, str(REPO_ROOT / "web" / "backend"))
 from app.services.audio.formats import SAMPLE_RATE  # noqa: E402
 
 #: Named speech/silence structures, each exercising a specific pipeline behaviour.
+#: Syllable-rate amplitude modulation, so generated audio reads as speech rather than as a tone.
+SYLLABLE_HZ = 4.0
+SYLLABLE_FLOOR = 0.12
+
 PATTERNS: dict[str, str] = {
     "alternating": "Speech and silence in turn — the ordinary case.",
     "continuous": "Unbroken speech with no qualifying pause — exercises the commit timeout.",
@@ -51,12 +55,19 @@ def build(pattern: str, seconds: float, sample_rate: int) -> np.ndarray:
         + 0.14 * np.sin(2 * np.pi * 950 * t)
     )
 
+    # Real speech varies at syllable rate; a constant-level tone is a fan, not a talker, and any
+    # detector with an adaptive noise floor will rightly learn it as background. Every pattern
+    # therefore carries a syllable envelope, including the "continuous" one.
+    syllables = SYLLABLE_FLOOR + (1.0 - SYLLABLE_FLOOR) * (
+        0.5 + 0.5 * np.sin(2 * np.pi * SYLLABLE_HZ * t)
+    )
+
     if pattern == "continuous":
-        envelope = np.ones(total)
+        envelope = syllables
     elif pattern == "sparse":
-        envelope = _gate(t, on=1.5, off=8.0)
+        envelope = _gate(t, on=1.5, off=8.0) * syllables
     else:
-        envelope = _gate(t, on=4.0, off=1.2)
+        envelope = _gate(t, on=4.0, off=1.2) * syllables
 
     signal = tone * envelope * 0.5
     peak = float(np.max(np.abs(signal))) or 1.0

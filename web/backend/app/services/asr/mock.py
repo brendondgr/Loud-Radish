@@ -22,6 +22,45 @@ import numpy as np
 from ..audio.formats import SAMPLE_RATE
 from .contract import AsrBackend, AsrCapabilities, AsrResult, WordToken
 
+#: Position-encoded audio carries each sample's absolute session time in its value, so the mock can
+#: answer the question a real model implicitly answers: *which words are in the audio I was
+#: actually handed?* Without it the mock returns the start of its script no matter which slice of
+#: the session it is given, which makes the engine's trimming and rebasing untestable — every trim
+#: would look like the model repeating the opening of the talk.
+POSITION_BASE = 0.5
+#: Encoded time is ``POSITION_BASE + seconds / POSITION_SCALE``. float32 resolves roughly 6e-8 at
+#: this magnitude, so this scale gives about 60 microseconds of timing precision — well under one
+#: sample — over sessions up to a few hundred seconds, which is ample for tests.
+POSITION_SCALE = 1_000.0
+
+
+def positional_audio(
+    start_seconds: float, duration_seconds: float, sample_rate: int = SAMPLE_RATE
+) -> np.ndarray:
+    """Build audio whose samples encode their own absolute session time.
+
+    Values sit around :data:`POSITION_BASE`, well clear of the silence threshold, so this behaves
+    like speech to every other part of the pipeline.
+    """
+    count = int(round(duration_seconds * sample_rate))
+    times = start_seconds + np.arange(count, dtype=np.float64) / sample_rate
+    return (POSITION_BASE + times / POSITION_SCALE).astype(np.float32)
+
+
+def decode_position(audio: np.ndarray, sample_rate: int = SAMPLE_RATE) -> float | None:
+    """Recover the absolute session time of sample zero, or ``None`` if unencoded.
+
+    Scans for the first encoded sample rather than assuming index zero: a buffer can begin with
+    genuine silence that was appended while the speaker was quiet.
+    """
+    if audio.size == 0:
+        return None
+    encoded = np.flatnonzero(audio >= POSITION_BASE * 0.9)
+    if encoded.size == 0:
+        return None
+    index = int(encoded[0])
+    return float(audio[index] - POSITION_BASE) * POSITION_SCALE - index / sample_rate
+
 
 @dataclass
 class MockScript:
@@ -36,6 +75,9 @@ class MockScript:
         revision_suffix: appended to revised words, so a revision is visible in a failure message.
         hallucinate_on_silence: emit text for silent input, reproducing the autoregressive failure
             mode the silence gate exists to prevent.
+        unstable_tail: rewrite this many trailing words *differently on every pass*, so they can
+            never agree. Models sometimes do this at a buffer edge, and it is the case the
+            commit timeout exists to rescue.
         repeat_ngram: when set, degenerate into looping this phrase, reproducing Whisper's
             repetition failure mode so the repetition filter can be tested.
         inference_seconds: simulated inference cost, for real-time factor tests.
@@ -45,6 +87,7 @@ class MockScript:
     words_per_second: float = 2.5
     revise_last: int = 0
     revision_suffix: str = "'"
+    unstable_tail: int = 0
     hallucinate_on_silence: bool = False
     repeat_ngram: list[str] | None = None
     repeat_after_pass: int = 0
@@ -141,7 +184,12 @@ class MockAsrBackend(AsrBackend):
         if self._is_silent(array) and not self._script.hallucinate_on_silence:
             return AsrResult(words=[], model_id=self._model_id)
 
-        words = self._words_for(seconds)
+        offset = decode_position(array)
+        words = (
+            self._words_in_window(offset, seconds)
+            if offset is not None
+            else self._words_for(seconds)
+        )
         return AsrResult(
             words=words,
             language="en",
@@ -149,8 +197,53 @@ class MockAsrBackend(AsrBackend):
             model_id=self._model_id,
         )
 
+    def _words_in_window(self, start: float, seconds: float) -> list[WordToken]:
+        """Return the scripted words that fall inside the submitted audio, as a real model would.
+
+        This is what makes the mock a genuine stand-in. Given the last two seconds of a talk it
+        returns the words spoken in those two seconds, not the opening of the script — so a trim
+        that miscalculates its offset shows up as wrong text rather than passing quietly.
+        """
+        script = self._script
+        if script.repeat_ngram and self._pass_count > script.repeat_after_pass:
+            return self._timed(script.repeat_ngram * 8, seconds)
+
+        step = 1.0 / script.words_per_second
+        end = start + seconds
+
+        chosen: list[tuple[str, float, float]] = []
+        for index, word in enumerate(script.words):
+            word_start = index * step
+            word_end = word_start + step
+            if word_end <= start or word_start >= end:
+                continue
+            chosen.append((word, word_start - start, word_end - start))
+
+        if script.revise_last > 0 and chosen:
+            # Rewrite the trailing words, exactly as a real model revises its own tail once more
+            # context arrives. LocalAgreement must not commit these.
+            for i in range(max(0, len(chosen) - script.revise_last), len(chosen)):
+                text, begins, ends = chosen[i]
+                chosen[i] = (f"{text}{script.revision_suffix}", begins, ends)
+
+        if script.unstable_tail > 0 and chosen:
+            # A tail that differs every pass can never reach agreement.
+            for i in range(max(0, len(chosen) - script.unstable_tail), len(chosen)):
+                text, begins, ends = chosen[i]
+                chosen[i] = (f"{text}-{self._pass_count}", begins, ends)
+
+        return [
+            WordToken(
+                text=text,
+                start=round(max(0.0, begins), 4),
+                end=round(min(seconds, ends), 4),
+                confidence=script.confidence,
+            )
+            for text, begins, ends in chosen
+        ]
+
     def _words_for(self, seconds: float) -> list[WordToken]:
-        """Choose the word list for this pass, applying revision and repetition behaviour."""
+        """Duration-only fallback for audio that carries no position encoding."""
         script = self._script
 
         if script.repeat_ngram and self._pass_count > script.repeat_after_pass:
@@ -160,8 +253,6 @@ class MockAsrBackend(AsrBackend):
         chosen = list(script.words[:count])
 
         if script.revise_last > 0 and chosen:
-            # Rewrite the trailing words, exactly as a real model revises its own tail once more
-            # context arrives. LocalAgreement must not commit these.
             revise_from = max(0, len(chosen) - script.revise_last)
             for i in range(revise_from, len(chosen)):
                 chosen[i] = f"{chosen[i]}{script.revision_suffix}"

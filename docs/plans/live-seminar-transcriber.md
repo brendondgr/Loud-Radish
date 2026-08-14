@@ -1,6 +1,6 @@
 # Live Seminar Transcriber — Implementation Plan
 
-*Created: 2026-08-14 · Status: **In progress** — Phase 4 of 14 complete*
+*Created: 2026-08-14 · Status: **In progress** — Phase 5 of 14 complete*
 
 **Source specifications** (external, read-only inputs to this plan):
 
@@ -503,7 +503,7 @@ Update this table as each phase lands. Do not delete completed rows.
 | 2 | Audio capture layer | ✅ Complete |
 | 3 | Voice activity detection | ✅ Complete |
 | 4 | ASR abstraction (Seam A) | ✅ Complete |
-| 5 | Streaming engine | Not started |
+| 5 | Streaming engine | ✅ Complete |
 | 6 | Transcript store | Not started |
 | 7 | Session manager, workers, metrics | Not started |
 | 8 | Transport layer | Not started |

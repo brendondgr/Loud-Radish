@@ -27,7 +27,7 @@ from .contract import (
     WordToken,
 )
 from .lifecycle import AsrLifecycle, LoadProgress, LoadState
-from .mock import MockAsrBackend, MockScript, scripted
+from .mock import MockAsrBackend, MockScript, decode_position, positional_audio, scripted
 from .prompting import PromptBuilder
 from .registry import (
     BackendInfo,
@@ -54,8 +54,10 @@ __all__ = [
     "PromptBuilder",
     "WordToken",
     "available_backends",
+    "decode_position",
     "build_backend",
     "register",
+    "positional_audio",
     "registered_ids",
     "scripted",
 ]

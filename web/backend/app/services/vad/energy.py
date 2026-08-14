@@ -20,15 +20,23 @@ import numpy as np
 
 from .base import VoiceActivityDetector
 
-#: How quickly the noise floor tracks quiet frames. Slow, so a pause between sentences does not
-#: raise the floor to the level of the speech that preceded it.
-FLOOR_ATTACK = 0.05
+#: How quickly the noise floor tracks quiet frames. Fast enough to reach the trough between
+#: syllables — roughly eight frames at a 4 Hz syllable rate — but not so fast that one quiet frame
+#: resets it. The decay upward is far slower, so a burst of speech does not desensitise the
+#: detector for the rest of the talk.
+FLOOR_ATTACK = 0.15
 FLOOR_DECAY = 0.002
 
 #: Sensitivity 0.0–1.0 maps onto this margin above the noise floor, in linear amplitude ratio.
 #: Most sensitive picks up speech only just above the background; least sensitive demands much more.
-MARGIN_AT_MAX_SENSITIVITY = 1.6
-MARGIN_AT_MIN_SENSITIVITY = 8.0
+#:
+#: Calibrated against the fixture generator rather than guessed. The floor settles near the trough
+#: between syllables, not at true silence, so the usable ratio for speech is a few times over —
+#: not the order of magnitude a peak-versus-silence comparison would suggest. A margin set from
+#: that intuition rejects continuous speech outright, which is the worst possible failure: the
+#: transcript simply stops with no indication why.
+MARGIN_AT_MAX_SENSITIVITY = 1.3
+MARGIN_AT_MIN_SENSITIVITY = 4.0
 
 #: Absolute floor. Below this, even a large ratio above the noise floor is not speech — it is a
 #: silent room being divided by an even quieter number.

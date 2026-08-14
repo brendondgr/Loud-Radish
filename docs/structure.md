@@ -1,6 +1,6 @@
 # Repository Structure
 
-*Last updated: 2026-08-14 (Phase 4 — ASR abstraction)*
+*Last updated: 2026-08-14 (Phase 5 — streaming engine)*
 
 Canonical map of TranscriberPrototype. This file documents **purpose**, not source code. Update it in
 the same change that adds, moves, renames, or removes a directory or significant file.
@@ -68,7 +68,16 @@ TranscriberPrototype/
 │   │   │       ├── faster_whisper.py  # The real default, optional dependency
 │   │   │       ├── prompting.py   # Session and rolling-context term biasing
 │   │   │       └── lifecycle.py   # Async load, warm-up, swap, unload
+│   │   │   └── streaming/         # The core — commit policy and buffering
+│   │   │       ├── agreement.py   # LocalAgreement-n, the commit rule
+│   │   │       ├── buffer.py      # Growing buffer, trimming, timestamp rebasing
+│   │   │       ├── guards.py      # The six guards of BE §7.6
+│   │   │       ├── segmenter.py   # Committed words → readable segments
+│   │   │       ├── events.py      # The committed / hypothesis output contract
+│   │   │       ├── engine.py      # Orchestrator for offline models
+│   │   │       └── passthrough.py # Bypass path for streaming-native models
 │   │   ├── models/                # Persistence shape
+│   │   │   └── segment.py         # The unit engine, store, and frontend all agree on
 │   │   └── schemas/               # Request/response validation
 │   ├── frontend/                  # Server-rendered UI (templates + static assets)
 │   └── shared/contracts/          # OpenAPI spec and WebSocket event schema
@@ -81,7 +90,8 @@ TranscriberPrototype/
 │   ├── data/                      # Transcript store, search, export
 │   └── utils/                     # Configuration and standalone helpers
 ├── scripts/                       # Developer and operational scripts
-│   └── make_fixture_wav.py        # Generates synthetic WAV fixtures for pipeline tests
+│   ├── make_fixture_wav.py        # Generates synthetic WAV fixtures for pipeline tests
+│   └── run_file_session.py        # Console-only pipeline run over a WAV file (BE M4)
 ├── data/                          # Sessions, config file, audio (gitignored)
 ├── logs/                          # Runtime logs (gitignored)
 │
@@ -101,7 +111,6 @@ intended shape is legible before the code lands; **none of these exist yet.**
 ```text
 web/backend/app/
 ├── services/
-│   ├── streaming/   # agreement, buffer, guards, segmenter, passthrough, engine              Phase 5
 │   ├── transcript/  # store, schema.sql, queries, export                                     Phase 6
 │   ├── session/     # manager, workers, metrics, degradation                                 Phase 7
 │   ├── llm/         # contract, openai_compatible, anthropic, registry, connection           Phase 9

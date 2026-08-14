@@ -1,6 +1,6 @@
 # TranscriberPrototype — Project Documentation
 
-*Last updated: 2026-08-14 (Phase 4 — ASR abstraction)*
+*Last updated: 2026-08-14 (Phase 5 — streaming engine)*
 
 ## Purpose
 
@@ -29,7 +29,7 @@ build step.
 | Audio capture | ✅ Phase 2 — formats, resampling, ring buffer, preprocessing, devices, sources |
 | Voice activity detection | ✅ Phase 3 — energy and optional Silero detectors, shared hysteresis |
 | ASR abstraction (Seam A) | ✅ Phase 4 — contract, registry, mock, faster-whisper, biasing, lifecycle |
-| Streaming engine | ⛔ Phase 5 |
+| Streaming engine | ✅ Phase 5 — LocalAgreement-2, trimming, rebasing, six guards, segmentation, bypass |
 | Transcript store | ⛔ Phase 6 |
 | Session manager and metrics | ⛔ Phase 7 |
 | Transport (HTTP + WebSocket) | ⛔ Phase 8 |

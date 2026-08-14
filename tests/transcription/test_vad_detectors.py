@@ -62,6 +62,51 @@ class TestEnergyVad:
         hum = (0.3 * np.sin(2 * np.pi * 50 * t)).astype(np.float32)
         assert not settle(EnergyVad()).is_speech(hum)
 
+    def test_continuous_syllable_modulated_speech_is_detected_throughout(self) -> None:
+        """The calibration regression test.
+
+        Real speech never stops varying, and the noise floor settles near the *trough between
+        syllables* rather than at true silence. A margin chosen from peak-versus-silence intuition
+        is several times too large and rejects continuous speech outright — which presents as the
+        transcript simply stopping, with nothing in the UI to explain why. Locked in here so the
+        margin cannot be quietly tightened back.
+        """
+        detector = EnergyVad(sensitivity=0.6)
+        seconds = 12.0
+        t = np.arange(int(seconds * SAMPLE_RATE), dtype=np.float64) / SAMPLE_RATE
+        tone = (
+            0.45 * np.sin(2 * np.pi * 180 * t)
+            + 0.28 * np.sin(2 * np.pi * 420 * t)
+            + 0.14 * np.sin(2 * np.pi * 950 * t)
+        )
+        syllables = 0.12 + 0.88 * (0.5 + 0.5 * np.sin(2 * np.pi * 4.0 * t))
+        signal = (tone * syllables * 0.5).astype(np.float32)
+
+        frames = [
+            signal[i : i + FRAME_SAMPLES]
+            for i in range(0, signal.size - FRAME_SAMPLES, FRAME_SAMPLES)
+        ]
+        detected = [detector.is_speech(frame) for frame in frames]
+
+        # Roughly half of a syllable cycle sits above the floor; anything near zero means the
+        # detector has gated out a talking speaker.
+        assert np.mean(detected) > 0.3, (
+            f"only {np.mean(detected):.0%} of continuous speech detected"
+        )
+
+    def test_a_constant_level_tone_is_still_rejected(self) -> None:
+        """The other side of that calibration: a fan or a hum is not speech, however loud."""
+        detector = EnergyVad(sensitivity=0.6)
+        t = np.arange(int(12.0 * SAMPLE_RATE), dtype=np.float64) / SAMPLE_RATE
+        constant = (0.3 * np.sin(2 * np.pi * 300 * t)).astype(np.float32)
+
+        frames = [
+            constant[i : i + FRAME_SAMPLES]
+            for i in range(0, constant.size - FRAME_SAMPLES, FRAME_SAMPLES)
+        ]
+        detected = [detector.is_speech(frame) for frame in frames]
+        assert np.mean(detected[20:]) < 0.05
+
     def test_the_noise_floor_adapts_to_a_louder_room(self) -> None:
         quiet = EnergyVad()
         loud = EnergyVad()
