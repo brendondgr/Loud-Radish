@@ -1,6 +1,6 @@
 # Live Seminar Transcriber — Implementation Plan
 
-*Created: 2026-08-14 · Status: **In progress** (Phase 0 of 14 complete — planning)*
+*Created: 2026-08-14 · Status: **In progress** — Phase 1 of 14 complete*
 
 **Source specifications** (external, read-only inputs to this plan):
 
@@ -499,7 +499,7 @@ Update this table as each phase lands. Do not delete completed rows.
 
 | # | Phase | Status |
 |---|---|---|
-| 1 | Foundations — deps, app skeleton, config, docs pivot | Not started |
+| 1 | Foundations — deps, app skeleton, config, docs pivot | ✅ Complete |
 | 2 | Audio capture layer | Not started |
 | 3 | Voice activity detection | Not started |
 | 4 | ASR abstraction (Seam A) | Not started |

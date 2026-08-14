@@ -3,11 +3,39 @@ name = "transcriber-prototype"
 version = "0.1.0"
 description = "Web application for audio transcription — Python API and transcription pipeline."
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "aiosqlite>=0.22.1",
+    "fastapi>=0.141.1",
+    "httpx>=0.28.1",
+    "jinja2>=3.1.6",
+    "numpy>=2.4.6",
+    "pydantic>=2.13.4",
+    "pydantic-settings>=2.15.0",
+    "python-multipart>=0.0.32",
+    "soxr>=1.1.0",
+    "uvicorn[standard]>=0.52.3",
+]
+
+[project.optional-dependencies]
+asr-whisper = [
+    "faster-whisper>=1.2.1",
+]
+audio-device = [
+    "sounddevice>=0.5.5",
+]
+vad-silero = [
+    "onnxruntime>=1.28.0",
+]
+credentials = [
+    "keyring>=25.7.0",
+]
 
 [dependency-groups]
 dev = [
+    "anyio>=4.14.2",
+    "httpx2>=2.10.0",
     "pytest>=8.0",
+    "pytest-asyncio>=1.4.0",
     "ruff>=0.6",
 ]
 

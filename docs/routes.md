@@ -1,46 +1,118 @@
 # Route Map
 
-*Last updated: 2026-08-14 (repository initialization)*
+*Last updated: 2026-08-14 (Phase 1 — foundations)*
 
-> **Status: proposed, none implemented.** No routes or pages exist yet. The tables below are the
-> intended surface, recorded so implementation has a starting point. Update this file in the same
-> change that adds, removes, or changes any route or page.
+> **Status column is authoritative.** Only `GET /api/health` is implemented. Everything else is the
+> agreed surface, landing in the phase named beside it. Update this file in the same change that adds,
+> removes, or changes any route or page.
 
-## Frontend Pages
+The upload-and-poll job routes recorded at initialization are **gone** — see Decision D-010 in
+`docs/documentation.md`. There is no `/api/transcriptions` surface.
 
-Rendered by `web/frontend/`. Paths are browser paths.
+## Pages
 
-| Path | Purpose | Owning location | Status |
+Server-rendered from `web/frontend/templates/` by `web/backend/app/routes/pages.py`.
+
+| Path | Purpose | Template | Status |
 |---|---|---|---|
-| `/` | Upload an audio file and start a transcription job | `web/frontend/src/pages/` | Proposed |
-| `/jobs/:jobId` | Job progress, then the transcript viewer/editor | `web/frontend/src/pages/` | Proposed |
-| `/jobs` | List of past transcription jobs | `web/frontend/src/pages/` | Proposed |
+| `/` | The live application — transcript pane, chat pane, header, status bar | `pages/app.html` | Phase 11 |
+| `/sessions` | Past sessions, with export | `pages/sessions.html` | Phase 14 |
 
-## API Endpoints
+## WebSocket
+
+| Path | Purpose | Status |
+|---|---|---|
+| `/ws` | The live event stream. Accepts a `since` segment id on connect and replays everything after it. | Phase 8 |
+
+Event envelopes are specified in [api-contract.md](api-contract.md) and machine-readably in
+`web/shared/contracts/ws-events.json`.
+
+## API endpoints
 
 Served by `web/backend/app/routes/`. All paths are prefixed `/api`.
 
+### Health
+
 | Method | Path | Purpose | Status |
 |---|---|---|---|
-| `POST` | `/api/transcriptions` | Accept an audio upload, create a job, return its id | Proposed |
-| `GET` | `/api/transcriptions/{job_id}` | Job status and, when complete, the transcript | Proposed |
-| `GET` | `/api/transcriptions` | List jobs | Proposed |
-| `DELETE` | `/api/transcriptions/{job_id}` | Delete a job and its artifacts | Proposed |
-| `GET` | `/api/health` | Liveness check | Proposed |
+| `GET` | `/api/health` | Liveness, plus which optional dependency groups are installed | **Implemented** |
 
-Request and response shapes belong in [api-contract.md](api-contract.md), not here. This file is the
-index; that file is the contract.
+### Session
+
+| Method | Path | Purpose | Status |
+|---|---|---|---|
+| `POST` | `/api/session/start` | Begin capture and transcription | Phase 8 |
+| `POST` | `/api/session/stop` | End the session and return final statistics | Phase 8 |
+| `GET` | `/api/session` | Current session state and metadata | Phase 8 |
+| `GET` | `/api/session/list` | Past sessions | Phase 8 |
+
+### Audio
+
+| Method | Path | Purpose | Status |
+|---|---|---|---|
+| `GET` | `/api/audio/devices` | Input and loopback devices in one merged list, each tagged with its type | Phase 8 |
+| `POST` | `/api/audio/device` | Select the capture device | Phase 8 |
+| `POST` | `/api/audio/preprocess` | Set gain normalisation and high-pass toggles | Phase 8 |
+
+### Speech recognition
+
+| Method | Path | Purpose | Status |
+|---|---|---|---|
+| `GET` | `/api/asr/models` | Available models with their declared capabilities and measured speed | Phase 8 |
+| `POST` | `/api/asr/load` | Load a model — asynchronous, with progress over the WebSocket | Phase 8 |
+| `POST` | `/api/asr/unload` | Free the model and its device memory | Phase 8 |
+| `POST` | `/api/asr/prompt` | Set the session biasing prompt | Phase 8 |
+
+### Language model
+
+| Method | Path | Purpose | Status |
+|---|---|---|---|
+| `GET` | `/api/llm/config` | Current mode and both provider configurations. Never returns a credential. | Phase 9 |
+| `PUT` | `/api/llm/config` | Update mode or provider configuration | Phase 9 |
+| `POST` | `/api/llm/credential` | Store a credential in the OS credential store | Phase 9 |
+| `DELETE` | `/api/llm/credential` | Remove a stored credential | Phase 9 |
+| `POST` | `/api/llm/test` | Connection test — returns a specific result, never generic failure text | Phase 9 |
+| `GET` | `/api/llm/models` | Models the configured endpoint reports | Phase 9 |
+
+### Chat
+
+| Method | Path | Purpose | Status |
+|---|---|---|---|
+| `POST` | `/api/chat/send` | Ask a question. The answer streams over the WebSocket. | Phase 10 |
+| `POST` | `/api/chat/cancel` | Cancel an in-flight request | Phase 10 |
+| `GET` | `/api/chat/history` | Conversation history | Phase 10 |
+| `DELETE` | `/api/chat/history` | Clear the conversation | Phase 10 |
+| `GET` | `/api/chat/quick-actions` | The configured quick-action prompts | Phase 10 |
+
+### Transcript
+
+| Method | Path | Purpose | Status |
+|---|---|---|---|
+| `GET` | `/api/transcript/since/{segment_id}` | Everything after a segment id — the reconnection path | Phase 8 |
+| `GET` | `/api/transcript/range` | Everything in a time range | Phase 8 |
+| `GET` | `/api/transcript/search` | Full-text search over the session | Phase 8 |
+| `GET` | `/api/transcript/export` | Export as text, Markdown, SRT, VTT, or JSON | Phase 8 |
+| `GET` | `/api/transcript/glossary` | The session glossary | Phase 10 |
+| `GET` | `/api/transcript/summaries` | The rolling outline | Phase 10 |
+
+### Configuration
+
+| Method | Path | Purpose | Status |
+|---|---|---|---|
+| `GET` | `/api/config` | The full resolved configuration | Phase 8 |
+| `PATCH` | `/api/config` | Apply dotted-path changes; returns the hot-swap class of the change | Phase 8 |
+| `POST` | `/api/config/preset` | Apply a named preset | Phase 8 |
+| `POST` | `/api/config/save` | Persist runtime changes to the user config file | Phase 8 |
 
 ## Conventions
 
-- API routes live under `/api`; everything else is frontend territory.
-- Route modules stay thin — validate input, call a service, shape the response. No business logic.
-- One route module per resource, in `web/backend/app/routes/`.
-- Adding a route requires updating this file, `docs/api-contract.md`, and
-  `web/shared/contracts/` in the same change.
+- API routes live under `/api`. `/ws` is the event stream. Everything else is a page.
+- Route modules stay thin — validate, call a service, shape the response. No business logic.
+- One route module per area, in `web/backend/app/routes/`.
+- Adding a route requires updating this file, `docs/api-contract.md`, and `web/shared/contracts/` in
+  the same change.
 
-## Auth Boundaries
+## Auth boundaries
 
-**None defined.** No authentication model has been chosen, so every route above is currently assumed
-public. When auth is introduced, add a "Requires auth" column to both tables and record the model in
-`docs/architecture.md`. Tracked in `docs/checklist.md`.
+**None.** Single-user, loopback-bound, no authentication model — see `docs/architecture.md`. Every
+route is reachable by anything that can reach the port, which is why the port is bound to `127.0.0.1`.

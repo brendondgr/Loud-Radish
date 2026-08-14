@@ -1,32 +1,45 @@
 # TranscriberPrototype — Project Documentation
 
-*Last updated: 2026-08-14 (repository initialization)*
+*Last updated: 2026-08-14 (Phase 1 — foundations)*
 
 ## Purpose
 
-TranscriberPrototype is a **web application for audio transcription**. Users interact with it through
-a browser: a Python backend owns the API and the transcription pipeline, and a separate Node frontend
-owns the interface.
+TranscriberPrototype is the **Live Seminar Transcriber**: a single-user local application that
+continuously captures audio from a microphone or from system playback, transcribes it in near-real-time
+through a pluggable speech model, maintains a growing timestamped transcript, and exposes that
+transcript to a language model so the user can ask questions about a talk while it is happening.
 
-This repository was initialized as a structural scaffold. The layout, documentation contract, and
-agent-tooling wiring are complete; the application itself is not yet implemented.
+The driving use case is attending a seminar or colloquium on an unfamiliar topic — asking, mid-talk,
+*"Summarise the last ten minutes,"* or *"What does the speaker mean by that term?"*
+
+A Python backend owns the entire pipeline and publishes an HTTP plus WebSocket contract. The frontend
+is server-rendered from the same process: Jinja2 templates, plain CSS, and vanilla ES modules, with no
+build step.
 
 ## Status
 
 | Area | Status |
 |---|---|
 | Repository structure | ✅ Scaffolded |
-| Canonical documentation (`docs/`) | ✅ Created |
-| Skill definitions (`docs/skills/`) | ✅ Created |
-| Agent pointers (Claude Code, Codex, Cursor) | ✅ Created |
-| Python environment (`uv`) | ✅ Initialized — `pyproject.toml`, `uv.lock` |
-| Backend application code | ⛔ Not started |
-| Frontend application code | ⛔ Not scaffolded — `web/frontend/` awaits `npm create` |
-| Transcription pipeline | ⛔ Not started |
-| Tests | ⛔ None yet — `tests/` tree exists |
-| Deployment | ⛔ Not defined |
+| Canonical documentation (`docs/`) | ✅ Rewritten for the live-streaming product |
+| Implementation plan | ✅ `docs/plans/live-seminar-transcriber.md` — 14 phases |
+| Python environment (`uv`) | ✅ Dependencies added; optional groups defined |
+| Application skeleton + `GET /api/health` | ✅ Phase 1 |
+| Configuration system | ✅ Phase 1 — layers, presets, hot-swap classes, credentials |
+| Audio capture | ⛔ Phase 2 |
+| Voice activity detection | ⛔ Phase 3 |
+| ASR abstraction (Seam A) | ⛔ Phase 4 |
+| Streaming engine | ⛔ Phase 5 |
+| Transcript store | ⛔ Phase 6 |
+| Session manager and metrics | ⛔ Phase 7 |
+| Transport (HTTP + WebSocket) | ⛔ Phase 8 |
+| LLM abstraction (Seam B) | ⛔ Phase 9 |
+| Chat and context pipeline | ⛔ Phase 10 |
+| Frontend | ⛔ Phases 11–13 |
+| Hardening and soak | ⛔ Phase 14 |
 
-Open work is tracked in [checklist.md](checklist.md).
+Open work is tracked in [checklist.md](checklist.md); phase status in
+[plans/live-seminar-transcriber.md](plans/live-seminar-transcriber.md).
 
 ## Tech Stack
 
@@ -34,42 +47,39 @@ Open work is tracked in [checklist.md](checklist.md).
 |---|---|---|
 | Backend language | Python 3.11+ | Confirmed |
 | Python env/package manager | `uv` | Confirmed |
-| Backend web framework | FastAPI | **Assumed** — see Decision Log D-004 |
-| Frontend runtime | Node 22 / npm | Confirmed |
-| Frontend framework | React + Vite + TypeScript | **Assumed** — see Decision Log D-005 |
-| Transcription engine | Undecided | Open |
-| Persistence | Undecided | Open |
-| Auth | Undecided | Open |
-| Deployment target | Undecided | Open |
-
-Items marked **Assumed** were scaffolded so structure work could proceed while the user deferred
-product specifics. They are cheap to change now and expensive to change later — confirm them before
-substantial code lands. Each has a corresponding item in `docs/checklist.md`.
+| Backend web framework | FastAPI | **Confirmed** — D-004 |
+| Frontend | Jinja2 templates + vanilla ES modules + plain CSS, no build step | **Confirmed** — D-011 |
+| Transport | HTTP for operations, WebSocket for the live event stream | Confirmed — D-013 |
+| Speech recognition | Pluggable. Scripted mock and WAV file source ship; `faster-whisper` optional. | **Confirmed** — D-012 |
+| Language model | Pluggable. One OpenAI-compatible client plus a native Anthropic client. | Confirmed — D-014 |
+| Persistence | SQLite with FTS5 | **Confirmed** — D-015 |
+| Auth | None — single-user, loopback-bound | **Confirmed** — D-016 |
+| Deployment target | Runs locally. Desktop packaging deliberately left open. | Open |
 
 ## Architecture Overview
 
-A three-tier split, documented in detail in [architecture.md](architecture.md):
+Detail in [architecture.md](architecture.md).
 
 ```text
-Browser (web/frontend)
-    │  HTTP/JSON, file upload
-    ▼
-API (web/backend/app/routes)
-    │
-    ▼
-Services (web/backend/app/services) ──▶ Transcription engine
-    │
-    ▼
-Storage (data/, database TBD)
+microphone / loopback / WAV file
+    ▼  audio capture — 16 kHz mono float32, ring-buffered, never blocking
+    ▼  voice activity detection — speech flag, hysteresis, pause events
+    ▼  streaming engine ◄──► ASR abstraction  (SEAM A: mock, faster-whisper)
+    ▼  transcript store — SQLite, append-only, written through on commit
+    ├──────────────► transport — WebSocket events ──► browser
+    ▼  context pipeline — rolling summaries, glossary, chunk index
+    ▼  chat orchestrator ◄──► LLM abstraction  (SEAM B: local, hosted API)
+    └──────────────► transport ──► browser
 ```
 
-The frontend and backend are separate deployables that agree on the contracts in
-`web/shared/contracts/`. Neither imports the other's source directly.
+The design rests on two swap points. **Seam A** lets the speech model change without touching the
+commit logic; **Seam B** lets the language model move between a local server and a hosted API. Both
+are narrow interfaces defined early because everything else is replaceable later and these are not.
 
 ## Repository Conventions
 
-- **`docs/` is the single source of truth.** Agent folders (`.claude/`, `.agents/`, `.cursor/`)
-  contain pointers only; they never hold rule content of their own.
+- **`docs/` is the single source of truth.** Agent folders (`.claude/`, `.agents/`, `.cursor/`) contain
+  pointers only.
 - **All web application code lives under `web/`.**
 - **Python is managed exclusively with `uv`.** No bare `pip`, `poetry`, or `conda`.
 - **Files cap at 800 lines**, ideally under 500.
@@ -77,7 +87,7 @@ The frontend and backend are separate deployables that agree on the contracts in
 
 ## Supported Agent Environments
 
-Configured during initialization: **Claude Code**, **OpenAI Codex**, and **Cursor**.
+Configured: **Claude Code**, **OpenAI Codex**, and **Cursor**.
 
 | Tool | Pointer location |
 |---|---|
@@ -85,38 +95,29 @@ Configured during initialization: **Claude Code**, **OpenAI Codex**, and **Curso
 | OpenAI Codex | `.agents/skills/<skill>/SKILL.md` |
 | Cursor | `.cursor/rules/<rule>.mdc` |
 
-Antigravity (`.agent/`) and Gemini CLI (`.gemini/`) were not requested and are not configured.
+Antigravity (`.agent/`) and Gemini CLI (`.gemini/`) are not configured.
 
 ## Decision Log
 
 | ID | Decision | Rationale |
 |---|---|---|
-| D-001 | `docs/` is the source of truth; agent folders hold pointers only | Prevents the same rule drifting across three tool-specific copies. Adding a tool becomes a pointer file, not a rule fork. |
-| D-002 | Mode G layout — API plus separate frontend under `web/` | Matches the confirmed Python-backend / Node-frontend split. Keeps the two toolchains and their lockfiles cleanly separated. |
-| D-003 | `uv` for Python, `npm` for the frontend | `uv` is the mandated Python manager for this ecosystem. npm keeps frontend tooling conventional and lockfile-stable. |
-| D-004 | FastAPI assumed for the backend | Async-native, which suits long-running transcription jobs and streaming responses; generates the OpenAPI spec that `web/shared/contracts/` needs. **Assumption — confirm before building.** |
-| D-005 | React + Vite + TypeScript assumed for the frontend | The most conventional Node frontend stack; `structures/web-interfaces.md` Mode G assumes a `src/`-based SPA. **Assumption — confirm before building.** |
-| D-006 | Only `repository-structure` and `planner` skills adopted | The user selected these two. `website-architecture`, `ui-frontend`, `accessibility-mobile`, and `ada-compliance` were referenced by the initializer but **did not exist in this repository** and were explicitly not selected for synthesis. |
-| D-007 | Accessibility requirements folded into `docs/design-system.md` rather than dedicated skills | Since the a11y skills were not adopted but this is a web project, WCAG 2.1 AA and mobile-touch baselines are still recorded — as documentation rather than as skills. Tracked in `docs/checklist.md`. |
-| D-008 | No `CHANGELOG.md` | Git history plus this Decision Log and `docs/checklist.md` cover it. Revisit if versioned artifacts are ever published. |
-| D-009 | Initializer files deleted after migration | `initialize.md`, `read-yaml.py`, `repo-structure/`, and `plan/` were removed at the user's request once their content was migrated into `docs/skills/`. Nothing was lost — see "Initialization Artifacts" below. |
-
-## Initialization Artifacts
-
-Initialization inputs were removed after their content was migrated. Where each one went:
-
-| Removed | Migrated to |
-|---|---|
-| `initialize.md` | Its Definition of Done became the setup checklist in `docs/checklist.md`; its rules became `docs/skills/global-project-rules/SKILL.md`. |
-| `read-yaml.py` | Not needed after skill discovery; skills are now enumerated in `docs/skills/`. |
-| `repo-structure/SKILL.md` | `docs/skills/repository-structure/SKILL.md` (tailored to this project). |
-| `repo-structure/SETUP.md` | `docs/skills/repository-structure/SETUP.md` (with answers recorded). |
-| `repo-structure/structures/` | `docs/skills/repository-structure/structures/` (verbatim). |
-| `plan/SKILL.md` | `docs/skills/planner/SKILL.md` (tailored to this project). |
-| `plan/SETUP.md` | `docs/skills/planner/SETUP.md` (with answers recorded). |
-| `plan/planner.md` | `docs/skills/planner/planner.md` (verbatim). |
-
-Nothing was retained outside `docs/`.
+| D-001 | `docs/` is the source of truth; agent folders hold pointers only | Prevents the same rule drifting across three tool-specific copies. |
+| D-002 | Mode G layout — API plus separate frontend under `web/` | Keeps the two concerns and their assets cleanly separated. Still holds under D-011; only the frontend's toolchain changed. |
+| D-003 | `uv` for Python | The mandated Python manager for this ecosystem. **npm is no longer used** — see D-011. |
+| D-004 | **FastAPI confirmed** for the backend | Async-native, which suits a continuous WebSocket event stream alongside ordinary request/response; generates the OpenAPI spec `web/shared/contracts/` needs. The assumption recorded at initialization is now a commitment. |
+| D-005 | ~~React + Vite + TypeScript assumed for the frontend~~ | **Reversed by D-011.** |
+| D-006 | Only `repository-structure` and `planner` skills adopted | The user selected these two; the others did not exist in this repository. |
+| D-007 | Accessibility requirements folded into `docs/design-system.md` | The a11y skills were not adopted, but WCAG 2.1 AA remains a requirement, recorded as documentation. |
+| D-008 | No `CHANGELOG.md` | Git history plus this log and `docs/checklist.md` cover it. |
+| D-009 | Initializer files deleted after migration | Content migrated into `docs/skills/`; nothing lost. |
+| **D-010** | **The product is a live streaming transcriber, not an upload-and-poll job service** | The two design documents specify continuous capture with a persistent event stream. The upload/job model recorded at initialization describes a different application: it has no notion of a live hypothesis tail, a commit policy, or health telemetry, all of which are central here. Keeping both would have meant two contradictory contracts. `architecture.md`, `routes.md`, `api-contract.md`, and `data-flow.md` were rewritten rather than extended. |
+| **D-011** | **Frontend is Jinja2 templates + vanilla ES modules + plain CSS, no build step. Reverses D-005.** | The user asked for a heavily compartmentalised template/CSS/JS structure rather than a single file, and for HTML and JavaScript to be the primary artifacts. Server-side includes give that compartmentalisation directly; a framework would add a build step, a lockfile, and a toolchain for a UI that is two panes and a settings modal. It also removes the npm/Node requirement entirely — one runtime, one package manager. The HTTP/WebSocket contract is unchanged, so a framework rewrite later remains possible without touching the backend. |
+| **D-012** | **ASR ships as a scripted mock plus a real-time WAV file source; `faster-whisper` lives behind an optional dependency group** | The architecture is explicit that development should happen against recorded audio because live microphone input is not reproducible, and that the commit policy needs a mock backend with scripted outputs to be testable at all. Making the real model optional keeps `uv sync` fast and the test suite free of model downloads, while `uv sync --extra asr-whisper` gives the real thing. Verified: a plain `uv sync` produces an environment with no `faster_whisper`. |
+| **D-013** | **HTTP for operations, WebSocket for the live stream** | The transcript is a continuous server-to-client push; everything else is ordinary request/response. Polling a transcript that updates once a second is wasteful and adds latency to the one thing that must feel live. The socket is treated as disposable — reconnection replays from the last segment id, which removes an entire class of bug. |
+| **D-014** | **One OpenAI-compatible HTTP client plus a native Anthropic client** | Ollama, llama.cpp's server, LM Studio, vLLM, LocalAI, and OpenAI itself all expose the same chat-completions shape, differing only in base URL. That collapses an apparent provider matrix into two implementations. Anthropic's request/response shape genuinely differs and gets its own client. |
+| **D-015** | **SQLite with FTS5 for persistence** | Survives a crash mid-talk, gives full-text search over the transcript for free, and needs no server. A 90-minute session held only in memory is unrecoverable if the process dies at minute 80. |
+| **D-016** | **No authentication; bound to `127.0.0.1`** | Single-user local application, so an auth model would be ceremony with no security benefit. The binding is the actual control: an unauthenticated transcript endpoint on a network interface would publish the contents of a private room. Recorded as a decision so it is not mistaken for an oversight. |
+| **D-017** | **Credentials go to the OS credential store, never a config file** | Keys in a plaintext config file get committed, backed up, and shared by accident. `keyring` maps to the correct store on every platform; an environment variable is the documented fallback. The frontend is only ever told whether a credential is *present*. |
 
 ## Where to Go Next
 
@@ -124,3 +125,4 @@ Nothing was retained outside `docs/`.
 - Commands and daily workflow → [workflow.md](workflow.md)
 - Open work → [checklist.md](checklist.md)
 - System design → [architecture.md](architecture.md)
+- The build plan → [plans/live-seminar-transcriber.md](plans/live-seminar-transcriber.md)
