@@ -164,6 +164,48 @@ def test_helpers_agree_with_the_tables() -> None:
         modes.states_for("screen")
 
 
+# -- the client store may only speak the vocabulary --------------------------------------
+
+MODE_STORE_JS = STATIC_DIR / "js" / "stores" / "mode.js"
+
+
+@pytest.fixture(scope="module")
+def store_js() -> str:
+    assert MODE_STORE_JS.is_file(), f"The mode store is missing: {MODE_STORE_JS}"
+    return MODE_STORE_JS.read_text(encoding="utf-8")
+
+
+def test_the_mode_store_names_no_state_of_its_own(store_js: str) -> None:
+    """Every state the store mentions must be an imported constant, never a bare string.
+
+    A literal ``"processing"`` in the store is how the interface ends up displaying a state the
+    backend never sends, or missing one it does. The vocabulary is imported so a rename in
+    `modes.js` breaks the import rather than silently un-matching a comparison.
+    """
+    body = re.sub(r"/\*\*.*?\*/", "", store_js, flags=re.DOTALL)
+    body = re.sub(r"//[^\n]*", "", body)
+    # Strip the import block itself, which legitimately contains no string literals anyway.
+    body = re.sub(r"import \{.*?\} from [^;]+;", "", body, flags=re.DOTALL)
+
+    literals = set(re.findall(r'"([a-z_]+)"', body))
+    forbidden = literals & set(modes.RECORD_STATES) | literals & set(modes.CAPTURE_MODES)
+    assert not forbidden, (
+        f"stores/mode.js uses bare state or mode strings {sorted(forbidden)}; "
+        "import the constants from core/modes.js instead"
+    )
+
+
+def test_the_mode_store_imports_the_vocabulary(store_js: str) -> None:
+    assert 'from "../core/modes.js"' in store_js
+
+
+def test_the_mode_store_refuses_states_a_mode_cannot_reach(store_js: str) -> None:
+    """`setState` must be gated on `statesFor`, which is the whole guarantee the map buys."""
+    match = re.search(r"setState\(state, message = \"\"\) \{(.*?)\n  \}", store_js, re.DOTALL)
+    assert match, "setState is missing or has changed shape"
+    assert "statesFor(this.mode).includes(state)" in match.group(1)
+
+
 def test_the_mirror_is_where_the_documentation_says_it_is() -> None:
     # A rename that moved the file would make every parsing test above skip silently if the
     # fixture merely returned an empty string, so the location is asserted on its own.
