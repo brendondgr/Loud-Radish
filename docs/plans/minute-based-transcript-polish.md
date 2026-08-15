@@ -1,6 +1,6 @@
 # Minute-Based Transcript Polish
 
-*Created: 2026-08-15 · Status: in progress (0 / 7 steps)*
+*Created: 2026-08-15 · Status: **complete** (7 / 7 steps)*
 
 ## 1. Introduction
 
@@ -26,6 +26,11 @@ before cutting. A hard ceiling catches a speaker who never pauses.
 ---
 
 ## 2. Gaps & Unanswered Questions
+
+*Every assumption below was implemented as written. One detail changed during the build and is
+recorded here rather than left contradicting the code: the chunk planner shipped as a module-level
+`decide_cut()` returning a `CutDecision`, not as a `ChunkPlanner` class — it holds no state, and a
+stateless class would have been a namespace pretending to be an object.*
 
 - **Naming collision with the existing rolling summaries.** `ContextWorker` already produces
   `summary.added` records, and those *are* summaries — lossy compression used to fit a two-hour talk
@@ -97,9 +102,9 @@ before cutting. A hard ceiling catches a speaker who never pauses.
 
 - **Locations**:
   - `web/backend/app/services/polish/__init__.py` — package exports.
-  - `web/backend/app/services/polish/chunker.py` — `ChunkPlanner` class with a `decide()` method
-    taking `(cursor, last_committed_end, silence_seconds, config)` and returning a cut point or
-    `None`. No clock, no I/O.
+  - `web/backend/app/services/polish/chunker.py` — `decide_cut(cursor, last_committed_end,
+    silence_seconds, config, final)` returning a `CutDecision`: a cut point or `None`, and the
+    reason either way. No clock, no I/O.
   - `web/backend/app/services/polish/guard.py` — `strip_decoration()` (removes bold, italic, heading
     and blockquote markers while leaving list bullets alone) and `preserves_content()` returning a
     pass/fail plus the reason.
@@ -248,10 +253,10 @@ before cutting. A hard ceiling catches a speaker who never pauses.
 
 | Step | Title | Status |
 |---|---|---|
-| 1 | Configuration surface and the durable record | Not started |
-| 2 | Chunk planner and content-integrity guard | Not started |
-| 3 | Polish worker and prompt | Not started |
-| 4 | Pipeline wiring | Not started |
-| 5 | Transport and HTTP surface | Not started |
-| 6 | Frontend | Not started |
-| 7 | Documentation, verification, merge | Not started |
+| 1 | Configuration surface and the durable record | ✅ Complete |
+| 2 | Chunk planner and content-integrity guard | ✅ Complete |
+| 3 | Polish worker and prompt | ✅ Complete |
+| 4 | Pipeline wiring | ✅ Complete |
+| 5 | Transport and HTTP surface | ✅ Complete |
+| 6 | Frontend | ✅ Complete |
+| 7 | Documentation, verification, merge | ✅ Complete |

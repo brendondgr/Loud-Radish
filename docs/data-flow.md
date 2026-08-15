@@ -38,11 +38,21 @@ never uploaded; it is captured locally and consumed in flight.
    `transcript.committed` (append) and `transcript.hypothesis` (replace) go to every
    connected client, alongside audio level, VAD state, and health telemetry.
 
-7. SUMMARISE                                  services/context/
+7. POLISH                                     services/polish/
+   Once about a minute of committed transcript has accumulated, the worker waits for
+   the speaker to stop for ~2 s and cuts there, at the end of the newest committed
+   segment. The chunk goes to the language model with an instruction list — repair
+   punctuation, sentences, and paragraphs, change nothing else — and comes back as a
+   POLISHED BLOCK, published as `transcript.polished`. The segments it covers are
+   left exactly as they are; the block is an additional row, never a replacement.
+   With no language model, or on any failure, nothing is emitted and the page keeps
+   showing raw segments. That fallback is the design, not the error path.
+
+8. SUMMARISE                                  services/context/
    In the background, at low priority: rolling summaries and glossary terms. Never
    allowed to delay a chat request or contend with transcription for the GPU.
 
-8. ANSWER                                     services/chat/
+9. ANSWER                                     services/chat/
    A question assembles context in priority order under a token budget, calls the
    provider, and streams `chat.delta` frames back. Transcription continues throughout.
 ```

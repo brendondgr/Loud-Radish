@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-08-14 (Phase 11 — frontend foundation)*
+*Last updated: 2026-08-15 (minute-based transcript polish)*
 
 The active work list for TranscriberPrototype. Update it whenever a task is finished or new work is
 discovered.
@@ -77,6 +77,31 @@ and every part of that is configurable from inside the interface, with no config
 
 ---
 
+## Part 3b — Minute-Based Transcript Polish
+
+Tracked in [plans/minute-based-transcript-polish.md](plans/minute-based-transcript-polish.md).
+**All seven steps are complete.** Each finished minute of transcript is rewritten into readable
+prose in the background, and the page keeps showing raw segments whenever that cannot happen.
+
+- [x] Configuration (`polish.*`), the `PolishedBlock` record, and the `polished_blocks` table
+- [x] The pause-aware chunk planner and the content-integrity guard
+- [x] The background worker, its instruction-list prompt, and every failure path
+- [x] Session wiring behind a factory, so a machine with no language model is unaffected
+- [x] `transcript.polished` over the socket, reconnection replay, `GET /api/transcript/polished`
+- [x] The transcript pane, the settings controls, and the 320 px and keyboard passes
+- [x] Documentation: D-018 plus `structure`, `architecture`, `data-flow`, `api-contract`,
+      `routes`, `component-map`, `design-system`
+
+Deliberately out of scope, recorded so the absences are not mistaken for oversights:
+
+- **Export is unchanged.** `/api/transcript/export` emits the verbatim record with timestamps.
+  Polished text is a reading aid, and an export that quietly substituted a model's rewrite for what
+  was said would be the wrong document to keep.
+- **The session archive does not count polished blocks.** `services/transcript/archive.py` reads
+  older session files directly and must open one written before this table existed.
+
+---
+
 ## Part 4 — Still Open
 
 - [ ] **Default ASR model and compute device.** Depends entirely on the user's hardware. A
@@ -97,6 +122,13 @@ and every part of that is configurable from inside the interface, with no config
 - [ ] **Speaker diarisation.** Out of scope for v1. The segment model reserves an optional `speaker`
       field so adding it later is not a schema migration.
 - [ ] **Hosted ASR backends.** Deferred to v2. Seam A accommodates them; none is implemented.
+- [ ] **A per-page control for the polish view.** Settings → Context turns the pass on and off, but
+      there is no way to see the raw segments for a stretch that has been polished without turning
+      it off entirely. Worth adding once the pass has been used against a real model and it is
+      clear how often anyone wants to.
+- [ ] **Tuning `polish.min_retained_ratio`.** The 0.6 default is a starting point chosen without a
+      real model behind it. It is a length check, not a meaning check, and the right value can only
+      come from watching what a real model actually returns.
 
 ---
 
@@ -123,6 +155,13 @@ user's own machine, and none may be reported as passing until it has had one.
       integration tests in `tests/assistant/test_llm_live.py` run against it when it is up and skip
       when it is not.
 - [ ] **A real hosted LLM provider** — confirm credential storage, auth, and streaming.
+- [ ] **The polish pass against a real language model.** Every failure path is covered by tests
+      against a scripted backend, and the happy path is verified end to end in the browser with a
+      block written directly into the session database. What has *not* been observed is a real
+      model obeying the instruction list: whether it strips filler without dropping content,
+      whether it honours the no-markup rule, whether the no-reasoning fields are accepted by the
+      user's server, and whether the length guard's default floor is right. Run a talk with a local
+      model and read the result against the raw transcript.
 - [ ] **A genuine 90-minute soak** — the accelerated soak in `tests/transcription/test_soak.py`
       drives ninety minutes of transcript through the engine in seconds and holds bounded memory,
       contiguous segment ids, and a clock that has not drifted. It is not the same as ninety

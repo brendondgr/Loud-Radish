@@ -1,6 +1,6 @@
 # TranscriberPrototype — Project Documentation
 
-*Last updated: 2026-08-14 (Phase 11 — frontend foundation)*
+*Last updated: 2026-08-15 (minute-based transcript polish)*
 
 ## Purpose
 
@@ -33,11 +33,12 @@ build step.
 | Transcript store | ✅ Phase 6 — SQLite, FTS5 search, query surface, five export formats |
 | Session manager and metrics | ✅ Phase 7 — worker wiring, bounded queues, health telemetry, degradation |
 | Transport (HTTP + WebSocket) | ✅ Phase 8 — event hub, reconnection replay, full HTTP surface |
-| LLM abstraction (Seam B) | ⛔ Phase 9 |
-| Chat and context pipeline | ⛔ Phase 10 |
+| LLM abstraction (Seam B) | ✅ Phase 9 — OpenAI-compatible and Anthropic clients, error taxonomy |
+| Chat and context pipeline | ✅ Phase 10 — context assembly, quick actions, summaries, glossary |
 | Frontend foundation | ✅ Phase 11 — templates, tokens, transport, transcript pane |
-| Frontend chrome, settings, chat | ⛔ Phases 12–13 |
-| Hardening and soak | ⛔ Phase 14 |
+| Frontend chrome, settings, chat | ✅ Phases 12–13 — settings modal, chat pane, glossary, sessions |
+| Hardening and soak | ✅ Phase 14 — degradation tests, accelerated soak, export, docs |
+| Minute-based transcript polish | ✅ D-018 — background clean-up pass, optional at every level |
 
 Open work is tracked in [checklist.md](checklist.md); phase status in
 [plans/live-seminar-transcriber.md](plans/live-seminar-transcriber.md).
@@ -68,6 +69,7 @@ microphone / loopback / WAV file
     ▼  streaming engine ◄──► ASR abstraction  (SEAM A: mock, faster-whisper)
     ▼  transcript store — SQLite, append-only, written through on commit
     ├──────────────► transport — WebSocket events ──► browser
+    ├──────────────► polish pass — a minute at a time, rewritten for reading ──► browser
     ▼  context pipeline — rolling summaries, glossary, chunk index
     ▼  chat orchestrator ◄──► LLM abstraction  (SEAM B: local, hosted API)
     └──────────────► transport ──► browser
@@ -119,6 +121,7 @@ Antigravity (`.agent/`) and Gemini CLI (`.gemini/`) are not configured.
 | **D-015** | **SQLite with FTS5 for persistence** | Survives a crash mid-talk, gives full-text search over the transcript for free, and needs no server. A 90-minute session held only in memory is unrecoverable if the process dies at minute 80. |
 | **D-016** | **No authentication; bound to `127.0.0.1`** | Single-user local application, so an auth model would be ceremony with no security benefit. The binding is the actual control: an unauthenticated transcript endpoint on a network interface would publish the contents of a private room. Recorded as a decision so it is not mistaken for an oversight. |
 | **D-017** | **Credentials go to the OS credential store, never a config file** | Keys in a plaintext config file get committed, backed up, and shared by accident. `keyring` maps to the correct store on every platform; an environment variable is the documented fallback. The frontend is only ever told whether a credential is *present*. |
+| **D-018** | **The transcript is polished a minute at a time, and polishing is not summarising** | A speech model emits fragments: two seconds of speech with guessed punctuation, and a page of those is a wall of half-sentences. The clean-up pass rewrites each finished minute into readable prose. Three properties make it safe. **It is not summarisation** — `services/context/` already summarises, which is lossy by design; this must not drop a claim, so the prompt is a numbered instruction list rather than a request, and a length guard rejects a rewrite that came back as a summary. **It is additive** — polished blocks are stored alongside the segments they cover, never in place of them, so the verbatim record, its timestamps, search, and export are untouched and a bad rewrite costs one redundant row. **Its fallback is doing nothing** — with no language model, an unreachable one, a failed call, or a result that fails the guard, no block is produced and the page shows exactly what it showed before the feature existed. Chunks are cut at a pause in speech rather than on a timer, and always at the end of a committed segment, so no chunk ever contains half a sentence or omits words still in the hypothesis tail. |
 
 ## Where to Go Next
 

@@ -42,6 +42,7 @@ Every frame is `{"event": "<name>", "data": { … }}`.
 | `session.stopped` | `session_id`, `stats` | Capture ended |
 | `transcript.committed` | `id`, `text`, `start`, `end`, `wall_clock`, `confidence`, `model_id`, `speaker` | Append permanently |
 | `transcript.hypothesis` | `text` (may be empty), `start` | Replace the tentative tail |
+| `transcript.polished` | `id`, `start`, `end`, `text`, `source_ids` | A finished minute rewritten for reading. Append the block and stop drawing the segments in `source_ids` — do **not** delete them |
 | `audio.level` | `rms`, `peak`, `clipping` | Drives the level meter |
 | `vad.state` | `speaking` (bool) | Drives the speaking indicator |
 | `status` | `rtf`, `queue_depth`, `commit_latency_s`, `model_id`, `device`, `dropped_frames` | Health telemetry |
@@ -75,8 +76,17 @@ The socket is disposable by design.
 1. The client detects the disconnect and shows it in the status bar. **It does not clear the transcript.**
 2. It reconnects with exponential backoff.
 3. On reconnect it sends `hello` with the last segment id it received.
-4. The server replays every committed segment after that id, then resumes live events.
-5. The client ignores any segment id it already holds, which makes the replay idempotent.
+4. The server replays every committed segment after that id, then every polished block, then
+   resumes live events.
+5. The client ignores any segment id or block id it already holds, which makes the replay idempotent.
+
+Polished blocks are replayed **in full**, not from a cursor. There is one a minute so the whole set
+is small even for a long talk, and a block is produced once and never re-sent — a client that missed
+one would show that minute as raw text for the rest of the session.
+
+Frame order within a replay is not part of the contract and cannot be: a client is registered the
+moment it connects, so live events may already be queued when its `hello` arrives. Read the stream
+by event type, never by position.
 
 ## Implemented HTTP shapes
 
