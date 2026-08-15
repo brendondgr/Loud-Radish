@@ -81,6 +81,8 @@ def build(
     frame_rate: int = DEFAULT_FRAME_RATE,
     max_height: int = DEFAULT_MAX_HEIGHT,
     want_preview: bool = True,
+    source_width: int = 0,
+    source_height: int = 0,
 ) -> PipelineSpec:
     """Assemble the launch line for one recording.
 
@@ -109,20 +111,23 @@ def build(
         "!",
         f"video/x-raw,framerate={frame_rate}/1",
         "!",
-        "videoscale",
-        "!",
-        # Only ever scales *down*: a small window recorded at its own size is sharper than one
-        # stretched to a ceiling it never reached.
-        f"video/x-raw,height=[1,{max_height}],pixel-aspect-ratio=1/1",
-        "!",
         "videoconvert",
         "!",
     ]
 
     include_preview = want_preview and support.preview
+
+    # **Each branch scales for itself.** A single shared `videoscale` ahead of the tee looks
+    # economical and is a trap: GStreamer resolves caps upstream, so the preview's fixed
+    # `width=480` propagated back through the tee and became the *recording's* width too. Every
+    # window capture on this machine was written at 480 pixels wide, and — with the height left as
+    # an open range for the scaler to satisfy however it liked — one was written at **480x16**, a
+    # sixteen-pixel-tall strip of a talk. Two scalers cost one extra rescale of a frame that is
+    # already being encoded twice; a recording nobody can watch costs the recording.
     if include_preview:
         args += ["tee", "name=t", "!", "queue", "!"]
 
+    args += ["videoscale", "!", _record_caps(max_height, source_width, source_height), "!"]
     args += encoder_args(support.encoder)
     args += ["!", support.muxer, "!", "filesink", f"location={video_path}"]
 
@@ -140,6 +145,8 @@ def build(
             "!",
             "videoscale",
             "!",
+            # Width only. Pinning the height as well would letterbox or stretch a window whose
+            # shape is not the preview's, and the monitor pane is sized from the image it gets.
             f"video/x-raw,width={PREVIEW_WIDTH},pixel-aspect-ratio=1/1",
             "!",
             "jpegenc",
@@ -158,3 +165,25 @@ def build(
         video_path=video_path,
         preview_path=preview_path if include_preview else "",
     )
+
+
+def _record_caps(max_height: int, source_width: int, source_height: int) -> str:
+    """The recording branch's output size.
+
+    **Concrete numbers whenever the portal told us the source size**, because a caps *range* asks
+    the scaler to pick, and a scaler with a range and any other constraint in play will pick
+    something no one wanted — which is exactly how a talk got recorded sixteen pixels tall. When
+    the size is unknown the range is still the right answer, but it is now the only constraint on
+    the branch, so `videoscale` passes a small window through untouched instead of resolving it
+    against a preview's width.
+
+    Only ever scales *down*: a window smaller than the ceiling is sharper at its own size than
+    stretched up to one it never reached.
+    """
+    if source_width > 0 and source_height > 0:
+        height = min(source_height, max_height)
+        width = max(2, round(source_width * height / source_height))
+        # Even dimensions: VP8, VP9 and H.264 all subsample chroma, and an odd edge is either
+        # rejected outright or silently rounded by the encoder.
+        return f"video/x-raw,width={width - width % 2},height={height - height % 2}"
+    return f"video/x-raw,height=[1,{max_height}],pixel-aspect-ratio=1/1"

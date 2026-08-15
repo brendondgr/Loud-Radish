@@ -672,6 +672,20 @@ class SessionManager:
             frame_rate=config.capture.frame_rate,
             max_height=config.capture.max_height,
             want_preview=config.capture.preview,
+            # What the compositor says it is handing over. Without it the pipeline can only give
+            # the scaler a range to satisfy, and a range is how a recording ended up 480x16.
+            source_width=stream.width,
+            source_height=stream.height,
+        )
+        # The source size is worth a line of its own: when a capture records the wrong thing, this
+        # is what says whether the compositor handed over the wrong node or the pipeline mangled a
+        # correct one, and the two have nothing in common as faults.
+        logger.info(
+            "Recording PipeWire node %s, source %sx%s: %s",
+            stream.node_id,
+            stream.width,
+            stream.height,
+            spec.command,
         )
 
         self._recorder = WindowRecorder(

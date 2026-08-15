@@ -148,6 +148,64 @@ def test_scaling_is_only_ever_downward() -> None:
     assert any("height=[1,720]" in arg for arg in build().args)
 
 
+def test_the_preview_does_not_decide_the_recordings_size() -> None:
+    """The bug this file did not catch, and the reason every window capture was 480 wide.
+
+    GStreamer resolves caps *upstream*. With one shared `videoscale` ahead of the tee, the preview
+    branch's fixed `width=480` propagated back through the tee and became the recording's width
+    too — and with the height left as an open range for the scaler to satisfy however it liked, one
+    recording came out **480x16**: a sixteen-pixel-tall strip of a talk, written without a single
+    warning from GStreamer, because nothing about it was invalid. Only watching the file revealed
+    it. So each branch owns a scaler, and the recording's size is stated rather than negotiated.
+    """
+    spec = build(source_width=1920, source_height=1080)
+    args = spec.args
+
+    assert args.count("videoscale") == 2
+    assert "video/x-raw,width=1280,height=720" in args
+    # And the preview still gets its own, unrelated, width.
+    assert any(f"width={pipeline.PREVIEW_WIDTH}" in arg for arg in args)
+
+
+def test_the_recording_branch_scales_after_the_tee() -> None:
+    """Position is the whole fix: a scaler before the tee is shared, and sharing is the fault."""
+    args = build(source_width=1920, source_height=1080).args
+
+    assert args.index("tee") < args.index("videoscale")
+
+
+def test_a_known_source_size_is_stated_rather_than_left_to_the_scaler() -> None:
+    """A range asks the scaler to choose. Given anything else to satisfy, it chooses badly."""
+    args = build(source_width=800, source_height=600).args
+
+    # Under the ceiling, so it records at its own size rather than being stretched up to it.
+    assert "video/x-raw,width=800,height=600" in args
+    assert not any("height=[" in arg for arg in args)
+
+
+def test_a_tall_source_is_capped_at_the_ceiling_and_keeps_its_shape() -> None:
+    args = build(source_width=2560, source_height=1440, max_height=720).args
+
+    assert "video/x-raw,width=1280,height=720" in args
+
+
+def test_odd_dimensions_are_rounded_down_to_even() -> None:
+    """VP8, VP9 and H.264 all subsample chroma; an odd edge is rejected or silently rounded."""
+    args = build(source_width=1919, source_height=1081, max_height=1081).args
+
+    caps = next(arg for arg in args if arg.startswith("video/x-raw,width="))
+    width, height = (int(part.split("=")[1]) for part in caps.split(",")[1:3])
+    assert width % 2 == 0
+    assert height % 2 == 0
+
+
+def test_an_unknown_source_size_still_gets_a_ceiling() -> None:
+    """The portal does not always report a size, and a capture must not depend on it doing so."""
+    args = build(source_width=0, source_height=0).args
+
+    assert any("height=[1,720]" in arg for arg in args)
+
+
 def test_frames_are_dropped_rather_than_queued() -> None:
     """The portal's node is live: a late frame queued rather than dropped drifts the recording
     behind the audio it will be muxed against."""
