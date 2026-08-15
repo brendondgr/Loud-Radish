@@ -18,12 +18,16 @@ router = APIRouter(prefix="/api", tags=["health"])
 async def health(request: Request) -> dict[str, Any]:
     """Report that the process is alive, and which optional capabilities are installed."""
     from ..config import CredentialStore
+    from ..services.asr.acceleration import detect
 
     credentials: CredentialStore = request.app.state.credentials
     return {
         "status": "ok",
         "credentials_backend": credentials.backend_name,
         "optional": _optional_capabilities(),
+        # What GPU acceleration is available, and what is stopping it if it is not. Reported here
+        # because the alternative is discovering it when the user presses record.
+        "acceleration": detect().as_dict(),
     }
 
 

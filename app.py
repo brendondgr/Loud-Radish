@@ -91,6 +91,28 @@ def _optional_capabilities() -> list[tuple[str, str, bool, str]]:
     ]
 
 
+def _acceleration_lines() -> list[str]:
+    """Where GPU acceleration stands, and what would fix it.
+
+    Reported at startup because every way this can be wrong — no ROCm build, a missing runtime
+    library, a GPU the kernel cannot see — surfaces identically at the moment the user presses
+    record, with nothing to say which of them applies.
+
+    Import is deferred and guarded: this is a launcher, and a banner must never be the reason the
+    application will not start.
+    """
+    try:
+        from app.services.asr.acceleration import describe_lines
+
+        lines = describe_lines()
+    except Exception:  # noqa: BLE001 - a diagnostic must not become a failure
+        return []
+
+    if not lines:
+        return []
+    return ["", f"    {lines[0]}"] + [f"    {line}" for line in lines[1:]]
+
+
 def _port_is_free(host: str, port: int) -> bool:
     """Whether ``port`` can be bound, so a clash is reported clearly rather than as a traceback."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
@@ -119,6 +141,9 @@ def _print_banner(host: str, port: int, reload: bool) -> None:
         print()
         print("    Nothing optional is installed, so the scripted mock backend will run.")
         print("    That transcribes placeholder text — enough to see the interface work.")
+
+    for line in _acceleration_lines():
+        print(line)
 
     if host not in ("127.0.0.1", "localhost"):
         print()

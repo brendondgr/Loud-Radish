@@ -153,6 +153,27 @@ Two caveats worth knowing before committing to this:
 - **`uv sync` will put the PyPI wheel back**, because `pyproject.toml` names `ctranslate2` without
   knowing which build you want. Re-run the install above after any sync that touches it.
 
+### Startup tells you where you stand
+
+`app.py` checks all three requirements at startup and prints what is missing along with the exact
+commands, with your Python tag and CTranslate2 version filled in. The same report is on
+`GET /api/health` under `acceleration`. It never imports the GPU stack to find out, so a broken
+ROCm install cannot stop the application starting.
+
+### The container option
+
+A ROCm PyTorch container — such as one built from TheRock's `rocm-sdk` wheels — can run
+`faster-whisper` too, and every library the ROCm CTranslate2 needs is present inside one. It needs
+one extra step: those wheels put the runtime under `site-packages/_rocm_sdk_*/lib`, and CTranslate2
+has no RPATH pointing there, so the directories must be on `LD_LIBRARY_PATH`. PyTorch works without
+this because it carries its own RPATH, which makes the failure look like a missing install when it
+is a missing path.
+
+It is the harder option for *this* application regardless. The transcriber needs the microphone, so
+containerising it means passing `/dev/snd` through as well as the GPU, the port, and the data
+directory — whereas on the host the whole thing is two packages and a wheel. A container earns its
+keep when the alternative is a PyTorch-based ASR backend, not here.
+
 If ROCm proves troublesome, `whisper.cpp` with its Vulkan backend is the fallback: it runs on the
 same iGPU through RADV with no ROCm at all, at the cost of writing a second ASR backend against
 Seam A — which is exactly the seam that exists to make that a contained change.
