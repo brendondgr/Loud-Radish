@@ -65,9 +65,20 @@ class TestTheModelsOwnVerdict:
         assert judge(speech, 2.0, config()) is None
 
     def test_a_high_score_alone_is_not_enough_when_the_model_was_sure_of_the_words(self) -> None:
-        """Corroboration matters: a decisive decode over a noisy stretch is often real speech."""
-        decisive = result("the operators commute", no_speech=0.9, logprob=-0.1)
+        """Corroboration matters in the ordinary band: a decisive decode is often real speech."""
+        decisive = result("the operators commute", no_speech=0.7, logprob=-0.1)
         assert judge(decisive, 2.0, config()) is None
+
+    def test_an_all_but_certain_score_needs_no_corroboration(self) -> None:
+        """The measured case. `tiny` invented "Oh" at 0.901 with a log-probability of -0.99, which
+        the corroborated rule acquitted by a hundredth."""
+        verdict = judge(result("Oh", no_speech=0.901, logprob=-0.99, seconds=20.0), 20.0, config())
+        assert verdict is not None
+        assert verdict.code == "no-speech"
+
+    def test_the_certainty_tier_is_configurable(self) -> None:
+        measured = result("Oh", no_speech=0.901, logprob=-0.99, seconds=20.0)
+        assert judge(measured, 20.0, config(no_speech_certain=0.95)) is None
 
     def test_the_primary_signal_stands_alone_when_no_logprob_is_reported(self) -> None:
         """Requiring corroboration that is structurally unavailable would switch the check off."""

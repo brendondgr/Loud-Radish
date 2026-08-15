@@ -123,6 +123,7 @@ def _build_faster_whisper(config: AsrConfig) -> AsrBackend:
         precision=config.precision,
         language=config.language,
         beam_size=config.beam_size,
+        vad_filter=config.vad_filter,
     )
 
 

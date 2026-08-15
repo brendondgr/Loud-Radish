@@ -73,6 +73,10 @@ class HallucinationConfig(_Base):
     #: Corroboration for the above: the mean token log-probability must also be at or below this.
     #: Strongly negative means the model was guessing. Ignored when the backend reports none.
     logprob_threshold: float = Field(default=-1.0, ge=-10.0, le=0.0)
+    #: Above this, the model's no-speech estimate needs no corroboration at all. Measured against
+    #: `tiny` on a non-speech fixture: it invented "Oh" at 0.901 with a log-probability of -0.99,
+    #: which the corroborated rule missed by a hundredth. At this level the model is not hedging.
+    no_speech_certain: float = Field(default=0.85, ge=0.0, le=1.0)
     #: Drop a pass whose words averaged less confidence than this. Zero switches it off, which is
     #: the default: it is a blunt instrument and it punishes quiet speakers.
     min_word_confidence: float = Field(default=0.0, ge=0.0, le=1.0)

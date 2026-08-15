@@ -142,12 +142,20 @@ def judge(
 def _model_says_no_speech(result: AsrResult, config: HallucinationConfig) -> bool:
     """Whether the model's own numbers condemn this pass.
 
-    ``no_speech_prob`` is the primary signal and ``avg_logprob`` is corroboration. When the model
-    reported no log-probability, the primary signal stands on its own — requiring corroboration that
-    is structurally unavailable would switch the check off without saying so.
+    Two tiers, and the second exists because the first was measured and found wanting. In the
+    ordinary tier ``no_speech_prob`` is the primary signal and ``avg_logprob`` corroborates it. But
+    a run of `tiny` over a non-speech fixture invented "Oh" at a no-speech score of 0.901 with a
+    log-probability of −0.99 — condemned by the primary signal, acquitted by corroboration, missing
+    the threshold by a hundredth. Past :attr:`~HallucinationConfig.no_speech_certain` the model is
+    no longer hedging and its verdict stands unaided.
+
+    When the model reported no log-probability at all, the primary signal also stands alone:
+    requiring corroboration that is structurally unavailable would switch the check off in silence.
     """
     if result.no_speech_prob is None:
         return False
+    if result.no_speech_prob >= config.no_speech_certain:
+        return True
     if result.no_speech_prob < config.no_speech_threshold:
         return False
     return result.avg_logprob is None or result.avg_logprob <= config.logprob_threshold

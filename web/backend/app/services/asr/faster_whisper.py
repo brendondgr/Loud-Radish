@@ -64,6 +64,7 @@ class FasterWhisperBackend(AsrBackend):
         language: str | None = "en",
         beam_size: int = 1,
         model_factory: Any | None = None,
+        vad_filter: bool = True,
     ) -> None:
         self._model_name = model
         self._device = device
@@ -71,6 +72,9 @@ class FasterWhisperBackend(AsrBackend):
         self._language = language
         self._beam_size = beam_size
         self._model_factory = model_factory
+        #: Whisper's built-in Silero filter. The first line of defence against invented text:
+        #: non-speech that is never decoded cannot be transcribed into something.
+        self._vad_filter = vad_filter
         self._model: Any | None = None
 
     # -- identity ------------------------------------------------------------------
@@ -159,6 +163,10 @@ class FasterWhisperBackend(AsrBackend):
             word_timestamps=True,
             initial_prompt=prompt or None,
             condition_on_previous_text=False,
+            # Strips non-speech from the buffer before decoding. The cheapest fix for invented
+            # text there is, because text that is never decoded cannot be invented — and the
+            # filter is a small Silero model, which is far cheaper than the Whisper pass it saves.
+            vad_filter=self._vad_filter,
         )
         words, confidence = self._collect(segments)
 

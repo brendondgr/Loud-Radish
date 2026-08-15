@@ -173,6 +173,44 @@ class TestWhisperConfidenceCollection:
         assert confidence.no_speech_prob is None
 
 
+class TestWhisperVadFilter:
+    """The decoder's own speech filter: non-speech that is never decoded cannot be invented."""
+
+    @staticmethod
+    def call_args(**overrides):
+        """Capture the keyword arguments the backend passes to ``model.transcribe``."""
+        from app.services.asr.faster_whisper import FasterWhisperBackend
+
+        seen: dict = {}
+
+        class FakeModel:
+            def transcribe(self, _audio, **kwargs):
+                seen.update(kwargs)
+                return iter(()), SimpleNamespace(language="en")
+
+        backend = FasterWhisperBackend(model_factory=lambda *a, **k: FakeModel(), **overrides)
+        backend.load()
+        backend.transcribe(audio(1.0))
+        return seen
+
+    def test_it_is_on_by_default(self) -> None:
+        assert self.call_args()["vad_filter"] is True
+
+    def test_it_can_be_switched_off(self) -> None:
+        """It costs CPU per pass, which matters when the real-time factor is already near 1."""
+        assert self.call_args(vad_filter=False)["vad_filter"] is False
+
+    def test_the_setting_reaches_the_backend_from_configuration(self) -> None:
+        from app.services.asr.registry import build_backend
+
+        built = build_backend(AsrConfig(backend="faster-whisper", vad_filter=False))
+        assert built._vad_filter is False  # noqa: SLF001 - the wiring is the thing under test
+
+    def test_repetition_conditioning_stays_off(self) -> None:
+        """Already set, and pinned here because turning it on reintroduces runaway looping."""
+        assert self.call_args()["condition_on_previous_text"] is False
+
+
 class TestCapabilities:
     def test_a_wildcard_language_list_accepts_anything(self) -> None:
         assert AsrCapabilities(languages=["*"]).supports_language("cy")
