@@ -131,6 +131,47 @@ segment reading "you"; all three non-speech fixtures now commit zero words.
 
 ---
 
+## Part 3e — The Multi-Mode Expansion
+
+Five plans, written 2026-08-15, indexed in [plans/README.md](plans/README.md). The application grows
+from one capture mode to three, and from a browser tab to a resident desktop application.
+
+- [ ] **Plan 1 — [Interface design](plans/multi-mode-ui-design.md)** (0 / 5). The mode and run-state
+      vocabulary, mirrored on both sides of the wire and checked identical by test; the header's two
+      controls; the pre-flight sheet; the monitor pane. Specification, not implementation.
+- [ ] **Plan 2 — [Interface implementation](plans/multi-mode-ui-implementation.md)** (0 / 6). Mode
+      selector, six-state record control, pre-flight sheet, third pane, and `mode` carried through
+      `POST /api/session/start`. Live transcription must be unchanged at every point.
+- [ ] **Plan 3 — [Recorded transcription](plans/recorded-transcription.md)** (0 / 6). Capture to a
+      WAV with no inference; transcribe the whole file in one pass on stop; delete the audio
+      afterwards unless retention is on, and keep it when the pass fails.
+- [ ] **Plan 4 — [Window recording](plans/window-recording-transcription.md)** (0 / 7). Portal
+      ScreenCast window capture, optional video, live and post-process transcription, the monitor
+      pane, and transcript revisions so both passes can be kept.
+- [ ] **Plan 5 — [System integration](plans/system-integration.md)** (0 / 6). Autostart, a tray
+      companion process, global keybinds through KGlobalAccel, and a keybind settings tab.
+
+Known blockers and open questions carried by these plans:
+
+- [ ] **The tray animation specification was never supplied.** Plan 5 step 5 references an "attached
+      document" naming the animation per state; no such document exists in this repository or was
+      provided. The mechanism is built against a drop-in manifest with placeholder frames, and the
+      step cannot be reported complete against the brief until the specification arrives.
+- [ ] **Whether software video encoding and live transcription fit on one CPU.** This machine has no
+      hardware encoder — `x264enc` and every VAAPI encoder are absent, leaving software VP8 or
+      OpenH264 competing with a speech model already measured at RTF ≈ 1.5. Plan 4 step 7 measures
+      it with `scripts/measure_capture_cost.py` rather than assuming; the documented remedy if it
+      does not fit is to record video and transcribe afterwards instead of live.
+- [ ] **Whether the StatusNotifierItem protocol can be spoken directly with `jeepney`.** Plan 5
+      avoids pulling a GUI toolkit into the virtualenv for one tray icon. Exporting icon pixmaps as
+      D-Bus properties is the part that may not be worth it; the fallback is `PySide6`'s
+      `QSystemTrayIcon` behind the same optional group, decided by trying rather than by arguing.
+- [ ] **Per-window audio is not available.** The KDE ScreenCast portal carries video only, so window
+      capture records the machine's audio, not that window's. Plan 4 says so at the moment of arming
+      rather than letting a user discover it in the recording.
+
+---
+
 ## Part 4 — Still Open
 
 - [ ] **Default ASR model and compute device.** Depends entirely on the user's hardware. A

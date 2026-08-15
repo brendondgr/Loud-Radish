@@ -23,3 +23,20 @@ conventions in [../skills/planner/SKILL.md](../skills/planner/SKILL.md).
 | [minute-based-transcript-polish.md](minute-based-transcript-polish.md) | A background pass that rewrites each finished minute of transcript into clean block text, without changing what was said | Complete (7 / 7 steps) |
 | [transcript-polish-refinements.md](transcript-polish-refinements.md) | Dialogue accuracy: spoken code references written properly, timestamps retained for retrieval, and continuous prose instead of constant line breaks | Complete (5 / 5 steps) |
 | [asr-hallucination-suppression.md](asr-hallucination-suppression.md) | Stop the speech model inventing "thank you", "bye", and stray words on room noise and silence | Complete (4 / 4 steps) |
+
+## The multi-mode expansion
+
+Five plans, written together and executed in order. The application grows from one thing it can do —
+live transcription — to three capture modes plus a desktop presence. Plans 1 and 2 are the interface;
+3 and 4 are the two new modes; 5 makes the whole thing resident on the machine.
+
+| # | Plan | Topic | Status |
+|---|---|---|---|
+| 1 | [multi-mode-ui-design.md](multi-mode-ui-design.md) | The mode and run-state vocabulary, the header's two controls, the pre-flight sheet, and the monitor pane — specified, not built | Not started (0 / 5) |
+| 2 | [multi-mode-ui-implementation.md](multi-mode-ui-implementation.md) | Building it: mode selector, six-state record control, pre-flight sheet, third pane, mode carried through the API | Not started (0 / 6) |
+| 3 | [recorded-transcription.md](recorded-transcription.md) | Toggle on to capture audio with no inference; toggle off to transcribe the whole file in one pass | Not started (0 / 6) |
+| 4 | [window-recording-transcription.md](window-recording-transcription.md) | Wayland portal window capture, optional video, live and post-process transcription, the monitor pane, transcript revisions | Not started (0 / 7) |
+| 5 | [system-integration.md](system-integration.md) | Autostart, a tray companion process, global keybinds, and a keybind settings tab | Not started (0 / 6) — **partly blocked**, see its section 2 |
+
+Execution order is 1 → 2 → 3 → 4, with 5 runnable any time after 2. Plan 5's animation step is
+blocked on a specification document that was referenced but never supplied.
