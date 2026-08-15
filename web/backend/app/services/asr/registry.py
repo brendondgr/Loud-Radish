@@ -142,9 +142,26 @@ def _faster_whisper_info() -> BackendInfo:
         models=[
             {"name": "tiny", "size": "75 MB", "note": "Fastest; noticeably less accurate"},
             {"name": "base", "size": "142 MB", "note": "Usable on modest CPUs"},
-            {"name": "small", "size": "466 MB", "note": "The recommended starting point"},
-            {"name": "medium", "size": "1.5 GB", "note": "Better on jargon; needs a GPU"},
-            {"name": "large-v3", "size": "3.1 GB", "note": "Best accuracy; GPU only in practice"},
+            {"name": "small", "size": "466 MB", "note": "The recommended starting point on a CPU"},
+            {
+                "name": "large-v3-turbo",
+                "size": "1.6 GB",
+                # A distilled large-v3 with four decoder layers instead of thirty-two. Nearly all
+                # of large-v3's accuracy at roughly four times its speed, which on a GPU makes it
+                # the only large-class model that keeps up with a live talk. Measured on a Radeon
+                # 8060S: 40x batch real-time, the same as `small`, from a large-v3-derived model.
+                "note": "Best accuracy that still keeps up live. The right default with a GPU.",
+            },
+            {
+                "name": "medium",
+                "size": "1.5 GB",
+                "note": "Superseded by large-v3-turbo, which is faster and more accurate",
+            },
+            {
+                "name": "large-v3",
+                "size": "3.1 GB",
+                "note": "Most accurate; too slow to keep up live on most hardware",
+            },
         ],
         compute=compute_support() if available else {},
     )

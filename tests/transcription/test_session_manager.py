@@ -371,7 +371,9 @@ class TestDegradation:
         assert "faster compute device" in failure.message
 
     def test_out_of_memory_offers_a_smaller_model_first(self) -> None:
-        assert degradation.out_of_memory("large-v3", "GPU").remedy == {"asr.model": "medium"}
+        assert degradation.out_of_memory("large-v3", "GPU").remedy == {
+            "asr.model": "large-v3-turbo"
+        }
 
     def test_out_of_memory_on_the_smallest_model_offers_the_cpu(self) -> None:
         assert degradation.out_of_memory("tiny", "GPU").remedy == {"asr.device": "cpu"}

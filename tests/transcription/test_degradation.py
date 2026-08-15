@@ -107,7 +107,8 @@ def test_an_assistant_failure_is_never_critical() -> None:
 @pytest.mark.parametrize(
     ("model", "expected"),
     [
-        ("large-v3", "medium"),
+        ("large-v3", "large-v3-turbo"),
+        ("large-v3-turbo", "small"),
         ("medium", "small"),
         ("small", "base"),
         ("base", "tiny"),
@@ -133,6 +134,12 @@ def test_falling_behind_offers_the_next_model_down() -> None:
     assert "0.6" in failure.message
 
 
+def test_the_ladder_steps_through_turbo_rather_than_medium() -> None:
+    """Turbo is both faster and more accurate than medium, so medium is never a useful fallback."""
+    assert degradation.smaller_model("large-v3") == "large-v3-turbo"
+    assert degradation.smaller_model("large-v3-turbo") == "small"
+
+
 def test_falling_behind_on_the_smallest_model_says_what_else_to_try() -> None:
     failure = degradation.falling_behind(0.4, "tiny")
 
@@ -151,11 +158,11 @@ def test_a_lost_device_says_the_transcript_is_safe() -> None:
 
 def test_dropped_audio_admits_words_are_missing_and_says_how_to_stop_it() -> None:
     """The transcript has a hole in it, and the rest of the talk is about to get the same."""
-    failure = degradation.dropped_audio(4, "medium")
+    failure = degradation.dropped_audio(4, "large-v3")
 
     assert "missing" in failure.message
     assert "4" in failure.message
-    assert failure.remedy == {"asr.model": "small"}
+    assert failure.remedy == {"asr.model": "large-v3-turbo"}
 
 
 def test_dropped_audio_on_the_smallest_model_still_suggests_something() -> None:

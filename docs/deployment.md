@@ -91,17 +91,71 @@ The one number that matters is the **real-time factor** — how fast the model t
 the speech arriving. Below 1.0 the pipeline falls behind and will not catch up, which the status bar
 says in words as well as colour.
 
-Measured on this project's development machine (32-core AMD Ryzen AI Max+ 395, CPU only):
-`faster-whisper` `small` at `int8` gives **RTF ≈ 1.5** with about 1.4 s of commit latency. That is
-comfortable but not generous — `medium` on the same machine would not keep up.
+### Two different real-time factors
 
-There is no substitute for measuring on your own hardware, which is why the status bar shows the
-figure continuously rather than burying it. If it drops below 1.0 the application offers the next
-model down as a one-click fix.
+Batch and streaming figures are not comparable, and confusing them will lead you to pick a model
+that cannot keep up.
 
-A note that outranks any model choice: **a directional or clip-on microphone improves accuracy more
-than any upgrade in this table.** A laptop microphone in a lecture hall captures a distant,
-reverberant speaker plus the room, and no model recovers what was never captured.
+**Batch** transcribes each second of audio once. **Streaming** re-runs inference over an overlapping
+buffer on every step, because that is what LocalAgreement needs in order to know which words two
+consecutive passes agree on. Measured here, that costs roughly **18× the batch work**: `small` on
+CPU transcribes a clip at 26× real time but sustains only 1.5× through the live pipeline.
+
+So: divide a published batch figure by about 18 to guess whether a model will keep up live.
+
+### Measured on this project's development machine
+
+AMD Ryzen AI Max+ 395 (32 cores) with a Radeon 8060S iGPU, on a 25-second clip:
+
+| Model | CPU `int8` | GPU `float16` | Streaming estimate (GPU) |
+|---|---|---|---|
+| `small` | 26.4× | 40.7× | ~2.3× |
+| `large-v3-turbo` | 11.0× | **40.2×** | **~2.2×** |
+| `large-v3` | — | 10.3× | ~0.6× — will not keep up |
+
+`large-v3-turbo` is the interesting row. It is a distilled `large-v3` with four decoder layers
+instead of thirty-two, and on a GPU it runs at the speed of `small` while being a large-class model.
+It is the right default for anyone with a GPU, and the fallback ladder steps through it rather than
+through `medium`, which it beats on both speed and accuracy.
+
+On CPU only, `small` remains the right choice: turbo's 11× batch works out to well under real time
+once the streaming overhead is applied.
+
+## GPU acceleration on AMD (ROCm)
+
+`faster-whisper` uses CTranslate2, which added AMD support in **v4.7.0**. The wheel on PyPI is
+CPU-and-CUDA; the ROCm build is attached to each GitHub release as `rocm-python-wheels-Linux.zip`.
+No fork, no source build, and `HSA_OVERRIDE_GFX_VERSION` is not needed.
+
+Verified on this machine — Fedora 44, kernel 7.1, ROCm 7.1.1 from Fedora's own repositories,
+Radeon 8060S (gfx1151), Python 3.14:
+
+```bash
+# 1. The two ROCm runtime libraries the wheel needs that a base ROCm install does not pull in.
+sudo dnf install hiprand rocrand
+
+# 2. The ROCm build of CTranslate2, matching the version already pinned in pyproject.toml.
+curl -LO https://github.com/OpenNMT/CTranslate2/releases/download/v4.8.1/rocm-python-wheels-Linux.zip
+unzip -j rocm-python-wheels-Linux.zip '*cp314-cp314-manylinux*x86_64.whl'
+uv pip install --reinstall ./ctranslate2-4.8.1-cp314-cp314-manylinux*.whl
+```
+
+Then set **Run on** to `GPU (CUDA)` and **Precision** to `float16` in Settings → Transcription. The
+label says CUDA because CTranslate2 reports ROCm through the same API; it is your Radeon.
+
+Wheels ship for cp39 through cp314 including free-threaded 3.14t. Substitute your own Python tag.
+
+Two caveats worth knowing before committing to this:
+
+- **It replaces the CPU/CUDA build.** The same package name provides both, so installing the ROCm
+  wheel means that environment no longer has a CUDA build. On a machine with only an AMD GPU that
+  costs nothing.
+- **`uv sync` will put the PyPI wheel back**, because `pyproject.toml` names `ctranslate2` without
+  knowing which build you want. Re-run the install above after any sync that touches it.
+
+If ROCm proves troublesome, `whisper.cpp` with its Vulkan backend is the fallback: it runs on the
+same iGPU through RADV with no ROCm at all, at the cost of writing a second ASR backend against
+Seam A — which is exactly the seam that exists to make that a contained change.
 
 ## If it is ever packaged
 

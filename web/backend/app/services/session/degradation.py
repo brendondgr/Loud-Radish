@@ -18,10 +18,15 @@ from typing import Any
 from ..streaming.guards import Severity
 
 #: Smaller model to fall back to, per model name. Ordered downward.
+#: Each step down is a model that is genuinely faster *and* still worth using. ``large-v3-turbo``
+#: sits between ``large-v3`` and ``small`` rather than ``medium`` doing so, because it is both
+#: faster and more accurate than ``medium`` — falling back to ``medium`` would cost quality to buy
+#: speed that turbo gives away.
 SMALLER_MODEL: dict[str, str] = {
-    "large-v3": "medium",
-    "large-v2": "medium",
-    "large": "medium",
+    "large-v3": "large-v3-turbo",
+    "large-v2": "large-v3-turbo",
+    "large": "large-v3-turbo",
+    "large-v3-turbo": "small",
     "medium": "small",
     "small": "base",
     "base": "tiny",
