@@ -94,6 +94,48 @@
         }
       }
     },
+    "/api/session/toggle": {
+      "post": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Toggle Session",
+        "description": "Start if idle, stop if running (D-023's companion, and Plan 5's whole control surface).\n\n**One endpoint rather than two** because a keystroke has no way to know the current state, and\na round trip to find out is a race: press the key twice quickly and the second request reads a\nstate the first has already changed. Deciding it server-side, where the lock is, removes the\nrace rather than narrowing it.",
+        "operationId": "toggle_session_api_session_toggle_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartSessionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/session/stop": {
       "post": {
         "tags": [

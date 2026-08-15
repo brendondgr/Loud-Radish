@@ -132,6 +132,26 @@ async def start_session(request: Request, body: StartSessionRequest) -> dict[str
     return manager.state()
 
 
+@router.post("/session/toggle", response_model=SessionResponse)
+async def toggle_session(request: Request, body: StartSessionRequest) -> dict[str, Any]:
+    """Start if idle, stop if running (D-023's companion, and Plan 5's whole control surface).
+
+    **One endpoint rather than two** because a keystroke has no way to know the current state, and
+    a round trip to find out is a race: press the key twice quickly and the second request reads a
+    state the first has already changed. Deciding it server-side, where the lock is, removes the
+    race rather than narrowing it.
+    """
+    manager = _manager(request)
+    if manager.is_running:
+        try:
+            await manager.stop()
+        except SessionError as exc:
+            raise HTTPException(status_code=409, detail=_error("no-session", str(exc))) from exc
+        return manager.state()
+
+    return await start_session(request, body)
+
+
 @router.post("/session/stop", response_model=SessionStoppedResponse)
 async def stop_session(request: Request) -> dict[str, Any]:
     """End the session and return its final statistics."""
