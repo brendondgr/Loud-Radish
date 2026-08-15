@@ -103,6 +103,10 @@ class SessionManager:
         #: keep working on a machine that has none.
         self.context_worker_factory: Callable[[TranscriptStore, AppConfig], Any] | None = None
         self._context_worker: Any = None
+        #: Rewrites the transcript a minute at a time for reading (D-018). Attached the same way
+        #: and for the same reason: it needs a language model, and the pipeline must not.
+        self.polish_worker_factory: Callable[[TranscriptStore], Any] | None = None
+        self._polish_worker: Any = None
 
     # -- state ---------------------------------------------------------------------
 
@@ -135,6 +139,16 @@ class SessionManager:
         if self._engine is not None:
             return float(self._engine.session_seconds)
         return self._store.stats().duration_seconds if self._store is not None else 0.0
+
+    @property
+    def silence_seconds(self) -> float:
+        """How long the speaker has currently been silent, from the VAD gate.
+
+        Read by the polish worker to find a natural break to cut a chunk at. Zero while speaking,
+        and permanently zero when the VAD is disabled — the polish worker's chunk ceiling is what
+        covers that case.
+        """
+        return self._gate.silence_seconds if self._gate is not None else 0.0
 
     def state(self) -> dict[str, Any]:
         """A JSON-safe description of the session, for ``GET /api/session``."""
@@ -211,6 +225,7 @@ class SessionManager:
 
         self._metadata = session
         self._start_context_worker(config)
+        self._start_polish_worker()
         self._emit(
             "session.started",
             {
@@ -245,6 +260,10 @@ class SessionManager:
 
         if self._engine is not None:
             self._dispatch(self._engine.flush())
+
+        # After the flush, unlike the context worker: the polish pass reads committed segments, and
+        # the flush is what commits the closing sentence of the talk.
+        await self._stop_polish_worker()
 
         stats = self._store.stats() if self._store else SessionStats(0, 0, 0.0)
         self._metadata.ended_at = datetime.now(UTC)
@@ -418,6 +437,30 @@ class SessionManager:
         except Exception:  # noqa: BLE001 - a failed final summary must not fail the stop
             logger.warning("Final summary failed", exc_info=True)
 
+    def _start_polish_worker(self) -> None:
+        """Start the minute-by-minute polish pass, if anything is configured to do it.
+
+        Wrapped for the same reason as the context worker: the transcript is the document and the
+        polish is a reading aid, so a failure to build one must not stop a recording.
+        """
+        if self.polish_worker_factory is None or self._store is None:
+            return
+        try:
+            self._polish_worker = self.polish_worker_factory(self._store)
+            self._polish_worker.start()
+        except Exception:  # noqa: BLE001 - never fatal to a recording
+            logger.warning("The transcript polish pass is unavailable this session", exc_info=True)
+            self._polish_worker = None
+
+    async def _stop_polish_worker(self) -> None:
+        worker, self._polish_worker = self._polish_worker, None
+        if worker is None:
+            return
+        try:
+            await worker.stop()
+        except Exception:  # noqa: BLE001 - a failed final pass must not fail the stop
+            logger.warning("The final polish pass failed", exc_info=True)
+
     def _open_store(self, config: AppConfig, session: SessionMetadata) -> TranscriptStore:
         directory = self._session_dir or Path(config.storage.session_dir)
         path = directory / f"{session.started_at.strftime('%Y%m%d-%H%M%S')}-{session.session_id}.db"
@@ -454,6 +497,11 @@ class SessionManager:
 
     async def _teardown(self) -> None:
         """Stop the workers and release the session's resources."""
+        # Before the store closes, and before the ordinary stop path is assumed to have run: an
+        # abrupt shutdown reaches here without passing through `stop`, and a polish task still
+        # ticking against a closed database would raise once a second.
+        await self._stop_polish_worker()
+
         self._status_stop.set()
         thread = self._status_thread
         if thread is not None and thread.is_alive():

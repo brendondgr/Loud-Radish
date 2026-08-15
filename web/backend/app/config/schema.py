@@ -135,6 +135,30 @@ class ContextConfig(_Base):
     recent_verbatim_s: float = Field(default=240.0, ge=30.0, le=3600.0)
 
 
+class PolishConfig(_Base):
+    """The minute-by-minute pass that tidies the transcript for reading.
+
+    Distinct from :class:`ContextConfig`'s rolling summaries, which compress. This one must not:
+    it rewrites punctuation, sentence flow, and paragraphing while keeping every claim the speaker
+    made. See Decision D-018.
+    """
+
+    enabled: bool = True
+    #: How much committed transcript accumulates before a cut is looked for.
+    chunk_seconds: float = Field(default=60.0, ge=15.0, le=600.0)
+    #: How long the speaker must stop for before the accumulated chunk is cut at that break.
+    pause_seconds: float = Field(default=2.0, ge=0.5, le=15.0)
+    #: The ceiling. A speaker who never pauses would otherwise never produce a chunk at all, and
+    #: the page would stay raw for the whole talk.
+    max_chunk_seconds: float = Field(default=150.0, ge=30.0, le=1800.0)
+    #: Ask the provider not to think before answering. There is no portable field for this, so
+    #: several are sent; a server that rejects unknown fields is retried without them.
+    disable_reasoning: bool = True
+    #: The floor on ``returned words ÷ source words``. Below it the result is a summary rather than
+    #: a tidy-up, and is discarded in favour of the raw text.
+    min_retained_ratio: float = Field(default=0.6, ge=0.0, le=1.0)
+
+
 class StorageConfig(_Base):
     """Where sessions are written, and what is retained (BE §17)."""
 
@@ -165,5 +189,6 @@ class AppConfig(_Base):
     streaming: StreamingConfig = Field(default_factory=StreamingConfig)
     llm: LlmConfig = Field(default_factory=LlmConfig)
     context: ContextConfig = Field(default_factory=ContextConfig)
+    polish: PolishConfig = Field(default_factory=PolishConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     quick_actions: list[QuickAction] = Field(default_factory=list)

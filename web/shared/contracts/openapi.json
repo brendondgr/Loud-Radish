@@ -138,6 +138,167 @@
         }
       }
     },
+    "/api/audio/test": {
+      "post": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Test Device",
+        "description": "Open a capture device briefly and report whether it is actually producing usable audio.\n\nEnumerating a device proves only that the host knows about it. Whether the microphone is\nplugged into the socket the driver means, unmuted, and at a workable gain is a different\nquestion, and every one of those failures looks identical until the talk has started and the\ntranscript is empty. No audio is retained (BE \u00a717).",
+        "operationId": "test_device_api_audio_test_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Test Device Api Audio Test Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/audio/files": {
+      "get": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Get Audio Files",
+        "description": "Recordings the file source can replay.\n\n``audio.file_path`` is a path on this machine, and a browser can neither browse that filesystem\nnor resolve one from a file picker. Without this list the only way to choose a recording is to\nedit the config file by hand \u2014 which is the kind of step this application exists not to need.",
+        "operationId": "get_audio_files_api_audio_files_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Audio Files Api Audio Files Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Upload Audio File",
+        "description": "Add a recording to the library and select it.\n\nSelecting it immediately is the point: uploading a file and then having to pick it from a list\nis two steps to express one intention.",
+        "operationId": "upload_audio_file_api_audio_files_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_audio_file_api_audio_files_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Upload Audio File Api Audio Files Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Delete Audio File",
+        "description": "Remove a recording from the library. Refuses anything outside it.",
+        "operationId": "delete_audio_file_api_audio_files_delete",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Audio File Api Audio Files Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/audio/device": {
       "post": {
         "tags": [
@@ -505,6 +666,28 @@
         }
       }
     },
+    "/api/transcript/polished": {
+      "get": {
+        "tags": [
+          "transcript"
+        ],
+        "summary": "Polished",
+        "description": "The transcript rewritten for reading, oldest block first.\n\nRead on every page load, and empty on a machine with no language model \u2014 which is why it uses\nthe optional store: \"nothing has been polished\" is the ordinary state, not a failure.",
+        "operationId": "polished_api_transcript_polished_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolishedBlocksResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/transcript/glossary": {
       "get": {
         "tags": [
@@ -696,6 +879,618 @@
           }
         }
       }
+    },
+    "/api/llm/config": {
+      "get": {
+        "tags": [
+          "llm"
+        ],
+        "summary": "Get Llm Config",
+        "description": "Both provider configurations, and whether a credential exists. Never a credential value.",
+        "operationId": "get_llm_config_api_llm_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LlmConfigResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/llm/credential": {
+      "put": {
+        "tags": [
+          "llm"
+        ],
+        "summary": "Put Credential",
+        "description": "Store a credential in the OS credential store.\n\nA failure here is reported rather than swallowed: a key the user believes is saved but is not\nproduces an authentication failure much later, with nothing connecting it to this moment.",
+        "operationId": "put_credential_api_llm_credential_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LlmCredentialRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Put Credential Api Llm Credential Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/llm/credential/{provider}": {
+      "delete": {
+        "tags": [
+          "llm"
+        ],
+        "summary": "Delete Credential",
+        "description": "Remove a stored credential. Removing one that was never there is not an error.",
+        "operationId": "delete_credential_api_llm_credential__provider__delete",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provider"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Credential Api Llm Credential  Provider  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/llm/models": {
+      "get": {
+        "tags": [
+          "llm"
+        ],
+        "summary": "Get Llm Models",
+        "description": "Models the configured endpoint reports.\n\nA failure is a 200 with an empty list and an explanation, not an HTTP error: this is called to\npopulate a dropdown while the user is still typing an address, and a red error for \"you have\nnot finished typing the URL yet\" is noise.",
+        "operationId": "get_llm_models_api_llm_models_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Llm Models Api Llm Models Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/llm/test": {
+      "post": {
+        "tags": [
+          "llm"
+        ],
+        "summary": "Test Connection",
+        "description": "Probe the provider and report one of four specific outcomes.\n\nAccepts an optional partial LLM configuration so the settings form can test what is on screen\nrather than what is saved.",
+        "operationId": "test_connection_api_llm_test_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionTestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/llm/status": {
+      "get": {
+        "tags": [
+          "llm"
+        ],
+        "summary": "Get Llm Status",
+        "description": "A cheap description of the assistant's readiness, with no network call.\n\nThe header reads this to decide between \"Assistant ready\" and \"Assistant not set up\", and it is\nread on every page load \u2014 so it must never wait on a model server that may not be running.",
+        "operationId": "get_llm_status_api_llm_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Llm Status Api Llm Status Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/send": {
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Send",
+        "description": "Ask a question. The answer streams over the WebSocket.",
+        "operationId": "send_api_chat_send_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatSendRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSendResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/cancel": {
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Cancel",
+        "description": "Stop the in-flight answer. Cancelling nothing is not an error.",
+        "operationId": "cancel_api_chat_cancel_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Cancel Api Chat Cancel Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/history": {
+      "get": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "History",
+        "description": "The conversation so far.",
+        "operationId": "history_api_chat_history_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatHistoryResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Clear History",
+        "description": "Clear the conversation. The transcript is untouched.",
+        "operationId": "clear_history_api_chat_history_delete",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Clear History Api Chat History Delete"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/quick-actions": {
+      "get": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Quick Actions",
+        "description": "The configured one-tap prompts.",
+        "operationId": "quick_actions_api_chat_quick_actions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuickActionsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chat/read": {
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Mark Read",
+        "description": "Record how far the user has read, so \"what did I miss\" has a starting point.\n\nHeld on the server rather than in the browser so it survives a reload \u2014 losing it mid-talk\nturns the action into \"summarise everything\", which is a different and much less useful thing.",
+        "operationId": "mark_read_api_chat_read_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Mark Read Api Chat Read Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "List Sessions",
+        "description": "Every session on disk, newest first.\n\nIncludes files that cannot be read, each with its reason. A session the user can see and cannot\nopen is more useful than one that has silently vanished from the list.",
+        "operationId": "list_sessions_api_sessions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response List Sessions Api Sessions Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{key}": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Read Session",
+        "description": "One past session's transcript, summaries, and glossary.",
+        "operationId": "read_session_api_sessions__key__get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 20000,
+              "minimum": 1,
+              "default": 2000,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Read Session Api Sessions  Key  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Delete Session",
+        "description": "Delete a past session file.\n\nRefuses the session that is currently recording: deleting the file out from under an open\nconnection loses the talk in progress, which is the one thing this application must not do.",
+        "operationId": "delete_session_api_sessions__key__delete",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Session Api Sessions  Key  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{key}/export": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Export Session",
+        "description": "Download a past session in any of the five formats.",
+        "operationId": "export_session_api_sessions__key__export_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "fmt",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "markdown",
+              "title": "Fmt"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "App Page",
+        "description": "The live application: transcript pane, chat pane, header, status bar.",
+        "operationId": "app_page__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions": {
+      "get": {
+        "tags": [
+          "pages"
+        ],
+        "summary": "Sessions Page",
+        "description": "Past sessions, with export. Everything it shows arrives over ``/api/sessions``.",
+        "operationId": "sessions_page_sessions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -724,6 +1519,105 @@
         ],
         "title": "AsrModelsResponse",
         "description": "Every backend, including ones that cannot run here, with the reason attached."
+      },
+      "Body_upload_audio_file_api_audio_files_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_audio_file_api_audio_files_post"
+      },
+      "ChatHistoryResponse": {
+        "properties": {
+          "messages": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Messages"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "messages"
+        ],
+        "title": "ChatHistoryResponse",
+        "description": "The conversation so far."
+      },
+      "ChatSendRequest": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "default": ""
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote"
+          },
+          "quote_start": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Start"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ChatSendRequest",
+        "description": "Ask a question. The answer streams over the WebSocket."
+      },
+      "ChatSendResponse": {
+        "properties": {
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          },
+          "context_timestamp": {
+            "type": "number",
+            "title": "Context Timestamp"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "request_id",
+          "context_timestamp"
+        ],
+        "title": "ChatSendResponse",
+        "description": "Acknowledgement. The answer itself arrives as ``chat.delta`` frames."
       },
       "ConfigPatchRequest": {
         "properties": {
@@ -814,6 +1708,39 @@
         "title": "ConfigResponse",
         "description": "The full resolved configuration, plus what each area costs to change."
       },
+      "ConnectionTestResponse": {
+        "properties": {
+          "result": {
+            "type": "string",
+            "enum": [
+              "connected",
+              "no_server",
+              "auth_rejected",
+              "server_error"
+            ],
+            "title": "Result"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Models"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "result",
+          "message"
+        ],
+        "title": "ConnectionTestResponse",
+        "description": "A specific result, never generic failure text (FE \u00a77.3)."
+      },
       "DeviceListResponse": {
         "properties": {
           "devices": {
@@ -875,6 +1802,69 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "LlmConfigResponse": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "local",
+              "api"
+            ],
+            "title": "Mode"
+          },
+          "local": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Local"
+          },
+          "api": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Api"
+          },
+          "generation": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Generation"
+          },
+          "credential": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Credential"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "mode",
+          "local",
+          "api",
+          "generation",
+          "credential"
+        ],
+        "title": "LlmConfigResponse",
+        "description": "Both provider configurations, and whether a credential exists.\n\n**Never carries a credential value.** The frontend learns only whether one is present."
+      },
+      "LlmCredentialRequest": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "value"
+        ],
+        "title": "LlmCredentialRequest",
+        "description": "Store a credential in the OS credential store."
+      },
       "LoadModelRequest": {
         "properties": {
           "backend": {
@@ -927,6 +1917,25 @@
         "title": "LoadModelRequest",
         "description": "Load a specific model."
       },
+      "PolishedBlocksResponse": {
+        "properties": {
+          "blocks": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Blocks"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "blocks"
+        ],
+        "title": "PolishedBlocksResponse",
+        "description": "The transcript rewritten for reading, one block per finished minute (D-018).\n\nEmpty whenever no language model has been available \u2014 which is the ordinary state, and the\nsignal to the frontend that it should keep showing raw segments."
+      },
       "PresetRequest": {
         "properties": {
           "name": {
@@ -941,6 +1950,25 @@
         ],
         "title": "PresetRequest",
         "description": "Apply a named profile."
+      },
+      "QuickActionsResponse": {
+        "properties": {
+          "actions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Actions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "actions"
+        ],
+        "title": "QuickActionsResponse",
+        "description": "The configured one-tap prompts."
       },
       "SearchResponse": {
         "properties": {

@@ -28,12 +28,14 @@ import {
   STATUS,
   TRANSCRIPT_COMMITTED,
   TRANSCRIPT_HYPOTHESIS,
+  TRANSCRIPT_POLISHED,
   VAD_STATE,
 } from "./transport/events.js";
 import { TranscriptSocket } from "./transport/socket.js";
 import { CHAT_CHANGED, chat } from "./stores/chat.js";
 import { config } from "./stores/config.js";
 import { health } from "./stores/health.js";
+import { polish } from "./stores/polish.js";
 import { session } from "./stores/session.js";
 import { transcript } from "./stores/transcript.js";
 
@@ -118,6 +120,13 @@ function wireTranscript(socket, pane) {
     transcript.setHypothesis(text, start);
   });
 
+  on(TRANSCRIPT_POLISHED, (block) => {
+    // A finished minute, rewritten for reading. The raw segments it covers stay in the transcript
+    // store — only the pane stops drawing them — so search, citations, and export are unaffected
+    // by whether a stretch has been polished.
+    polish.add(block);
+  });
+
   window.transcriptPane = pane; // used by citation and glossary navigation in later phases
 }
 
@@ -133,6 +142,7 @@ function wireSession(header) {
   on(SESSION_STARTED, (payload) => {
     // A new session is the one moment the transcript is cleared — never on disconnect.
     transcript.reset();
+    polish.reset();
     session.start(payload);
   });
 
@@ -215,6 +225,11 @@ async function hydrate(chatPane, glossary) {
     if (state.metrics) health.setStatus(state.metrics);
 
     if (state.running) {
+      // Blocks first: the pane skips any segment a block already covers, so loading them in this
+      // order renders one minute once rather than rendering it raw and then replacing it.
+      const { blocks } = await api.polished();
+      polish.addMany(blocks);
+
       const { segments } = await api.since(0);
       transcript.commitMany(segments);
     }

@@ -82,6 +82,54 @@
   </div>
 
   <div class="settings__group">
+    <h3 class="settings__heading">Tidy the transcript</h3>
+    <p class="settings__blurb">
+      A speech model writes fragments. This rewrites each finished minute into readable prose —
+      punctuation, sentences, paragraphs — leaving what was said unchanged. It needs a language
+      model; without one the transcript is shown exactly as the speech model produced it.
+    </p>
+
+    <div class="field field--switch">
+      <input type="checkbox" id="polish-enabled" data-config="polish.enabled" />
+      <label class="field__label field__label--inline" for="polish-enabled">
+        Clean up the transcript as it goes
+      </label>
+    </div>
+
+    <div class="field field--inline" data-when="polish.enabled=true">
+      <label class="field__label field__label--inline" for="polish-chunk">Clean up every</label>
+      <input
+        class="field__control field__control--number"
+        id="polish-chunk"
+        type="number"
+        min="15"
+        max="600"
+        step="15"
+        data-config="polish.chunk_seconds"
+      />
+      <span class="field__value">s</span>
+      <p class="field__hint">
+        Approximate. Each pass waits for the speaker to stop before it cuts, so it never breaks
+        mid-sentence.
+      </p>
+    </div>
+
+    <div class="field field--inline" data-when="polish.enabled=true">
+      <label class="field__label field__label--inline" for="polish-pause">Treat this as a break</label>
+      <input
+        class="field__control field__control--number"
+        id="polish-pause"
+        type="number"
+        min="0.5"
+        max="15"
+        step="0.5"
+        data-config="polish.pause_seconds"
+      />
+      <span class="field__value">s of silence</span>
+    </div>
+  </div>
+
+  <div class="settings__group">
     <h3 class="settings__heading">Glossary</h3>
 
     <div class="field field--switch">

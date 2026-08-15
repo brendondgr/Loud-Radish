@@ -72,6 +72,36 @@ class Summary:
 
 
 @dataclass(frozen=True)
+class PolishedBlock:
+    """One minute of transcript, rewritten for reading (D-018).
+
+    Not a summary. A summary compresses and is allowed to drop things; this is the same content
+    with punctuation, sentence flow, and paragraphing repaired. It is stored **alongside** the
+    segments it covers rather than replacing them, so the verbatim record and its timestamps
+    survive intact and a bad rewrite costs nothing but a redundant row.
+    """
+
+    id: int
+    start: float
+    end: float
+    text: str
+    #: Ids of the segments this block was built from. The frontend uses them to know which raw
+    #: segments to hide, and search highlighting uses them to mark a block as a match.
+    source_ids: list[int] = field(default_factory=list)
+    created_at: datetime = field(default_factory=_now)
+
+    def as_event(self) -> dict[str, Any]:
+        """The ``transcript.polished`` payload."""
+        return {
+            "id": self.id,
+            "start": round(self.start, 3),
+            "end": round(self.end, 3),
+            "text": self.text,
+            "source_ids": list(self.source_ids),
+        }
+
+
+@dataclass(frozen=True)
 class GlossaryTerm:
     """A technical term, with a plain-language definition and when it first appeared.
 
@@ -128,6 +158,7 @@ class SessionStats:
     duration_seconds: float
     summary_count: int = 0
     glossary_count: int = 0
+    polished_count: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         """JSON-safe payload."""
@@ -137,4 +168,5 @@ class SessionStats:
             "duration_s": round(self.duration_seconds, 2),
             "summaries": self.summary_count,
             "glossary_terms": self.glossary_count,
+            "polished_blocks": self.polished_count,
         }

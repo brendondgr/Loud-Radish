@@ -70,6 +70,73 @@
   box-shadow: 0 0 0 var(--space-2) var(--accent-wash-strong);
 }
 
+/* -- polished blocks -----------------------------------------------------------------------
+ * A finished minute, rewritten for reading: real sentences, real paragraphs. Same face, size, and
+ * colour as a raw segment, because it is the same speech — the difference the reader should see is
+ * that it reads properly, not that it is a different kind of thing.
+ *
+ * The one visual distinction is a rule down the left edge, marking where the text has been through
+ * the clean-up pass. Deliberately quiet: on a working setup nearly the whole page is polished, and
+ * a loud treatment on nearly every paragraph is just a loud page.
+ */
+
+.polished {
+  margin-bottom: var(--space-10);
+  padding-left: var(--space-8);
+  border-left: 2px solid var(--border-control);
+}
+
+.polished__time {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  margin-bottom: var(--space-3);
+  display: block;
+}
+
+.polished__paragraph {
+  margin: 0 0 var(--space-6);
+  font-family: var(--font-transcript);
+  font-size: var(--transcript-size);
+  font-weight: 350;
+  line-height: var(--transcript-leading);
+  color: var(--text-transcript);
+  text-wrap: pretty;
+}
+
+.polished__list {
+  margin: 0 0 var(--space-6);
+  padding-left: var(--space-10);
+  font-family: var(--font-transcript);
+  font-size: var(--transcript-size);
+  font-weight: 350;
+  line-height: var(--transcript-leading);
+  color: var(--text-transcript);
+}
+
+.polished__list li {
+  margin-bottom: var(--space-3);
+}
+
+.polished__paragraph:last-child,
+.polished__list:last-child {
+  margin-bottom: 0;
+}
+
+/* Search highlights a block the same way it highlights a segment: the block is a match when any
+ * segment it was built from is. */
+.polished.segment--match .polished__body {
+  background: var(--accent-wash);
+  box-shadow: 0 0 0 var(--space-2) var(--accent-wash);
+  border-radius: var(--radius-sm);
+}
+
+.polished.segment--current-match .polished__body {
+  background: var(--accent-wash-strong);
+  box-shadow: 0 0 0 var(--space-2) var(--accent-wash-strong);
+}
+
 /* -- the hypothesis tail -------------------------------------------------------------------
  * One element, always last, replaced wholly on every update. It is deliberately NOT a segment:
  * modelling it as the last list entry is what duplicates text on screen (FE §4.1).

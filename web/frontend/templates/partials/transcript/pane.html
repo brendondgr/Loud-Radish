@@ -11,6 +11,12 @@
         <div class="transcript__column">
           {% include "partials/transcript/empty_state.html" %}
 
+          {# Finished minutes, rewritten for reading. Deliberately OUTSIDE the live region below:
+             a polished block restates text a screen reader has already announced, and announcing
+             a whole minute a second time would make the page unusable. It stays fully readable —
+             it is only the automatic announcement that is suppressed. #}
+          <div class="transcript__polished" data-transcript-polished></div>
+
           {# Committed text only is announced. The hypothesis sits outside this region. #}
           <div
             class="transcript__segments"

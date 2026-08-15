@@ -21,7 +21,7 @@ from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
-from .events import TRANSCRIPT_COMMITTED, envelope
+from .events import TRANSCRIPT_COMMITTED, TRANSCRIPT_POLISHED, envelope
 from .hub import ClientConnection, EventHub
 
 logger = logging.getLogger(__name__)
@@ -90,6 +90,13 @@ async def _handle_hello(
         replayed = session.store.segments_since(int(since), limit=MAX_REPLAY_SEGMENTS)
         for segment in replayed:
             connection.push(envelope(TRANSCRIPT_COMMITTED, segment.as_event()))
+
+        # All of them, not just the recent ones: a polished block is produced once and never
+        # re-sent, so a client that missed one would show that minute as raw text for the rest of
+        # the session. There is one block a minute, so the whole set is small even for a long talk.
+        for block in session.store.polished_blocks():
+            connection.push(envelope(TRANSCRIPT_POLISHED, block.as_event()))
+
         if replayed:
             logger.info(
                 "Replayed %d segments to client %s from id %s",

@@ -1,6 +1,6 @@
 # Repository Structure
 
-*Last updated: 2026-08-14 (root launcher on port 8395)*
+*Last updated: 2026-08-15 (minute-based transcript polish)*
 
 Canonical map of TranscriberPrototype. This file documents **purpose**, not source code. Update it in
 the same change that adds, moves, renames, or removes a directory or significant file.
@@ -17,7 +17,8 @@ TranscriberPrototype/
 ├── docs/                          # Source of truth for all repository documentation
 │   ├── plans/
 │   │   ├── README.md              # Plan conventions and index
-│   │   └── live-seminar-transcriber.md   # The 14-phase build plan
+│   │   ├── live-seminar-transcriber.md   # The 14-phase build plan
+│   │   └── minute-based-transcript-polish.md  # The clean-up pass (D-018)
 │   ├── skills/                    # Canonical skill definitions used by every agent tool
 │   │   ├── global-project-rules/SKILL.md
 │   │   ├── planner/{SKILL.md,SETUP.md,planner.md}
@@ -83,6 +84,11 @@ TranscriberPrototype/
 │   │   │       ├── events.py      # The committed / hypothesis output contract
 │   │   │       ├── engine.py      # Orchestrator for offline models
 │   │   │       └── passthrough.py # Bypass path for streaming-native models
+│   │   │   └── polish/            # The minute-by-minute clean-up pass (D-018)
+│   │   │       ├── chunker.py     # When a chunk is ready: a minute, then a pause
+│   │   │       ├── guard.py       # Strips decoration; rejects a summary posing as a tidy-up
+│   │   │       ├── prompts.py     # The instruction list, and the no-reasoning hints
+│   │   │       └── worker.py      # The background loop and every failure path
 │   │   │   └── transcript/        # The durable record
 │   │   │       ├── schema.sql     # SQLite tables, FTS5 index, and its triggers
 │   │   │       ├── store.py       # Append-only writes, the four queries, search
@@ -92,9 +98,22 @@ TranscriberPrototype/
 │   │   │       ├── metrics.py     # Pipeline health, gathered in one place
 │   │   │       ├── degradation.py # What each failure means and what to do
 │   │   │       └── manager.py     # capture → VAD → engine → store → transport
+│   │   │   └── llm/               # SEAM B — the pluggable language model
+│   │   │       ├── contract.py    # Interface, streaming chunks, capabilities
+│   │   │       ├── openai_compatible.py  # Ollama, LM Studio, llama.cpp, vLLM, OpenAI
+│   │   │       ├── anthropic.py   # The one API whose shape genuinely differs
+│   │   │       ├── errors.py      # The four-way failure taxonomy
+│   │   │       ├── registry.py    # Provider construction from configuration
+│   │   │       └── tokens.py      # Budget estimation for context assembly
+│   │   │   └── context/           # What the assistant is given when it answers
+│   │   │       ├── assembler.py   # Priority-ordered assembly under a token budget
+│   │   │       ├── prompts.py     # The chat, summary, and glossary instructions
+│   │   │       └── worker.py      # Rolling summaries and glossary extraction
+│   │   │   └── chat/              # Question → context → provider → streamed answer
+│   │   │       └── orchestrator.py
 │   │   ├── models/                # Persistence shape
 │   │   │   ├── segment.py         # The unit engine, store, and frontend all agree on
-│   │   │   └── session.py         # Metadata, summaries, glossary terms, chat turns
+│   │   │   └── session.py         # Metadata, summaries, polished blocks, glossary, chat turns
 │   │   └── schemas/
 │   │       └── api.py             # Request/response shapes for every route
 │   ├── frontend/                  # Server-rendered UI — no build step, no npm
@@ -105,15 +124,16 @@ TranscriberPrototype/
 │   │   │   └── partials/          # header, status_bar, banners, transcript/, chat/
 │   │   └── static/
 │   │       ├── css/               # tokens, base, layout + one file per component
-│   │       └── js/                # main + core/, transport/, stores/, components/
+│   │       └── js/                # main + core/, transport/, stores/, components/, a11y/
 │   └── shared/contracts/          # Generated: openapi.json, ws-events.json
 │
 ├── libs/                          # Internal packages with more than one consumer
 ├── utils/                         # Standalone helpers not specific to the web app
 ├── tests/                         # Python tests, grouped by area
-│   ├── api/                       # Routes, transport, LLM and chat behaviour
+│   ├── api/                       # Routes, transport, audio library
+│   ├── assistant/                 # LLM clients, chat, context, and the polish pass
 │   ├── transcription/             # Audio, VAD, ASR, streaming engine, session
-│   ├── data/                      # Transcript store, search, export
+│   ├── data/                      # Transcript store, search, export, session archive
 │   └── utils/                     # Configuration and standalone helpers
 ├── scripts/                       # Developer and operational scripts
 │   ├── make_fixture_wav.py        # Generates synthetic WAV fixtures for pipeline tests
@@ -133,20 +153,8 @@ TranscriberPrototype/
 
 ## Planned additions
 
-Directories that later phases of `docs/plans/live-seminar-transcriber.md` create. Listed here so the
-intended shape is legible before the code lands; **none of these exist yet.**
-
-```text
-web/backend/app/
-├── services/
-│   ├── llm/         # contract, openai_compatible, anthropic, registry, connection           Phase 9
-│   ├── context/     # summariser, glossary, chunks, pipeline                                Phase 10
-│   └── chat/        # assembly, quick_actions, orchestrator                                 Phase 10
-
-web/frontend/templates/partials/
-├── chat/            # pane, quick_actions, message, composer, collapsed              Phase 13
-└── settings/        # modal, nav, audio, asr, llm, context, storage                  Phase 12
-```
+None outstanding. Every directory the fourteen-phase plan called for now exists; the block that
+listed them has been removed rather than left describing work that has landed.
 
 ## Top-Level Directory Purposes
 
@@ -161,11 +169,12 @@ web/frontend/templates/partials/
 | `web/backend/app/routes/` | HTTP endpoint definitions only. Thin — they delegate to services. |
 | `web/backend/app/transport/` | The WebSocket hub and its event envelopes. Separate from `routes/` because it is a push channel with its own reconnection semantics. |
 | `web/backend/app/services/` | The pipeline. One sub-package per stage, so each is independently testable. |
+| `web/backend/app/services/polish/` | The clean-up pass that rewrites finished minutes for reading. Separate from `context/` because the two do opposite things: `context/` compresses on purpose, and this must not lose a single claim. |
 | `web/backend/app/models/` | Persistence shape, separated so storage concerns do not leak into routes. |
 | `web/backend/app/schemas/` | Request and response validation — the runtime enforcement of `docs/api-contract.md`. |
 | `web/frontend/templates/` | Jinja2 templates, split into many small partials rather than a few large pages. One partial per region of the interface. |
 | `web/frontend/static/css/` | Design tokens plus one stylesheet per component. No inline styles. |
-| `web/frontend/static/js/` | ES modules: core utilities, transport, six client stores, one controller per component. No bundler. |
+| `web/frontend/static/js/` | ES modules: core utilities, transport, the client stores, one controller per component. No bundler. |
 | `web/shared/contracts/` | The generated OpenAPI spec and the hand-authored WebSocket event schema, which OpenAPI cannot express. Prevents the two sides drifting apart. |
 | `libs/` | Internal packages once code genuinely has more than one consumer. Until then it belongs in `services/`. |
 | `utils/` | Small standalone helpers supporting the codebase but not part of the web application. |
@@ -180,7 +189,8 @@ web/frontend/templates/partials/
 
 ```text
 tests/
-├── api/            # Route behaviour, WebSocket contract, LLM providers, chat assembly
+├── api/            # Route behaviour and the WebSocket contract
+├── assistant/      # LLM providers, chat assembly, context worker, polish chunker/guard/worker
 ├── transcription/  # Audio sources, VAD, ASR seam, streaming engine, session wiring
 ├── data/           # Transcript store, queries, search, export formats
 └── utils/          # Configuration layers and hot-swap classification

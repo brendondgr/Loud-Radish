@@ -166,6 +166,16 @@ class SummariesResponse(_Model):
     summaries: list[dict[str, Any]]
 
 
+class PolishedBlocksResponse(_Model):
+    """The transcript rewritten for reading, one block per finished minute (D-018).
+
+    Empty whenever no language model has been available — which is the ordinary state, and the
+    signal to the frontend that it should keep showing raw segments.
+    """
+
+    blocks: list[dict[str, Any]]
+
+
 class GlossaryResponse(_Model):
     """The session glossary."""
 

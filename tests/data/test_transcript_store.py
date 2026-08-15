@@ -324,7 +324,48 @@ class TestStats:
 
     def test_stats_serialise(self, talk_store: TranscriptStore) -> None:
         payload = talk_store.stats().as_dict()
-        assert set(payload) == {"segments", "words", "duration_s", "summaries", "glossary_terms"}
+        assert set(payload) == {
+            "segments",
+            "words",
+            "duration_s",
+            "summaries",
+            "glossary_terms",
+            "polished_blocks",
+        }
+
+
+class TestPolishedBlocks:
+    """The tidied-for-reading layer (D-018). Additive: it never touches the segments it covers."""
+
+    def test_a_block_round_trips_with_the_segments_it_came_from(
+        self, talk_store: TranscriptStore
+    ) -> None:
+        block = talk_store.add_polished_block(0.0, 60.0, "Tidied prose.", [1, 2, 3])
+
+        assert block.id > 0
+        stored = talk_store.polished_blocks()
+        assert len(stored) == 1
+        assert stored[0].text == "Tidied prose."
+        assert stored[0].source_ids == [1, 2, 3]
+
+    def test_polishing_leaves_the_verbatim_record_alone(self, talk_store: TranscriptStore) -> None:
+        """The whole safety argument for the feature rests on this."""
+        before = [seg.text for seg in talk_store.all_segments()]
+        talk_store.add_polished_block(0.0, 60.0, "A completely different sentence.", [1])
+
+        assert [seg.text for seg in talk_store.all_segments()] == before
+
+    def test_the_cursor_survives_a_reopen(self, tmp_path: Path) -> None:
+        """So reopening a session file does not re-polish what it already holds."""
+        path = tmp_path / "polished.db"
+        with TranscriptStore(path) as store:
+            assert store.last_polished_end() == 0.0
+            store.add_polished_block(0.0, 60.0, "First minute.", [1])
+            store.add_polished_block(60.0, 118.0, "Second minute.", [2])
+
+        with TranscriptStore(path) as reopened:
+            assert reopened.last_polished_end() == 118.0
+            assert reopened.stats().polished_count == 2
 
 
 def test_a_long_session_stays_queryable(tmp_path: Path) -> None:
