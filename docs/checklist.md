@@ -136,12 +136,12 @@ segment reading "you"; all three non-speech fixtures now commit zero words.
 Five plans, written 2026-08-15, indexed in [plans/README.md](plans/README.md). The application grows
 from one capture mode to three, and from a browser tab to a resident desktop application.
 
-- [ ] **Plan 1 — [Interface design](plans/multi-mode-ui-design.md)** (0 / 5). The mode and run-state
+- [x] **Plan 1 — [Interface design](plans/multi-mode-ui-design.md)** (5 / 5). The mode and run-state
       vocabulary, mirrored on both sides of the wire and checked identical by test; the header's two
       controls; the pre-flight sheet; the monitor pane. Specification, not implementation.
-- [ ] **Plan 2 — [Interface implementation](plans/multi-mode-ui-implementation.md)** (0 / 6). Mode
+- [x] **Plan 2 — [Interface implementation](plans/multi-mode-ui-implementation.md)** (6 / 6). Mode
       selector, six-state record control, pre-flight sheet, third pane, and `mode` carried through
-      `POST /api/session/start`. Live transcription must be unchanged at every point.
+      `POST /api/session/start`. Live transcription verified unchanged, in tests and in the browser.
 - [ ] **Plan 3 — [Recorded transcription](plans/recorded-transcription.md)** (0 / 6). Capture to a
       WAV with no inference; transcribe the whole file in one pass on stop; delete the audio
       afterwards unless retention is on, and keep it when the pass fails.
@@ -150,6 +150,17 @@ from one capture mode to three, and from a browser tab to a resident desktop app
       pane, and transcript revisions so both passes can be kept.
 - [ ] **Plan 5 — [System integration](plans/system-integration.md)** (0 / 6). Autostart, a tray
       companion process, global keybinds through KGlobalAccel, and a keybind settings tab.
+
+Three things the interface work got wrong on paper and right only once it was run. Recorded because
+each was invisible to reading and obvious to using, which is the argument for the manual pass:
+
+- **Requiring a capture device disabled every mode.** A plain `uv sync` has no `sounddevice`, and
+  the file source replaces a capture device entirely — so the selector struck out all three modes on
+  a machine that transcribes perfectly well. Only `window` has a hard requirement now.
+- **The interface stuck in "Stopping…" permanently.** The guard returning to idle named only
+  `recording`, excluding the very state a stop passes through.
+- **The primary control was pushed off-screen at 320 px.** The header has wrapped since Phase 12,
+  but each header *group* was a non-wrapping row — fine at three items, not at four.
 
 Known blockers and open questions carried by these plans:
 

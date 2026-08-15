@@ -41,10 +41,27 @@ Served by `web/backend/app/routes/`. All paths are prefixed `/api`.
 
 | Method | Path | Purpose | Status |
 |---|---|---|---|
-| `POST` | `/api/session/start` | Begin capture and transcription | **Implemented** |
+| `POST` | `/api/session/start` | Begin capture in a capture mode | **Implemented** — see below |
 | `POST` | `/api/session/stop` | End the session and return final statistics | **Implemented** |
 | `GET` | `/api/session` | Current session state and metadata | **Implemented** |
 | `GET` | `/api/session/list` | Past sessions | Phase 14 (with the sessions page) |
+
+**Capture mode on start (D-020).** `POST /api/session/start` takes `mode` — `live`, `recorded`, or
+`window` — defaulting to `live` so a client written before capture modes keeps working. `window`
+also takes `options`, three per-run booleans: `live_transcription`, `post_transcription`, `video`.
+
+Three refusals, in the order they are checked:
+
+| Condition | Status | Code |
+|---|---|---|
+| A mode outside the vocabulary | `422` | Pydantic validation |
+| All three options false | `422` | `records-nothing` |
+| A mode this build does not implement | `501` | `mode-unavailable` |
+
+`501` rather than `409` is deliberate: the request is valid and the session state is fine, the build
+simply lacks the feature — a different problem with a different remedy. Each of Plans 3 and 4
+removes its own entry from that set. `GET /api/health` reports per-mode availability so the
+interface can disable a mode with its reason rather than hiding it.
 
 ### Audio
 

@@ -23,8 +23,10 @@ web/frontend/
 │   ├── macros/icons.html       inline SVG, inheriting currentColor
 │   └── partials/               one file per region of the interface
 │       ├── header.html, banners.html, status_bar.html
+│       ├── preflight.html      the per-run capture options sheet
 │       ├── transcript/         pane, toolbar, hypothesis, empty state, glossary panel…
 │       ├── chat/               pane, composer, quick actions, empty state
+│       ├── monitor/            the recording monitor pane and its states
 │       └── settings/           modal, nav, and one file per tab
 └── static/
     ├── css/
@@ -35,9 +37,9 @@ web/frontend/
     └── js/
         ├── main.js             the application page's entry point
         ├── sessions.js         the sessions page's entry point
-        ├── core/               DOM helpers, the event bus, formatting, preferences
+        ├── core/               DOM helpers, the event bus, formatting, preferences, modes
         ├── transport/          HTTP client, WebSocket, event names
-        ├── stores/             state: transcript, polish, session, health, config, chat
+        ├── stores/             state: transcript, polish, session, mode, health, config, chat
         ├── components/         one class per region, plus settings/ per tab
         └── a11y/               the focus trap
 ```
@@ -88,22 +90,25 @@ browser owns is genuinely its own — pane widths, text size, which pane is show
 | `settings/*` | One tab each, plus `bindings.js` | Controls declare a dotted config path; the binding layer does the rest |
 | `FocusTrap` | Modal focus containment and restoration | Recomputes candidates per Tab — the dialog changes shape constantly |
 
-### Planned — the multi-mode expansion (D-020)
+### The multi-mode expansion (D-020)
 
 Specified in `docs/design-system.md` § Capture Modes; built by
-[plans/multi-mode-ui-implementation.md](plans/multi-mode-ui-implementation.md) and the two mode plans
-after it. Listed here so the ownership boundaries are settled before any of them is written.
+[plans/multi-mode-ui-implementation.md](plans/multi-mode-ui-implementation.md).
 
 | Component | Owns | Notes |
 |---|---|---|
-| `ModeSwitcher` | The three-way capture-mode `radiogroup` | Separate from `Header` so the header stays a renderer rather than a controller. Disabled whenever the run state is not `idle`; a mode whose requirements are missing is disabled with the reason, never hidden |
-| `Preflight` | The window pre-flight sheet's three toggles | Reuses `FocusTrap` and the existing modal styling. Refuses the all-off combination in the sheet; the server refuses it again |
-| `RecordingMonitor` | The third pane: preview, elapsed, output size, active options | Pulls the preview as a still image on a timer, paused when hidden — the socket must never carry video, because transcript events on it are undroppable |
+| `ModeSwitcher` | The three-way capture-mode `radiogroup` | Separate from `Header` so the header stays a renderer rather than a controller. One tab stop for the group; arrows move within and skip unavailable options rather than landing on one and refusing. Disabled whenever the run state is not `idle` |
+| `Preflight` | The window pre-flight sheet's three toggles | Reuses `FocusTrap` and the modal styling rather than adding a second dialog primitive. `show()` returns a promise, because arming is a sequence. Refuses the all-off combination; the server refuses it again |
+| `RecordingMonitor` *(Plan 4)* | The third pane's contents: preview, elapsed, output size, active options | The pane, its tab, and its states exist now; only the live data is outstanding. Will pull the preview as a still image on a timer — the socket must never carry video, because transcript events on it are undroppable |
 
-`Header` keeps the record control, but stops deriving its appearance from a boolean: it renders the
-six run states from `stores/mode.js` and asks that store what pressing the control means. The
-transcript pane grows a mode-specific empty state and, once a session can hold two transcription
-passes, a Live/Final revision switch in its toolbar.
+`Header` keeps the record control but no longer derives its appearance from a boolean: it renders
+the six run states from a presentation table and asks `stores/mode.js` what pressing the control
+means. The error message goes to the banner and the `title`, never into the state label — a sentence
+there stretches the header until the primary control is pushed off a narrow screen.
+
+`TranscriptPane` grows a mode-specific empty state, because `recorded` mode genuinely has no
+transcript while it records and a blank pane reads as a transcriber that has stopped working. Once a
+session can hold two transcription passes it also grows a Live/Final revision switch (Plan 4).
 
 ## Stores
 
@@ -115,7 +120,7 @@ passes, a Live/Final revision switch in its toolbar.
 | `health` | Level, speech, RTF, latency, connection | `store.health.changed`, throttled to ~4 Hz |
 | `config` | The backend's resolved configuration | `config:changed` |
 | `chat` | Settled messages plus the streaming one | `store.chat.changed`, `store.chat.stream` |
-| `mode` *(planned)* | Selected capture mode, current run state, per-mode availability, the pending run's options | `store.mode.changed` |
+| `mode` | Selected capture mode, current run state, per-mode availability, the pending run's options | `store.mode.changed` |
 
 ## Adding a component
 

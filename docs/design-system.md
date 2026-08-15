@@ -105,6 +105,17 @@ reason*, never hidden — a feature that disappears when its dependency is absen
 from a feature that does not exist, whereas a disabled one naming the install command is actionable.
 This mirrors how `GET /api/health` already reports optional dependency groups.
 
+**But a mode is only gated on what it genuinely cannot do without.** Only `window` has a hard
+requirement. The two audio modes were first gated on the capture-device backend, and running it
+showed why that is wrong: a plain `uv sync` has no `sounddevice`, and the file source replaces a
+capture device entirely — so all three modes were struck through on a machine transcribing perfectly
+well. A missing device is an *input source* problem with an existing remedy path (the audio settings
+tab, and a start failure that opens it). Disabling the mode as well tells the same failure twice,
+once wrongly.
+
+Unavailable is drawn as dimmed **and** struck through: colour is never the only signal, and the
+reason is on the control's `title` as well as in the disabled state.
+
 **The selector is disabled whenever the run state is not `idle`.** Switching capture mode mid-session
 would mean rebuilding the pipeline underneath a transcript that is still accumulating, and there is
 no user need for it. Changing mode while idle does **not** clear the transcript: the transcript is

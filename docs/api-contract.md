@@ -38,7 +38,7 @@ Every frame is `{"event": "<name>", "data": { … }}`.
 
 | Event | Payload | Meaning |
 |---|---|---|
-| `session.started` | `session_id`, `config` snapshot, `started_at` | Capture began |
+| `session.started` | `session_id`, `mode`, `config` snapshot, `started_at`, `source` | Capture began. `mode` is the capture mode (D-020) and is authoritative — a client reloading mid-recording adopts it rather than its own last selection |
 | `session.stopped` | `session_id`, `stats` | Capture ended |
 | `transcript.committed` | `id`, `text`, `start`, `end`, `wall_clock`, `confidence`, `model_id`, `speaker` | Append permanently |
 | `transcript.hypothesis` | `text` (may be empty), `start` | Replace the tentative tail |
@@ -102,13 +102,33 @@ Response `200 OK`:
     "asr_whisper": false,
     "audio_device": false,
     "vad_silero": false,
-    "credentials": false
+    "credentials": false,
+    "window_capture": false
+  },
+  "acceleration": { "...": "GPU availability and what is blocking it" },
+  "modes": {
+    "live": { "available": true, "missing": [], "reason": "" },
+    "recorded": { "available": true, "missing": [], "reason": "" },
+    "window": {
+      "available": false,
+      "missing": ["window_capture"],
+      "reason": "Window recording is not built yet — see docs/plans/"
+    }
   }
 }
 ```
 
 `optional` reports which optional dependency groups are installed, so a missing model backend surfaces
-here rather than as a confusing failure when the user presses record.
+here rather than as a confusing failure when the user presses record. `window_capture` is listed
+alongside them although it is not a dependency group, because from the user's side it is the same
+question: can this machine do the thing, and if not what is missing.
+
+`modes` answers that question per capture mode (D-020). The interface shows every mode always and
+disables the unavailable ones with `reason`, because a mode that vanishes when its dependency is
+absent is indistinguishable from a mode that does not exist. **An empty `missing` is the common
+case**: only `window` has a hard requirement. A missing capture device deliberately does *not*
+disable the audio modes — the file source replaces one entirely, and gating on it made every mode
+unavailable on a machine that transcribes perfectly well.
 
 ## Agreed shapes, not yet implemented
 

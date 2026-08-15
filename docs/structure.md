@@ -131,7 +131,8 @@ TranscriberPrototype/
 │   │   │   ├── base.html          # Document shell; loads the stylesheets and the entry module
 │   │   │   ├── pages/app.html     # The live application
 │   │   │   ├── macros/icons.html  # Inline SVG icons, inheriting currentColor
-│   │   │   └── partials/          # header, status_bar, banners, transcript/, chat/
+│   │   │   └── partials/          # header, status_bar, banners, preflight,
+│   │   │                          #   transcript/, chat/, monitor/, settings/
 │   │   └── static/
 │   │       ├── css/               # tokens, base, layout + one file per component
 │   │       └── js/                # main + core/, transport/, stores/, components/, a11y/
