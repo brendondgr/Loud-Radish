@@ -7,6 +7,7 @@
  */
 
 import { $, el, setText } from "../../core/dom.js";
+import { duration } from "../../core/format.js";
 import { config } from "../../stores/config.js";
 import { api } from "../../transport/api.js";
 import { session } from "../../stores/session.js";
@@ -51,17 +52,109 @@ export class StorageSettings {
     this.onStatus = onStatus;
     this.facts = $("[data-settings-facts]", root);
     this.exportNote = $("[data-export-note]", root);
+    this.recordingsList = $("[data-recordings-list]", root);
+    this.recordingsNote = $("[data-recordings-note]", root);
 
     $("[data-export-now]", root)?.addEventListener("click", () => this.exportTranscript());
   }
 
   async load() {
-    if (!this.facts) return;
+    if (this.facts) {
+      try {
+        const health = await api.health();
+        this.renderFacts(health);
+      } catch (error) {
+        setText(this.exportNote, error.message);
+      }
+    }
+    await this.loadRecordings();
+  }
+
+  /**
+   * List the audio still on disk (D-021).
+   *
+   * An empty list is the *normal* state, because a successful pass deletes its own audio — so the
+   * note explains that rather than leaving an empty panel looking broken.
+   */
+  async loadRecordings() {
+    if (!this.recordingsList) return;
     try {
-      const health = await api.health();
-      this.renderFacts(health);
+      const { recordings, retain_audio: retain } = await api.recordings();
+      this.renderRecordings(recordings, retain);
     } catch (error) {
-      setText(this.exportNote, error.message);
+      setText(this.recordingsNote, error.message);
+      this.recordingsList.replaceChildren();
+    }
+  }
+
+  renderRecordings(recordings, retain) {
+    setText(
+      this.recordingsNote,
+      recordings.length === 0
+        ? "None. Audio is deleted once it has been transcribed — an empty list is the normal state."
+        : retain
+          ? `${recordings.length} kept, because audio retention is on.`
+          : `${recordings.length} left over from a pass that failed or was interrupted. ` +
+            "Transcribe one again, or delete it."
+    );
+
+    this.recordingsList.replaceChildren(
+      ...recordings.map((entry) => this.renderRecording(entry))
+    );
+  }
+
+  renderRecording(entry) {
+    const megabytes = (entry.bytes / (1024 * 1024)).toFixed(1);
+    const detail = entry.unreadable
+      ? "unreadable — only deleting is possible"
+      : `${duration(entry.duration_s ?? 0)} · ${megabytes} MB`;
+
+    const retry = el("button", { className: "button button--small", text: "Transcribe" });
+    retry.disabled = Boolean(entry.unreadable);
+    retry.addEventListener("click", () => this.retranscribe(entry.name, retry));
+
+    const remove = el("button", {
+      className: "button button--small button--quiet",
+      text: "Delete",
+    });
+    remove.addEventListener("click", () => this.deleteRecording(entry.name));
+
+    return el("li", {
+      className: "recordings__item",
+      children: [
+        el("div", {
+          className: "recordings__text",
+          children: [
+            el("span", { className: "recordings__name", text: entry.name }),
+            el("span", { className: "recordings__detail", text: detail }),
+          ],
+        }),
+        el("div", { className: "recordings__actions", children: [retry, remove] }),
+      ],
+    });
+  }
+
+  async retranscribe(name, button) {
+    button.disabled = true;
+    try {
+      await api.transcribeRecording(name);
+      this.onStatus?.(`Transcribing ${name}. Progress shows in the transcript.`, "ok");
+    } catch (error) {
+      // The message already names the remedy — no model loaded, a pass already running, a session
+      // recording — so it is surfaced verbatim rather than replaced with something vaguer.
+      this.onStatus?.(error.message, "error");
+      button.disabled = false;
+    }
+  }
+
+  async deleteRecording(name) {
+    if (!window.confirm(`Delete ${name}? The audio cannot be recovered.`)) return;
+    try {
+      await api.deleteRecording(name);
+      await this.loadRecordings();
+      this.onStatus?.(`${name} deleted.`, "ok");
+    } catch (error) {
+      this.onStatus?.(error.message, "error");
     }
   }
 

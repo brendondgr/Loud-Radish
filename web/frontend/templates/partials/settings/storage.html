@@ -45,6 +45,72 @@
   </div>
 
   <div class="settings__group">
+    <h3 class="settings__heading">Recording</h3>
+
+    <div class="field">
+      <label class="field__label" for="recording-dir">Recording folder</label>
+      <input
+        class="field__control"
+        id="recording-dir"
+        type="text"
+        spellcheck="false"
+        data-config="recording.recording_dir"
+      />
+      <p class="field__hint">
+        Where <strong>Recorded</strong> and <strong>Window</strong> modes write their audio.
+        Deliberately not the recordings library the file source replays from — one holds what this
+        machine captured, the other holds what you gave it, and a single list mixing them is a way
+        to delete the wrong thing.
+      </p>
+    </div>
+
+    <div class="field field--inline">
+      <label class="field__label field__label--inline" for="recording-cap">Stop recording after</label>
+      <input
+        class="field__control field__control--number"
+        id="recording-cap"
+        type="number"
+        min="1"
+        max="1440"
+        step="1"
+        data-config="recording.max_minutes"
+      />
+      <span class="field__value">min</span>
+      <p class="field__hint">
+        A toggle is easy to forget, and an unattended microphone will fill a disk overnight.
+        Reaching the limit stops cleanly and says so — everything captured up to it is transcribed.
+      </p>
+    </div>
+
+    <div class="field field--inline">
+      <label class="field__label field__label--inline" for="recording-window">Transcribe in windows of</label>
+      <input
+        class="field__control field__control--number"
+        id="recording-window"
+        type="number"
+        min="5"
+        max="300"
+        step="5"
+        data-config="recording.batch_window_s"
+      />
+      <span class="field__value">s</span>
+      <p class="field__hint">
+        How much audio the model sees per pass when transcribing a finished recording. Longer gives
+        it more context; shorter moves the progress figure more often and loses less if it fails.
+      </p>
+    </div>
+  </div>
+
+  {# The recovery path made reachable. A recording only survives here because a pass failed, was
+     interrupted, or because retention is on — so this list is mostly a list of things that went
+     wrong, which is exactly what it is for (D-021). #}
+  <div class="settings__group">
+    <h3 class="settings__heading">Recordings on disk</h3>
+    <p class="field__hint" data-recordings-note>Loading…</p>
+    <ul class="recordings" data-recordings-list></ul>
+  </div>
+
+  <div class="settings__group">
     <h3 class="settings__heading">Retention</h3>
 
     <div class="field field--switch">
@@ -55,6 +121,11 @@
       <p class="field__hint settings__hint--warning">
         Off by default, deliberately. A recording of a room is a materially different thing to hold
         than a transcript of it, and it is also large — roughly 115 MB an hour.
+        <br />
+        In <strong>Recorded</strong> and <strong>Window</strong> modes this decides what happens to
+        the captured audio <em>once it has been transcribed</em>: with this off it is deleted, and
+        with it on it is kept. Audio from a pass that <em>failed</em> is always kept regardless — it
+        is then the only copy of what was said.
       </p>
     </div>
 

@@ -1,6 +1,6 @@
 # Plan 3 — Toggleable Recorded Transcription
 
-*Created: 2026-08-15 · Status: **not started** (0 / 6 steps)*
+*Created: 2026-08-15 · Status: **complete** (6 / 6 steps)*
 
 Part three of the five-plan expansion. Depends on [Plan 2](multi-mode-ui-implementation.md).
 
@@ -58,6 +58,14 @@ audio has finished arriving the correct answer is to transcribe it and keep the 
 - **Does the assistant work during a recorded capture?** *Assumption*: it is available but has
   nothing to read, and says so. There is no transcript until the pass finishes, and pretending
   otherwise by answering from an empty context produces confident nonsense.
+
+- **What does the header show when a pass is re-run from settings?** *Answered during step 6, by
+  running it.* Nothing — it stays idle. A re-run is a background job rather than a session, and the
+  run state belongs to the *selected* capture mode: if the selector is on `live`, D-020's map says
+  `live` cannot reach `processing`, and forcing it there would put the header into a state its own
+  mode declares impossible. The feedback is elsewhere and is sufficient: the settings panel confirms
+  the pass started by name, and the transcript pane fills as segments commit. Recorded as a decision
+  rather than left as an inconsistency someone later 'fixes' by breaking the map.
 
 ---
 

@@ -58,6 +58,7 @@ TranscriberPrototype/
 │   │   │   ├── health.py          # Liveness plus installed optional groups
 │   │   │   ├── session.py         # Start/stop, devices, model loading, prompts
 │   │   │   ├── transcript.py      # Replay, ranges, search, summaries, export
+│   │   │   ├── recordings.py      # List, re-run, and delete captured audio (D-021)
 │   │   │   └── config.py          # Read, patch with hot-swap cost, presets, save
 │   │   ├── transport/             # The push channel — separate from routes/
 │   │   │   ├── events.py          # The event vocabulary and coalescing rules
@@ -93,6 +94,11 @@ TranscriberPrototype/
 │   │   │       ├── events.py      # The committed / hypothesis output contract
 │   │   │       ├── engine.py      # Orchestrator for offline models
 │   │   │       └── passthrough.py # Bypass path for streaming-native models
+│   │   │   └── recording/         # Capture to disk, and transcribe it whole (D-021)
+│   │   │       ├── sink.py        # Incremental WAV writer; crash-safe header, duration cap
+│   │   │       ├── batch.py       # Whole-file pass in overlapping windows; bypasses agreement
+│   │   │       ├── job.py         # One pass's state, progress, and the one-at-a-time rule
+│   │   │       └── runner.py      # Runs it on a thread, outliving the session that made the file
 │   │   │   └── polish/            # The minute-by-minute clean-up pass (D-018)
 │   │   │       ├── chunker.py     # When a chunk is ready: a minute, then a pause
 │   │   │       ├── source.py      # The chunk flattened to one run, timestamps placed
@@ -152,7 +158,7 @@ TranscriberPrototype/
 │   ├── make_fixture_wav.py        # Generates synthetic WAV fixtures for pipeline tests
 │   ├── run_file_session.py        # Console-only pipeline run over a WAV file (BE M4)
 │   └── generate_contracts.py      # Writes openapi.json and ws-events.json
-├── data/                          # Sessions, config file, audio (gitignored)
+├── data/                          # Sessions, config file, audio, recordings (gitignored)
 ├── logs/                          # Runtime logs (gitignored)
 │
 ├── .claude/skills/ · .agents/skills/ · .cursor/rules/   # Pointers → docs/skills/
@@ -182,6 +188,7 @@ listed them has been removed rather than left describing work that has landed.
 | `web/backend/app/routes/` | HTTP endpoint definitions only. Thin — they delegate to services. |
 | `web/backend/app/transport/` | The WebSocket hub and its event envelopes. Separate from `routes/` because it is a push channel with its own reconnection semantics. |
 | `web/backend/app/services/` | The pipeline. One sub-package per stage, so each is independently testable. |
+| `web/backend/app/services/recording/` | Capturing audio to a file and transcribing it once whole. Separate from `streaming/` because the two answer opposite questions: `streaming/` decides what is safe to show while audio is still arriving, and this runs only when it has stopped. |
 | `web/backend/app/services/polish/` | The clean-up pass that rewrites finished minutes for reading. Separate from `context/` because the two do opposite things: `context/` compresses on purpose, and this must not lose a single claim. |
 | `web/backend/app/models/` | Persistence shape, separated so storage concerns do not leak into routes. |
 | `web/backend/app/schemas/` | Request and response validation — the runtime enforcement of `docs/api-contract.md`. |

@@ -1,6 +1,6 @@
 # Route Map
 
-*Last updated: 2026-08-14 (Phase 10 — chat orchestration)*
+*Last updated: 2026-08-15 (capture modes and recordings — D-020, D-021)*
 
 > **Status column is authoritative.** Every API group is implemented and tested, as is the
 > WebSocket. Only the `/sessions` page remains. Update this file in the same change that adds,
@@ -62,6 +62,23 @@ Three refusals, in the order they are checked:
 simply lacks the feature — a different problem with a different remedy. Each of Plans 3 and 4
 removes its own entry from that set. `GET /api/health` reports per-mode availability so the
 interface can disable a mode with its reason rather than hiding it.
+
+### Recordings
+
+Audio this machine captured, as opposed to the library the file source replays from. A recording
+appears here only because a transcription pass failed, was interrupted, or because audio retention
+is on — a successful pass deletes its own audio (D-021).
+
+| Method | Path | Purpose | Status |
+|---|---|---|---|
+| `GET` | `/api/recordings` | Every recording still on disk, newest first | **Implemented** |
+| `POST` | `/api/recordings/{name}/transcribe` | Run or re-run a pass, into a **new** session | **Implemented** |
+| `DELETE` | `/api/recordings/{name}` | Remove one | **Implemented** |
+
+`{name}` is a file name and is resolved strictly inside the recordings directory: a loopback-bound
+server is still reachable from any page in any other tab, so a traversal here would be a real file
+read. A re-run writes into a new session rather than the one that produced the recording, because
+the original may hold a partial transcript from the pass that failed.
 
 ### Audio
 

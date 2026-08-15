@@ -102,6 +102,12 @@ export const api = {
   uploadAudioFile: (file) => upload("/api/audio/files", file),
   deleteAudioFile: (path) => del(`/api/audio/files?path=${encodeURIComponent(path)}`),
 
+  // Recordings this machine captured, as opposed to the library above. A recording only survives
+  // here because a pass failed, was interrupted, or because audio retention is on (D-021).
+  recordings: () => get("/api/recordings"),
+  transcribeRecording: (name) => post(`/api/recordings/${encodeURIComponent(name)}/transcribe`),
+  deleteRecording: (name) => del(`/api/recordings/${encodeURIComponent(name)}`),
+
   asrModels: () => get("/api/asr/models"),
   loadModel: (body) => post("/api/asr/load", body),
   unloadModel: () => post("/api/asr/unload"),

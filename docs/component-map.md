@@ -121,6 +121,7 @@ session can hold two transcription passes it also grows a Live/Final revision sw
 | `config` | The backend's resolved configuration | `config:changed` |
 | `chat` | Settled messages plus the streaming one | `store.chat.changed`, `store.chat.stream` |
 | `mode` | Selected capture mode, current run state, per-mode availability, the pending run's options | `store.mode.changed` |
+| `recording` | Bytes and duration captured, and the post-capture pass's progress. Authoritative from the server, because the pass outlives the page (D-021) | `store.recording.changed` |
 
 ## Adding a component
 

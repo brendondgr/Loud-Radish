@@ -79,6 +79,31 @@ never uploaded; it is captured locally and consumed in flight.
    provider, and streams `chat.delta` frames back. Transcription continues throughout.
 ```
 
+## Secondary flow — a recorded session (D-021)
+
+```text
+device ──► capture ──► VAD (meter only, gates nothing)
+                 │
+                 └──► WavSink ──► data/recordings/<stamp>-<id>.wav
+                                   │  (toggle off)
+                                   ▼
+                        batch pass, overlapping windows
+                                   │
+                        ASR ──► segmenter ──► transcript store ──► transport ──► browser
+                                   │
+                                   └──► audio deleted, unless retention is on or the pass failed
+```
+
+Three differences from the live flow, each deliberate:
+
+- **The streaming engine is absent.** No inference runs while capturing. That is the mode.
+- **The sink is fed from the capture thread, not from the drop-oldest queue.** The queue discards
+  audio to protect inference latency, and audio discarded from a recording is a hole in the only
+  copy of the talk.
+- **The pass outlives the session.** The transcript store is handed to the runner, which alone
+  closes it; the manager keeps a read-only reference so `/api/transcript/...` still serves during
+  the pass, and drops it when the runner says the store is gone.
+
 ## The two timestamp domains
 
 **This is where the bugs are.** The ASR backend returns times relative to the audio array it was

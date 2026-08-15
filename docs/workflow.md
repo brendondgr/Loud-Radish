@@ -202,6 +202,21 @@ Run what applies to the change:
 **If a command was not run, say so and explain why.** Never imply a check passed when it was skipped.
 Report failures with the actual output.
 
+### Recorded mode, by hand
+
+`recorded` mode makes two claims that only a real run confirms. With a WAV selected as the source
+(or a real microphone), choose **Recorded**, press record, and check that:
+
+1. **No transcript appears while it records.** The pane says so explicitly rather than sitting
+   blank. If text appears, the streaming engine is being built when it should not be.
+2. **The audio file grows.** `ls -la data/recordings/` mid-recording; the size figure in the header
+   should climb in step.
+3. **The transcript arrives after the toggle**, with a progress bar while the pass runs.
+4. **The audio is gone afterwards** — unless Settings → Storage → *Keep the audio* is on.
+
+To exercise the recovery path, kill the server mid-pass. The recording survives; the next start
+lists it under Settings → Storage → *Recordings on disk*, with a button to transcribe it again.
+
 ### What cannot be verified in a headless environment
 
 State these explicitly rather than implying coverage:

@@ -142,9 +142,9 @@ from one capture mode to three, and from a browser tab to a resident desktop app
 - [x] **Plan 2 — [Interface implementation](plans/multi-mode-ui-implementation.md)** (6 / 6). Mode
       selector, six-state record control, pre-flight sheet, third pane, and `mode` carried through
       `POST /api/session/start`. Live transcription verified unchanged, in tests and in the browser.
-- [ ] **Plan 3 — [Recorded transcription](plans/recorded-transcription.md)** (0 / 6). Capture to a
+- [x] **Plan 3 — [Recorded transcription](plans/recorded-transcription.md)** (6 / 6). Capture to a
       WAV with no inference; transcribe the whole file in one pass on stop; delete the audio
-      afterwards unless retention is on, and keep it when the pass fails.
+      afterwards unless retention is on, and keep it when the pass fails. Recorded as **D-021**.
 - [ ] **Plan 4 — [Window recording](plans/window-recording-transcription.md)** (0 / 7). Portal
       ScreenCast window capture, optional video, live and post-process transcription, the monitor
       pane, and transcript revisions so both passes can be kept.
@@ -170,6 +170,15 @@ each was invisible to reading and obvious to using, which is the argument for th
       *after* the toggle and a reload a moment later loses text the user has only just seen. The
       record itself is safe on disk and readable from `/sessions`. Worth closing by keeping the last
       session's store open for reading until the next one starts.
+
+- [ ] **The transcription pass is neither resumable nor cancellable.** It runs whole or fails whole.
+      A forty-minute recording at RTF ≈ 1.5 takes around twenty-seven minutes, which is long enough
+      that resumption is worth wanting — but the right design for it cannot be guessed before anyone
+      has watched a real one run. A server restart mid-pass keeps the recording and loses the job;
+      the recording then appears in Settings → Storage with a button to run it again.
+- [ ] **`recording.batch_window_s` has not been tuned against a real model.** The 30-second default
+      matches Whisper's own window, but whether a longer window measurably improves a recorded
+      transcript over a live one is the question the mode exists to exploit, and it is unmeasured.
 
 Known blockers and open questions carried by these plans:
 

@@ -43,6 +43,10 @@ Every frame is `{"event": "<name>", "data": { … }}`.
 | `transcript.committed` | `id`, `text`, `start`, `end`, `wall_clock`, `confidence`, `model_id`, `speaker` | Append permanently |
 | `transcript.hypothesis` | `text` (may be empty), `start` | Replace the tentative tail |
 | `transcript.polished` | `id`, `start`, `end`, `text`, `source_ids` | A finished minute rewritten for reading, as one continuous paragraph. Append the block and stop drawing the segments in `source_ids` — do **not** delete them. `text` carries inline `[MM:SS]` markers, in the same format the assistant cites, so a passage can be traced back to when it was said |
+| `recording.progress` | `duration_s`, `bytes` | How much audio the current recording has captured. In `recorded` mode this is the *only* sign the application is doing anything, because no transcript is being produced — a figure that climbs is what distinguishes recording from having silently stopped (D-021) |
+| `transcription.progress` | `session_id`, `state`, `progress`, `transcribed_seconds`, `total_seconds`, `segments`, `error` | The post-capture pass. Progress is by **audio position** — honest, monotonic, and needing no instrumentation inside the model |
+| `transcription.done` | same shape | The pass finished. Never dropped: losing it leaves a progress bar running for a pass that ended |
+| `transcription.failed` | same shape, with `error` | The pass failed **and the recording is still on disk**. The message names the file, because it is now the only copy of what was said and `/api/recordings` can run the pass again against it |
 | `audio.level` | `rms`, `peak`, `clipping` | Drives the level meter |
 | `vad.state` | `speaking` (bool) | Drives the speaking indicator |
 | `status` | `rtf`, `queue_depth`, `commit_latency_s`, `model_id`, `device`, `dropped_frames`, `suppressed` | Health telemetry. `suppressed` counts passes discarded as invented speech |
