@@ -43,6 +43,14 @@ EVENT_NOTES: dict[str, dict[str, str]] = {
             "text on screen. An empty text means clear the tail."
         ),
     },
+    "transcript.polished": {
+        "action": "append",
+        "note": (
+            "A finished minute rewritten for reading. Append the block and hide the raw segments "
+            "listed in source_ids — do not delete them. A client that ignores this event keeps "
+            "showing raw segments, which is the correct fallback."
+        ),
+    },
     "audio.level": {"action": "replace", "note": "Drives the input meter."},
     "vad.state": {"action": "replace", "note": "Drives the speaking indicator."},
     "status": {

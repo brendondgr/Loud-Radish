@@ -71,6 +71,7 @@ class TestEventVocabulary:
             "session.stopped",
             "transcript.committed",
             "transcript.hypothesis",
+            "transcript.polished",
             "audio.level",
             "vad.state",
             "status",
@@ -85,6 +86,11 @@ class TestEventVocabulary:
         """Losing one loses transcript."""
         assert not is_coalescing("transcript.committed")
         assert "transcript.committed" in CRITICAL_EVENTS
+
+    def test_polished_blocks_are_never_coalesced(self) -> None:
+        """A block is produced once and never re-sent; dropping one leaves that minute raw."""
+        assert not is_coalescing("transcript.polished")
+        assert "transcript.polished" in CRITICAL_EVENTS
 
     def test_health_events_coalesce(self) -> None:
         """A stale level-meter frame is worse than none — it draws a wrong bar."""
@@ -286,6 +292,25 @@ class TestTranscriptEndpoints:
         second = recorded.get("/api/transcript/since/0").json()["segments"]
         assert [s["id"] for s in first] == [s["id"] for s in second]
 
+    def test_polished_blocks_are_empty_without_a_session(self, client: TestClient) -> None:
+        """Read on every page load, so "nothing recorded yet" must not be a console error."""
+        response = client.get("/api/transcript/polished")
+        assert response.status_code == 200
+        assert response.json() == {"blocks": []}
+
+    def test_polished_blocks_are_empty_with_no_language_model(self, recorded: TestClient) -> None:
+        """The ordinary case: the page falls back to raw segments, which is the feature working."""
+        assert recorded.get("/api/transcript/polished").json()["blocks"] == []
+
+    def test_polished_blocks_are_returned_oldest_first(self, recorded: TestClient) -> None:
+        store = recorded.app.state.session_manager.store
+        store.add_polished_block(60.0, 118.0, "The second minute.", [4, 5])
+        store.add_polished_block(0.0, 58.0, "The first minute.", [1, 2, 3])
+
+        blocks = recorded.get("/api/transcript/polished").json()["blocks"]
+        assert [block["text"] for block in blocks] == ["The first minute.", "The second minute."]
+        assert blocks[0]["source_ids"] == [1, 2, 3]
+
     def test_search_finds_committed_text(self, recorded: TestClient) -> None:
         body = recorded.get("/api/transcript/search", params={"q": "operators"}).json()
         assert isinstance(body["segments"], list)
@@ -380,6 +405,43 @@ class TestWebSocket:
                 assert saw_state, "the client never received the session state"
                 assert cutoff not in replayed, "replayed a segment the client already had"
                 assert replayed == sorted(replayed)
+        finally:
+            client.post("/api/session/stop")
+
+    def test_reconnecting_replays_every_polished_block(self, client: TestClient) -> None:
+        """All of them, not just recent ones: a block is sent once and never repeated, so a
+        client that missed one would show that minute as raw text for the rest of the talk."""
+        client.post("/api/session/start", json={})
+        try:
+            store = client.app.state.session_manager.store
+            store.add_polished_block(0.0, 58.0, "The first minute.", [1, 2])
+            store.add_polished_block(60.0, 118.0, "The second minute.", [3, 4])
+
+            with client.websocket_connect("/ws") as socket:
+                socket.send_json({"type": "hello", "since": 0})
+
+                # Frame order is not part of the contract; read by event type, as the client does.
+                polished: list[str] = []
+                for _ in range(60):
+                    frame = socket.receive_json()
+                    if frame["event"] == "transcript.polished":
+                        polished.append(frame["data"]["text"])
+                    if len(polished) >= 2:
+                        break
+
+                assert polished == ["The first minute.", "The second minute."]
+        finally:
+            client.post("/api/session/stop")
+
+    def test_a_fresh_client_is_not_sent_the_polished_backlog(self, client: TestClient) -> None:
+        """`since: null` means a fresh page, which fetches the transcript over HTTP instead."""
+        client.post("/api/session/start", json={})
+        try:
+            client.app.state.session_manager.store.add_polished_block(0.0, 58.0, "A minute.", [1])
+
+            with client.websocket_connect("/ws") as socket:
+                socket.send_json({"type": "hello", "since": None})
+                assert socket.receive_json()["event"] == "session.state"
         finally:
             client.post("/api/session/stop")
 

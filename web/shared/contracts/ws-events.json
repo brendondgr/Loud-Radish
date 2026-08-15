@@ -45,6 +45,12 @@
       "critical": false,
       "coalescing": true
     },
+    "transcript.polished": {
+      "action": "append",
+      "note": "A finished minute rewritten for reading. Append the block and hide the raw segments listed in source_ids \u2014 do not delete them. A client that ignores this event keeps showing raw segments, which is the correct fallback.",
+      "critical": true,
+      "coalescing": false
+    },
     "audio.level": {
       "action": "replace",
       "note": "Drives the input meter.",

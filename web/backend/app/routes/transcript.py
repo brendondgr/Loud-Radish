@@ -11,7 +11,13 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import Response
 
-from ..schemas.api import GlossaryResponse, SearchResponse, SegmentListResponse, SummariesResponse
+from ..schemas.api import (
+    GlossaryResponse,
+    PolishedBlocksResponse,
+    SearchResponse,
+    SegmentListResponse,
+    SummariesResponse,
+)
 from ..services.transcript import export as render_export
 
 router = APIRouter(prefix="/api/transcript", tags=["transcript"])
@@ -88,6 +94,17 @@ async def summaries(request: Request) -> dict[str, Any]:
     """The running outline of the talk."""
     store = _optional_store(request)
     return {"summaries": [s.as_event() for s in store.summaries()] if store else []}
+
+
+@router.get("/polished", response_model=PolishedBlocksResponse)
+async def polished(request: Request) -> dict[str, Any]:
+    """The transcript rewritten for reading, oldest block first.
+
+    Read on every page load, and empty on a machine with no language model — which is why it uses
+    the optional store: "nothing has been polished" is the ordinary state, not a failure.
+    """
+    store = _optional_store(request)
+    return {"blocks": [block.as_event() for block in store.polished_blocks()] if store else []}
 
 
 @router.get("/glossary", response_model=GlossaryResponse)
