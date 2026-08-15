@@ -1,0 +1,28 @@
+{# The glossary.
+
+   Terms the speaker introduced, defined as *they* used them. Sits beside the transcript rather
+   than inside the chat because it is reference material you glance at, not a conversation.
+
+   Each term carries the moment it was introduced, so "when did they define this?" is one click. #}
+
+<aside class="glossary-panel" id="glossary-panel" data-glossary-panel hidden aria-label="Glossary">
+  <header class="glossary-panel__header">
+    <h2 class="glossary-panel__title">Terms in this talk</h2>
+    <button
+      type="button"
+      class="button button--icon button--quiet"
+      data-glossary-close
+      aria-label="Close the glossary"
+    >
+      <svg width="12" height="12" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+        <path d="M2.5 2.5 11.5 11.5M11.5 2.5 2.5 11.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+      </svg>
+    </button>
+  </header>
+
+  <div class="glossary-panel__list" data-glossary-list></div>
+
+  <p class="glossary-panel__empty" data-glossary-empty>
+    Terms appear here as the speaker introduces them. Nothing yet.
+  </p>
+</aside>

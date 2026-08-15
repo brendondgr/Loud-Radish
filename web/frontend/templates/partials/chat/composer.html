@@ -1,0 +1,32 @@
+{# The composer.
+
+   Enter sends and Shift+Enter starts a new line, which is the convention every chat interface
+   uses; getting it backwards here would cost the user a sentence every time.
+
+   The send button becomes Stop while an answer is streaming rather than a second control appearing
+   beside it — during a talk there is one thing to do at a time. #}
+
+<form class="composer" data-chat-form>
+  <div class="composer__quote" data-chat-quote hidden>
+    <span class="composer__quote-text" data-chat-quote-text></span>
+    <button type="button" class="composer__quote-clear" data-chat-quote-clear aria-label="Remove the quoted passage">
+      Remove
+    </button>
+  </div>
+
+  <div class="composer__row">
+    <label class="visually-hidden" for="chat-input">Ask about the talk</label>
+    <textarea
+      class="composer__input"
+      id="chat-input"
+      data-chat-input
+      rows="1"
+      placeholder="Ask about the talk…"
+      autocomplete="off"
+    ></textarea>
+
+    <button type="submit" class="button button--primary composer__send" data-chat-send>Ask</button>
+  </div>
+
+  <p class="composer__note" data-chat-note role="status" aria-live="polite"></p>
+</form>

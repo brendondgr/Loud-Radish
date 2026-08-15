@@ -93,7 +93,19 @@ class TranscriptStore {
 
   /** Find the segment covering a session-absolute time — used by citation timestamps. */
   segmentAt(seconds) {
-    return this.segments.find((segment) => segment.start <= seconds && segment.end >= seconds);
+    const exact = this.segments.find(
+      (segment) => segment.start <= seconds && segment.end >= seconds
+    );
+    if (exact) return exact;
+
+    // A citation rarely lands inside a segment. The model rounds `[00:03]` to the second, the gap
+    // between segments is silence nobody spoke in, and a cited time before the first segment is
+    // routine — `[00:00]` for a talk whose first word lands at 0.8 s. Returning nothing for any of
+    // these makes a citation that looks clickable do nothing, which is worse than approximate.
+    return (
+      [...this.segments].reverse().find((segment) => segment.start <= seconds) ??
+      this.segments[0]
+    );
   }
 
   /** Clear everything. Called when a new session starts — never on disconnect. */

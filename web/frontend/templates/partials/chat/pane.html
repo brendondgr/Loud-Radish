@@ -1,0 +1,86 @@
+{% import "macros/icons.html" as icons %}
+
+{# The assistant pane.
+
+   A tool beside the document, not the point of the application — so it takes a fixed column and
+   the transcript takes the flexible space (FE §P1). It can be collapsed entirely, because during a
+   talk the transcript is what matters and the width is worth more to it.
+
+   The composer sits at the bottom and the messages scroll above it, so the thing you type into
+   never moves. #}
+
+<aside class="pane-chat" data-chat-pane aria-label="Assistant">
+  <header class="pane-header">
+    <div class="pane-header__group">
+      <h2 class="pane-header__title">Assistant</h2>
+      <span class="pane-header__note" data-chat-model></span>
+    </div>
+
+    <div class="pane-header__group">
+      <button
+        type="button"
+        class="button button--icon button--quiet"
+        data-glossary-toggle
+        aria-expanded="false"
+        aria-controls="glossary-panel"
+      >
+        <span class="button__label">Glossary</span>
+        <span class="badge badge--muted" data-glossary-count>0</span>
+      </button>
+
+      <button
+        type="button"
+        class="button button--icon button--quiet"
+        data-chat-clear
+        aria-label="Clear the conversation"
+        title="Clear the conversation. The transcript is untouched."
+      >
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M2.5 4h9M5.5 4V2.6h3V4M4 4l.6 7.4h4.8L10 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+        </svg>
+      </button>
+
+      <button
+        type="button"
+        class="button button--icon button--quiet"
+        data-chat-collapse
+        aria-label="Collapse the assistant"
+      >
+        {{ icons.chevron_right() }}
+      </button>
+    </div>
+  </header>
+
+  <div class="chat__body">
+    <div class="chat__scroller" data-chat-scroller tabindex="0">
+      {# Polite rather than assertive: an answer arriving must not interrupt a screen reader
+         mid-sentence in the transcript. #}
+      <div
+        class="chat__messages"
+        data-chat-messages
+        role="log"
+        aria-live="polite"
+        aria-relevant="additions"
+        aria-label="Conversation"
+      ></div>
+
+      {% include "partials/chat/empty_state.html" %}
+    </div>
+  </div>
+
+  {% include "partials/chat/quick_actions.html" %}
+  {% include "partials/chat/composer.html" %}
+</aside>
+
+{# Collapsed rail. A separate element rather than a restyled pane: collapsed, the only thing it
+   needs is a way back, and reusing the full markup means hiding six controls to show one. #}
+<button
+  type="button"
+  class="chat-rail"
+  data-chat-expand
+  hidden
+  aria-label="Show the assistant"
+>
+  <span class="chat-rail__label">Assistant</span>
+  <span class="badge badge--muted chat-rail__badge" data-chat-rail-badge hidden>0</span>
+</button>

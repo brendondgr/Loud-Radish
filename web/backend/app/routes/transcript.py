@@ -71,16 +71,30 @@ async def search(
     return {"query": q, "segments": [s.as_event() for s in store.search(q, limit=limit)]}
 
 
+def _optional_store(request: Request):  # noqa: ANN201 - returns TranscriptStore | None
+    """The store if a session is open, otherwise ``None``.
+
+    Used by the two endpoints the interface reads on *every* page load. "Nothing has been recorded
+    yet" is the ordinary state before the first session, not a failure, and answering it with a 404
+    puts a red error in the browser console every time the page opens — which trains the reader to
+    ignore the console, where the real failures also appear.
+    """
+    manager = getattr(request.app.state, "session_manager", None)
+    return manager.store if manager else None
+
+
 @router.get("/summaries", response_model=SummariesResponse)
 async def summaries(request: Request) -> dict[str, Any]:
     """The running outline of the talk."""
-    return {"summaries": [summary.as_event() for summary in _store(request).summaries()]}
+    store = _optional_store(request)
+    return {"summaries": [s.as_event() for s in store.summaries()] if store else []}
 
 
 @router.get("/glossary", response_model=GlossaryResponse)
 async def glossary(request: Request) -> dict[str, Any]:
     """The session glossary, in order of first appearance."""
-    return {"terms": [term.as_event() for term in _store(request).glossary()]}
+    store = _optional_store(request)
+    return {"terms": [t.as_event() for t in store.glossary()] if store else []}
 
 
 @router.get("/export")

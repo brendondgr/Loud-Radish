@@ -1,0 +1,113 @@
+/* The glossary panel.
+ *
+ * Reference material beside the transcript, not part of the conversation. It overlays the
+ * transcript's right edge rather than displacing it: the transcript's measure is tuned for reading
+ * and shrinking it mid-talk would reflow every line the user is looking at.
+ */
+
+.glossary-panel {
+  flex: 0 0 var(--glossary-width);
+  width: var(--glossary-width);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-raised);
+  border-left: 1px solid var(--border-default);
+  overflow: hidden;
+}
+
+.glossary-panel[hidden] {
+  display: none;
+}
+
+.glossary-panel__header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+  height: var(--pane-header-height);
+  padding: 0 var(--space-6);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.glossary-panel__title {
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin: 0;
+}
+
+.glossary-panel__list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-6);
+}
+
+.glossary-panel__empty {
+  padding: 0 var(--space-6) var(--space-8);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--text-faint);
+  margin: 0;
+}
+
+.glossary-panel__empty[hidden] {
+  display: none;
+}
+
+/* -- one term ------------------------------------------------------------------------------- */
+
+.glossary-term {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--space-5) var(--space-5);
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.glossary-term:hover {
+  background: var(--surface-control);
+}
+
+.glossary-term + .glossary-term {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.glossary-term__name {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: var(--space-2);
+}
+
+.glossary-term__definition {
+  display: block;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.glossary-term__time {
+  display: block;
+  margin-top: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--accent-dim);
+}
+
+/* A term just added, marked briefly so a glance at the panel shows what is new. Fades rather than
+ * pulses — anything that repeats is noise on a panel open for two hours. */
+.glossary-term--new {
+  background: var(--accent-wash);
+  transition: background var(--duration-slow) var(--ease);
+}

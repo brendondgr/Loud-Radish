@@ -118,6 +118,15 @@ export const api = {
   applyPreset: (name) => post("/api/config/preset", { name }),
   saveConfig: () => post("/api/config/save"),
 
+  // Chat. `chatSend` returns as soon as the request is accepted; the answer arrives as
+  // `chat.delta` frames on the WebSocket and ends with `chat.done`.
+  chatSend: (body) => post("/api/chat/send", body),
+  chatCancel: () => post("/api/chat/cancel"),
+  chatHistory: () => get("/api/chat/history"),
+  clearChatHistory: () => del("/api/chat/history"),
+  quickActions: () => get("/api/chat/quick-actions"),
+  markRead: (position) => post("/api/chat/read", { position }),
+
   since: (segmentId, limit = 500) => get(`/api/transcript/since/${segmentId}?limit=${limit}`),
   range: (start, end) => get(`/api/transcript/range?start=${start}&end=${end}`),
   search: (query, limit = 50) =>
