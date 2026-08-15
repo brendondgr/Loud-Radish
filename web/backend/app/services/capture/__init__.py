@@ -12,11 +12,33 @@ receive a PipeWire node we may read. That puts a dialog that can be declined in 
 feature, and it means this application never learns what windows exist.
 """
 
+from .pipeline import PipelineSpec
+from .pipeline import build as build_pipeline
+from .portal import (
+    PortalDeclined,
+    PortalError,
+    PortalSession,
+    PortalUnavailable,
+    WindowStream,
+    open_window_stream,
+)
 from .probe import CaptureSupport, detect, gstreamer_elements, session_type
+from .recorder import RecorderError, RecorderState, WindowRecorder
 
 __all__ = [
     "CaptureSupport",
+    "PipelineSpec",
+    "PortalDeclined",
+    "PortalError",
+    "PortalSession",
+    "PortalUnavailable",
+    "RecorderError",
+    "RecorderState",
+    "WindowRecorder",
+    "WindowStream",
+    "build_pipeline",
     "detect",
     "gstreamer_elements",
+    "open_window_stream",
     "session_type",
 ]
