@@ -1,5 +1,6 @@
 """Session wiring, workers, metrics, and degradation (BE §14, §15, §16).
 
+* ``modes``        — the capture-mode and run-state vocabulary, mirrored in the frontend
 * ``workers``      — the drop-oldest queue and the worker threads that drain it
 * ``metrics``      — pipeline health, gathered in one place
 * ``degradation``  — what each failure means and what to do about it
@@ -9,7 +10,7 @@ The manager is event-loop agnostic: it emits by calling a plain function, and th
 marshals onto the loop. asyncio stays out of the audio path.
 """
 
-from . import degradation
+from . import degradation, modes
 from .manager import CapturedFrame, EmitFn, SessionError, SessionManager
 from .metrics import PipelineMetrics
 from .workers import DropOldestQueue, QueueStats, Worker
@@ -24,4 +25,5 @@ __all__ = [
     "SessionManager",
     "Worker",
     "degradation",
+    "modes",
 ]
