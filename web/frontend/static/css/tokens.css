@@ -135,6 +135,9 @@
   --chat-collapsed-width: 46px;
   --glossary-width: 250px;
   --transcript-min-width: 420px;
+  /* The recording monitor (D-020). Narrower than the chat: it holds a 16:9 preview and four
+     figures, where the chat holds a conversation that has to be readable. */
+  --monitor-width: 300px;
 
   /* -- motion --------------------------------------------------------------------------
    * Almost none, by design. Every element here is on screen for two hours, so anything that

@@ -1,0 +1,13 @@
+{# The monitor's degraded and idle states.
+
+   Specified before there is anything to degrade *from*, deliberately: a black rectangle and a
+   broken preview look identical, and the difference between "this window is dark" and "capture has
+   failed" is the entire value of looking at the monitor at all (D-020). #}
+
+<div class="monitor-empty" data-monitor-empty data-variant="idle">
+  <p class="monitor-empty__title" data-monitor-empty-title>Not recording a window</p>
+  <p class="monitor-empty__body" data-monitor-empty-body>
+    Choose <strong>Window</strong> above and press <strong>Start recording</strong>. Your desktop
+    will ask which window to share — this application never sees the others.
+  </p>
+</div>

@@ -1,0 +1,136 @@
+/* The recording monitor — the third pane (D-020).
+ *
+ * A fixed column beside the transcript, like the chat pane, rather than a share of the flexible
+ * space. The transcript is the document and both side panes are tools; giving the monitor flexible
+ * width would take it from the one region that is actually being read.
+ *
+ * Its contents arrive with Plan 4. What is here is the frame, the idle and degraded states, and
+ * the responsive behaviour — verified once, on its own, rather than inside the plan that also has
+ * to negotiate a desktop portal.
+ */
+
+.pane-monitor {
+  flex: 0 0 var(--monitor-width);
+  width: var(--monitor-width);
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border-default);
+  background: var(--surface-panel);
+}
+
+.pane-monitor[hidden] {
+  display: none;
+}
+
+.monitor__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-7);
+  padding: var(--space-7);
+  overflow-y: auto;
+}
+
+.monitor__clock {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+/* -- preview ---------------------------------------------------------------------------------
+ * 16:9 so the frame does not jump when a first image arrives, and a visible surface rather than
+ * black — a black box and a failed capture are indistinguishable, which is the one thing this pane
+ * exists not to be.
+ */
+
+.monitor__preview {
+  position: relative;
+  flex: 0 0 auto;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--surface-control);
+  overflow: hidden;
+}
+
+.monitor__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: var(--surface-base);
+}
+
+.monitor-empty {
+  padding: var(--space-6);
+  text-align: center;
+}
+
+.monitor-empty__title {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.monitor-empty__body {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.monitor-empty[data-variant="failed"] .monitor-empty__title {
+  color: var(--warning-text);
+}
+
+/* -- stats ------------------------------------------------------------------------------------ */
+
+.monitor__stats {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin: 0;
+}
+
+.monitor__stats[hidden] {
+  display: none;
+}
+
+.monitor__stat {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-5);
+  font-size: var(--text-sm);
+}
+
+.monitor__stat dt {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+
+.monitor__stat dd {
+  margin: 0;
+  min-width: 0;
+  text-align: right;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+/* -- narrow layout ----------------------------------------------------------------------------
+ * Below 900px the monitor becomes the third tab rather than a third column, matching the two panes
+ * it sits beside. Lives here rather than in layout.css: component stylesheets load later, a media
+ * query adds no specificity, and a responsive rule written there is silently overridden.
+ */
+@media (max-width: 900px) {
+  .pane-monitor {
+    flex: 1 1 auto;
+    width: auto;
+    border-left: none;
+  }
+}

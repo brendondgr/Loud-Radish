@@ -1,0 +1,47 @@
+{# The recording monitor — the third pane (D-020).
+
+   A pane, not a modal and not a floating window. Live transcription and asking the assistant
+   questions must keep working *during* a window recording, and anything overlaying the other two
+   panes prevents exactly that.
+
+   Shown only in `window` mode. Its contents arrive with Plan 4; the shell, the layout, and the
+   responsive behaviour land here so that plan adds a preview to a pane that already exists and has
+   already had a keyboard and 320 px pass. #}
+
+<section class="pane-monitor" data-monitor-pane aria-label="Recording monitor" hidden>
+  <header class="pane-header">
+    <div class="pane-header__group">
+      <h2 class="pane-title">Monitor</h2>
+    </div>
+    <div class="pane-header__group">
+      <span class="monitor__clock numeric" data-monitor-clock aria-label="Recording duration">
+        00:00:00
+      </span>
+    </div>
+  </header>
+
+  <div class="monitor__body">
+    <div class="monitor__preview" data-monitor-preview>
+      {% include "partials/monitor/empty_state.html" %}
+    </div>
+
+    <dl class="monitor__stats" data-monitor-stats hidden>
+      <div class="monitor__stat">
+        <dt>Window</dt>
+        <dd data-monitor-window>—</dd>
+      </div>
+      <div class="monitor__stat">
+        <dt>Output</dt>
+        <dd data-monitor-output>—</dd>
+      </div>
+      <div class="monitor__stat">
+        <dt>Size</dt>
+        <dd class="numeric" data-monitor-size>—</dd>
+      </div>
+      <div class="monitor__stat">
+        <dt>Capturing</dt>
+        <dd data-monitor-options>—</dd>
+      </div>
+    </dl>
+  </div>
+</section>

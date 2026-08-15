@@ -29,6 +29,8 @@ import { on } from "../core/bus.js";
 import { parseTimestamp } from "../core/citations.js";
 import { $, $$, el, setText, toggle } from "../core/dom.js";
 import { pluralise, timestamp, wallClock } from "../core/format.js";
+import { IDLE, LIVE, PROCESSING, RECORDED, RECORDING, WINDOW } from "../core/modes.js";
+import { MODE_CHANGED, mode as modeStore } from "../stores/mode.js";
 import { POLISH_CHANGED, polish } from "../stores/polish.js";
 import {
   HYPOTHESIS_CHANGED_TOPIC,
@@ -60,6 +62,68 @@ const MAX_RENDERED_SEGMENTS = 300;
  */
 const MAX_RENDERED_BLOCKS = 240;
 
+/**
+ * What the empty pane says, keyed `mode:state` (D-020).
+ *
+ * A mode falls back to its own idle copy, and then to live's, so a state with nothing written for
+ * it degrades to something true rather than to a blank pane.
+ */
+const EMPTY_COPY = {
+  [`${LIVE}:${IDLE}`]: {
+    variant: "idle",
+    title: "Nothing recorded yet",
+    body:
+      "Press <strong>Start recording</strong> and the talk will appear here as it is spoken, a " +
+      "paragraph at a time. Text still being decided shows in italics until it settles.",
+    hint: "Check your input device first — it is the one check worth doing every time.",
+  },
+  [`${RECORDED}:${IDLE}`]: {
+    variant: "idle",
+    title: "Record now, transcribe after",
+    body:
+      "Press <strong>Start recording</strong> to capture audio without transcribing it. Nothing " +
+      "is decoded while you record, so this costs almost nothing to run — the whole recording is " +
+      "transcribed in one pass when you stop.",
+    hint: "Better accuracy than live, because the model sees the entire talk at once.",
+  },
+  [`${RECORDED}:${RECORDING}`]: {
+    variant: "recording",
+    title: "Recording",
+    body:
+      "Nothing is being transcribed yet. The whole recording is transcribed in one pass when you " +
+      "stop, which is what makes this mode cheap to run.",
+    hint: "",
+  },
+  [`${RECORDED}:${PROCESSING}`]: {
+    variant: "processing",
+    title: "Transcribing the recording",
+    body: "The transcript appears here when the pass finishes. It is safe to leave this page.",
+    hint: "",
+  },
+  [`${WINDOW}:${IDLE}`]: {
+    variant: "idle",
+    title: "Record a window",
+    body:
+      "Press <strong>Start recording</strong> to choose what to capture, then pick a window. " +
+      "Live transcription, a second pass afterwards, and video are each optional.",
+    hint: "Audio comes from your current input, not from the window itself.",
+  },
+  [`${WINDOW}:${RECORDING}`]: {
+    variant: "recording",
+    title: "Recording a window",
+    body:
+      "Live transcription is off for this run, so nothing appears here while it records. The " +
+      "monitor shows the capture in progress.",
+    hint: "",
+  },
+  [`${WINDOW}:${PROCESSING}`]: {
+    variant: "processing",
+    title: "Transcribing the recording",
+    body: "The transcript appears here when the pass finishes. It is safe to leave this page.",
+    hint: "",
+  },
+};
+
 export class TranscriptPane {
   constructor(root) {
     this.root = root;
@@ -68,6 +132,9 @@ export class TranscriptPane {
     this.list = $(".transcript__segments", root);
     this.polishedList = $("[data-transcript-polished]", root);
     this.emptyState = $(".transcript-empty", root);
+    this.emptyTitle = $("[data-empty-title]", root);
+    this.emptyBody = $("[data-empty-body]", root);
+    this.emptyHint = $("[data-empty-hint]", root);
     this.hypothesisWrap = $(".hypothesis", root);
     this.hypothesisText = $(".hypothesis__text", root);
     this.hypothesisNote = $(".hypothesis__note", root);
@@ -86,6 +153,9 @@ export class TranscriptPane {
     on(HYPOTHESIS_CHANGED_TOPIC, (payload) => this._renderHypothesis(payload));
     on(FOLLOW_CHANGED, ({ following }) => toggle(this.jumpWrap, !following));
     on(UNREAD_CHANGED, ({ unread }) => this._renderUnread(unread));
+    // The empty copy depends on the mode and run state as well as on whether there is content, so
+    // it has to re-render when those change and not only when a segment arrives.
+    on(MODE_CHANGED, () => this._renderEmptyState());
 
     this._renderEmptyState();
   }
@@ -224,6 +294,28 @@ export class TranscriptPane {
     const hasContent = transcript.count > 0;
     toggle(this.emptyState, !hasContent);
     toggle(this.list, hasContent);
+    if (!hasContent) this._renderEmptyCopy();
+  }
+
+  /**
+   * Say the right thing for the mode and run state (D-020).
+   *
+   * `recorded` mode produces no transcript at all while it records — that is what makes it cheap —
+   * and an empty pane offering to start a recording that is already running is worse than useless.
+   * Each mode explains its own silence.
+   */
+  _renderEmptyCopy() {
+    const key = `${modeStore.mode}:${modeStore.state}`;
+    const copy =
+      EMPTY_COPY[key] ?? EMPTY_COPY[`${modeStore.mode}:${IDLE}`] ?? EMPTY_COPY[`${LIVE}:${IDLE}`];
+
+    this.emptyState?.setAttribute("data-variant", copy.variant);
+    setText(this.emptyTitle, copy.title);
+    // `innerHTML` because the idle copy carries a <strong>. The strings are literals in this
+    // module, never anything a user or a model produced.
+    if (this.emptyBody) this.emptyBody.innerHTML = copy.body;
+    setText(this.emptyHint, copy.hint ?? "");
+    toggle(this.emptyHint, Boolean(copy.hint));
   }
 
   /** Drop the oldest rendered segments once the list grows past the render budget. */

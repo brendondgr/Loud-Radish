@@ -98,8 +98,14 @@
     background: var(--surface-raised);
   }
 
+  /* One pane at a time. The monitor joins the set as a third tab in window mode; when it is
+     hidden entirely the `[hidden]` rule in its own stylesheet already wins. */
   .app__main[data-active-pane="transcript"] .pane-chat,
-  .app__main[data-active-pane="chat"] .pane-transcript {
+  .app__main[data-active-pane="transcript"] .pane-monitor,
+  .app__main[data-active-pane="chat"] .pane-transcript,
+  .app__main[data-active-pane="chat"] .pane-monitor,
+  .app__main[data-active-pane="monitor"] .pane-transcript,
+  .app__main[data-active-pane="monitor"] .pane-chat {
     display: none;
   }
 

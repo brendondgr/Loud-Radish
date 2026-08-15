@@ -8,7 +8,7 @@
 
 import { on } from "./core/bus.js";
 import { $ } from "./core/dom.js";
-import { ARMING, IDLE, STOPPING } from "./core/modes.js";
+import { ARMING, IDLE, STOPPING, WINDOW } from "./core/modes.js";
 import * as prefs from "./core/storage.js";
 import { Banners } from "./components/banners.js";
 import { ChatPane } from "./components/chat-pane.js";
@@ -38,7 +38,7 @@ import { TranscriptSocket } from "./transport/socket.js";
 import { CHAT_CHANGED, chat } from "./stores/chat.js";
 import { config } from "./stores/config.js";
 import { health } from "./stores/health.js";
-import { mode } from "./stores/mode.js";
+import { MODE_CHANGED, mode } from "./stores/mode.js";
 import { polish } from "./stores/polish.js";
 import { session } from "./stores/session.js";
 import { transcript } from "./stores/transcript.js";
@@ -192,6 +192,12 @@ function wireControls(pane) {
   }
   showPane(prefs.get("activePane"));
 
+  // The monitor exists only in window mode. Both the pane and its tab follow the selection, and
+  // leaving window mode while looking at the monitor falls back to the transcript rather than to
+  // an empty column.
+  on(MODE_CHANGED, () => renderMonitorVisibility());
+  renderMonitorVisibility();
+
   // Search highlights rather than filters, so the transcript keeps its shape and the live stream
   // keeps accumulating behind it.
   const searchInput = $("[data-transcript-search]");
@@ -216,6 +222,18 @@ function wireControls(pane) {
 
 function applyTextSize(px) {
   document.documentElement.style.setProperty("--transcript-size", `${px}px`);
+}
+
+/** Show or hide the monitor pane and its tab, following the selected capture mode. */
+function renderMonitorVisibility() {
+  const wanted = mode.mode === WINDOW;
+  const pane = $("[data-monitor-pane]");
+  const tab = $("[data-monitor-tab]");
+  if (pane) pane.hidden = !wanted;
+  if (tab) tab.hidden = !wanted;
+
+  // Leaving window mode while the monitor is the active pane would otherwise show nothing at all.
+  if (!wanted && $(".app__main")?.dataset.activePane === "monitor") showPane("transcript");
 }
 
 /**
