@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
+from starlette.concurrency import run_in_threadpool
 
 from ..models.session import SessionMetadata
 from ..schemas.api import (
@@ -29,7 +30,9 @@ from ..services.audio import (
     device_support_available,
     library,
     list_devices,
+    probe,
 )
+from ..services.audio.probe import probe_device
 from ..services.session import SessionError
 
 router = APIRouter(prefix="/api", tags=["session"])
@@ -124,6 +127,39 @@ async def get_devices() -> dict[str, Any]:
             else "Live capture needs the optional audio backend: uv sync --extra audio-device"
         ),
     }
+
+
+@router.post("/audio/test")
+async def test_device(request: Request, body: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Open a capture device briefly and report whether it is actually producing usable audio.
+
+    Enumerating a device proves only that the host knows about it. Whether the microphone is
+    plugged into the socket the driver means, unmuted, and at a workable gain is a different
+    question, and every one of those failures looks identical until the talk has started and the
+    transcript is empty. No audio is retained (BE §17).
+    """
+    manager = _manager(request)
+    if manager.is_running:
+        raise HTTPException(
+            status_code=409,
+            detail=_error(
+                "session-running",
+                "Stop the recording before testing a device — they cannot both hold it.",
+            ),
+        )
+
+    config = request.app.state.config.resolve()
+    payload = body or {}
+    # Falls back to the configured device, so the button works before anything is chosen.
+    device_id = payload.get("device_id", config.audio.device_id)
+
+    result = await run_in_threadpool(
+        probe_device,
+        device_id=device_id,
+        seconds=float(payload.get("seconds", probe.DEFAULT_PROBE_SECONDS)),
+        frame_ms=config.audio.frame_ms,
+    )
+    return result.as_dict()
 
 
 @router.get("/audio/files")

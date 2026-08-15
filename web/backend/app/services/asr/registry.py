@@ -9,7 +9,7 @@ between them, including whether it is installed at all.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from ...config.schema import AsrConfig
@@ -32,6 +32,10 @@ class BackendInfo:
     capabilities: AsrCapabilities
     #: Model names this backend offers, with a rough size for each.
     models: list[dict[str, Any]]
+    #: Devices and precisions *this machine* can run, keyed by device. Empty for backends where the
+    #: question does not arise. Offering a precision the host cannot run is offering a setting that
+    #: fails at load time, long after it was chosen.
+    compute: dict[str, list[str]] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
         """JSON-safe payload for ``GET /api/asr/models``."""
@@ -43,6 +47,7 @@ class BackendInfo:
             "unavailable_reason": self.unavailable_reason,
             "capabilities": self.capabilities.as_dict(),
             "models": list(self.models),
+            "compute": {key: list(value) for key, value in self.compute.items()},
         }
 
 
@@ -122,7 +127,7 @@ def _build_faster_whisper(config: AsrConfig) -> AsrBackend:
 
 
 def _faster_whisper_info() -> BackendInfo:
-    from .faster_whisper import FasterWhisperBackend, is_available
+    from .faster_whisper import FasterWhisperBackend, compute_support, is_available
 
     available = is_available()
     return BackendInfo(
@@ -141,6 +146,7 @@ def _faster_whisper_info() -> BackendInfo:
             {"name": "medium", "size": "1.5 GB", "note": "Better on jargon; needs a GPU"},
             {"name": "large-v3", "size": "3.1 GB", "note": "Best accuracy; GPU only in practice"},
         ],
+        compute=compute_support() if available else {},
     )
 
 

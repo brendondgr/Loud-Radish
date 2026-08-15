@@ -253,3 +253,52 @@ def is_available() -> bool:
     import importlib.util
 
     return importlib.util.find_spec("faster_whisper") is not None
+
+
+#: Every device and precision the UI could offer, before the machine is consulted.
+ALL_DEVICES = ("auto", "cpu", "cuda")
+ALL_PRECISIONS = ("int8", "float16", "float32")
+
+
+def compute_support() -> dict[str, list[str]]:
+    """Which devices and precisions *this machine* can actually run.
+
+    Offering ``float16`` on a CPU-only build is offering a setting that fails at load time, and the
+    failure arrives when the user presses record rather than when they choose it. CTranslate2 knows
+    the answer, so it is asked rather than guessed.
+
+    Returns a mapping of device to the precisions it supports, plus a ``devices`` key listing the
+    devices themselves. Everything is offered unconditionally when CTranslate2 cannot be reached —
+    a wrong guess that permits too much is recoverable, one that hides a working option is not.
+    """
+    try:
+        import ctranslate2
+    except ImportError:
+        return {"devices": list(ALL_DEVICES), **{d: list(ALL_PRECISIONS) for d in ALL_DEVICES}}
+
+    devices: list[str] = ["auto", "cpu"]
+    support: dict[str, list[str]] = {}
+
+    try:
+        cuda_count = int(ctranslate2.get_cuda_device_count())
+    except Exception:  # noqa: BLE001 - the probe itself must never fail a settings page
+        cuda_count = 0
+    if cuda_count > 0:
+        devices.append("cuda")
+
+    for device in ("cpu", "cuda"):
+        if device == "cuda" and cuda_count == 0:
+            support[device] = []
+            continue
+        try:
+            raw = set(ctranslate2.get_supported_compute_types(device))
+        except Exception:  # noqa: BLE001 - unknown is better handled as permissive
+            support[device] = list(ALL_PRECISIONS)
+            continue
+        # CTranslate2 reports composites such as ``int8_float32``; a precision counts as supported
+        # when it appears in any of them, which is how it is actually selected.
+        support[device] = [p for p in ALL_PRECISIONS if any(p in name for name in raw)]
+
+    # "auto" resolves to CUDA when present, so it can offer whatever that device can.
+    support["auto"] = support["cuda"] if cuda_count > 0 else support["cpu"]
+    return {"devices": devices, **support}

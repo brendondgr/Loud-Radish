@@ -31,8 +31,12 @@ export class AsrSettings {
     this.progress = $("[data-asr-progress]", root);
     this.progressFill = $("[data-asr-progress-fill]", root);
 
+    this.deviceSelect = $("#asr-device", root);
+    this.precisionSelect = $("#asr-precision", root);
+
     this.backendSelect?.addEventListener("change", () => this.onBackendChanged());
     this.modelSelect?.addEventListener("change", () => this.onModelChanged());
+    this.deviceSelect?.addEventListener("change", () => this.renderCompute());
     $("[data-asr-load]", root)?.addEventListener("click", () => this.loadModel());
     $("[data-asr-unload]", root)?.addEventListener("click", () => this.unloadModel());
 
@@ -55,6 +59,48 @@ export class AsrSettings {
     if (!this.backendSelect) return;
     this.backendSelect.value = config.get("asr.backend") ?? "";
     this.renderModels();
+    this.renderCompute();
+  }
+
+  /**
+   * Disable devices and precisions this machine cannot actually run.
+   *
+   * `float16` on a CPU-only build is a setting that fails at model load — which happens when the
+   * user presses record, long after they chose it. CTranslate2 knows what is supported, so the
+   * options that would fail are struck out here with the reason attached rather than offered.
+   */
+  renderCompute() {
+    const compute = this.backends.get(this.backendSelect?.value)?.compute;
+    if (!compute || !compute.devices) {
+      // A backend that does not answer the question — the mock — constrains nothing.
+      for (const select of [this.deviceSelect, this.precisionSelect]) {
+        for (const option of select?.options ?? []) option.disabled = false;
+      }
+      return;
+    }
+
+    for (const option of this.deviceSelect?.options ?? []) {
+      const supported = compute.devices.includes(option.value);
+      option.disabled = !supported;
+      option.textContent = option.textContent.replace(/ — not available.*$/, "");
+      if (!supported) option.textContent += " — not available on this machine";
+    }
+
+    const device = this.deviceSelect?.value ?? "auto";
+    const allowed = compute[device] ?? [];
+    for (const option of this.precisionSelect?.options ?? []) {
+      const supported = allowed.length === 0 || allowed.includes(option.value);
+      option.disabled = !supported;
+      option.textContent = option.textContent.replace(/ — not supported.*$/, "");
+      if (!supported) option.textContent += ` — not supported on ${device}`;
+    }
+
+    // A precision that is no longer selectable must not stay selected, or the load fails with a
+    // value the interface is still showing as chosen.
+    if (this.precisionSelect?.selectedOptions?.[0]?.disabled && allowed.length) {
+      this.precisionSelect.value = allowed[0];
+      void config.patch({ "asr.precision": allowed[0] });
+    }
   }
 
   // -- rendering ------------------------------------------------------------------

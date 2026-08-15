@@ -38,6 +38,7 @@ from .formats import (
 from .level import AudioLevel, LevelMeter, measure, to_dbfs
 from .library import AudioFile, AudioLibraryError, list_files, store_upload
 from .preprocess import GainNormaliser, HighPassFilter, PreprocessChain
+from .probe import ProbeResult, probe_device
 from .resample import resample, resampler_name
 from .ring_buffer import AudioRingBuffer, RingBufferStats
 from .sources import AudioSource, DeviceSource, SourceInfo, SyntheticSource, WavFileSource
@@ -60,6 +61,7 @@ __all__ = [
     "HighPassFilter",
     "LevelMeter",
     "PreprocessChain",
+    "ProbeResult",
     "RingBufferStats",
     "SourceInfo",
     "SyntheticSource",
@@ -74,6 +76,7 @@ __all__ = [
     "list_devices",
     "list_files",
     "measure",
+    "probe_device",
     "resample",
     "resampler_name",
     "store_upload",

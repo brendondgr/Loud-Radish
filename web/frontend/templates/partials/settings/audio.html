@@ -37,6 +37,15 @@
         <button type="button" class="button" data-device-refresh>Rescan</button>
       </div>
       <p class="field__hint" data-device-note></p>
+
+      {# The one check worth doing before every talk. Enumerating a device proves the host knows
+         about it; only opening it proves the microphone is plugged in, unmuted, and at a workable
+         level. No audio is kept — the samples are measured and dropped. #}
+      <div class="field__row field__row--actions">
+        <button type="button" class="button" data-device-test>Test this device</button>
+        <p class="settings__inline-status" data-device-test-status role="status" aria-live="polite"></p>
+      </div>
+      <p class="settings__result" data-device-test-result role="status" aria-live="polite"></p>
     </div>
 
     {# Recordings. The library and the upload control both live here so a file never has to be put

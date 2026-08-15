@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import importlib.util
+
 import numpy as np
 import pytest
 from app.config.schema import VadConfig
@@ -154,13 +156,39 @@ class TestEnergyVad:
         assert EnergyVad().name == "energy"
 
 
+def _onnxruntime_installed() -> bool:
+    return importlib.util.find_spec("onnxruntime") is not None
+
+
 class TestSileroAvailability:
+    """Two ways Silero can be unavailable, with two different remedies.
+
+    Which branch runs depends on the environment, so each is guarded. The version of this test that
+    only covered the missing-*dependency* case passed for as long as the dependency was absent and
+    failed the moment it was installed — which is precisely when the other branch starts mattering.
+    """
+
     def test_a_missing_dependency_names_the_install_command_and_the_alternative(self) -> None:
+        if _onnxruntime_installed():
+            pytest.skip("onnxruntime is installed; this branch cannot be exercised")
+
         with pytest.raises(SileroUnavailableError) as excinfo:
             SileroVad(model_path="nonexistent.onnx")
 
         message = str(excinfo.value)
         assert "vad-silero" in message
+        assert "energy" in message
+
+    def test_a_missing_model_file_names_the_file_and_the_alternative(self) -> None:
+        """The branch a user with the extra installed actually hits: no ``silero_vad.onnx``."""
+        if not _onnxruntime_installed():
+            pytest.skip("onnxruntime is absent; the dependency branch fires first")
+
+        with pytest.raises(SileroUnavailableError) as excinfo:
+            SileroVad(model_path="nonexistent.onnx")
+
+        message = str(excinfo.value)
+        assert "silero_vad.onnx" in message
         assert "energy" in message
 
     def test_the_factory_falls_back_rather_than_raising(self) -> None:

@@ -19,7 +19,7 @@ from typing import Any
 
 import numpy as np
 
-from ..devices import AudioDevice, find_device
+from ..devices import AudioDevice, default_device, find_device
 from ..formats import SAMPLE_RATE, to_canonical
 from .base import AudioSource, ErrorCallback, FrameCallback, SourceInfo
 
@@ -64,9 +64,14 @@ class DeviceSource(AudioSource):
         sd = self._require_sounddevice()
         device = find_device(self._device_id)
         if device is None:
+            fallback = default_device()
             raise DeviceUnavailableError(
-                f"No audio device matches {self._device_id!r}. "
-                "Re-open the device list — devices change when hardware is plugged or unplugged."
+                "The selected input is not connected any more. "
+                + (
+                    f"Choose another in Settings → Audio — {fallback.name} is available."
+                    if fallback
+                    else "No capture device is available at all."
+                )
             )
         if device.kind == "file":
             raise DeviceUnavailableError(
@@ -82,7 +87,9 @@ class DeviceSource(AudioSource):
 
         try:
             self._stream = sd.InputStream(
-                device=int(device.id),
+                # Resolved fresh, never stored: a PortAudio index is positional and shifts
+                # whenever hardware is plugged or unplugged.
+                device=device.index,
                 channels=self._channels,
                 samplerate=self._device_rate,
                 dtype="float32",

@@ -199,8 +199,12 @@ class SessionManager:
 
         try:
             self._source = self._open_source(config)
-            self._source_info = self._source.info
             self._source.start(self._on_frame, self._on_source_error)
+            # Read *after* starting. A device source does not know which device it holds until it
+            # has opened one, so asking first returned "No device" — and that string then went into
+            # the status bar and the session's stored metadata for every live recording, while
+            # capture was in fact working perfectly.
+            self._source_info = self._source.info
         except Exception as exc:
             await self._teardown()
             raise SessionError(str(exc)) from exc

@@ -319,13 +319,50 @@ class TestDeviceSource:
                 lambda frame: None
             )
 
-    def test_an_unknown_device_suggests_re_opening_the_list(
+    def test_a_device_that_is_gone_names_one_that_is_available(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        """The user unplugged something. Telling them to go and look is less use than an option."""
         fake = _fake_sounddevice([{"name": "Mic", "max_input_channels": 1}])
         monkeypatch.setitem(sys.modules, "sounddevice", fake)
-        with pytest.raises(DeviceUnavailableError, match="device list"):
-            DeviceSource(device_id="99", sounddevice_module=fake).start(lambda frame: None)
+
+        with pytest.raises(DeviceUnavailableError, match="not connected any more") as excinfo:
+            DeviceSource(device_id="a-microphone-that-left", sounddevice_module=fake).start(
+                lambda frame: None
+            )
+
+        assert "Mic is available" in str(excinfo.value)
+
+    def test_a_stored_index_never_resolves_to_a_different_device(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The bug this identity scheme exists to prevent.
+
+        A Samson GoMic sat at PortAudio index 1. Unplugged, index 1 became a different input
+        entirely. A configuration storing the index would have opened that one — successfully, and
+        silently — and recorded the whole talk from the wrong microphone.
+        """
+        before = _fake_sounddevice(
+            [
+                {"name": "Built-in Mic", "max_input_channels": 1},
+                {"name": "Samson GoMic", "max_input_channels": 1},
+                {"name": "Webcam Mic", "max_input_channels": 1},
+            ]
+        )
+        monkeypatch.setitem(sys.modules, "sounddevice", before)
+        chosen = find_device("Samson GoMic")
+        assert chosen is not None and chosen.index == 1
+
+        # The GoMic is unplugged; the webcam shifts down into index 1.
+        after = _fake_sounddevice(
+            [
+                {"name": "Built-in Mic", "max_input_channels": 1},
+                {"name": "Webcam Mic", "max_input_channels": 1},
+            ]
+        )
+        monkeypatch.setitem(sys.modules, "sounddevice", after)
+
+        assert find_device(chosen.id) is None, "a departed device must not resolve to its successor"
 
     def test_it_reports_no_device_before_starting(self) -> None:
         assert DeviceSource().info.name == "No device"

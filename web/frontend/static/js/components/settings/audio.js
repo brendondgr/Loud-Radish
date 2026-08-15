@@ -15,6 +15,23 @@ import { api } from "../../transport/api.js";
 import { AUDIO_LEVEL } from "../../transport/events.js";
 import { refreshDependants } from "./bindings.js";
 
+/**
+ * How each probe verdict is coloured, reusing the connection-test result styling.
+ *
+ * A working-but-imperfect device (quiet, or hot) is a warning rather than a success: it *will*
+ * record, and the transcript will be worse than it needs to be, which is exactly the case worth
+ * surfacing before the talk rather than after.
+ */
+const TEST_TONE = {
+  ok: "connected",
+  quiet: "no_server",
+  hot: "no_server",
+  clipping: "auth_rejected",
+  silent: "auth_rejected",
+  invalid: "auth_rejected",
+  failed: "auth_rejected",
+};
+
 /** Bytes as a short human string, for the recording list. */
 function megabytes(bytes) {
   return bytes >= 1024 * 1024
@@ -37,8 +54,13 @@ export class AudioSettings {
     this.meterFill = $("[data-settings-meter-fill]", root);
     this.meterNote = $("[data-settings-meter-note]", root);
 
+    this.testButton = $("[data-device-test]", root);
+    this.testStatus = $("[data-device-test-status]", root);
+    this.testResult = $("[data-device-test-result]", root);
+
     $("[data-device-refresh]", root)?.addEventListener("click", () => this.loadDevices());
     this.deviceSelect?.addEventListener("change", () => this.selectDevice());
+    this.testButton?.addEventListener("click", () => this.testDevice());
 
     $("[data-file-upload-trigger]", root)?.addEventListener("click", () => this.fileInput?.click());
     this.fileInput?.addEventListener("change", () => this.upload());
@@ -101,10 +123,45 @@ export class AudioSettings {
     const value = this.deviceSelect.value;
     try {
       await config.patch({ "audio.device_id": value === "" ? null : value });
+      // The new device is unproven, so any verdict about the old one is now misleading.
+      this.clearTest();
       this.onStatus?.("Input device set.", "ok");
     } catch (error) {
       this.onStatus?.(error.message, "error");
     }
+  }
+
+  /**
+   * Open the selected device for a moment and report what arrived.
+   *
+   * The check worth doing before every talk. A device that enumerates, opens, and delivers silence
+   * looks exactly like one that works until the transcript comes back empty.
+   */
+  async testDevice() {
+    if (!this.testButton) return;
+    this.testButton.disabled = true;
+    setText(this.testStatus, "Listening…");
+    this.clearTest();
+
+    try {
+      const outcome = await api.testDevice(this.deviceSelect?.value || null);
+      this.testResult.setAttribute("data-result", TEST_TONE[outcome.result] ?? "server_error");
+      setText(this.testResult, outcome.message);
+      this.onStatus?.(outcome.usable ? "Device test passed." : "Device test found a problem.",
+        outcome.usable ? "ok" : "error");
+    } catch (error) {
+      this.testResult.setAttribute("data-result", "server_error");
+      setText(this.testResult, error.message);
+    } finally {
+      this.testButton.disabled = false;
+      setText(this.testStatus, "");
+    }
+  }
+
+  clearTest() {
+    if (!this.testResult) return;
+    setText(this.testResult, "");
+    this.testResult.removeAttribute("data-result");
   }
 
   // -- the recording library -----------------------------------------------------

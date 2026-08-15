@@ -92,6 +92,9 @@ export const api = {
 
   devices: () => get("/api/audio/devices"),
   selectDevice: (body) => post("/api/audio/device", body),
+  // Opens the device for a moment and reports what arrived. Enumerating one proves only that the
+  // host knows about it, not that a microphone is plugged in, unmuted, and at a usable level.
+  testDevice: (deviceId) => post("/api/audio/test", { device_id: deviceId }),
 
   // The recording library. `audio.file_path` is a path on the server, which a browser cannot
   // resolve from a file picker — so the server lists what it has and accepts uploads into it.
