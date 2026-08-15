@@ -4,6 +4,18 @@ Ticks once a second while a session runs, asks :mod:`.chunker` whether a chunk i
 is, sends it to the language model and stores what comes back. Nothing about it requires attention
 from the user: there is no button, no progress bar, and no state to manage.
 
+One pass is four steps, and only the second involves the model:
+
+1. :mod:`.source` flattens the chunk into a single continuous run of text with ``[MM:SS]`` markers
+   already placed in it. It reads as nonsense at this stage — that is what concatenated
+   speech-model output is.
+2. The model rewrites that whole run at once. Rewriting the passage entire, rather than fragment by
+   fragment, is what lets it repair sentences that were split across three segments.
+3. :func:`..guard.collapse_to_paragraph` and :func:`..guard.reconcile_timestamps` enforce the parts
+   of the instructions a model complies with unevenly.
+4. :func:`..guard.preserves_content` decides whether what came back is a tidied transcript or a
+   summary wearing its clothes.
+
 **Nothing here may affect transcription.** The rule is the same one :mod:`..context` operates under
 and it is absolute — a language model failure is an inconvenience, a lost transcript is a ruined
 seminar. Every call is wrapped, every failure is reported once rather than every second, and the
@@ -29,7 +41,8 @@ from ..llm.contract import GenerationOptions, LlmBackend, system, user
 from ..llm.errors import LlmError, LlmServerError
 from . import prompts
 from .chunker import decide_cut
-from .guard import preserves_content, strip_decoration
+from .guard import collapse_to_paragraph, preserves_content, reconcile_timestamps, strip_decoration
+from .source import build_source
 
 logger = logging.getLogger(__name__)
 
@@ -137,18 +150,25 @@ class PolishWorker:
 
         start, end = self._cursor, decision.cut_at
         segments = self._store.segments_in_range(start, end)
-        source = " ".join(segment.text.strip() for segment in segments).strip()
-        if not source:
+        # Step one: the chunk as a single continuous run with its timestamps already in place. It
+        # reads as nonsense at this point, which is what concatenated speech-model output is; the
+        # model's job is to rewrite the whole of it at once rather than line by line.
+        source = build_source(segments, config.polish.timestamp_interval_s)
+        if source.is_empty:
             self._cursor = end
             return False
 
         logger.debug("Polishing %.1f–%.1f s (%s)", start, end, decision.reason)
-        polished = await self._polish(source, config)
-        if polished is None:
+        answer = await self._polish(source.text, config)
+        if answer is None:
             self._give_up_or_retry(end)
             return False
 
-        check = preserves_content(source, polished, config.polish.min_retained_ratio)
+        polished = reconcile_timestamps(
+            collapse_to_paragraph(answer), source.labels, fallback=source.first_label
+        )
+
+        check = preserves_content(source.text, polished, config.polish.min_retained_ratio)
         if not check.ok:
             # Not retried: a model that summarised when told to tidy will do it again, and a
             # second call costs the same as the first. The raw segments stay on the page, which

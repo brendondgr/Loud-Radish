@@ -42,7 +42,7 @@ Every frame is `{"event": "<name>", "data": { … }}`.
 | `session.stopped` | `session_id`, `stats` | Capture ended |
 | `transcript.committed` | `id`, `text`, `start`, `end`, `wall_clock`, `confidence`, `model_id`, `speaker` | Append permanently |
 | `transcript.hypothesis` | `text` (may be empty), `start` | Replace the tentative tail |
-| `transcript.polished` | `id`, `start`, `end`, `text`, `source_ids` | A finished minute rewritten for reading. Append the block and stop drawing the segments in `source_ids` — do **not** delete them |
+| `transcript.polished` | `id`, `start`, `end`, `text`, `source_ids` | A finished minute rewritten for reading, as one continuous paragraph. Append the block and stop drawing the segments in `source_ids` — do **not** delete them. `text` carries inline `[MM:SS]` markers, in the same format the assistant cites, so a passage can be traced back to when it was said |
 | `audio.level` | `rms`, `peak`, `clipping` | Drives the level meter |
 | `vad.state` | `speaking` (bool) | Drives the speaking indicator |
 | `status` | `rtf`, `queue_depth`, `commit_latency_s`, `model_id`, `device`, `dropped_frames` | Health telemetry |

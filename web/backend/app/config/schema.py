@@ -151,6 +151,10 @@ class PolishConfig(_Base):
     #: The ceiling. A speaker who never pauses would otherwise never produce a chunk at all, and
     #: the page would stay raw for the whole talk.
     max_chunk_seconds: float = Field(default=150.0, ge=30.0, le=1800.0)
+    #: How often a ``[MM:SS]`` marker is placed in the text handed to the model, which is how often
+    #: one can appear in the result. Markers are what make a polished stretch traceable back to the
+    #: moment it was said; too many turn readable prose into a table of contents.
+    timestamp_interval_s: float = Field(default=15.0, ge=5.0, le=300.0)
     #: Ask the provider not to think before answering. There is no portable field for this, so
     #: several are sent; a server that rejects unknown fields is retried without them.
     disable_reasoning: bool = True

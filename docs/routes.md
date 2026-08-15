@@ -102,7 +102,7 @@ state is a second place for it to drift.
 | `GET` | `/api/transcript/export` | Export as text, Markdown, SRT, VTT, or JSON | **Implemented** |
 | `GET` | `/api/transcript/glossary` | The session glossary | **Implemented** |
 | `GET` | `/api/transcript/summaries` | The rolling outline | **Implemented** |
-| `GET` | `/api/transcript/polished` | Finished minutes rewritten for reading. Empty with no language model, which is the ordinary state and not an error | **Implemented** |
+| `GET` | `/api/transcript/polished` | Finished minutes rewritten for reading, with inline `[MM:SS]` markers. Empty with no language model, which is the ordinary state and not an error | **Implemented** |
 
 ### Configuration
 

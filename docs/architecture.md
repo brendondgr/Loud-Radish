@@ -66,6 +66,7 @@ contract is what keeps that option open, and choosing the packaging is not urgen
    ┌────────────────────────────┐
    │ 6. CONTEXT PIPELINE        │  services/context/ — summaries, glossary, chunks
    │    POLISH PASS             │  services/polish/  — a minute at a time, for reading
+   │                            │  flatten → rewrite → reconcile → check
    └──────────────┬─────────────┘
                   ├──────────────────────────► TRANSPORT ──► browser
                   ▼
@@ -183,6 +184,7 @@ transcription. A chat error is an inconvenience; a lost transcript is a ruined s
 | Real-time factor below 1 | Rising queue depth | Persistent warning naming a specific remedy, with a control to apply it |
 | LLM endpoint unreachable | Connection error | Distinguish *not running* from *wrong URL* from *auth rejected*; transcription is unaffected |
 | Polish pass fails, or rewrites rather than tidies | LLM error, or the length guard in `services/polish/guard.py` | Emit no block. The page keeps showing raw segments, which is what it shows with no model at all — the fallback is the ordinary state, not a degraded one |
+| Polish pass invents or loses a timestamp | `reconcile_timestamps` against the markers that were actually supplied | Drop the unaccounted-for marker; if none survives, fall back to the block's own start. A wrong timestamp is worse than a missing one — it is indistinguishable from a real one until the reader clicks it |
 | Repetition loop | N-gram detector | Truncate, force-commit, log |
 | Disk full | Write error | Warn early, keep the transcript in memory, do not crash |
 
