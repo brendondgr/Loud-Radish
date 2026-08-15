@@ -30,6 +30,16 @@ from ..asr import AsrLifecycle, LoadProgress, PromptBuilder
 from ..asr.contract import AsrLoadError
 from ..audio import LevelMeter, WavFileSource
 from ..audio.sources import AudioSource, DeviceSource, SourceInfo
+from ..capture import (
+    PortalDeclined,
+    PortalError,
+    PortalSession,
+    RecorderError,
+    RecorderState,
+    WindowRecorder,
+    build_pipeline,
+)
+from ..capture import detect as detect_capture
 from ..recording import (
     JobRegistry,
     SinkError,
@@ -60,6 +70,23 @@ STATUS_INTERVAL_S = 1.0
 #: Capture queue depth, in frames. At 32 ms a frame this is about six seconds of slack — enough to
 #: absorb a slow inference pass, short enough that a sustained problem surfaces quickly.
 QUEUE_CAPACITY = 200
+
+
+@dataclass(frozen=True)
+class CaptureOptions:
+    """The three per-run switches a `window` session was armed with (D-020).
+
+    A plain dataclass rather than the request schema: `services/` must not import `schemas/`, which
+    is a validation boundary for HTTP and not a vocabulary for the pipeline.
+    """
+
+    live_transcription: bool = True
+    post_transcription: bool = True
+    video: bool = True
+
+    @property
+    def records_nothing(self) -> bool:
+        return not (self.live_transcription or self.post_transcription or self.video)
 
 
 @dataclass
@@ -116,6 +143,12 @@ class SessionManager:
         self._polish_worker: Any = None
         #: `recorded` mode's file, open only while such a session runs (D-021).
         self._sink: WavSink | None = None
+        #: `window` mode's video recorder and the portal session feeding it (D-022). Both are
+        #: `None` in every other mode, and either may be `None` in this one — video is optional.
+        self._recorder: WindowRecorder | None = None
+        self._portal: PortalSession | None = None
+        #: The per-run options a window session was armed with.
+        self._options: CaptureOptions | None = None
         #: The post-capture transcription pass. Deliberately owned here rather than by the session:
         #: it *outlives* the session, which is the whole shape of the mode.
         self.jobs = JobRegistry()
@@ -185,6 +218,8 @@ class SessionManager:
             # so a reload during a half-hour transcription resumes showing its progress rather than
             # an idle interface with no explanation for the missing transcript (D-021).
             "transcription": (job.as_event() if (job := self.jobs.current) else None),
+            # The window capture, when one is running (D-022).
+            "capture": self.capture_state() if self._recorder is not None else None,
             # Whether a recording is currently being written, and how much of one.
             "recording": (
                 {
@@ -211,7 +246,11 @@ class SessionManager:
 
     # -- lifecycle -----------------------------------------------------------------
 
-    async def start(self, metadata: SessionMetadata | None = None) -> SessionMetadata:
+    async def start(
+        self,
+        metadata: SessionMetadata | None = None,
+        options: CaptureOptions | None = None,
+    ) -> SessionMetadata:
         """Begin capture and transcription.
 
         Raises:
@@ -223,6 +262,7 @@ class SessionManager:
 
         config = self._config.resolve()
         session = metadata or SessionMetadata(session_id=uuid.uuid4().hex[:12])
+        self._options = options if session.mode == modes.WINDOW else None
         session.session_prompt = config.asr.session_prompt
         session.config = config.model_dump(mode="json")
 
@@ -243,15 +283,16 @@ class SessionManager:
         if session.mode == modes.RECORDED:
             self._sink = self._open_sink(config, session)
             self._engine = None
+        elif session.mode == modes.WINDOW:
+            # Three independent switches, which is the whole substance of the mode. The audio file
+            # is written whenever a second pass is wanted; the engine runs whenever live text is;
+            # the recorder runs whenever video is. None of them implies another.
+            options = self._options or CaptureOptions()
+            if options.post_transcription:
+                self._sink = self._open_sink(config, session)
+            self._engine = self._build_engine(config) if options.live_transcription else None
         else:
-            self._engine = build_engine(
-                config=config.streaming,
-                transcribe=self._asr.transcribe,
-                capabilities=self._asr.backend.capabilities if self._asr.backend else None,  # type: ignore[arg-type]
-                model_id=self._asr.model_id,
-                prompt_builder=self._prompts,
-                first_segment_id=self._store.last_segment_id() + 1,
-            )
+            self._engine = self._build_engine(config)
 
         self._queue.clear()
         self._meter.reset()
@@ -272,6 +313,26 @@ class SessionManager:
             raise SessionError(str(exc)) from exc
 
         self._metadata = session
+
+        # After the audio source is up, deliberately. The portal shows a dialog and waits for a
+        # human; doing that first would leave the microphone unopened for as long as they take,
+        # and the first words of a talk are said while someone is still choosing a window.
+        if session.mode == modes.WINDOW and (self._options or CaptureOptions()).video:
+            try:
+                self._start_window_capture(config, session)
+            except PortalDeclined as exc:
+                # They said no. Starting an audio-only recording they did not ask for would be
+                # reading a refusal as a yes.
+                await self._teardown()
+                self._metadata = None
+                raise SessionError(
+                    "Screen sharing was cancelled, so nothing was recorded."
+                ) from exc
+            except (PortalError, RecorderError) as exc:
+                # Everything else costs the video and keeps the talk.
+                logger.warning("Video capture could not start: %s", exc)
+                self._emit_failure(degradation.capture_failed(str(exc)))
+
         self._start_context_worker(config)
         self._start_polish_worker()
         self._emit(
@@ -302,6 +363,10 @@ class SessionManager:
 
         if self._source is not None:
             self._source.stop()
+
+        # Before the audio sink closes: finalising the container takes a few seconds, and the
+        # timestamps line up better if the audio is still being written while it happens.
+        self._stop_window_capture()
 
         # Stopped before the store is torn down, because its final pass summarises the tail — which
         # is where a talk's conclusions live.
@@ -549,6 +614,113 @@ class SessionManager:
         except Exception:  # noqa: BLE001 - a failed final pass must not fail the stop
             logger.warning("The final polish pass failed", exc_info=True)
 
+    def _build_engine(self, config: AppConfig) -> Any:
+        """The streaming engine, which is what makes a session transcribe as it goes."""
+        assert self._store is not None
+        return build_engine(
+            config=config.streaming,
+            transcribe=self._asr.transcribe,
+            capabilities=self._asr.backend.capabilities if self._asr.backend else None,  # type: ignore[arg-type]
+            model_id=self._asr.model_id,
+            prompt_builder=self._prompts,
+            first_segment_id=self._store.last_segment_id() + 1,
+        )
+
+    def _start_window_capture(self, config: AppConfig, session: SessionMetadata) -> None:
+        """Ask for a window and start recording it. Only called when video was requested.
+
+        **A failure here does not fail the session.** The audio is already capturing and its
+        transcript is the part that cannot be recreated; losing the video is a disappointment,
+        losing the talk is not recoverable. The one exception is the user declining, which ends the
+        whole run — they said no, and starting an audio recording they did not ask for would be
+        taking the refusal as a yes.
+        """
+        support = detect_capture()
+        if not support.available:
+            self._emit_failure(degradation.capture_unavailable(support.reason))
+            return
+
+        token = ""
+        credentials = getattr(self, "credentials", None)
+        if config.capture.reuse_consent and credentials is not None:
+            token = credentials.get("capture-restore-token") or ""
+
+        self._portal = PortalSession(cursor_mode=config.capture.cursor_mode, restore_token=token)
+        stream = self._portal.open()
+
+        if stream.restore_token and credentials is not None:
+            # Stored where credentials go, never in the config file: it is a granted capability
+            # and D-017 governs those.
+            credentials.set("capture-restore-token", stream.restore_token)
+
+        directory = Path(config.recording.recording_dir)
+        stamp = session.started_at.strftime("%Y%m%d-%H%M%S")
+        base = f"{stamp}-{session.session_id}"
+        spec = build_pipeline(
+            support,
+            node_id=stream.node_id,
+            fd=stream.fd,
+            video_path=str(directory / f"{base}.{support.extension}"),
+            preview_path=str(directory / f"{base}-preview.jpg"),
+            frame_rate=config.capture.frame_rate,
+            max_height=config.capture.max_height,
+            want_preview=config.capture.preview,
+        )
+
+        self._recorder = WindowRecorder(
+            spec,
+            portal_fd=stream.fd,
+            on_stopped=self._on_recorder_stopped,
+            log_dir=Path("logs"),
+        )
+        self._recorder.start()
+        self._emit("capture.state", self.capture_state())
+
+    def _stop_window_capture(self) -> None:
+        """Finalise the video and release the portal. Safe in any mode and at any point."""
+        recorder, self._recorder = self._recorder, None
+        if recorder is not None:
+            try:
+                recorder.stop()
+            except Exception:  # noqa: BLE001 - a failed teardown must not fail the stop
+                logger.exception("The video recorder did not stop cleanly")
+
+        portal, self._portal = self._portal, None
+        if portal is not None:
+            # Closing the portal session is what makes the compositor's sharing indicator go away.
+            # Leaving it open shows the user they are still sharing a window when they are not.
+            portal.close()
+
+    def _on_recorder_stopped(self, state: RecorderState) -> None:
+        """The video ended without being asked to. Usually the window was closed."""
+        if state.window_closed:
+            self._emit_failure(degradation.capture_window_closed())
+        elif state.failed:
+            self._emit_failure(degradation.capture_failed(state.error))
+        self._emit("capture.state", self.capture_state())
+
+    def capture_state(self) -> dict[str, Any]:
+        """What the monitor pane draws. Empty outside `window` mode."""
+        recorder = self._recorder
+        options = self._options
+        return {
+            "recording": bool(recorder and recorder.is_running),
+            "window_closed": bool(recorder and recorder.state.window_closed),
+            "failed": bool(recorder and recorder.state.failed),
+            "error": recorder.state.error if recorder else "",
+            "video_path": recorder.state.video_path if recorder else "",
+            "bytes": recorder.state.bytes_written if recorder else 0,
+            "duration_s": round(recorder.state.duration_s, 1) if recorder else 0.0,
+            "preview": bool(recorder and recorder.state.preview_path),
+            "options": {
+                "live_transcription": bool(options and options.live_transcription),
+                "post_transcription": bool(options and options.post_transcription),
+                "video": bool(options and options.video),
+            }
+            if options
+            else None,
+        }
+
     def _open_sink(self, config: AppConfig, session: SessionMetadata) -> WavSink:
         """Open the file this session records into.
 
@@ -690,6 +862,11 @@ class SessionManager:
         if self._sink is not None:
             self._sink.discard()
             self._sink = None
+
+        # Same for the video, and for the portal session behind it — an abrupt shutdown that left
+        # the portal open would leave the compositor telling the user they are still sharing.
+        self._stop_window_capture()
+        self._options = None
 
         self._engine = None
         self._gate = None

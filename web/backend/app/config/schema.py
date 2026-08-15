@@ -225,6 +225,25 @@ class RecordingConfig(_Base):
     batch_overlap_s: float = Field(default=1.0, ge=0.0, le=10.0)
 
 
+class CaptureConfig(_Base):
+    """Recording a window's video (D-022). Read only by `window` mode."""
+
+    #: Whether the mouse pointer is drawn into the recording.
+    cursor_mode: Literal["hidden", "embedded"] = "hidden"
+    #: Frames per second. Fifteen is ample for a talk — slides change every thirty seconds — and
+    #: doubling it doubles the work of a software encoder sharing a CPU with the speech model.
+    frame_rate: int = Field(default=15, ge=1, le=60)
+    #: Ceiling on the encoded height. Only ever scales down.
+    max_height: int = Field(default=720, ge=240, le=2160)
+    #: Draw a low-rate preview for the monitor pane. Costs one small JPEG a second.
+    preview: bool = True
+    #: Reuse the desktop's remembered consent so a second recording skips the picker. The token
+    #: itself lives in the OS credential store, never in this file (D-017).
+    reuse_consent: bool = True
+    #: Combine the video and the session's audio into one file once both are closed.
+    mux_audio: bool = True
+
+
 class QuickAction(_Base):
     """A parameterised prompt template surfaced as a one-tap button (BE §11.3)."""
 
@@ -247,5 +266,6 @@ class AppConfig(_Base):
     context: ContextConfig = Field(default_factory=ContextConfig)
     polish: PolishConfig = Field(default_factory=PolishConfig)
     recording: RecordingConfig = Field(default_factory=RecordingConfig)
+    capture: CaptureConfig = Field(default_factory=CaptureConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     quick_actions: list[QuickAction] = Field(default_factory=list)

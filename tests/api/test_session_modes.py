@@ -52,31 +52,28 @@ def test_an_unknown_mode_is_a_validation_error(client: TestClient) -> None:
     assert response.status_code == 422
 
 
-@pytest.mark.parametrize("mode", [modes.WINDOW])
-def test_an_unimplemented_mode_is_refused_by_name(client: TestClient, mode: str) -> None:
-    """501, not 422 and not 409: the request is valid and the state is fine, the build lacks it."""
+@pytest.mark.parametrize("mode", list(modes.CAPTURE_MODES))
+def test_no_mode_is_refused_as_unimplemented_any_more(client: TestClient, mode: str) -> None:
+    """All three plans removed their own entry. The set is empty and the mechanism is kept.
+
+    A mode can still fail to *start* — no capture device, no portal, a declined dialog — but that
+    is a 409 about this machine, not a 501 about this build.
+    """
     response = client.post("/api/session/start", json={"mode": mode})
-    assert response.status_code == 501
-
-    error = response.json()["detail"]["error"]
-    assert error["code"] == "mode-unavailable"
-    # The message has to say what to do instead, because this is a button the user just pressed.
-    assert "not built yet" in error["message"]
-    assert "docs/plans/" in error["message"]
-
-
-def test_recorded_mode_is_no_longer_refused(client: TestClient) -> None:
-    """Plan 3 removed its own entry from the unimplemented set."""
-    response = client.post("/api/session/start", json={"mode": modes.RECORDED})
     assert response.status_code != 501
     if response.status_code == 200:
-        assert response.json()["session"]["mode"] == modes.RECORDED
+        assert response.json()["session"]["mode"] == mode
         client.post("/api/session/stop")
 
 
-def test_a_refused_mode_does_not_start_anything(client: TestClient) -> None:
-    client.post("/api/session/start", json={"mode": modes.WINDOW})
-    assert client.get("/api/session").json()["running"] is False
+def test_a_start_that_fails_leaves_nothing_running(client: TestClient) -> None:
+    """Whether window capture can start here depends on the machine; either way a failure must
+    not leave a half-built session behind."""
+    response = client.post("/api/session/start", json={"mode": modes.WINDOW})
+    if response.status_code != 200:
+        assert client.get("/api/session").json()["running"] is False
+    else:
+        client.post("/api/session/stop")
 
 
 # -- per-run options --------------------------------------------------------------------
@@ -107,14 +104,19 @@ def test_all_options_off_is_refused_as_recording_nothing(client: TestClient) -> 
 def test_every_other_combination_gets_past_validation(client: TestClient, options: dict) -> None:
     """Video with no transcription, and transcription with no video, are both legitimate."""
     response = client.post("/api/session/start", json={"mode": modes.WINDOW, "options": options})
-    # 501 because window capture is not built; the point is that it was not 422.
-    assert response.status_code == 501
+    # It may still fail to start on this machine — no device, no portal, a declined dialog — but
+    # never with 422, which would mean the combination itself was rejected.
+    assert response.status_code != 422
+    if response.status_code == 200:
+        client.post("/api/session/stop")
 
 
 def test_options_are_optional(client: TestClient) -> None:
-    """Absent means the defaults; it is not a required field for the modes that ignore it."""
+    """Absent means the defaults; it is not a required field."""
     response = client.post("/api/session/start", json={"mode": modes.WINDOW})
-    assert response.status_code == 501  # refused for the mode, not for a missing field
+    assert response.status_code != 422
+    if response.status_code == 200:
+        client.post("/api/session/stop")
 
 
 # -- mode availability, which is what the interface disables a mode from -----------------

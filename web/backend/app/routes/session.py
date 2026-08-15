@@ -33,7 +33,7 @@ from ..services.audio import (
     probe,
 )
 from ..services.audio.probe import probe_device
-from ..services.session import SessionError, modes
+from ..services.session import CaptureOptions, SessionError, modes
 
 router = APIRouter(prefix="/api", tags=["session"])
 
@@ -55,6 +55,23 @@ def _error(code: str, message: str, severity: str = "warning") -> dict[str, Any]
     return {"error": {"code": code, "message": message, "severity": severity}}
 
 
+def _capture_options(body: StartSessionRequest) -> CaptureOptions | None:
+    """Translate the request's options into the pipeline's own vocabulary.
+
+    Two types for three booleans is deliberate: `schemas/` is the HTTP validation boundary and
+    `services/` must not import it, or the pipeline ends up depending on the shape of a request.
+    """
+    if body.mode != modes.WINDOW:
+        return None
+    if body.options is None:
+        return CaptureOptions()
+    return CaptureOptions(
+        live_transcription=body.options.live_transcription,
+        post_transcription=body.options.post_transcription,
+        video=body.options.video,
+    )
+
+
 # -- session ---------------------------------------------------------------------------
 
 
@@ -68,12 +85,7 @@ async def get_session(request: Request) -> dict[str, Any]:
 #: vocabulary is fixed (D-020) and the frontend offers all three — but refused here until their plan
 #: is implemented, so an unfinished mode gives a named error rather than a session that starts and
 #: records nothing. Each plan deletes its own entry from this set.
-_UNIMPLEMENTED_MODES: dict[str, str] = {
-    modes.WINDOW: (
-        "Window recording is not built yet. Use live transcription for now — "
-        "see docs/plans/window-recording-transcription.md."
-    ),
-}
+_UNIMPLEMENTED_MODES: dict[str, str] = {}
 
 
 @router.post("/session/start", response_model=SessionResponse)
@@ -111,7 +123,7 @@ async def start_session(request: Request, body: StartSessionRequest) -> dict[str
         mode=body.mode,
     )
     try:
-        await manager.start(metadata)
+        await manager.start(metadata, options=_capture_options(body))
     except SessionError as exc:
         # 409: the request is well-formed, it just conflicts with the current state or environment.
         raise HTTPException(

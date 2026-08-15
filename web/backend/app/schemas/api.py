@@ -87,6 +87,8 @@ class SessionResponse(_Model):
     transcription: dict[str, Any] | None = None
     #: How much audio the current recording has captured, when one is being written.
     recording: dict[str, Any] | None = None
+    #: The window capture, when `window` mode is recording video (D-022).
+    capture: dict[str, Any] | None = None
 
 
 class SessionStoppedResponse(_Model):

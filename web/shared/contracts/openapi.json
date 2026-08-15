@@ -2281,6 +2281,18 @@
               }
             ],
             "title": "Recording"
+          },
+          "capture": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capture"
           }
         },
         "additionalProperties": false,

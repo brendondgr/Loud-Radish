@@ -241,3 +241,47 @@ def transcription_failed(path: str, detail: str) -> Failure:
         remedy_label="Open storage settings",
         opens_settings="storage",
     )
+
+
+def capture_unavailable(detail: str) -> Failure:
+    """Window capture was asked for on a machine that cannot do it (D-022).
+
+    Names the specific missing piece, which the probe already worked out. "Window capture
+    unavailable" on its own is the message that generates support requests.
+    """
+    return Failure(
+        code="capture-unavailable",
+        message=f"The window could not be captured. {detail}",
+        severity=Severity.WARNING,
+        transcription_continues=True,
+    )
+
+
+def capture_window_closed() -> Failure:
+    """The captured window was closed while recording (D-022).
+
+    Explicitly not an error. People close windows, and the audio — which is the part that cannot be
+    recreated — is still recording.
+    """
+    return Failure(
+        code="capture-window-closed",
+        message=(
+            "The window you were recording was closed, so the video ended there. "
+            "Audio is still recording."
+        ),
+        severity=Severity.WARNING,
+        transcription_continues=True,
+    )
+
+
+def capture_failed(detail: str) -> Failure:
+    """The video recorder died. The session continues on audio alone (D-022)."""
+    return Failure(
+        code="capture-failed",
+        message=(
+            f"Video recording stopped: {detail} "
+            "Audio and the transcript are unaffected and still running."
+        ),
+        severity=Severity.WARNING,
+        transcription_continues=True,
+    )

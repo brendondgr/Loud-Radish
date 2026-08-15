@@ -51,6 +51,12 @@ RESTART_SESSION_PATHS: frozenset[str] = frozenset(
         # written against the old one (D-021).
         "recording.recording_dir",
         "recording.max_minutes",
+        # Every one of these is baked into the GStreamer launch line when capture starts, and the
+        # pipeline cannot be rebuilt without dropping the portal stream and asking again.
+        "capture.cursor_mode",
+        "capture.frame_rate",
+        "capture.max_height",
+        "capture.preview",
     }
 )
 

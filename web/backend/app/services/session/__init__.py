@@ -11,11 +11,12 @@ marshals onto the loop. asyncio stays out of the audio path.
 """
 
 from . import degradation, modes
-from .manager import CapturedFrame, EmitFn, SessionError, SessionManager
+from .manager import CapturedFrame, CaptureOptions, EmitFn, SessionError, SessionManager
 from .metrics import PipelineMetrics
 from .workers import DropOldestQueue, QueueStats, Worker
 
 __all__ = [
+    "CaptureOptions",
     "CapturedFrame",
     "DropOldestQueue",
     "EmitFn",
