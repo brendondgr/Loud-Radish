@@ -7,9 +7,10 @@ It captures audio from a microphone, from system playback, or from a recording; 
 near-real-time through a pluggable speech model; keeps a growing timestamped transcript; and serves
 that transcript to a browser as it is produced.
 
-> **Current state:** the pipeline and the transcript interface work end to end. The language model,
-> the chat pane, and the settings interface are not built yet — see
-> [docs/checklist.md](docs/checklist.md) for exactly what remains.
+> **Current state:** thirteen of the plan's fourteen phases are done. Recording, transcription, the
+> settings interface, and the assistant all work end to end, and everything is configurable from
+> inside the application. Phase 14 — the soak run, the sessions page, and a final documentation pass
+> — remains; see [docs/checklist.md](docs/checklist.md).
 
 ## Quick Start
 

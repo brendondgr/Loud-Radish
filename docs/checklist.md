@@ -59,23 +59,19 @@ Each of these was open at initialization and is now settled. Rationale is in the
 
 ## Part 3 — Remaining Build Phases
 
-Nine of the plan's fourteen phases are complete. The backend runs end to end and the application is
-usable: it records, transcribes, persists, and renders a live transcript in the browser.
+Thirteen of the plan's fourteen phases are complete. The application records, transcribes,
+persists, renders a live transcript, and answers questions about it — and every part of that is
+configurable from inside the interface, with no config file to edit.
 
-- [ ] **Phase 9 — LLM abstraction (Seam B).** OpenAI-compatible client, native Anthropic client,
-      the four-way error taxonomy, connection testing, credential handling. `docs/routes.md` lists
-      the `/api/llm/*` surface it fills in.
-- [ ] **Phase 10 — Chat orchestration and the context pipeline.** Priority-ordered context
+- [x] **Phase 9 — LLM abstraction (Seam B).** OpenAI-compatible client, native Anthropic client,
+      the four-way error taxonomy, connection testing, credential handling.
+- [x] **Phase 10 — Chat orchestration and the context pipeline.** Priority-ordered context
       assembly under a token budget, quick actions, streaming answers with cancellation, rolling
-      summaries, and glossary extraction. The store, the `summary.added` and `glossary.added`
-      events, and the `/api/transcript/{summaries,glossary}` endpoints already exist and return
-      empty until this lands.
-- [ ] **Phase 12 — Settings interface.** The five-tab modal over the existing `/api/config`
-      surface, which already reports the hot-swap cost of every change. The header's settings
-      buttons currently show a banner saying it is not built.
-- [ ] **Phase 13 — Chat interface.** Chat pane, quick actions, streaming responses, the glossary
-      panel, ask-about-selection, and citation timestamps. The transcript pane already exposes
-      `scrollToTime`, and the selection menu partial is in place but unwired.
+      summaries, and glossary extraction.
+- [x] **Phase 12 — Settings interface.** The five-tab modal over `/api/config`, plus the recording
+      library that makes the file source selectable without touching the filesystem.
+- [x] **Phase 13 — Chat interface.** Chat pane, quick actions, streaming responses, the glossary
+      panel, ask-about-selection, and clickable citation timestamps.
 - [ ] **Phase 14 — Hardening.** Degradation paths under test, the accelerated soak, transcript
       export in the UI, the sessions page, and a final documentation pass.
 
@@ -114,8 +110,11 @@ user's own machine, and none may be reported as passing until it has had one.
 - [ ] **System loopback capture** — confirm the loopback device is enumerated and captures playback.
 - [ ] **Real-model transcription** — install `--extra asr-whisper`, transcribe a saved recording, and
       measure real-time factor on the actual hardware.
-- [ ] **A real local LLM endpoint** — point at a running Ollama or LM Studio server and confirm the
-      connection test, model listing, and streaming responses.
+- [x] **A real local LLM endpoint** — done. Verified against an OpenAI-compatible relay on
+      `localhost:9090` serving `default-model`: connection test, model listing, streaming answers,
+      mid-stream cancellation, rolling summaries, and glossary extraction all confirmed. Five
+      integration tests in `tests/assistant/test_llm_live.py` run against it when it is up and skip
+      when it is not.
 - [ ] **A real hosted LLM provider** — confirm credential storage, auth, and streaming.
 - [ ] **A genuine 90-minute soak** — the plan runs an accelerated soak, which exercises flat memory and
       stable real-time factor but is not the same as ninety wall-clock minutes.
