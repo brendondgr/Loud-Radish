@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 from app.config.schema import AsrConfig
@@ -29,6 +31,45 @@ def audio(seconds: float, amplitude: float = 0.3) -> np.ndarray:
 
 def silence(seconds: float) -> np.ndarray:
     return np.zeros(int(seconds * SAMPLE_RATE), dtype=np.float32)
+
+
+class _FakeWord(SimpleNamespace):
+    pass
+
+
+def whisper_segment(
+    start: float,
+    end: float,
+    text: str,
+    no_speech: float | None = None,
+    logprob: float | None = None,
+) -> SimpleNamespace:
+    """One segment shaped like faster-whisper's, with word-level detail.
+
+    Attributes are omitted rather than set to ``None`` when unspecified, because that is how an
+    older library version presents them and the backend has to tell "did not say" from "said zero".
+    """
+    span = max(end - start, 0.0)
+    words = text.split()
+    step = span / len(words) if words and span else 0.0
+    segment = SimpleNamespace(
+        start=start,
+        end=end,
+        words=[
+            _FakeWord(
+                word=f" {word}",
+                start=start + index * step,
+                end=start + (index + 1) * step,
+                probability=0.9,
+            )
+            for index, word in enumerate(words)
+        ],
+    )
+    if no_speech is not None:
+        segment.no_speech_prob = no_speech
+    if logprob is not None:
+        segment.avg_logprob = logprob
+    return segment
 
 
 class TestWordToken:
@@ -67,6 +108,69 @@ class TestAsrResult:
     def test_audio_end_is_the_last_word_end(self) -> None:
         result = AsrResult(words=[WordToken(text="x", start=0.0, end=2.5)])
         assert result.audio_end == pytest.approx(2.5)
+
+    def test_the_models_own_confidence_has_no_opinion_by_default(self) -> None:
+        """Absent must never read as "definitely speech" — that would delete real words."""
+        result = AsrResult(words=[])
+        assert result.no_speech_prob is None
+        assert result.avg_logprob is None
+
+
+class TestWhisperConfidenceCollection:
+    """The signals that make invented text detectable, read off faster-whisper's own output.
+
+    Exercised against fakes shaped like the library's, because the library and its weights are not
+    installed here. That is a real limit and it is why the conversion is pinned down this closely:
+    it is the part of the backend that can be wrong without any test noticing.
+    """
+
+    @staticmethod
+    def collect(segments):
+        from app.services.asr.faster_whisper import FasterWhisperBackend
+
+        return FasterWhisperBackend._collect(segments)
+
+    def test_the_no_speech_estimate_is_kept_rather_than_discarded(self) -> None:
+        words, confidence = self.collect([whisper_segment(0.0, 2.0, "hello", no_speech=0.92)])
+        assert [word.text for word in words] == ["hello"]
+        assert confidence.no_speech_prob == pytest.approx(0.92)
+
+    def test_the_average_log_probability_is_kept(self) -> None:
+        _, confidence = self.collect([whisper_segment(0.0, 2.0, "hello", logprob=-1.4)])
+        assert confidence.avg_logprob == pytest.approx(-1.4)
+
+    def test_several_segments_are_weighted_by_how_much_audio_they_cover(self) -> None:
+        """A half-second aside must not outvote twenty seconds of speech."""
+        _, confidence = self.collect(
+            [
+                whisper_segment(0.0, 20.0, "a long stretch of real speech", no_speech=0.01),
+                whisper_segment(20.0, 20.5, "hm", no_speech=0.99),
+            ]
+        )
+        assert confidence.no_speech_prob < 0.05
+
+    def test_zero_length_segments_still_count(self) -> None:
+        _, confidence = self.collect(
+            [
+                whisper_segment(1.0, 1.0, "a", no_speech=0.2),
+                whisper_segment(1.0, 1.0, "b", no_speech=0.8),
+            ]
+        )
+        assert confidence.no_speech_prob == pytest.approx(0.5)
+
+    def test_a_model_that_reports_nothing_leaves_no_opinion(self) -> None:
+        _, confidence = self.collect([whisper_segment(0.0, 2.0, "hello")])
+        assert confidence.no_speech_prob is None
+        assert confidence.avg_logprob is None
+
+    def test_an_unreadable_value_is_no_opinion_rather_than_zero(self) -> None:
+        _, confidence = self.collect([whisper_segment(0.0, 2.0, "hi", no_speech=float("nan"))])
+        assert confidence.no_speech_prob is None
+
+    def test_an_empty_pass_leaves_no_opinion(self) -> None:
+        words, confidence = self.collect([])
+        assert words == []
+        assert confidence.no_speech_prob is None
 
 
 class TestCapabilities:
