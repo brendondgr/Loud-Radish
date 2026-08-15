@@ -59,9 +59,9 @@ Each of these was open at initialization and is now settled. Rationale is in the
 
 ## Part 3 — Remaining Build Phases
 
-Thirteen of the plan's fourteen phases are complete. The application records, transcribes,
-persists, renders a live transcript, and answers questions about it — and every part of that is
-configurable from inside the interface, with no config file to edit.
+**All fourteen phases are complete.** The application records, transcribes, persists, renders a
+live transcript, answers questions about it, and keeps past sessions retrievable and exportable —
+and every part of that is configurable from inside the interface, with no config file to edit.
 
 - [x] **Phase 9 — LLM abstraction (Seam B).** OpenAI-compatible client, native Anthropic client,
       the four-way error taxonomy, connection testing, credential handling.
@@ -72,8 +72,8 @@ configurable from inside the interface, with no config file to edit.
       library that makes the file source selectable without touching the filesystem.
 - [x] **Phase 13 — Chat interface.** Chat pane, quick actions, streaming responses, the glossary
       panel, ask-about-selection, and clickable citation timestamps.
-- [ ] **Phase 14 — Hardening.** Degradation paths under test, the accelerated soak, transcript
-      export in the UI, the sessions page, and a final documentation pass.
+- [x] **Phase 14 — Hardening.** Degradation paths under test, the accelerated soak, transcript
+      export in the UI, the sessions page, and the documentation pass.
 
 ---
 
@@ -84,12 +84,12 @@ configurable from inside the interface, with no config file to edit.
       architecture document is explicit that this cannot be decided from published benchmarks.
 - [ ] **Desktop packaging.** Whether this stays a browser-plus-local-server application or is packaged
       into a Tauri/Electron/Qt shell. The chosen contract keeps both open, so nothing is blocked.
-- [ ] **Deployment documentation.** `docs/deployment.md` still describes a generic web deployment and
-      needs rewriting for a locally-run desktop-style application. Due in Phase 14.
-- [ ] **Design tokens.** `web/frontend/static/css/tokens.css` is the working source of truth; the
-      token table in `docs/design-system.md` still needs to be filled in from it.
-- [ ] **Component map.** `docs/component-map.md` still describes React component ownership and needs
-      rewriting for the template-and-module model. Overdue — Phase 11 landed without it.
+- [x] **Deployment documentation.** Done. `docs/deployment.md` now describes installing and running
+      it locally, what ends up on disk, and measured hardware expectations.
+- [x] **Design tokens.** Done. `docs/design-system.md` documents every token group, the two
+      contrast corrections, and the rule about compositing translucent backgrounds before measuring.
+- [x] **Component map.** Done. `docs/component-map.md` describes the template-and-module tree, the
+      three ownership rules, and every component and store.
 - [ ] **Automated accessibility tooling.** Not selected. Manual keyboard, contrast, and 320 px passes
       are specified per phase in the plan; an automated check would complement them.
 - [ ] **Embeddings-based retrieval.** Deferred. Keyword search over FTS5 is expected to suffice for
@@ -105,16 +105,25 @@ configurable from inside the interface, with no config file to edit.
 Things the plan's phases cannot verify in a headless environment. Each needs a manual pass on the
 user's own machine, and none may be reported as passing until it has had one.
 
-- [ ] **Live microphone capture** — confirm real audio arrives, is not silence, is not clipped, and is
-      from the intended device.
-- [ ] **System loopback capture** — confirm the loopback device is enumerated and captures playback.
-- [ ] **Real-model transcription** — install `--extra asr-whisper`, transcribe a saved recording, and
-      measure real-time factor on the actual hardware.
+- [x] **Live microphone capture** — done, and it found four bugs. Verified against real hardware:
+      frames arrive at the correct rate and level, our conversion matches raw PortAudio, and the
+      device now has a stable identity so a saved selection cannot resolve to a different
+      microphone after a re-plug. Settings → Audio → **Test this device** does this check on demand.
+      *Still worth doing yourself:* speak into your own microphone and confirm the words appear.
+- [ ] **System loopback capture** — partially. Loopback sources are now correctly *classified*
+      rather than presented as microphones, but on a PipeWire desktop PortAudio does not expose the
+      sink monitors at all, so what is offered is whatever the JACK bridge surfaces. Capturing a
+      remote talk this way needs confirming on your own setup.
+- [x] **Real-model transcription** — done. `faster-whisper` `small` at `int8` on a 32-core CPU:
+      **RTF ≈ 1.5**, commit latency ≈ 1.4 s, transcript recognisably correct. Measured on this
+      machine; measure on yours, which is what the status bar exists for.
 - [x] **A real local LLM endpoint** — done. Verified against an OpenAI-compatible relay on
       `localhost:9090` serving `default-model`: connection test, model listing, streaming answers,
       mid-stream cancellation, rolling summaries, and glossary extraction all confirmed. Five
       integration tests in `tests/assistant/test_llm_live.py` run against it when it is up and skip
       when it is not.
 - [ ] **A real hosted LLM provider** — confirm credential storage, auth, and streaming.
-- [ ] **A genuine 90-minute soak** — the plan runs an accelerated soak, which exercises flat memory and
-      stable real-time factor but is not the same as ninety wall-clock minutes.
+- [ ] **A genuine 90-minute soak** — the accelerated soak in `tests/transcription/test_soak.py`
+      drives ninety minutes of transcript through the engine in seconds and holds bounded memory,
+      contiguous segment ids, and a clock that has not drifted. It is not the same as ninety
+      wall-clock minutes with a real model and a real device, which remains yours to run.

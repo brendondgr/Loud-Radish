@@ -1,74 +1,111 @@
 # Deployment
 
-*Last updated: 2026-08-14 (repository initialization)*
+*Last updated: 2026-08-15 (Phase 14 — final documentation pass)*
 
-> **Status: no deployment target selected.** Nothing is deployed and no hosting decision has been
-> made. This file records what is already true and what must be decided. Fill it in properly once a
-> target is chosen — tracked in `docs/checklist.md`.
+> **This application is not deployed.** It runs on the machine of the person using it, and that is
+> the design, not a stage before hosting. This file describes installing and running it there.
 
-## Current State
+Until Phase 14 this file described environments, build artifacts, and an `npm run build` step for a
+frontend that does not exist. None of that applied: Decision D-011 removed the Node toolchain, and
+Decision D-010 removed the upload-and-poll service model that a hosted deployment would have served.
 
-Local development only. Commands are in [workflow.md](workflow.md).
+## Why it is local
 
-| Artifact | Build | Notes |
+The application listens to a room and writes down what is said in it. Three consequences follow, and
+together they rule hosting out rather than merely making it unattractive.
+
+**Audio would have to leave the room.** A hosted version means streaming a private meeting to
+someone else's machine. With a local speech model and a local language model, nothing leaves at all,
+and the header says so at a glance.
+
+**There is no authentication model.** Not an omission — a deliberate consequence of being
+single-user and loopback-bound. Adding hosting means adding accounts, sessions, and access control
+to a transcript store that currently, correctly, assumes one person.
+
+**Latency is the product.** The commit policy is tuned around inference latency measured in
+hundreds of milliseconds. A network hop between capture and inference changes what the whole
+streaming engine is solving for.
+
+The server binds to `127.0.0.1` for these reasons. `app.py` warns when `--host` is set to anything
+else, because anything that can reach that port can read the transcript of a private room.
+
+## Installing
+
+Requires Python 3.11+ and [`uv`](https://docs.astral.sh/uv/). No Node toolchain, no build step.
+
+```bash
+uv sync
+```
+
+That gives a working application with a scripted mock speech model — enough to see the interface
+work. For real use:
+
+```bash
+uv sync --extra asr-whisper --extra audio-device
+```
+
+| Extra | Adds | Without it |
 |---|---|---|
-| Backend | None — runs from source | Python 3.11+, dependencies via `uv sync` |
-| Frontend | `npm --prefix web/frontend run build` | Not yet scaffolded |
+| `asr-whisper` | Real transcription via `faster-whisper` | Only the scripted mock backend is offered |
+| `audio-device` | Microphone and system loopback capture | Only the file source is available |
+| `vad-silero` | Neural voice-activity detection | The energy detector is used, which is fine in a quiet room |
+| `credentials` | Storing API keys in the OS credential store | Keys must come from environment variables |
 
-## Environments
+Everything the extras enable is then selectable **inside the application** — Settings → Audio for
+the device, Settings → Transcription for the model. Nothing needs a config file edited by hand.
 
-| Environment | Status |
-|---|---|
-| Local | The only one that exists |
-| Staging | Not defined |
-| Production | Not defined |
+## Running
 
-## Configuration
+```bash
+uv run python app.py
+```
 
-- All configuration comes from environment variables. No secrets in source, ever.
-- `.env.example` is the complete list of variables with safe placeholders.
-- `.env` is gitignored and must never be committed.
-- Adding a variable means adding it to `.env.example` in the same change.
+Then open <http://127.0.0.1:8395>. Flags: `--port`, `--host`, `--reload`, `--open`, `--log-level`.
 
-## Runtime Requirements (known so far)
+The launcher checks the port is free and names the remedy if it is not, creates `data/` and `logs/`,
+loads `.env` without overriding real environment variables, and reports which extras are installed
+so a missing capability is visible at startup rather than as a confusing failure later.
 
-- **Python 3.11+** and **Node 22** to build and run.
-- **Writable `data/` directory** — uploaded audio and generated transcripts land there.
-- **Writable `logs/` directory**.
-- Transcription is CPU- or GPU-intensive depending on the engine chosen. Sizing cannot be estimated
-  until that decision is made.
+## What ends up on disk
 
-## Decisions Required Before Deploying
+| Path | Holds | Notes |
+|---|---|---|
+| `data/transcriber-config.json` | Settings saved from the interface | Never contains credentials |
+| `data/sessions/*.db` | One SQLite file per session | Transcript, summaries, glossary, conversation |
+| `data/audio/` | Recordings uploaded through Settings → Audio | Only what you put there |
+| `logs/` | Application logs | Never transcript content (BE §18) |
+| `~/.cache/huggingface/` | Whisper model weights | Downloaded once, ~75 MB to 3 GB by model |
 
-| Decision | Blocks |
-|---|---|
-| Hosting target — VM, container platform, PaaS, serverless | Everything below |
-| Whether the frontend is served by the backend or hosted separately (CDN/static host) | CORS configuration, build pipeline |
-| Transcription engine — local model vs. hosted API | Hardware sizing, cost model, secret management |
-| Persistence — local files vs. managed database | Backup strategy, migrations |
-| Async execution — in-process background tasks vs. separate worker | Process topology, scaling |
-| Storage for uploaded audio — local disk vs. object storage | Durability, multi-instance viability |
-| Retention policy for audio and transcripts | Privacy and compliance posture |
-| TLS termination and reverse proxy | Networking |
+Audio is **not** retained by default. Sessions are kept until deleted, from the `/sessions` page or
+by removing the file; `storage.retention_days` sets an expiry if you want one.
 
-Until the async execution model and audio storage decisions are made, **the backend cannot safely run
-as more than one instance** — in-process jobs and local-disk audio are not shared across replicas.
-Record that constraint here when it is resolved.
+## Backing up
 
-## Data Sensitivity
+A session is one self-contained SQLite file. Copying `data/sessions/` copies everything: transcript,
+timestamps, summaries, glossary, and the conversation about it. There is no external state, no
+database server, and nothing to restore in a particular order.
 
-Uploaded audio may contain personal or confidential speech. Treat `data/` accordingly:
+## Hardware
 
-- Never commit it. Never include its contents in logs or error messages.
-- Any hosted transcription engine means user audio leaves the deployment boundary — that requires an
-  explicit, recorded decision, not a default.
+The one number that matters is the **real-time factor** — how fast the model transcribes relative to
+the speech arriving. Below 1.0 the pipeline falls behind and will not catch up, which the status bar
+says in words as well as colour.
 
-## Checklist Before a First Deploy
+Measured on this project's development machine (32-core AMD Ryzen AI Max+ 395, CPU only):
+`faster-whisper` `small` at `int8` gives **RTF ≈ 1.5** with about 1.4 s of commit latency. That is
+comfortable but not generous — `medium` on the same machine would not keep up.
 
-- [ ] Hosting target chosen and recorded here
-- [ ] All environment variables present in `.env.example` and set in the target
-- [ ] Health check endpoint (`GET /api/health`) implemented and wired to the platform
-- [ ] `data/` and `logs/` writable and backed by durable storage
-- [ ] `uv run pytest`, `uv run ruff check .`, and the frontend build all pass
-- [ ] Retention and privacy posture for uploaded audio decided and documented
-- [ ] Rollback procedure documented here
+There is no substitute for measuring on your own hardware, which is why the status bar shows the
+figure continuously rather than burying it. If it drops below 1.0 the application offers the next
+model down as a one-click fix.
+
+A note that outranks any model choice: **a directional or clip-on microphone improves accuracy more
+than any upgrade in this table.** A laptop microphone in a lecture hall captures a distant,
+reverberant speaker plus the room, and no model recovers what was never captured.
+
+## If it is ever packaged
+
+Whether this stays a browser-plus-local-server application or is wrapped in a desktop shell
+(Tauri, Electron, Qt) is still open — see `docs/checklist.md`. Nothing here forecloses it: the
+backend is a single ASGI application, the frontend is static files with no build step, and the two
+communicate over HTTP and one WebSocket. A shell would embed the server and point a webview at it.

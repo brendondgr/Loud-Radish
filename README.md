@@ -7,10 +7,10 @@ It captures audio from a microphone, from system playback, or from a recording; 
 near-real-time through a pluggable speech model; keeps a growing timestamped transcript; and serves
 that transcript to a browser as it is produced.
 
-> **Current state:** thirteen of the plan's fourteen phases are done. Recording, transcription, the
-> settings interface, and the assistant all work end to end, and everything is configurable from
-> inside the application. Phase 14 — the soak run, the sessions page, and a final documentation pass
-> — remains; see [docs/checklist.md](docs/checklist.md).
+> **Current state:** all fourteen phases are complete. Recording, transcription, the settings
+> interface, the assistant, and the sessions archive work end to end, and everything is configurable
+> from inside the application — there is no config file to edit. What has and has not been verified
+> on real hardware is recorded in [docs/checklist.md](docs/checklist.md).
 
 ## Quick Start
 
@@ -28,14 +28,17 @@ uv run python app.py
 Then open <http://127.0.0.1:8395>.
 
 Out of the box this runs a **scripted mock speech model** — it transcribes placeholder text, which
-is enough to see the interface work without downloading a model. For real transcription:
+is enough to see the interface work without downloading a model. For real transcription and live
+capture:
 
 ```bash
 uv sync --extra asr-whisper --extra audio-device
 ```
 
-Then set `asr.backend` to `faster-whisper` in `data/transcriber-config.json`, or point
-`audio.source_type` at a `file` and give it a WAV to replay.
+Then choose your microphone and your model in **Settings**, inside the application. Settings → Audio
+has a **Test this device** button that opens the device and tells you whether it is actually
+producing usable audio — worth pressing before every talk, and the one check that catches a muted
+input before the transcript comes back empty.
 
 Run the checks:
 
@@ -78,7 +81,8 @@ bug this design exists to prevent.
 | [docs/structure.md](docs/structure.md) | Repository layout and why each directory exists |
 | [docs/routes.md](docs/routes.md) · [docs/api-contract.md](docs/api-contract.md) | HTTP surface and event contract |
 | [docs/data-flow.md](docs/data-flow.md) | How data moves through the pipeline |
-| [docs/component-map.md](docs/component-map.md) · [docs/design-system.md](docs/design-system.md) | Frontend ownership and the accessibility baseline |
+| [docs/component-map.md](docs/component-map.md) · [docs/design-system.md](docs/design-system.md) | Frontend ownership, design tokens, the accessibility baseline |
+| [docs/deployment.md](docs/deployment.md) | Installing, what lands on disk, hardware expectations |
 
 ## Privacy
 

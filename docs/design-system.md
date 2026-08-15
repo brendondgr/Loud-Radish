@@ -1,10 +1,11 @@
 # Design System
 
-*Last updated: 2026-08-14 (repository initialization)*
+*Last updated: 2026-08-15 (Phase 14 — final documentation pass)*
 
-> **Status: baseline only.** No visual design has been chosen and no frontend exists. This file
-> records the non-negotiable quality and accessibility floor every UI in this repository must clear,
-> plus the token structure to fill in once a visual direction is set.
+> **Status: implemented.** The tokens below are the ones in
+> `web/frontend/static/css/tokens.css`, which remains the source of truth — this file is the
+> explanation of it. The accessibility floor is a requirement, not an aspiration, and the contrast
+> figures here were measured in a browser rather than estimated.
 
 The dedicated `ui-frontend`, `accessibility-mobile`, and `ada-compliance` skills referenced by the
 initializer were not adopted (see Decision Log D-006/D-007 in `docs/documentation.md`). Their
@@ -63,29 +64,60 @@ incomplete:
 3. **Error** — plain language, actionable, never a raw stack trace or internal identifier.
 4. **Success / populated.**
 
-For this project specifically: upload progress, `queued` / `processing` / `completed` / `failed` job
-states, and long-transcript rendering performance all need deliberate treatment.
+For this project specifically: the live level meter, the real-time-factor indicator, model-loading
+progress, and long-transcript rendering performance all need deliberate treatment. The
+upload-and-poll job states this paragraph once listed are gone — see Decision D-010.
 
 ## Design Tokens
 
-**Not yet defined.** When a visual direction is chosen, tokens live in
-`web/frontend/src/styles/` and are recorded here. Fill in this table:
+Every colour, size, radius, and duration lives in `web/frontend/static/css/tokens.css`. No component
+hardcodes any of them.
 
-| Token group | Values | Status |
+The palette is **dark by default and deliberately so**: a bright screen in a darkened lecture hall is
+conspicuous to everyone sitting behind you.
+
+| Token group | Shape | Notes |
 |---|---|---|
-| Color — surface, text, border, accent, semantic (success/warning/error/info) | — | Undefined |
-| Typography — family, scale, weights, line heights | — | Undefined |
-| Spacing — a single consistent scale | — | Undefined |
-| Radii | — | Undefined |
-| Shadows / elevation | — | Undefined |
-| Breakpoints | — | Undefined |
-| Motion — durations, easings | — | Undefined |
+| Surfaces | `--surface-base` → `--surface-panel`, plus `--surface-control{,-hover}`, `--surface-input` | Four depths. The transcript sits on the lowest so it reads as the document |
+| Text | `--text-primary`, `--text-transcript`, `--text-secondary`, `--text-muted`, `--text-faint`, `--text-dim` | `--text-transcript` is warmer and softer than white; it is read for two hours |
+| The tentative tail | `--text-hypothesis` | ~7:1 against the transcript surface. "Faded" text is easy to under-contrast |
+| Borders | `--border-subtle` → `--border-strong` | Four weights |
+| Accent | `--accent`, `--accent-bright`, `--accent-dim`, `--accent-wash{,-strong}`, `--accent-border` | One hue. The wash variants are translucent and composite over whatever is behind them |
+| Semantic | `--danger`, `--warning`, each with `-text`, `-wash`, `-border` | Never used alone — see the colour rule below |
+| Type | `--font-ui`, `--font-transcript`, `--font-mono` | Local stacks only. A webfont that fails to load would change the transcript's measure mid-session |
+| Type scale | `--text-xs` (10.5px) → `--text-lg` (17px), plus `--transcript-size` | The transcript's size is user-adjustable independently of the chrome |
+| Spacing | `--space-1` (2px) → `--space-12` (30px) | One scale, used everywhere |
+| Radii | `--radius-sm` → `--radius-xl`, `--radius-pill` | |
+| Elevation | `--shadow-pill`, `--shadow-panel`, `--shadow-popover` | |
+| Layout | `--header-height`, `--chat-width`, `--glossary-width`, `--transcript-min-width`, … | The frame's fixed dimensions |
+| Motion | `--duration-fast` (120ms), `--duration` (180ms), `--duration-slow` (260ms), `--ease` | Almost none by design — see below |
 
-Rules once defined:
+### Rules
 
-- **No hardcoded values in components.** Colors, spacing, and radii come from tokens.
-- Semantic naming (`surface-raised`, `text-muted`), not literal (`gray-200`).
-- Light and dark themes both defined, both meeting the contrast floor above.
+- **No hardcoded values in components.** Colours, spacing, and radii come from tokens.
+- **Semantic naming** (`surface-raised`, `text-muted`), never literal (`gray-200`).
+- **Motion is for state changes only** — a hover, a panel opening — and never for content. Every
+  element here is on screen for two hours; anything that loops or pulses becomes noise within
+  minutes. `prefers-reduced-motion` reduces all three durations to nothing.
+
+### Contrast
+
+Measured against the surfaces each token actually sits on, and corrected twice:
+
+- `--text-faint` and `--text-dim` were first set from the transcript's surfaces, which are the
+  **darkest** in the palette. On `--surface-panel` and `--surface-control` — the settings dialog —
+  they measured 4.40:1 against a 4.5:1 floor. Their current values are the lightest-surface floor:
+  ≥4.5:1 on `--surface-control-hover`, and therefore ≥4.5:1 everywhere.
+- When checking a translucent background such as `--accent-wash`, **composite it over its parent
+  first**. Comparing a foreground against the wash's own RGB ignores its alpha and produces a figure
+  that is wrong by a factor of six.
+
+### Colour is never the only signal
+
+Every state carries an icon or a word as well as a colour. Real-time factor below 1.0 turns red
+*and* says so; a device test result is coloured *and* names what to do; the tentative tail is
+italic and labelled as well as dimmer. This is a WCAG requirement and also simply what works in a
+darkened room on a projector.
 
 ## Quality Brief
 

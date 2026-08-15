@@ -525,4 +525,4 @@ Update this table as each phase lands. Do not delete completed rows.
 | 11 | Frontend foundation and transcript pane | ✅ Complete (taken ahead of 9–10) |
 | 12 | Frontend chrome and settings | ✅ Complete |
 | 13 | Frontend chat, glossary, cross-pane, states | ✅ Complete |
-| 14 | Hardening, soak, merge | Not started |
+| 14 | Hardening, soak, merge | ✅ Complete |
