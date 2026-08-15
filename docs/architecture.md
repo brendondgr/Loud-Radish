@@ -55,6 +55,8 @@ contract is what keeps that option open, and choosing the packaging is not urgen
    │ 4. STREAMING ENGINE        │◄──────►│ 3. ASR ABSTRACTION       │
    │    services/streaming/     │        │    services/asr/  SEAM A │
    │    buffer · commit · trim  │        │    mock · faster-whisper │
+   │                            │        │    + invented-speech     │
+   │                            │        │      filter (D-019)      │
    └──────────────┬─────────────┘        └──────────────────────────┘
                   │  committed segments + a single hypothesis tail
                   ▼
@@ -185,6 +187,7 @@ transcription. A chat error is an inconvenience; a lost transcript is a ruined s
 | LLM endpoint unreachable | Connection error | Distinguish *not running* from *wrong URL* from *auth rejected*; transcription is unaffected |
 | Polish pass fails, or rewrites rather than tidies | LLM error, or the length guard in `services/polish/guard.py` | Emit no block. The page keeps showing raw segments, which is what it shows with no model at all — the fallback is the ordinary state, not a degraded one |
 | Polish pass invents or loses a timestamp | `reconcile_timestamps` against the markers that were actually supplied | Drop the unaccounted-for marker; if none survives, fall back to the block's own start. A wrong timestamp is worse than a missing one — it is indistinguishable from a real one until the reader clicks it |
+| The speech model invents text on silence or noise | The model's own `no_speech_prob`, then a list of the phrases it emits over non-speech (`services/asr/hallucination.py`) | Discard the pass, count it, and log what was dropped. The count appears in the status bar once non-zero, because the filter's own failure mode — deleting real speech — is otherwise invisible |
 | Repetition loop | N-gram detector | Truncate, force-commit, log |
 | Disk full | Write error | Warn early, keep the transcript in memory, do not crash |
 

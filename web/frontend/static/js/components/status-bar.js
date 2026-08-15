@@ -25,6 +25,8 @@ export class StatusBar {
     this.rtf = $("[data-rtf]", root);
     this.rtfIcon = $("[data-rtf-icon]", root);
     this.latency = $("[data-latency]", root);
+    this.suppressed = $("[data-suppressed]", root);
+    this.suppressedItem = $("[data-suppressed-item]", root);
     this.source = $("[data-source-label]", root);
     this.connectionDot = $("[data-connection-dot]", root);
     this.connectionLabel = $("[data-connection-label]", root);
@@ -63,6 +65,12 @@ export class StatusBar {
     setAttr(this.rtf, "data-health", !hasData ? "unknown" : health.fallingBehind ? "bad" : "good");
     toggle(this.rtfIcon, health.fallingBehind);
     setText(this.latency, health.commitLatency ? latency(health.commitLatency) : "—");
+
+    // Shown only once something has been discarded. Zero is the normal state and a permanent "0
+    // discarded" is chrome; a number climbing while someone is talking is a real signal that the
+    // thresholds are too tight, which is the one failure this filter can cause.
+    setText(this.suppressed, String(health.suppressed));
+    toggle(this.suppressedItem, health.suppressed > 0);
   }
 
   _renderConnection() {

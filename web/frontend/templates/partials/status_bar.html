@@ -36,6 +36,19 @@
       <span>lag</span>
       <span class="status-item__value" data-latency>—</span>
     </div>
+
+    {# Hidden while zero, which is the normal state. It appears only once something has been
+       discarded, because a count climbing steadily while someone is talking is how a user finds
+       out the thresholds are too tight — and that is the one failure this filter can cause. #}
+    <div
+      class="status-item"
+      data-suppressed-item
+      title="Passages discarded as text the speech model invented rather than heard. Adjust in Settings → Speech model."
+      hidden
+    >
+      <span class="status-item__value" data-suppressed>0</span>
+      <span>discarded</span>
+    </div>
   </div>
 
   <div class="status-bar__group">

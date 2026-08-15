@@ -45,7 +45,7 @@ Every frame is `{"event": "<name>", "data": { … }}`.
 | `transcript.polished` | `id`, `start`, `end`, `text`, `source_ids` | A finished minute rewritten for reading, as one continuous paragraph. Append the block and stop drawing the segments in `source_ids` — do **not** delete them. `text` carries inline `[MM:SS]` markers, in the same format the assistant cites, so a passage can be traced back to when it was said |
 | `audio.level` | `rms`, `peak`, `clipping` | Drives the level meter |
 | `vad.state` | `speaking` (bool) | Drives the speaking indicator |
-| `status` | `rtf`, `queue_depth`, `commit_latency_s`, `model_id`, `device`, `dropped_frames` | Health telemetry |
+| `status` | `rtf`, `queue_depth`, `commit_latency_s`, `model_id`, `device`, `dropped_frames`, `suppressed` | Health telemetry. `suppressed` counts passes discarded as invented speech |
 | `summary.added` | `start`, `end`, `text` | A new rolling summary |
 | `glossary.added` | `term`, `definition`, `first_seen` | A new term identified |
 | `chat.delta` | `request_id`, `text` | A streaming answer fragment |

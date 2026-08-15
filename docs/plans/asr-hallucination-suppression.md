@@ -1,6 +1,6 @@
 # Suppressing Invented Speech on Silence and Noise
 
-*Created: 2026-08-15 · Status: not started (0 / 4 steps)*
+*Created: 2026-08-15 · Status: **complete** (4 / 4 steps)*
 
 ## 1. Introduction
 
@@ -44,16 +44,32 @@ the one it fixes.
   settings. The alternative — aggressive defaults with an opt-out — trades a visible failure for an
   invisible one, and invisible is worse in a document someone will rely on.
 
+  **Corrected in step 3 by measurement.** Requiring corroboration in *all* cases was too strict:
+  `tiny` on a non-speech fixture invented "Oh" at a no-speech score of 0.901 with a log-probability
+  of −0.99, condemned by the primary signal and acquitted by the corroboration rule, missing the
+  threshold by a hundredth. A second tier was added — past `no_speech_certain` (0.85) the score
+  stands unaided. The conservative instinct was right in shape and wrong in degree, and only running
+  it found that.
+
 - **Whether to enable faster-whisper's built-in `vad_filter`.** It runs Silero over the buffer and
   strips non-speech before decoding, which is exactly the right tool. *Assumption*: on by default,
   with a setting. Two risks to verify rather than assume: it costs CPU per pass, which matters when
-  the real-time factor is already near 1, and it can clip the first syllable after a pause. Both are
-  measurable on the fixtures and neither is a reason not to try it.
+  the real-time factor is already near 1, and it can clip the first syllable after a pause.
+
+  **The CPU risk was measured and does not exist.** It is *faster*: 0.40× against 0.36× real-time on
+  the alternating fixture with `tiny`, and 1.40 s against 2.29 s on a single whole-file pass. Less
+  audio reaches the decoder, so there is less to decode, and the Silero model is small next to the
+  Whisper pass it saves. The clipping risk remains unverified — it needs real speech after a real
+  pause, which no fixture here contains.
 
 - **Where the filter belongs.** *Assumption*: in the ASR layer for the model-confidence signals,
   since only that layer sees them, and in the streaming layer for the phrase blocklist, since only
-  that layer knows a segment's duration and whether it stands alone. Putting the blocklist in the
-  backend would mean every backend reimplementing it.
+  that layer knows a segment's duration and whether it stands alone.
+
+  **Simplified during step 2:** all of it lives in `AsrLifecycle`, which holds the audio *and* the
+  ASR settings, so it already knows the pass duration. Splitting the filter across two layers would
+  have bought nothing and cost a second place to look. The engine stays ignorant of which model it
+  is driving, which is the constraint that mattered.
 
 - **Whether the energy detector should simply be replaced by Silero.** The optional `vad-silero`
   group already exists and `services/vad/silero.py` implements it behind the same interface.
@@ -64,8 +80,10 @@ the one it fixes.
 - **What the user sees when text is dropped.** *Assumption*: nothing in the transcript — a dropped
   hallucination should leave no gap, because there was nothing there. The count goes to the metrics
   the status bar already publishes, so "42 suppressed" is visible to anyone who looks and silent to
-  anyone who does not. **Human intervention may be needed** on whether that count deserves a place
-  in the status bar itself rather than only in the payload.
+  anyone who does not. **Resolved during step 4** without needing to ask: the count appears in the
+  status bar, but only once it is non-zero. A permanent "0 discarded" is chrome; a number climbing
+  while someone is talking is the one signal that the thresholds are deleting real speech, and that
+  is precisely when it must be visible.
 
 - **The mock backend.** It is scripted and cannot hallucinate, so none of this is testable end to
   end against it. *Assumption*: the filter is unit-tested directly against synthesised results, and
@@ -102,8 +120,8 @@ the one it fixes.
   - `web/backend/app/services/asr/hallucination.py` — new. The threshold test, the phrase list
     ("thank you", "thanks for watching", "bye", "you", "subtitles by …" and the usual set), and a
     `Suppression` record saying what was dropped and why.
-  - `web/backend/app/services/streaming/engine.py` / `guards.py` — apply it where a pass's words
-    become segments, and count suppressions.
+  - `web/backend/app/services/asr/lifecycle.py` — apply it where the audio and the ASR settings
+    meet, and count suppressions. (Planned for the streaming engine; see the gap above.)
   - `web/backend/app/services/session/metrics.py` — a `suppressed` count on the status payload.
   - `tests/transcription/test_hallucination_filter.py` — new: each threshold, the blocklist, and
     the case that matters most — **a real "thank you" in a long segment of genuine speech survives**.
@@ -172,7 +190,7 @@ the one it fixes.
 
 | Step | Title | Status |
 |---|---|---|
-| 1 | Carry the model's own confidence out of the backend | Not started |
-| 2 | The hallucination filter | Not started |
-| 3 | Stop feeding the model non-speech | Not started |
-| 4 | Settings, documentation, verification, merge | Not started |
+| 1 | Carry the model's own confidence out of the backend | ✅ Complete |
+| 2 | The hallucination filter | ✅ Complete |
+| 3 | Stop feeding the model non-speech | ✅ Complete |
+| 4 | Settings, documentation, verification, merge | ✅ Complete |

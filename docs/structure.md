@@ -19,7 +19,8 @@ TranscriberPrototype/
 │   │   ├── README.md              # Plan conventions and index
 │   │   ├── live-seminar-transcriber.md   # The 14-phase build plan
 │   │   ├── minute-based-transcript-polish.md  # The clean-up pass (D-018)
-│   │   └── transcript-polish-refinements.md   # Dialogue accuracy, timestamps, prose
+│   │   ├── transcript-polish-refinements.md   # Dialogue accuracy, timestamps, prose
+│   │   └── asr-hallucination-suppression.md   # Invented speech on silence (D-019)
 │   ├── skills/                    # Canonical skill definitions used by every agent tool
 │   │   ├── global-project-rules/SKILL.md
 │   │   ├── planner/{SKILL.md,SETUP.md,planner.md}
@@ -75,6 +76,7 @@ TranscriberPrototype/
 │   │   │       ├── registry.py    # Backend registration and construction
 │   │   │       ├── mock.py        # Scripted backend; what makes the engine testable
 │   │   │       ├── faster_whisper.py  # The real default, optional dependency
+│   │   │       ├── hallucination.py  # Discards text the model invented (D-019)
 │   │   │       ├── prompting.py   # Session and rolling-context term biasing
 │   │   │       └── lifecycle.py   # Async load, warm-up, swap, unload
 │   │   │   └── streaming/         # The core — commit policy and buffering

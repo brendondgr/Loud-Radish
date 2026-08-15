@@ -20,6 +20,15 @@ never uploaded; it is captured locally and consumed in flight.
    Each frame gets a speech flag, with hysteresis so the state does not flicker.
    Silence runs past the threshold emit a PAUSE EVENT — a safe place to cut.
 
+2b. FILTER INVENTED SPEECH                    services/asr/hallucination.py
+   A speech model given non-speech audio does not go quiet — it returns the phrases
+   its training data ends with. The decoder's own Silero filter strips non-speech
+   before it is decoded; what survives is then judged on the model's own no-speech
+   estimate, on word confidence, and against a literal list of observed boilerplate.
+   A discarded pass returns empty, which is what genuine silence produces anyway.
+   Every layer here can delete real speech, so the count is published rather than
+   the discards being silent.
+
 3. ACCUMULATE AND COMMIT                      services/streaming/
    Speech frames append to a growing buffer. Every ~0.75 s the buffer is submitted
    to the ASR backend. This pass's words are compared with the previous pass's:

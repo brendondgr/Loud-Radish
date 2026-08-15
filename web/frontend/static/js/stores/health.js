@@ -20,6 +20,7 @@ class HealthStore {
     this.commitLatency = 0;
     this.queueDepth = 0;
     this.droppedFrames = 0;
+    this.suppressed = 0;
     this.modelId = "";
     this.source = "";
     this.healthy = true;
@@ -46,6 +47,7 @@ class HealthStore {
     this.commitLatency = status.commit_latency_s ?? 0;
     this.queueDepth = status.queue_depth ?? 0;
     this.droppedFrames = status.dropped_frames ?? 0;
+    this.suppressed = status.suppressed ?? 0;
     this.modelId = status.model_id ?? this.modelId;
     this.source = status.source ?? this.source;
     this.healthy = status.healthy ?? true;

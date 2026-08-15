@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-08-15 (polish: dialogue accuracy, timestamps, continuous prose)*
+*Last updated: 2026-08-15 (suppressing invented speech)*
 
 The active work list for TranscriberPrototype. Update it whenever a task is finished or new work is
 discovered.
@@ -117,6 +117,20 @@ transcription.
 
 ---
 
+## Part 3d — Suppressing Invented Speech
+
+Tracked in [plans/asr-hallucination-suppression.md](plans/asr-hallucination-suppression.md).
+**All four steps are complete.** Reported from real use: the transcript inventing "thank you",
+"bye", and stray words over room noise. Reproduced on a synthetic tone fixture that produced a
+segment reading "you"; all three non-speech fixtures now commit zero words.
+
+- [x] `no_speech_prob` and `avg_logprob` carried out of the backend instead of discarded
+- [x] The filter: model confidence, optional word confidence, and a literal phrase list
+- [x] The decoder's own Silero filter, on by default — measured faster, not slower
+- [x] Settings in Speech model, the count in the status bar, and the documentation (D-019)
+
+---
+
 ## Part 4 — Still Open
 
 - [ ] **Default ASR model and compute device.** Depends entirely on the user's hardware. A
@@ -151,12 +165,17 @@ transcription.
       `[MM:SS]` markers the assistant cites, feeding it the polished version instead would give it
       cleaner input — but it is a decision about what the assistant is allowed to read, not a
       refactor, and it was deliberately not smuggled into the polish work.
-- [ ] **ASR hallucination on silence and noise.** Reported from real use: the transcript picks up
-      room noise and invents speech that was never said — "thank you", "bye", and stray single
-      words are the recurring ones. Reproduced on a synthetic tone fixture, which produced a
-      segment reading "you". This is the well-known Whisper failure on non-speech audio and it
-      needs its own plan; the likely levers are the model's own `no_speech_prob`, gating inference
-      on the VAD rather than only preferring its pauses, and a blocklist of the specific phrases.
+- [ ] **Tuning the invented-speech thresholds against real audio.** The defaults were calibrated
+      against `tiny` on synthetic fixtures, which is not the same thing as a real room. The number
+      to watch is `suppressed` in the status bar: climbing while someone is talking means the
+      thresholds are too tight and real speech is being deleted, which is the one failure this
+      filter can cause. `no_speech_certain` in particular was set at 0.85 because a measured
+      hallucination scored 0.901 — a sample of one.
+- [ ] **Whether the Silero voice detector should replace the energy one by default.** The optional
+      `vad-silero` group already ships and swaps in behind the same interface. The decoder's own
+      filter now addresses the same problem inside the model, so this was left alone rather than
+      changed blind; it is a one-line setting if the energy detector proves too permissive in a
+      noisy room.
 
 ---
 
