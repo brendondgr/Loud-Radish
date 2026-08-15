@@ -308,7 +308,9 @@ class SessionManager:
         )
         if dropped and not self._warned_backpressure:
             self._warned_backpressure = True
-            self._emit_failure(degradation.dropped_audio(self._queue.dropped))
+            self._emit_failure(
+                degradation.dropped_audio(self._queue.dropped, self._config.resolve().asr.model)
+            )
 
         self._emit_level(frame, result.state_changed, result.speaking)
 

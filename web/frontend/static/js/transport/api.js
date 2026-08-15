@@ -137,4 +137,12 @@ export const api = {
   summaries: () => get("/api/transcript/summaries"),
   glossary: () => get("/api/transcript/glossary"),
   exportUrl: (fmt) => `/api/transcript/export?fmt=${encodeURIComponent(fmt)}`,
+
+  // Past sessions. The live transcript routes read the *running* session's store and stop
+  // answering the moment it ends, which is exactly when a finished talk needs retrieving.
+  sessions: () => get("/api/sessions"),
+  pastSession: (key) => get(`/api/sessions/${encodeURIComponent(key)}`),
+  deleteSession: (key) => del(`/api/sessions/${encodeURIComponent(key)}`),
+  sessionExportUrl: (key, fmt) =>
+    `/api/sessions/${encodeURIComponent(key)}/export?fmt=${encodeURIComponent(fmt)}`,
 };

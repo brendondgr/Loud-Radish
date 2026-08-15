@@ -130,3 +130,46 @@
     min-width: 0;
   }
 }
+
+/* -- standalone pages -------------------------------------------------------------------
+ * The sessions page is a document, not an application frame: it scrolls normally, has a
+ * readable measure, and shares nothing with the two-pane layout above.
+ */
+
+.page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--surface-base);
+}
+
+.page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-8);
+  padding: var(--space-10) var(--space-12);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+}
+
+.page__title {
+  font-family: var(--font-ui);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.page__subtitle {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  margin: var(--space-3) 0 0;
+  word-break: break-all;
+}
+
+.page__body {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: var(--space-10) var(--space-8) var(--space-12);
+}

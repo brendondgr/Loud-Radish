@@ -1,0 +1,83 @@
+/* The past-sessions list.
+ *
+ * One row per session, each carrying enough to recognise it — when, how long, how much was said —
+ * without opening it. Recognising the right talk is the whole job of this page.
+ */
+
+.sessions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.session {
+  padding: var(--space-8);
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+}
+
+.session__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.session__title {
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.session__meta {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin: var(--space-3) 0 0;
+}
+
+/* A file that could not be read is listed with its reason rather than dropped: a session the user
+   can see and cannot open beats one that has silently vanished. */
+.session__problem {
+  font-size: var(--text-sm);
+  color: var(--warning-text);
+  margin: var(--space-5) 0 0;
+}
+
+.session__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  margin-top: var(--space-7);
+  flex-wrap: wrap;
+}
+
+.sessions__empty,
+.sessions__error {
+  font-size: var(--text-base);
+  line-height: 1.6;
+  color: var(--text-muted);
+  margin: var(--space-10) 0 0;
+}
+
+.sessions__error {
+  color: var(--danger-text);
+}
+
+.sessions__empty[hidden],
+.sessions__error[hidden] {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .page__header {
+    flex-direction: column;
+    padding: var(--space-8);
+  }
+
+  .page__body {
+    padding: var(--space-8) var(--space-6);
+  }
+}

@@ -37,3 +37,9 @@ def _templates(request: Request):  # noqa: ANN202 - returns Jinja2Templates
 async def app_page(request: Request) -> HTMLResponse:
     """The live application: transcript pane, chat pane, header, status bar."""
     return _templates(request).TemplateResponse(request, "pages/app.html", {})
+
+
+@router.get("/sessions", response_class=HTMLResponse)
+async def sessions_page(request: Request) -> HTMLResponse:
+    """Past sessions, with export. Everything it shows arrives over ``/api/sessions``."""
+    return _templates(request).TemplateResponse(request, "pages/sessions.html", {})

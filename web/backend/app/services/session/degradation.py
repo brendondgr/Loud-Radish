@@ -140,15 +140,30 @@ def falling_behind(real_time_factor: float, model: str) -> Failure:
     )
 
 
-def dropped_audio(events: int) -> Failure:
-    """Audio was discarded because the consumer could not keep up. Words were lost."""
+def dropped_audio(events: int, model: str = "") -> Failure:
+    """Audio was discarded because the consumer could not keep up. Words were lost.
+
+    Reports the hole *and* what to do about it. The cause is the same as
+    :func:`falling_behind` — inference slower than real time — so the remedy is too, and a warning
+    that a transcript has gaps in it without saying how to stop it recurring leaves the user
+    watching the rest of the talk go the same way.
+    """
+    fallback = smaller_model(model) if model else None
     return Failure(
         code="dropped-audio",
         message=(
             f"{events} stretches of audio were dropped because transcription could not keep up. "
-            "Those words are missing from the transcript."
+            f"Those words are missing from the transcript. "
+            + (
+                f"Switching to {fallback} stops it happening again."
+                if fallback
+                else "Try a smaller model or a faster compute device."
+            )
         ),
         severity=Severity.WARNING,
+        remedy={"asr.model": fallback} if fallback else None,
+        remedy_label=f"Switch to {fallback}" if fallback else "",
+        opens_settings="" if fallback else "asr",
     )
 
 
