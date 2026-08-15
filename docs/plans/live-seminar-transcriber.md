@@ -520,7 +520,7 @@ Update this table as each phase lands. Do not delete completed rows.
 | 6 | Transcript store | ✅ Complete |
 | 7 | Session manager, workers, metrics | ✅ Complete |
 | 8 | Transport layer | ✅ Complete |
-| 9 | LLM abstraction (Seam B) | Not started |
+| 9 | LLM abstraction (Seam B) | ✅ Complete |
 | 10 | Chat orchestration and context pipeline | Not started |
 | 11 | Frontend foundation and transcript pane | ✅ Complete (taken ahead of 9–10) |
 | 12 | Frontend chrome and settings | Not started |

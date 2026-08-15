@@ -1,10 +1,10 @@
 # Route Map
 
-*Last updated: 2026-08-14 (Phase 8 — transport layer)*
+*Last updated: 2026-08-14 (Phase 9 — LLM abstraction)*
 
-> **Status column is authoritative.** Session, audio, ASR, transcript, and configuration are
-> implemented and tested, as is the WebSocket. The language-model and chat groups land in the phase
-> named beside them. Update this file in the same change that adds, removes, or changes any route.
+> **Status column is authoritative.** Session, audio, ASR, transcript, configuration, and the
+> language-model group are implemented and tested, as is the WebSocket. The chat group lands in the
+> phase named beside it. Update this file in the same change that adds, removes, or changes a route.
 
 The upload-and-poll job routes recorded at initialization are **gone** — see Decision D-010 in
 `docs/documentation.md`. There is no `/api/transcriptions` surface.
@@ -67,12 +67,16 @@ Served by `web/backend/app/routes/`. All paths are prefixed `/api`.
 
 | Method | Path | Purpose | Status |
 |---|---|---|---|
-| `GET` | `/api/llm/config` | Current mode and both provider configurations. Never returns a credential. | Phase 9 |
-| `PUT` | `/api/llm/config` | Update mode or provider configuration | Phase 9 |
-| `POST` | `/api/llm/credential` | Store a credential in the OS credential store | Phase 9 |
-| `DELETE` | `/api/llm/credential` | Remove a stored credential | Phase 9 |
-| `POST` | `/api/llm/test` | Connection test — returns a specific result, never generic failure text | Phase 9 |
-| `GET` | `/api/llm/models` | Models the configured endpoint reports | Phase 9 |
+| `GET` | `/api/llm/config` | Current mode and both provider configurations, plus suggested endpoints and providers. Never returns a credential. | **Implemented** |
+| `GET` | `/api/llm/status` | Whether the assistant is set up, and whether it is local. Makes no network call. | **Implemented** |
+| `PUT` | `/api/llm/credential` | Store a credential in the OS credential store | **Implemented** |
+| `DELETE` | `/api/llm/credential/{provider}` | Remove a stored credential | **Implemented** |
+| `POST` | `/api/llm/test` | Connection test — one of four specific results, never generic failure text. Accepts an unsaved partial config so the form tests what is on screen. | **Implemented** |
+| `GET` | `/api/llm/models` | Models the configured endpoint reports. Degrades to an empty list with an explanation rather than an HTTP error. | **Implemented** |
+
+There is no `PUT /api/llm/config`. Configuration is written through the one configuration surface,
+`PATCH /api/config`, with dotted paths such as `llm.local.model` — a second writer for the same
+state is a second place for it to drift.
 
 ### Chat
 

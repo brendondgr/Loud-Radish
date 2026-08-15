@@ -23,9 +23,18 @@ logger = logging.getLogger(__name__)
 SERVICE_NAME = "transcriber-prototype"
 
 #: Provider name → environment variable consulted when no OS credential store is available.
+#:
+#: ``local`` has its own slot rather than sharing one with a hosted provider. Most local servers
+#: need no key at all, but relays in front of them often do, and a key entered for a machine on the
+#: same desk must never be sent to a hosted API if the user flips the mode switch.
 ENV_VARS: dict[str, str] = {
+    "local": "LOCAL_LLM_API_KEY",
     "anthropic": "ANTHROPIC_API_KEY",
     "openai": "OPENAI_API_KEY",
+    "openrouter": "OPENROUTER_API_KEY",
+    "groq": "GROQ_API_KEY",
+    "together": "TOGETHER_API_KEY",
+    "mistral": "MISTRAL_API_KEY",
 }
 
 
