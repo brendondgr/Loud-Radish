@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Live Seminar Transcriber
+Comment=Transcribe a talk as it happens, and ask questions about it
+# @REPO@ is replaced by install_autostart.py, or by hand. The application runs as a local server
+# and its interface is a browser page, so this opens that page in an application window rather
+# than launching a binary of its own.
+Exec=xdg-open http://127.0.0.1:8395
+Icon=audio-input-microphone
+Terminal=false
+Categories=AudioVideo;Audio;Utility;
+Keywords=transcribe;transcription;speech;seminar;
+StartupNotify=false

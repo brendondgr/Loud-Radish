@@ -194,3 +194,42 @@ Whether this stays a browser-plus-local-server application or is wrapped in a de
 (Tauri, Electron, Qt) is still open — see `docs/checklist.md`. Nothing here forecloses it: the
 backend is a single ASGI application, the frontend is static files with no build step, and the two
 communicate over HTTP and one WebSocket. A shell would embed the server and point a webview at it.
+
+
+## Starting with your desktop session (Plan 5)
+
+```bash
+uv run scripts/install_autostart.py
+```
+
+Writes and enables a **systemd user unit** at `~/.config/systemd/user/transcriber.service`. A user
+unit rather than an XDG autostart entry because it starts with the *session*, restarts on failure,
+and is inspectable:
+
+```bash
+systemctl --user status transcriber
+```
+
+```bash
+journalctl --user -u transcriber -f
+```
+
+The unit runs `uv run app.py --no-takeover`. That flag is deliberate and is the one thing worth
+understanding here: the launcher's default is to stop an older instance and take the port, which is
+right at a terminal and wrong under a supervisor — systemd restarting a unit that then kills the
+instance systemd is already tracking is a loop. Under the unit, a port already in use means the
+service fails and lets systemd decide.
+
+Removing it leaves nothing behind:
+
+```bash
+uv run scripts/install_autostart.py --uninstall
+```
+
+**Verified on this machine**: installs and starts, serves on 8395, comes back within seconds of the
+process being killed, refuses cleanly when something else already holds the port, and uninstalls
+with the unit file gone and the service reported `not-found`.
+
+On a desktop without systemd, put `scripts/transcriber.desktop.in` into `~/.config/autostart/`
+after replacing its paths — it opens the interface rather than starting the server, so the server
+would need its own arrangement.
