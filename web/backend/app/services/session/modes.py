@@ -78,13 +78,23 @@ BUSY_STATES: Final[frozenset[str]] = frozenset({ARMING, RECORDING, STOPPING, PRO
 
 #: What each mode needs beyond a plain ``uv sync``, as the key reported by ``GET /api/health``.
 #:
-#: ``live`` and ``recorded`` share the same requirement because both capture a device; the speech
-#: model is *not* listed, because a session with no model loaded is a recoverable state the
-#: interface already explains rather than a reason to hide the mode.
+#: **Empty is the common case and is deliberate.** Only ``window`` has a hard requirement, because
+#: only it needs a capability the application cannot substitute for. The two audio modes were first
+#: written as needing ``audio_device``, and running it showed why that is wrong: the file source
+#: replaces a capture device entirely, so on a machine with no ``sounddevice`` — which is what a
+#: plain ``uv sync`` produces — every mode was struck through and the application looked broken
+#: while working perfectly.
+#:
+#: A missing capture device is a real problem, but it is an *input source* problem with an existing
+#: remedy path: the audio settings tab reports it, and a start that fails for it opens that tab.
+#: Disabling the mode as well would be the same failure told twice, once wrongly.
+#:
+#: The speech model is likewise absent. A session with no model loaded is a recoverable state the
+#: interface already explains, not a reason to grey out a button.
 MODE_REQUIREMENTS: Final[dict[CaptureMode, tuple[str, ...]]] = {
-    LIVE: ("audio_device",),
-    RECORDED: ("audio_device",),
-    WINDOW: ("audio_device", "window_capture"),
+    LIVE: (),
+    RECORDED: (),
+    WINDOW: ("window_capture",),
 }
 
 

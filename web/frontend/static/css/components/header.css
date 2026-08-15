@@ -144,7 +144,12 @@
     gap: var(--space-5);
   }
 
+  /* The groups themselves must wrap, not only the header. The header has wrapped since Phase 12,
+   * but each group was a non-wrapping flex row — which was fine while the left group held three
+   * items and stopped being fine when the mode selector made it four: the primary control was
+   * pushed past the right edge and clipped, at exactly the width where it matters most. */
   .header__group {
+    flex-wrap: wrap;
     gap: var(--space-5);
     min-width: 0;
   }

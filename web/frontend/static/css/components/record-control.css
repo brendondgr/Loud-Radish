@@ -1,0 +1,155 @@
+/* The capture-mode selector and the six-state record indicator (D-020).
+ *
+ * Split out of header.css because the header is now three separate controls sharing a row, and one
+ * stylesheet describing all of them would be the file nobody wants to edit.
+ *
+ * No new tokens. Every state reuses a colour already measured in docs/design-system.md, and every
+ * one pairs that colour with a word — the colour-is-never-the-only-signal rule.
+ */
+
+/* -- mode selector ---------------------------------------------------------------------------
+ * A segmented radiogroup rather than a <select>: three options that change what the primary
+ * control does are worth seeing without opening anything.
+ */
+
+.mode-switcher {
+  display: flex;
+  align-items: stretch;
+  padding: 2px;
+  gap: 2px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius);
+  background: var(--surface-control);
+}
+
+.mode-switcher__option {
+  /* 44px tall including the group's padding, meeting the touch-target floor. */
+  min-height: 40px;
+  padding: 0 var(--space-5);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  border-radius: calc(var(--radius) - 2px);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
+}
+
+.mode-switcher__option:hover:not([disabled]) {
+  color: var(--text-primary);
+  background: var(--surface-control-hover);
+}
+
+.mode-switcher__option[aria-checked="true"] {
+  color: var(--text-primary);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-pill);
+}
+
+/* Unavailable is *disabled with a reason*, never hidden — a feature that vanishes when its
+ * dependency is missing is indistinguishable from one that does not exist. The strike-through is
+ * the second signal alongside the dimmed colour.
+ */
+.mode-switcher__option[disabled] {
+  cursor: not-allowed;
+  color: var(--text-dim);
+}
+
+.mode-switcher__option--unavailable {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.mode-switcher[aria-disabled="true"] .mode-switcher__option {
+  cursor: not-allowed;
+}
+
+/* -- the six run states ------------------------------------------------------------------------
+ * `.record-state` itself is styled in header.css. These are the states it can be in beyond the
+ * original two, each keyed off data-state and each carrying a word as well as a colour.
+ *
+ * Nothing here pulses. Every element in this interface is on screen for two hours, and the motion
+ * rule in docs/design-system.md exists because anything that loops becomes noise within minutes —
+ * which is also why there is nothing extra for prefers-reduced-motion to switch off.
+ */
+
+.record-state[data-state="arming"],
+.record-state[data-state="busy"] {
+  border-color: var(--accent-border);
+  background: var(--accent-wash);
+}
+
+.record-state[data-state="arming"] .record-state__dot,
+.record-state[data-state="busy"] .record-state__dot {
+  background: var(--accent);
+}
+
+.record-state[data-state="arming"] .record-state__label,
+.record-state[data-state="busy"] .record-state__label {
+  color: var(--accent-bright);
+}
+
+/* Stopping is the recording states dimmed rather than a fourth colour: the recording has not ended
+ * yet, and changing the colour would say it had. */
+.record-state[data-state="stopping"] {
+  border-color: var(--danger-border);
+  background: var(--danger-wash);
+}
+
+.record-state[data-state="stopping"] .record-state__dot {
+  background: var(--danger);
+  opacity: 0.5;
+}
+
+.record-state[data-state="stopping"] .record-state__label {
+  color: var(--danger-text);
+  opacity: 0.7;
+}
+
+/* The failure stays visible next to a button that once again says "Start recording", which is the
+ * only thing distinguishing "this went wrong" from "nothing has happened yet". */
+.record-state[data-state="error"] {
+  border-color: var(--warning-border);
+  background: var(--warning-wash);
+}
+
+.record-state[data-state="error"] .record-state__dot {
+  background: var(--warning);
+}
+
+.record-state[data-state="error"] .record-state__label {
+  color: var(--warning-text);
+}
+
+/* -- narrow chrome ---------------------------------------------------------------------------
+ * Below 700px the header already sheds the model identity and the privacy wording. The mode
+ * selector survives, because which mode is about to be recorded is not something to discover
+ * afterwards — but its labels shrink to fit alongside the clock and the primary control.
+ *
+ * Lives here rather than in layout.css: component stylesheets load later, a media query adds no
+ * specificity, and a responsive rule written there is silently overridden by the base rules above.
+ */
+@media (max-width: 700px) {
+  .mode-switcher__option {
+    /* The 44 px touch floor from docs/design-system.md. Applied at the widths where a finger is
+     * the likely input rather than everywhere, so the desktop header keeps its proportions. */
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    font-size: var(--text-xs);
+  }
+}
+
+@media (max-width: 420px) {
+  .mode-switcher {
+    order: -1;
+    width: 100%;
+  }
+
+  .mode-switcher__option {
+    flex: 1 1 0;
+  }
+}

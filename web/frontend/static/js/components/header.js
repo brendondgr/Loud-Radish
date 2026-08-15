@@ -1,5 +1,10 @@
 /**
- * The header: recording state, elapsed clock, the primary control, and identity.
+ * The header: capture mode, run state, elapsed clock, the primary control, and identity.
+ *
+ * The control used to flip a boolean. It now renders six run states from `stores/mode.js` and asks
+ * that store what pressing it means, rather than working the rules out itself (D-020). Everything
+ * about *which* state is current belongs to the store; everything about *how it looks* belongs
+ * here, and the table below is the whole of it.
  *
  * Stopping asks for confirmation. An accidental stop mid-talk is costly, and the confirmation is
  * the cheapest possible guard against it (FE §6.1).
@@ -8,13 +13,31 @@
 import { on } from "../core/bus.js";
 import { $, setAttr, setText } from "../core/dom.js";
 import { timestamp } from "../core/format.js";
+import { ARMING, ERROR, IDLE, PROCESSING, RECORDING, STOPPING } from "../core/modes.js";
 import { HEALTH_CHANGED, health } from "../stores/health.js";
+import { MODE_CHANGED, mode as modeStore } from "../stores/mode.js";
 import { SESSION_CHANGED, session } from "../stores/session.js";
 
+/**
+ * How each run state presents itself. Specified in `docs/design-system.md` § Capture Modes.
+ *
+ * `state` is what the dot and the wash key off; it is not always the run state, because `arming`
+ * and `processing` both read as "the application is working on it" and share an appearance.
+ */
+const PRESENTATION = {
+  [IDLE]: { label: "Not recording", button: "Start recording", state: "idle", enabled: true },
+  [ARMING]: { label: "Choosing a window…", button: "Cancel", state: "arming", enabled: true },
+  [RECORDING]: { label: "Recording", button: "Stop", state: "recording", enabled: true },
+  [STOPPING]: { label: "Stopping…", button: "Stopping…", state: "stopping", enabled: false },
+  [PROCESSING]: { label: "Transcribing…", button: "Transcribing…", state: "busy", enabled: false },
+  [ERROR]: { label: "Recording failed", button: "Start recording", state: "error", enabled: true },
+};
+
 export class Header {
-  constructor(root, { onStart, onStop, onOpenSettings }) {
+  constructor(root, { onStart, onArm, onStop, onOpenSettings }) {
     this.root = root;
     this.onStart = onStart;
+    this.onArm = onArm;
     this.onStop = onStop;
 
     this.state = $("[data-record-state]", root);
@@ -32,6 +55,7 @@ export class Header {
     }
 
     on(SESSION_CHANGED, () => this.render());
+    on(MODE_CHANGED, () => this.render());
     on(HEALTH_CHANGED, () => this.renderIdentity());
 
     // The clock ticks once a second but is *derived* from the start time, so it stays correct
@@ -41,12 +65,23 @@ export class Header {
   }
 
   render() {
-    const running = session.running;
+    const shown = PRESENTATION[modeStore.state] ?? PRESENTATION[IDLE];
 
-    setAttr(this.state, "data-state", running ? "recording" : "idle");
-    setText(this.stateLabel, running ? "Recording" : "Not recording");
-    setText(this.toggle, running ? "Stop" : "Start recording");
-    this.toggle?.classList.toggle("button--danger", running);
+    setAttr(this.state, "data-state", shown.state);
+    // The label stays short and the *banner* carries the message. Putting the failure text here
+    // instead was tried and is wrong twice over: a sentence naming a file path stretches the
+    // header until the primary control is pushed off a narrow screen, and it duplicates what the
+    // banner directly below is already saying and already announcing.
+    setText(this.stateLabel, shown.label);
+    setAttr(this.state, "title", modeStore.state === ERROR ? modeStore.message : "");
+
+    setText(this.toggle, shown.button);
+    if (this.toggle) {
+      this.toggle.disabled = !shown.enabled;
+      // Danger styling only while there is something to lose. `stopping` has already been asked
+      // for, and colouring an inert button as destructive invites a second click at it.
+      this.toggle.classList.toggle("button--danger", modeStore.state === RECORDING);
+    }
 
     this.renderClock();
     this.renderIdentity();
@@ -76,14 +111,32 @@ export class Header {
     setText(this.privacyLabel, local ? "Fully local" : "Sending data off this machine");
   }
 
+  /**
+   * One control, six states. What pressing it means comes from the store, not from a boolean here.
+   */
   async _onToggle() {
-    if (!session.running) {
-      await this.onStart?.();
-      return;
-    }
-    // Confirmation, because an accidental stop mid-talk cannot be undone.
-    if (window.confirm("Stop recording? The transcript so far is kept.")) {
-      await this.onStop?.();
+    switch (modeStore.action) {
+      case "arm":
+        await this.onArm?.(modeStore.mode);
+        return;
+      case "start":
+        await this.onStart?.(modeStore.mode);
+        return;
+      case "stop":
+        // Arming has captured nothing yet, so cancelling it costs nothing and asking would be
+        // ceremony. Stopping a recording cannot be undone, so it asks.
+        if (modeStore.state === ARMING) {
+          await this.onStop?.({ armedOnly: true });
+          return;
+        }
+        if (window.confirm("Stop recording? The transcript so far is kept.")) {
+          await this.onStop?.({ armedOnly: false });
+        }
+        return;
+      default:
+        // `stopping` and `processing`: the control is disabled and this is unreachable by click.
+        // Kept explicit so a future state that forgets its presentation entry fails loudly here
+        // rather than silently starting a second session.
     }
   }
 }

@@ -17,6 +17,7 @@ import {
   ERROR,
   IDLE,
   LIVE,
+  PROCESSING,
   RECORDING,
   isBusy,
   isValidMode,
@@ -139,9 +140,12 @@ class ModeStore {
     }
     if (running) {
       this.setState(RECORDING);
-    } else if (this.state === RECORDING) {
-      // Only from `recording`. A stop that leads into `processing` sets that itself, and
-      // overwriting it here would hide the pass that is still running.
+    } else if (this.state !== PROCESSING && this.state !== ERROR) {
+      // Everything except those two returns to idle, `stopping` very much included — that is the
+      // state a stop *passes through*, and an earlier version of this guard listed only
+      // `recording`, which left the header reading "Stopping…" with a disabled control for the
+      // rest of the session. `processing` is excluded because the post-capture pass owns it and
+      // outlives the session; `error` because the user has not seen it yet.
       this.setState(IDLE);
     }
     emit(MODE_CHANGED, this);

@@ -1,16 +1,57 @@
 {% import "macros/icons.html" as icons %}
 
-{# The header: session control and identity.
+{# The header: capture mode, session control, and identity.
 
-   One primary control, and stopping asks first — an accidental stop mid-talk is costly (FE §6.1).
-   The privacy indicator sits here rather than in settings because it is what a user checks before
-   pressing record in a room full of people (FE §7.6). #}
+   Two controls, not one (D-020). The mode selector answers *what kind of recording this will be*;
+   the record control answers *where this recording has got to*. A single control cycling both
+   changes meaning depending on how many times it has been pressed, so a user cannot know what
+   pressing it does without reading a label that is itself what changes.
+
+   Stopping asks first — an accidental stop mid-talk is costly (FE §6.1). The privacy indicator sits
+   here rather than in settings because it is what a user checks before pressing record in a room
+   full of people (FE §7.6). #}
 
 <header class="header">
   <div class="header__group">
+    {# Every mode is always present. An unavailable one is disabled and carries the reason, because
+       a feature that vanishes when its dependency is missing is indistinguishable from one that
+       does not exist. #}
+    <div class="mode-switcher" data-mode-switcher role="radiogroup" aria-label="Capture mode">
+      <button
+        type="button"
+        class="mode-switcher__option"
+        data-mode-option="live"
+        role="radio"
+        aria-checked="true"
+      >
+        Live
+      </button>
+      <button
+        type="button"
+        class="mode-switcher__option"
+        data-mode-option="recorded"
+        role="radio"
+        aria-checked="false"
+      >
+        Recorded
+      </button>
+      <button
+        type="button"
+        class="mode-switcher__option"
+        data-mode-option="window"
+        role="radio"
+        aria-checked="false"
+      >
+        Window
+      </button>
+    </div>
+
+    {# The announcement lives here rather than on the button: a live region on a control whose text
+       changes announces the new *label* — "Stop" — which describes what pressing it would do, not
+       what just happened. #}
     <div class="record-state" data-record-state data-state="idle">
       <span class="record-state__dot" aria-hidden="true"></span>
-      <span class="record-state__label" data-record-label>Not recording</span>
+      <span class="record-state__label" data-record-label aria-live="polite">Not recording</span>
     </div>
 
     <span class="clock numeric" data-clock aria-label="Session duration">00:00:00</span>

@@ -118,10 +118,25 @@ def test_mode_requirements_match(js: str) -> None:
 # -- internal consistency, which catches a wrong edit on either side ---------------------
 
 
-def test_every_mode_has_states_and_requirements() -> None:
+def test_every_mode_has_states_and_a_requirements_entry() -> None:
     for mode in modes.CAPTURE_MODES:
         assert modes.MODE_STATES.get(mode), f"{mode} has no run states"
-        assert modes.MODE_REQUIREMENTS.get(mode), f"{mode} has no requirements entry"
+        # The *entry* must exist; being empty is the common and correct case. Only `window` needs
+        # something that cannot be substituted for.
+        assert mode in modes.MODE_REQUIREMENTS, f"{mode} has no requirements entry"
+
+
+def test_the_audio_modes_are_not_gated_on_a_capture_device() -> None:
+    """Found by running it: gating these made a working application look broken.
+
+    A plain ``uv sync`` produces an environment with no ``sounddevice``, and the file source
+    replaces a capture device entirely. Requiring one struck out every mode in the selector on a
+    machine that transcribes perfectly well. A missing device is an input-source problem with its
+    own remedy path, not a reason to disable the mode.
+    """
+    assert modes.MODE_REQUIREMENTS[modes.LIVE] == ()
+    assert modes.MODE_REQUIREMENTS[modes.RECORDED] == ()
+    assert "window_capture" in modes.MODE_REQUIREMENTS[modes.WINDOW]
 
 
 def test_every_mode_can_be_idle_and_can_fail() -> None:

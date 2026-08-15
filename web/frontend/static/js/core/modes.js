@@ -60,13 +60,15 @@ export const BUSY_STATES = Object.freeze([ARMING, RECORDING, STOPPING, PROCESSIN
 /**
  * What each mode needs beyond a plain install, keyed as `GET /api/health` reports it.
  *
- * The speech model is deliberately absent: a session with no model loaded is a recoverable state
- * the interface already explains, not a reason to grey out the mode.
+ * Empty is the common case and is deliberate — only `window` needs a capability the application
+ * cannot substitute for. A missing capture device does *not* disable the audio modes: the file
+ * source replaces one entirely, and a missing device already has its own remedy path in the audio
+ * settings tab. See the canonical note in `services/session/modes.py`.
  */
 export const MODE_REQUIREMENTS = Object.freeze({
-  live: Object.freeze(["audio_device"]),
-  recorded: Object.freeze(["audio_device"]),
-  window: Object.freeze(["audio_device", "window_capture"]),
+  live: Object.freeze([]),
+  recorded: Object.freeze([]),
+  window: Object.freeze(["window_capture"]),
 });
 
 /** The run states `mode` can reach, or an empty list for a mode that does not exist. */

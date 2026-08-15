@@ -8,11 +8,13 @@
 
 import { on } from "./core/bus.js";
 import { $ } from "./core/dom.js";
+import { IDLE, STOPPING } from "./core/modes.js";
 import * as prefs from "./core/storage.js";
 import { Banners } from "./components/banners.js";
 import { ChatPane } from "./components/chat-pane.js";
 import { GlossaryPanel } from "./components/glossary-panel.js";
 import { Header } from "./components/header.js";
+import { ModeSwitcher } from "./components/mode-switcher.js";
 import { TranscriptSelection } from "./components/selection.js";
 import { SettingsModal } from "./components/settings-modal.js";
 import { StatusBar } from "./components/status-bar.js";
@@ -35,6 +37,7 @@ import { TranscriptSocket } from "./transport/socket.js";
 import { CHAT_CHANGED, chat } from "./stores/chat.js";
 import { config } from "./stores/config.js";
 import { health } from "./stores/health.js";
+import { mode } from "./stores/mode.js";
 import { polish } from "./stores/polish.js";
 import { session } from "./stores/session.js";
 import { transcript } from "./stores/transcript.js";
@@ -54,9 +57,15 @@ function boot() {
     },
   });
 
+  new ModeSwitcher($("[data-mode-switcher]"));
+
   const header = new Header($(".header"), {
-    onStart: () => start(banners, settings),
-    onStop: () => stop(banners),
+    onStart: (name) => start(name, banners, settings),
+    // Window capture collects its options and picks a window before anything is captured. Neither
+    // exists yet, so arming currently falls straight through to start — which the server refuses
+    // by name until Plan 4 lands, and that refusal is the correct thing for a user to see.
+    onArm: (name) => start(name, banners, settings),
+    onStop: ({ armedOnly }) => stop(armedOnly, banners),
     onOpenSettings: (section) => settings.show(section),
   });
 
@@ -144,10 +153,20 @@ function wireSession(header) {
     transcript.reset();
     polish.reset();
     session.start(payload);
+    // The server is authoritative about the mode: a reload mid-recording, or a session started
+    // from somewhere other than this tab, must show what is actually being recorded.
+    mode.adoptSession({ running: true, mode: session.mode });
   });
 
-  on(SESSION_STOPPED, (payload) => session.stop(payload));
-  on(SESSION_STATE, (state) => session.hydrate(state));
+  on(SESSION_STOPPED, (payload) => {
+    session.stop(payload);
+    mode.adoptSession({ running: false, mode: session.mode });
+  });
+
+  on(SESSION_STATE, (state) => {
+    session.hydrate(state);
+    mode.adoptSession({ running: session.running, mode: session.mode });
+  });
   void header;
 }
 
@@ -219,9 +238,20 @@ function showPane(name, { persist = true } = {}) {
 
 /** Fetch state over HTTP on load, so the page is correct before the socket says anything. */
 async function hydrate(chatPane, glossary) {
+  // Before anything else: which capture modes this machine can run. Until it answers, every mode
+  // is offered — the server refuses what it cannot do, so the worst case is one clear error rather
+  // than a selector that is inexplicably dead on load.
+  try {
+    const { modes } = await api.health();
+    mode.hydrateAvailability(modes);
+  } catch (error) {
+    if (error instanceof ApiError) console.warn("Could not read capabilities:", error.message);
+  }
+
   try {
     const state = await api.session();
     session.hydrate(state);
+    mode.adoptSession({ running: session.running, mode: session.mode });
     if (state.metrics) health.setStatus(state.metrics);
 
     if (state.running) {
@@ -251,27 +281,41 @@ async function hydrate(chatPane, glossary) {
   await Promise.allSettled([chatPane?.load(), glossary?.load()]);
 }
 
-async function start(banners, settings) {
+async function start(captureMode, banners, settings) {
   try {
-    await api.startSession({});
+    await api.startSession({ mode: captureMode });
   } catch (error) {
+    mode.fail(error.message);
+
+    // A mode this build does not have is not an audio problem, and sending the user to the audio
+    // settings to fix it would be a wrong instruction confidently given. The banner alone is the
+    // whole remedy: the message names the plan that will deliver it.
+    const unavailable = error.code === "mode-unavailable";
     banners.show({
       code: error.code ?? "start-failed",
-      severity: error.severity ?? "critical",
+      severity: unavailable ? "warning" : (error.severity ?? "critical"),
       message: error.message,
-      // A failure to start is nearly always the input source, and the remedy is a setting. Opening
-      // the tab that fixes it beats a message telling the user to go and find it.
-      remedy: "audio",
-      remedy_label: "Open audio settings",
+      // A failure to start is otherwise nearly always the input source, and the remedy is a
+      // setting. Opening the tab that fixes it beats a message telling the user to go and find it.
+      remedy: unavailable ? undefined : "audio",
+      remedy_label: unavailable ? undefined : "Open audio settings",
     });
-    settings?.show("audio");
+    if (!unavailable) settings?.show("audio");
   }
 }
 
-async function stop(banners) {
+async function stop(armedOnly, banners) {
+  // Cancelling an arming run has captured nothing, so there is no session to stop — the state
+  // simply returns to idle.
+  if (armedOnly) {
+    mode.setState(IDLE);
+    return;
+  }
   try {
+    mode.setState(STOPPING);
     await api.stopSession();
   } catch (error) {
+    mode.fail(error.message);
     banners.show({ code: error.code ?? "stop-failed", severity: "warning", message: error.message });
   }
 }
