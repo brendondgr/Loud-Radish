@@ -107,16 +107,22 @@ So: divide a published batch figure by about 18 to guess whether a model will ke
 
 AMD Ryzen AI Max+ 395 (32 cores) with a Radeon 8060S iGPU, on a 25-second clip:
 
-| Model | CPU `int8` | GPU `float16` | Streaming estimate (GPU) |
+| Model | CPU `int8` batch | GPU `float16` batch | Live, through the pipeline |
 |---|---|---|---|
-| `small` | 26.4× | 40.7× | ~2.3× |
-| `large-v3-turbo` | 11.0× | **40.2×** | **~2.2×** |
-| `large-v3` | — | 10.3× | ~0.6× — will not keep up |
+| `small` | 26.4× | 40.7× | 1.5× (CPU, measured) |
+| `large-v3-turbo` | 11.0× | **40.2×** | **2.6× (GPU, measured)** |
+| `large-v3` | — | 10.3× | ~0.6× estimated — will not keep up |
+
+The live figures for `small`/CPU and `large-v3-turbo`/GPU were measured through the running
+application, not derived. `large-v3` is an estimate from its batch figure and the ~18× ratio, and is
+marked as one.
 
 `large-v3-turbo` is the interesting row. It is a distilled `large-v3` with four decoder layers
 instead of thirty-two, and on a GPU it runs at the speed of `small` while being a large-class model.
-It is the right default for anyone with a GPU, and the fallback ladder steps through it rather than
-through `medium`, which it beats on both speed and accuracy.
+Live, it sustains 2.6× with commit latency around 1.2 s — comfortably ahead of a speaker, and 1.7×
+the headroom of `small` on the CPU while being a far better model. It is the right default for
+anyone with a GPU, and the fallback ladder steps through it rather than through `medium`, which it
+beats on both speed and accuracy.
 
 On CPU only, `small` remains the right choice: turbo's 11× batch works out to well under real time
 once the streaming overhead is applied.
@@ -136,6 +142,8 @@ sudo dnf install hiprand rocrand
 
 # 2. The ROCm build of CTranslate2, matching the version already pinned in pyproject.toml.
 curl -LO https://github.com/OpenNMT/CTranslate2/releases/download/v4.8.1/rocm-python-wheels-Linux.zip
+# The trailing dash after the second tag is not optional: `cp314-cp314*` also matches the
+# free-threaded `cp314t` wheel, and uv refuses two conflicting URLs for one package.
 unzip -j rocm-python-wheels-Linux.zip '*cp314-cp314-manylinux*x86_64.whl'
 uv pip install --reinstall ./ctranslate2-4.8.1-cp314-cp314-manylinux*.whl
 ```
@@ -151,7 +159,9 @@ Two caveats worth knowing before committing to this:
   wheel means that environment no longer has a CUDA build. On a machine with only an AMD GPU that
   costs nothing.
 - **`uv sync` will put the PyPI wheel back**, because `pyproject.toml` names `ctranslate2` without
-  knowing which build you want. Re-run the install above after any sync that touches it.
+  knowing which build you want. Keep the wheel — `data/wheels/` is the conventional place here —
+  and re-install it after any sync that touches CTranslate2. The startup banner will tell you when
+  that has happened, so it is noticed at the next launch rather than at the next recording.
 
 ### Startup tells you where you stand
 

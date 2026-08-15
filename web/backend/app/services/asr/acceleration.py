@@ -265,9 +265,13 @@ def _rocm_remedy(missing: list[str]) -> list[str]:
     steps.extend(
         [
             f"curl -LO {ROCM_WHEEL_URL.format(version=version)}",
+            # The trailing dash after the second tag matters: without it the glob also matches
+            # the free-threaded `cp314t` wheel, and uv refuses two conflicting URLs for one
+            # package rather than picking one.
             "unzip -j rocm-python-wheels-Linux.zip "
-            f"'*cp{_python_tag()}-cp{_python_tag()}*manylinux*x86_64.whl'",
-            f"uv pip install --reinstall ./ctranslate2-{version}-cp{_python_tag()}-*.whl",
+            f"'*cp{_python_tag()}-cp{_python_tag()}-manylinux*x86_64.whl'",
+            f"uv pip install --reinstall ./ctranslate2-{version}"
+            f"-cp{_python_tag()}-cp{_python_tag()}-*.whl",
         ]
     )
     return steps
