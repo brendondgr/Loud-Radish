@@ -25,6 +25,7 @@ import numpy as np
 from ...config.schema import AsrConfig
 from ..audio.formats import SAMPLE_RATE
 from .contract import AsrBackend, AsrLoadError, AsrResult
+from .hallucination import judge
 from .registry import build_backend
 
 logger = logging.getLogger(__name__)
@@ -80,6 +81,9 @@ class AsrLifecycle:
         self._state = LoadState.UNLOADED
         self._error: str = ""
         self._lock = asyncio.Lock()
+        #: How many passes have been discarded as invented. Published with pipeline health, because
+        #: a filter that deletes speech invisibly is a worse bug than the one it fixes.
+        self._suppressed = 0
 
     # -- state ---------------------------------------------------------------------
 
@@ -87,6 +91,11 @@ class AsrLifecycle:
     def state(self) -> LoadState:
         """The current lifecycle state."""
         return self._state
+
+    @property
+    def suppressed(self) -> int:
+        """How many passes have been discarded as invented text."""
+        return self._suppressed
 
     @property
     def backend(self) -> AsrBackend | None:
@@ -203,7 +212,39 @@ class AsrLifecycle:
             )
         if not backend.capabilities.accepts_prompt:
             prompt = None
-        return backend.transcribe(audio, prompt)
+
+        result = backend.transcribe(audio, prompt)
+        return self._filter_hallucinations(result, audio)
+
+    def _filter_hallucinations(self, result: AsrResult, audio: np.ndarray) -> AsrResult:
+        """Drop a pass the model invented rather than heard.
+
+        Applied here rather than in the streaming engine on purpose. This is a property of *speech
+        models* — it is Whisper's behaviour on non-speech audio, not a fact about commit policy —
+        and the engine is deliberately ignorant of which model it is driving (constraint **C6**).
+        The lifecycle is the one place that holds both the audio and the ASR settings.
+
+        A suppressed pass returns as an empty result, which is a state the engine already handles:
+        it is exactly what a pass over genuine silence produces.
+        """
+        suppression = judge(result, audio.size / SAMPLE_RATE, self._config.hallucination)
+        if suppression is None:
+            return result
+
+        self._suppressed += 1
+        # Logged at debug with the text, because a wrongly-suppressed passage must be recoverable
+        # by someone diagnosing it. Transcript content never goes to a higher level (BE §18).
+        logger.debug(
+            "Suppressed %s: %s (%r)", suppression.code, suppression.reason, suppression.text
+        )
+        return AsrResult(
+            words=[],
+            language=result.language,
+            inference_seconds=result.inference_seconds,
+            model_id=result.model_id,
+            no_speech_prob=result.no_speech_prob,
+            avg_logprob=result.avg_logprob,
+        )
 
     # -- internals -----------------------------------------------------------------
 

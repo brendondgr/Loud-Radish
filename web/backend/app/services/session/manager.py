@@ -171,6 +171,7 @@ class SessionManager:
             device=config.asr.device,
             source=self._source_info.describe() if self._source_info else "",
             detector=self._gate.detector_name if self._gate else "",
+            suppressed=self._asr.suppressed,
         )
 
     # -- lifecycle -----------------------------------------------------------------
