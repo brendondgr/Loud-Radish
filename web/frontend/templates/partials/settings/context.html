@@ -127,6 +127,24 @@
       />
       <span class="field__value">s of silence</span>
     </div>
+
+    <div class="field field--inline" data-when="polish.enabled=true">
+      <label class="field__label field__label--inline" for="polish-timestamps">Mark the time every</label>
+      <input
+        class="field__control field__control--number"
+        id="polish-timestamps"
+        type="number"
+        min="5"
+        max="300"
+        step="5"
+        data-config="polish.timestamp_interval_s"
+      />
+      <span class="field__value">s</span>
+      <p class="field__hint">
+        Timestamps stay in the cleaned-up text so a passage can be traced back to the moment it was
+        said. Fewer of them reads better; more of them locates a claim more precisely.
+      </p>
+    </div>
   </div>
 
   <div class="settings__group">

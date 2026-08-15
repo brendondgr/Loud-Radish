@@ -3,9 +3,11 @@
  *
  * Renders three regions, in reading order:
  *
- * 1. **Polished blocks** — finished minutes rewritten for reading. Empty, and therefore invisible,
- *    whenever no language model is available, which is why the pane below it still has to work on
- *    its own.
+ * 1. **Polished blocks** — finished minutes rewritten for reading, one paragraph each, flowing into
+ *    one another as continuous prose. Timestamps live inside the text rather than in a heading
+ *    above it: a rule and a header line every minute is exactly the constant breaking this region
+ *    exists to stop. Empty, and therefore invisible, whenever no language model is available,
+ *    which is why the pane below it still has to work on its own.
  * 2. **Committed segments** — the raw tail: the minute currently accumulating, exactly as the
  *    speech model produced it.
  * 3. **The hypothesis** — a single element, replaced wholly, never a list entry (FE §4.1).
@@ -24,6 +26,7 @@
  */
 
 import { on } from "../core/bus.js";
+import { parseTimestamp } from "../core/citations.js";
 import { $, $$, el, setText, toggle } from "../core/dom.js";
 import { pluralise, timestamp, wallClock } from "../core/format.js";
 import { POLISH_CHANGED, polish } from "../stores/polish.js";
@@ -155,13 +158,11 @@ export class TranscriptPane {
     this.polishedList.insertBefore(node, later ?? null);
   }
 
+  /**
+   * One block. No timestamp header above it: the times are inside the prose now, and a heading
+   * line over every minute is one of the breaks this pane exists to stop making.
+   */
   _buildBlock(block) {
-    const time = el("span", {
-      className: "polished__time numeric",
-      text: timestamp(block.start),
-      attrs: { "data-start": block.start },
-    });
-
     return el("article", {
       className: "polished",
       attrs: {
@@ -172,7 +173,7 @@ export class TranscriptPane {
         // a dataset value is a string either way.
         "data-segment-ids": (block.source_ids ?? []).join(","),
       },
-      children: [time, el("div", { className: "polished__body", children: renderProse(block.text) })],
+      children: renderProse(block.text),
     });
   }
 
@@ -295,6 +296,9 @@ export class TranscriptPane {
   }
 }
 
+/** `[MM:SS]` and `[H:MM:SS]`, the markers the polish pass carries through the prose. */
+const INLINE_TIME = /\[(\d{1,2}:\d{2}(?::\d{2})?)\]/g;
+
 /**
  * Turn polished text into paragraphs and lists.
  *
@@ -316,9 +320,40 @@ function renderProse(text) {
       if (items.length === lines.length) {
         return el("ul", {
           className: "polished__list",
-          children: items.map((line) => el("li", { text: line.slice(2).trim() })),
+          children: items.map((line) => el("li", { children: withTimes(line.slice(2).trim()) })),
         });
       }
-      return el("p", { className: "polished__paragraph", text: lines.join(" ") });
+      return el("p", { className: "polished__paragraph", children: withTimes(lines.join(" ")) });
     });
+}
+
+/**
+ * Split a run of prose into text and the timestamps carried through it.
+ *
+ * The times are **not** buttons, unlike the identical-looking citations in a chat answer. A
+ * citation points somewhere else and needs a click to get there; a timestamp sitting in the
+ * transcript is already at the moment it names, so a control that seeks to itself would be an
+ * affordance that does nothing. They are here to be read, and to be exported and searched with the
+ * text — that is what makes a polished passage traceable back to when it was said.
+ */
+function withTimes(text) {
+  const nodes = [];
+  let cursor = 0;
+
+  for (const match of text.matchAll(INLINE_TIME)) {
+    if (match.index > cursor) {
+      nodes.push(document.createTextNode(text.slice(cursor, match.index)));
+    }
+    nodes.push(
+      el("span", {
+        className: "polished__at numeric",
+        text: match[1],
+        attrs: { "data-start": parseTimestamp(match[1]) ?? 0 },
+      })
+    );
+    cursor = match.index + match[0].length;
+  }
+
+  if (cursor < text.length) nodes.push(document.createTextNode(text.slice(cursor)));
+  return nodes;
 }

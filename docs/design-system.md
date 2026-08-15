@@ -86,7 +86,8 @@ conspicuous to everyone sitting behind you.
 | Surfaces | `--surface-base` → `--surface-panel`, plus `--surface-control{,-hover}`, `--surface-input` | Four depths. The transcript sits on the lowest so it reads as the document |
 | Text | `--text-primary`, `--text-transcript`, `--text-secondary`, `--text-muted`, `--text-faint`, `--text-dim` | `--text-transcript` is warmer and softer than white; it is read for two hours |
 | The tentative tail | `--text-hypothesis` | ~7:1 against the transcript surface. "Faded" text is easy to under-contrast |
-| Polished blocks | *(no new tokens)* | Same face, size, and colour as a raw segment — it is the same speech. A quiet `--border-control` rule marks the region; on a working setup nearly the whole page is polished, so a loud treatment would just be a loud page |
+| Polished blocks | *(no new tokens)* | Same face, size, and colour as a raw segment — it is the same speech. No rule, no heading, no extra gap: one minute is one paragraph and consecutive minutes read as consecutive paragraphs. On a working setup nearly the whole page is polished, so any per-block treatment is a break on every paragraph |
+| Inline timestamps in polished text | `--text-faint`, `--text-xs`, `--font-mono` | 5.56:1 on the transcript surface, above the 4.5:1 small-text floor. Not interactive: unlike a chat citation, which points elsewhere, a timestamp in the transcript is already at the moment it names |
 | Borders | `--border-subtle` → `--border-strong` | Four weights |
 | Accent | `--accent`, `--accent-bright`, `--accent-dim`, `--accent-wash{,-strong}`, `--accent-border` | One hue. The wash variants are translucent and composite over whatever is behind them |
 | Semantic | `--danger`, `--warning`, each with `-text`, `-wash`, `-border` | Never used alone — see the colour rule below |

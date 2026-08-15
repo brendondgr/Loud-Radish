@@ -71,28 +71,35 @@
 }
 
 /* -- polished blocks -----------------------------------------------------------------------
- * A finished minute, rewritten for reading: real sentences, real paragraphs. Same face, size, and
- * colour as a raw segment, because it is the same speech — the difference the reader should see is
- * that it reads properly, not that it is a different kind of thing.
+ * A finished minute, rewritten for reading. Same face, size, and colour as a raw segment, because
+ * it is the same speech — the difference the reader should see is that it reads properly, not that
+ * it is a different kind of thing.
  *
- * The one visual distinction is a rule down the left edge, marking where the text has been through
- * the clean-up pass. Deliberately quiet: on a working setup nearly the whole page is polished, and
- * a loud treatment on nearly every paragraph is just a loud page.
+ * **Blocks have no chrome of their own.** No rule, no heading, no extra gap: one minute is one
+ * paragraph, and consecutive minutes read as consecutive paragraphs of continuous prose. An earlier
+ * version drew a rule and a timestamp line above every block, which broke the page to a new line
+ * roughly every minute on top of whatever breaks the model chose — the exact thing this pass exists
+ * to stop. The element is still there for search highlighting and time navigation; it just has
+ * nothing to say visually.
  */
 
 .polished {
-  margin-bottom: var(--space-10);
-  padding-left: var(--space-8);
-  border-left: 2px solid var(--border-control);
+  margin: 0;
 }
 
-.polished__time {
+/* The timestamps carried through the prose. Quiet enough to read past — there are several a minute
+ * and they are reference marks, not content — but present, because they are what ties a polished
+ * passage back to the moment it was said. Not interactive: unlike a citation in a chat answer,
+ * which points somewhere else, a timestamp here is already at the moment it names. */
+.polished__at {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   letter-spacing: 0.04em;
-  color: var(--text-dim);
-  margin-bottom: var(--space-3);
-  display: block;
+  color: var(--text-faint);
+  /* Lifted slightly so it reads as a mark against the line rather than a word in it. */
+  vertical-align: 0.15em;
+  margin-right: var(--space-2);
+  white-space: nowrap;
 }
 
 .polished__paragraph {
@@ -119,20 +126,26 @@
   margin-bottom: var(--space-3);
 }
 
-.polished__paragraph:last-child,
-.polished__list:last-child {
+/* Only the very last paragraph on the page loses its trailing space. Zeroing it per block — which
+ * an earlier version did — welds consecutive minutes together with no gap at all, which is as hard
+ * to read as breaking between them too hard. */
+.transcript__polished > .polished:last-child > :last-child {
   margin-bottom: 0;
 }
 
 /* Search highlights a block the same way it highlights a segment: the block is a match when any
  * segment it was built from is. */
-.polished.segment--match .polished__body {
-  background: var(--accent-wash);
-  box-shadow: 0 0 0 var(--space-2) var(--accent-wash);
+.polished.segment--match > *,
+.polished.segment--current-match > * {
   border-radius: var(--radius-sm);
 }
 
-.polished.segment--current-match .polished__body {
+.polished.segment--match > * {
+  background: var(--accent-wash);
+  box-shadow: 0 0 0 var(--space-2) var(--accent-wash);
+}
+
+.polished.segment--current-match > * {
   background: var(--accent-wash-strong);
   box-shadow: 0 0 0 var(--space-2) var(--accent-wash-strong);
 }
