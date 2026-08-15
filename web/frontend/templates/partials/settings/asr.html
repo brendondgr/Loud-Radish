@@ -1,0 +1,207 @@
+{# Transcription: the speech model, how text is committed, and term biasing.
+
+   Every backend is listed, including the ones this machine cannot run, with the reason attached
+   (FE §7.2). A model that silently does not appear looks like a missing feature; one greyed out
+   with "install the asr-whisper extra" is something the user can act on. #}
+
+<section
+  class="settings__panel"
+  role="tabpanel"
+  id="settings-panel-asr"
+  aria-labelledby="settings-tab-asr"
+  data-settings-panel="asr"
+  hidden
+>
+  <div class="settings__group">
+    <h3 class="settings__heading">Speech model</h3>
+
+    <div class="field">
+      <label class="field__label" for="asr-backend">Engine</label>
+      <select class="field__control" id="asr-backend" data-asr-backend></select>
+      <p class="field__hint" data-asr-backend-note></p>
+    </div>
+
+    <div class="field">
+      <label class="field__label" for="asr-model">Model</label>
+      <select class="field__control" id="asr-model" data-asr-model></select>
+      <p class="field__hint" data-asr-model-note></p>
+    </div>
+
+    <div class="field__row">
+      <div class="field">
+        <label class="field__label" for="asr-device">Run on</label>
+        <select class="field__control" id="asr-device" data-config="asr.device">
+          <option value="auto">Choose automatically</option>
+          <option value="cpu">CPU</option>
+          <option value="cuda">GPU (CUDA)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="asr-precision">Precision</label>
+        <select class="field__control" id="asr-precision" data-config="asr.precision">
+          <option value="int8">int8 — fastest, lowest memory</option>
+          <option value="float16">float16 — GPU default</option>
+          <option value="float32">float32 — slowest, most exact</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field__row field__row--actions">
+      <button type="button" class="button button--primary" data-asr-load>Load model</button>
+      <button type="button" class="button" data-asr-unload>Unload</button>
+      <p class="settings__inline-status" data-asr-status role="status" aria-live="polite"></p>
+    </div>
+
+    <div class="settings__progress" data-asr-progress hidden>
+      <div class="settings__progress-fill" data-asr-progress-fill></div>
+    </div>
+  </div>
+
+  <div class="settings__group">
+    <h3 class="settings__heading">Language</h3>
+
+    <div class="field">
+      <label class="field__label" for="asr-language">Spoken language</label>
+      <input
+        class="field__control"
+        id="asr-language"
+        type="text"
+        placeholder="en — leave empty to detect"
+        data-config="asr.language"
+        data-config-nullable
+      />
+      <p class="field__hint">
+        A two-letter code. Setting it explicitly is more reliable than detection, which occasionally
+        switches language mid-talk on a technical term.
+      </p>
+    </div>
+
+    <div class="field field--inline">
+      <label class="field__label field__label--inline" for="asr-beam">Beam size</label>
+      <input
+        class="field__control field__control--number"
+        id="asr-beam"
+        type="number"
+        min="1"
+        max="10"
+        data-config="asr.beam_size"
+      />
+      <p class="field__hint">
+        1 is greedy and fastest. Higher is more accurate and proportionally slower — raise it only
+        if the real-time factor has room.
+      </p>
+    </div>
+  </div>
+
+  <div class="settings__group">
+    <h3 class="settings__heading">Terms and names</h3>
+    <p class="settings__blurb">
+      Paste the speaker's name, the venue, and any jargon before the talk. The model is biased
+      toward these spellings, which is the single most effective thing available for a seminar full
+      of proper nouns it has never seen.
+    </p>
+
+    <div class="field">
+      <label class="field__label" for="asr-prompt">Session terms</label>
+      <textarea
+        class="field__control field__control--text"
+        id="asr-prompt"
+        rows="4"
+        placeholder="Hilbert space, deficiency indices, Prof. Kowalczyk, essentially self-adjoint"
+        data-config="asr.session_prompt"
+      ></textarea>
+    </div>
+
+    <div class="field field--switch">
+      <input type="checkbox" id="asr-use-prompt" data-config="asr.use_session_prompt" />
+      <label class="field__label field__label--inline" for="asr-use-prompt">
+        Use these terms
+      </label>
+    </div>
+
+    <div class="field field--switch">
+      <input type="checkbox" id="asr-rolling" data-config="asr.use_rolling_prompt" />
+      <label class="field__label field__label--inline" for="asr-rolling">
+        Also feed back the last few sentences
+      </label>
+      <p class="field__hint">
+        Gives the model continuity across buffer boundaries. Occasionally lets a mistake reinforce
+        itself, so turn it off if the same error keeps recurring.
+      </p>
+    </div>
+  </div>
+
+  <div class="settings__group settings__group--advanced">
+    <h3 class="settings__heading">Committing text</h3>
+    <p class="settings__blurb">
+      Text is committed once consecutive passes agree on it. Committed text never changes; the
+      tentative tail is replaced wholesale each pass. These control that trade-off between how fast
+      text settles and how often it settles on the wrong thing.
+    </p>
+
+    <div class="field field--inline">
+      <label class="field__label field__label--inline" for="stream-agreement">Passes that must agree</label>
+      <input
+        class="field__control field__control--number"
+        id="stream-agreement"
+        type="number"
+        min="1"
+        max="5"
+        data-config="streaming.agreement_count"
+      />
+      <p class="field__hint">
+        2 is the working default. 3 commits more slowly and revises less.
+      </p>
+    </div>
+
+    <div class="field field--inline">
+      <label class="field__label field__label--inline" for="stream-step">Run the model every</label>
+      <input
+        class="field__control field__control--number"
+        id="stream-step"
+        type="number"
+        min="0.1"
+        max="5"
+        step="0.05"
+        data-config="streaming.step_s"
+      />
+      <span class="field__value">s</span>
+    </div>
+
+    <div class="field field--inline">
+      <label class="field__label field__label--inline" for="stream-max-buffer">Longest buffer</label>
+      <input
+        class="field__control field__control--number"
+        id="stream-max-buffer"
+        type="number"
+        min="5"
+        max="30"
+        step="0.5"
+        data-config="streaming.max_buffer_s"
+      />
+      <span class="field__value">s</span>
+      <p class="field__hint">
+        Whisper-family models see 30 s at once, so nothing above that is useful.
+      </p>
+    </div>
+
+    <div class="field field--inline">
+      <label class="field__label field__label--inline" for="stream-timeout">Commit anyway after</label>
+      <input
+        class="field__control field__control--number"
+        id="stream-timeout"
+        type="number"
+        min="2"
+        max="120"
+        step="1"
+        data-config="streaming.commit_timeout_s"
+      />
+      <span class="field__value">s</span>
+      <p class="field__hint">
+        Rescues text the model keeps rewriting and never settles on, which otherwise sits in the
+        tentative tail indefinitely.
+      </p>
+    </div>
+  </div>
+</section>

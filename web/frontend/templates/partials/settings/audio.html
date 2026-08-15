@@ -1,0 +1,218 @@
+{# Audio: where sound comes from, and what happens to it before the model sees it.
+
+   This tab exists to answer the one question worth asking before every talk — "is it listening to
+   the right thing?" (FE §7.1). So the source comes first, the live level meter sits beside it, and
+   everything else is below the fold. #}
+
+<section
+  class="settings__panel"
+  role="tabpanel"
+  id="settings-panel-audio"
+  aria-labelledby="settings-tab-audio"
+  data-settings-panel="audio"
+>
+  <div class="settings__group">
+    <h3 class="settings__heading">Source</h3>
+
+    <div class="field">
+      <label class="field__label" for="audio-source-type">Capture from</label>
+      <select class="field__control" id="audio-source-type" data-config="audio.source_type">
+        <option value="microphone">Microphone</option>
+        <option value="loopback">System audio (loopback)</option>
+        <option value="file">A recording</option>
+      </select>
+      <p class="field__hint">
+        Loopback captures what this machine is playing, which is far cleaner for a remote talk. A
+        recording replays a WAV at real-time speed, exactly as if it were live.
+      </p>
+    </div>
+
+    {# Devices, shown only when a device is actually the source. #}
+    <div class="field" data-when="audio.source_type=microphone|loopback">
+      <label class="field__label" for="audio-device">Device</label>
+      <div class="field__row">
+        <select class="field__control" id="audio-device" data-device-select data-config-nullable>
+          <option value="">System default</option>
+        </select>
+        <button type="button" class="button" data-device-refresh>Rescan</button>
+      </div>
+      <p class="field__hint" data-device-note></p>
+    </div>
+
+    {# Recordings. The library and the upload control both live here so a file never has to be put
+       in place from outside the application. #}
+    <div class="field" data-when="audio.source_type=file">
+      <label class="field__label" for="audio-file">Recording</label>
+      <div class="field__row">
+        <select class="field__control" id="audio-file" data-file-select>
+          <option value="">No recording selected</option>
+        </select>
+        <button type="button" class="button" data-file-upload-trigger>Add a WAV…</button>
+        <input type="file" accept=".wav,audio/wav,audio/x-wav" data-file-upload hidden />
+      </div>
+      <p class="field__hint" data-file-note></p>
+
+      <div class="field__row field__row--spread">
+        <label class="field__label field__label--inline" for="audio-file-speed">Replay speed</label>
+        <input
+          class="field__control field__control--range"
+          id="audio-file-speed"
+          type="range"
+          min="0.25"
+          max="8"
+          step="0.25"
+          data-config="audio.file_speed"
+          data-config-output="audio-file-speed-out"
+          data-config-suffix="×"
+        />
+        <output class="field__value" id="audio-file-speed-out"></output>
+      </div>
+      <p class="field__hint">
+        1× is real time and behaves exactly like a live source. Higher speeds reprocess a long
+        recording quickly — useful for testing, but the pipeline will start dropping audio if it
+        cannot keep up.
+      </p>
+    </div>
+
+    <div class="field">
+      <span class="field__label">Input level</span>
+      <div class="settings__meter" data-settings-meter>
+        <div class="settings__meter-fill" data-settings-meter-fill></div>
+      </div>
+      <p class="field__hint" data-settings-meter-note>
+        Start recording to see the level. Speech should reach the middle without pinning to the end.
+      </p>
+    </div>
+  </div>
+
+  <div class="settings__group">
+    <h3 class="settings__heading">Speech detection</h3>
+    <p class="settings__blurb">
+      Silence is never sent to the model. This both saves compute and prevents the model inventing
+      words from nothing, which is its most common failure on a quiet room.
+    </p>
+
+    <div class="field field--switch">
+      <input type="checkbox" id="vad-enabled" data-config="vad.enabled" />
+      <label class="field__label field__label--inline" for="vad-enabled">
+        Skip silence
+      </label>
+    </div>
+
+    <div class="field" data-when="vad.enabled=true">
+      <label class="field__label" for="vad-detector">Detector</label>
+      <select class="field__control" id="vad-detector" data-config="vad.detector">
+        <option value="energy">Energy (built in)</option>
+        <option value="silero">Silero (neural, needs the vad-silero extra)</option>
+      </select>
+      <p class="field__hint" data-vad-note></p>
+    </div>
+
+    <div class="field field--inline" data-when="vad.enabled=true">
+      <label class="field__label field__label--inline" for="vad-sensitivity">Sensitivity</label>
+      <input
+        class="field__control field__control--range"
+        id="vad-sensitivity"
+        type="range"
+        min="0"
+        max="1"
+        step="0.05"
+        data-config="vad.sensitivity"
+        data-config-output="vad-sensitivity-out"
+      />
+      <output class="field__value" id="vad-sensitivity-out"></output>
+    </div>
+    <p class="field__hint" data-when="vad.enabled=true">
+      Higher catches quieter speech at the cost of letting more room noise through. If whole
+      sentences are going missing, raise it.
+    </p>
+
+    <div class="field field--inline" data-when="vad.enabled=true">
+      <label class="field__label field__label--inline" for="vad-pause">Pause before a paragraph break</label>
+      <input
+        class="field__control field__control--number"
+        id="vad-pause"
+        type="number"
+        min="100"
+        max="5000"
+        step="50"
+        data-config="vad.pause_ms"
+      />
+      <span class="field__value">ms</span>
+    </div>
+  </div>
+
+  <div class="settings__group">
+    <h3 class="settings__heading">Preprocessing</h3>
+
+    <div class="field field--switch">
+      <input type="checkbox" id="audio-high-pass" data-config="audio.high_pass" />
+      <label class="field__label field__label--inline" for="audio-high-pass">
+        Filter out low rumble
+      </label>
+      <p class="field__hint">
+        Removes air conditioning, projector fans, and desk knocks below the cut-off. On by default;
+        it removes nothing a speaker produces.
+      </p>
+    </div>
+
+    <div class="field field--inline" data-when="audio.high_pass=true">
+      <label class="field__label field__label--inline" for="audio-high-pass-hz">Cut-off</label>
+      <input
+        class="field__control field__control--number"
+        id="audio-high-pass-hz"
+        type="number"
+        min="20"
+        max="300"
+        step="5"
+        data-config="audio.high_pass_hz"
+      />
+      <span class="field__value">Hz</span>
+    </div>
+
+    <div class="field field--switch">
+      <input type="checkbox" id="audio-normalise" data-config="audio.normalise_gain" />
+      <label class="field__label field__label--inline" for="audio-normalise">
+        Even out the volume
+      </label>
+      <p class="field__hint">
+        Helps with a speaker who moves away from the microphone. Leave it off for a lapel mic, where
+        it mostly amplifies room noise between sentences.
+      </p>
+    </div>
+
+    <div class="field field--inline">
+      <label class="field__label field__label--inline" for="audio-gain">Fixed gain</label>
+      <input
+        class="field__control field__control--range"
+        id="audio-gain"
+        type="range"
+        min="-24"
+        max="24"
+        step="0.5"
+        data-config="audio.gain_db"
+        data-config-output="audio-gain-out"
+        data-config-suffix=" dB"
+      />
+      <output class="field__value" id="audio-gain-out"></output>
+    </div>
+
+    <div class="field field--inline">
+      <label class="field__label field__label--inline" for="audio-frame">Frame size</label>
+      <input
+        class="field__control field__control--number"
+        id="audio-frame"
+        type="number"
+        min="10"
+        max="200"
+        step="2"
+        data-config="audio.frame_ms"
+      />
+      <span class="field__value">ms</span>
+      <p class="field__hint">
+        How much audio is handled at once. Smaller reacts faster and costs more; 32 ms suits almost
+        everything.
+      </p>
+    </div>
+  </div>
+</section>

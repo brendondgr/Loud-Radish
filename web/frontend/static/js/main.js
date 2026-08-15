@@ -11,6 +11,7 @@ import { $ } from "./core/dom.js";
 import * as prefs from "./core/storage.js";
 import { Banners } from "./components/banners.js";
 import { Header } from "./components/header.js";
+import { SettingsModal } from "./components/settings-modal.js";
 import { StatusBar } from "./components/status-bar.js";
 import { TranscriptPane } from "./components/transcript-pane.js";
 import { ApiError, api } from "./transport/api.js";
@@ -27,6 +28,7 @@ import {
   VAD_STATE,
 } from "./transport/events.js";
 import { TranscriptSocket } from "./transport/socket.js";
+import { config } from "./stores/config.js";
 import { health } from "./stores/health.js";
 import { session } from "./stores/session.js";
 import { transcript } from "./stores/transcript.js";
@@ -34,25 +36,22 @@ import { transcript } from "./stores/transcript.js";
 function boot() {
   const socket = new TranscriptSocket();
 
-  const banners = new Banners($("[data-banners]"), {
-    onRemedy: (changes) => api.patchConfig(changes),
-  });
-
   const pane = new TranscriptPane($("[data-transcript-pane]"));
   new StatusBar($("[data-status-bar]"));
 
-  const header = new Header($(".header"), {
-    onStart: () => start(banners),
-    onStop: () => stop(banners),
-    onOpenSettings: (section) => {
-      // Settings arrive in a later phase. Say so plainly rather than doing nothing, which reads
-      // as a broken control.
-      banners.show({
-        code: "settings-pending",
-        severity: "warning",
-        message: `Settings (${section}) are not built yet. Configure the recorder from its config file for now.`,
-      });
+  const settings = new SettingsModal($("[data-settings]"));
+
+  const banners = new Banners($("[data-banners]"), {
+    onRemedy: async ({ changes, settings: tab }) => {
+      if (changes) await config.patch(changes);
+      if (tab) await settings.show(tab);
     },
+  });
+
+  const header = new Header($(".header"), {
+    onStart: () => start(banners, settings),
+    onStop: () => stop(banners),
+    onOpenSettings: (section) => settings.show(section),
   });
 
   wireTranscript(socket, pane);
@@ -167,9 +166,18 @@ async function hydrate() {
   } catch (error) {
     if (error instanceof ApiError) console.warn("Could not load session state:", error.message);
   }
+
+  // Loaded on boot rather than only when settings open: the header's model name and privacy
+  // indicator are read from it, and they are what a user checks *before* pressing record.
+  try {
+    await config.load();
+    session.setConfig(config.data);
+  } catch (error) {
+    if (error instanceof ApiError) console.warn("Could not load configuration:", error.message);
+  }
 }
 
-async function start(banners) {
+async function start(banners, settings) {
   try {
     await api.startSession({});
   } catch (error) {
@@ -177,7 +185,12 @@ async function start(banners) {
       code: error.code ?? "start-failed",
       severity: error.severity ?? "critical",
       message: error.message,
+      // A failure to start is nearly always the input source, and the remedy is a setting. Opening
+      // the tab that fixes it beats a message telling the user to go and find it.
+      remedy: "audio",
+      remedy_label: "Open audio settings",
     });
+    settings?.show("audio");
   }
 }
 

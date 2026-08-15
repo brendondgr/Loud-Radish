@@ -57,8 +57,19 @@ export class Header {
   }
 
   renderIdentity() {
-    setText(this.modelName, health.modelId || "No model loaded");
-    setText(this.llmName, session.llmConfigured ? "Assistant ready" : "Assistant not set up");
+    // `health.modelId` is what is actually loaded and only exists once a session has run. Before
+    // that, the configured model is the honest answer — and the distinction is kept in the wording
+    // rather than collapsed, because "selected" and "loaded" are different states and the gap
+    // between them is where model-loading failures live.
+    const configured = session.config?.asr?.model;
+    setText(
+      this.modelName,
+      health.modelId || (configured ? `${configured} — not loaded` : "No model selected")
+    );
+
+    const llm = session.config?.llm;
+    const llmModel = llm?.mode === "api" ? llm?.api?.model : llm?.local?.model;
+    setText(this.llmName, session.llmConfigured ? llmModel : "Assistant not set up");
 
     const local = session.fullyLocal;
     setAttr(this.privacy, "data-state", local ? "local" : "remote");

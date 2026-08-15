@@ -36,6 +36,7 @@ from .formats import (
     to_float32,
 )
 from .level import AudioLevel, LevelMeter, measure, to_dbfs
+from .library import AudioFile, AudioLibraryError, list_files, store_upload
 from .preprocess import GainNormaliser, HighPassFilter, PreprocessChain
 from .resample import resample, resampler_name
 from .ring_buffer import AudioRingBuffer, RingBufferStats
@@ -47,8 +48,10 @@ __all__ = [
     "FILE_DEVICE",
     "SAMPLE_RATE",
     "AudioDevice",
+    "AudioFile",
     "AudioFormatError",
     "AudioLevel",
+    "AudioLibraryError",
     "AudioRingBuffer",
     "AudioSource",
     "DeviceEnumerationError",
@@ -69,9 +72,11 @@ __all__ = [
     "frame_samples",
     "is_canonical",
     "list_devices",
+    "list_files",
     "measure",
     "resample",
     "resampler_name",
+    "store_upload",
     "to_canonical",
     "to_dbfs",
     "to_float32",

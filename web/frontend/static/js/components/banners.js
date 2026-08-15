@@ -20,7 +20,14 @@ export class Banners {
     on(ERROR, (payload) => this.show(payload));
   }
 
-  show({ code, message, severity = "warning", remedy, remedy_label: remedyLabel }) {
+  show({
+    code,
+    message,
+    severity = "warning",
+    remedy,
+    remedy_label: remedyLabel,
+    opens_settings: opensSettings,
+  }) {
     if (severity === "info") return; // status-bar territory, not a banner
     if (!message) return;
 
@@ -28,14 +35,19 @@ export class Banners {
 
     const children = [el("span", { className: "banner__message", text: message })];
 
-    if (remedy && remedyLabel) {
+    // Two kinds of recovery, and both are offered. Some failures have a single configuration
+    // change that fixes them; others — an unplugged microphone — need a choice only the user can
+    // make, and for those the action opens the tab where the choice lives. A labelled button was
+    // previously rendered only for the first kind, so "Choose a device" appeared as plain text
+    // with nothing to click.
+    if (remedyLabel && (remedy || opensSettings)) {
       const action = el("button", {
         className: "banner__action",
         text: remedyLabel,
         attrs: { type: "button" },
       });
       action.addEventListener("click", async () => {
-        await this.onRemedy?.(remedy);
+        await this.onRemedy?.({ changes: remedy ?? null, settings: opensSettings ?? "" });
         this.dismiss(code);
       });
       children.push(action);

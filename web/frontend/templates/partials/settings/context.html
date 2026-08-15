@@ -1,0 +1,127 @@
+{# Context: what the assistant is given when it answers.
+
+   A two-hour talk does not fit in any context window, so the question is never "send everything"
+   but "send the right part". These settings control that selection. #}
+
+<section
+  class="settings__panel"
+  role="tabpanel"
+  id="settings-panel-context"
+  aria-labelledby="settings-tab-context"
+  data-settings-panel="context"
+  hidden
+>
+  <div class="settings__group">
+    <h3 class="settings__heading">Budget</h3>
+    <p class="settings__blurb">
+      The transcript grows without limit; the model's context does not. Material is assembled in
+      priority order until this budget is spent — the question, then the most recent speech
+      verbatim, then summaries of everything before it.
+    </p>
+
+    <div class="field field--inline">
+      <label class="field__label field__label--inline" for="context-budget">Tokens per question</label>
+      <input
+        class="field__control field__control--number"
+        id="context-budget"
+        type="number"
+        min="512"
+        max="1000000"
+        step="512"
+        data-config="context.token_budget"
+      />
+      <p class="field__hint" data-context-budget-note></p>
+    </div>
+
+    <div class="field field--inline">
+      <label class="field__label field__label--inline" for="context-verbatim">Recent speech kept word for word</label>
+      <input
+        class="field__control field__control--number"
+        id="context-verbatim"
+        type="number"
+        min="30"
+        max="3600"
+        step="30"
+        data-config="context.recent_verbatim_s"
+      />
+      <span class="field__value">s</span>
+      <p class="field__hint">
+        Questions are usually about what was just said, so the tail is sent exactly rather than
+        summarised.
+      </p>
+    </div>
+  </div>
+
+  <div class="settings__group">
+    <h3 class="settings__heading">Rolling summaries</h3>
+
+    <div class="field field--switch">
+      <input type="checkbox" id="context-summary" data-config="context.summary_enabled" />
+      <label class="field__label field__label--inline" for="context-summary">
+        Summarise as the talk goes
+      </label>
+      <p class="field__hint">
+        Produces the outline in the assistant pane, and is what lets a question about the first
+        twenty minutes still be answerable two hours in.
+      </p>
+    </div>
+
+    <div class="field field--inline" data-when="context.summary_enabled=true">
+      <label class="field__label field__label--inline" for="context-interval">Summarise every</label>
+      <input
+        class="field__control field__control--number"
+        id="context-interval"
+        type="number"
+        min="30"
+        max="3600"
+        step="30"
+        data-config="context.summary_interval_s"
+      />
+      <span class="field__value">s</span>
+    </div>
+  </div>
+
+  <div class="settings__group">
+    <h3 class="settings__heading">Glossary</h3>
+
+    <div class="field field--switch">
+      <input type="checkbox" id="context-glossary" data-config="context.glossary_enabled" />
+      <label class="field__label field__label--inline" for="context-glossary">
+        Collect unfamiliar terms
+      </label>
+      <p class="field__hint">
+        Picks out jargon as it is introduced and defines it from how the speaker used it, which is
+        usually more useful than a textbook definition.
+      </p>
+    </div>
+  </div>
+
+  <div class="settings__group settings__group--advanced">
+    <h3 class="settings__heading">Retrieval</h3>
+
+    <div class="field field--switch">
+      <input type="checkbox" id="context-retrieval" data-config="context.retrieval_enabled" />
+      <label class="field__label field__label--inline" for="context-retrieval">
+        Search the transcript for relevant passages
+      </label>
+      <p class="field__hint">
+        Pulls in earlier material that matches the question, rather than relying on the summaries
+        alone.
+      </p>
+    </div>
+
+    <div class="field field--inline" data-when="context.retrieval_enabled=true">
+      <label class="field__label field__label--inline" for="context-chunk">Passage size</label>
+      <input
+        class="field__control field__control--number"
+        id="context-chunk"
+        type="number"
+        min="50"
+        max="2000"
+        step="25"
+        data-config="context.chunk_words"
+      />
+      <span class="field__value">words</span>
+    </div>
+  </div>
+</section>

@@ -39,9 +39,15 @@
   /* Both of these were darker to begin with and failed WCAG AA against the surfaces they sit on
    * — 4.10:1 and 2.53:1 against 4.5:1 required. They carry real content: section labels, and the
    * timestamps a user reads to find their place. Measured and corrected rather than eyeballed;
-   * anything darker here fails again. */
-  --text-faint: #767d79;
-  --text-dim: #737e79;
+   * anything darker here fails again.
+   *
+   * Corrected a second time when the settings dialog landed. The first pass measured them against
+   * the transcript's surfaces, which are the *darkest* in the palette; on --surface-panel and
+   * --surface-control they came back to 4.40:1. The values below are the lightest-surface floor:
+   * ≥4.5:1 on --surface-control-hover, the lightest ground either one is used on, and therefore
+   * ≥4.5:1 everywhere. */
+  --text-faint: #848b87;
+  --text-dim: #808b86;
 
   /* -- the tentative tail --------------------------------------------------------------
    * Distinct from committed text but still legible. Contrast against --surface-document is

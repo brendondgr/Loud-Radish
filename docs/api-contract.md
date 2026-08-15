@@ -49,7 +49,13 @@ Every frame is `{"event": "<name>", "data": { … }}`.
 | `glossary.added` | `term`, `definition`, `first_seen` | A new term identified |
 | `chat.delta` | `request_id`, `text` | A streaming answer fragment |
 | `chat.done` | `request_id`, `usage`, `context_timestamp`, `cites` | The answer is complete |
-| `error` | `code`, `message`, `severity` | Something went wrong |
+| `error` | `code`, `message`, `severity`, `remedy`, `remedy_label`, `opens_settings` | Something went wrong |
+
+`remedy` is a map of dotted configuration paths that would fix the failure, offered as a one-click
+action. Some failures have no single answer — an unplugged microphone needs a choice only the user
+can make — and those carry `opens_settings` instead, naming the settings tab where the choice lives.
+A failure with `remedy_label` but neither of the two renders as text with nothing to click, so one
+of them must be set whenever a label is.
 
 `severity` is `info`, `warning`, or `critical`, and the frontend presents each differently: status-bar
 text, a dismissible inline banner, or a banner with an explicit recovery action. Never a modal — a

@@ -48,8 +48,39 @@ async function request(method, path, body) {
 
 export const get = (path) => request("GET", path);
 export const post = (path, body = {}) => request("POST", path, body);
+export const put = (path, body = {}) => request("PUT", path, body);
 export const patch = (path, body = {}) => request("PATCH", path, body);
 export const del = (path) => request("DELETE", path);
+
+/**
+ * Send a file as multipart form data.
+ *
+ * Separate from `request` because the two cannot share a body: setting `Content-Type` by hand on a
+ * `FormData` body omits the multipart boundary the browser generates, and the server then rejects
+ * a request that looks perfectly well-formed from here.
+ */
+async function upload(path, file) {
+  const form = new FormData();
+  form.append("file", file);
+
+  let response;
+  try {
+    response = await fetch(path, { method: "POST", body: form });
+  } catch (cause) {
+    throw new ApiError(0, {
+      error: {
+        code: "unreachable",
+        message: "The recorder is not responding. Check that it is still running.",
+        severity: "critical",
+      },
+      cause,
+    });
+  }
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new ApiError(response.status, payload);
+  return payload;
+}
 
 /** The endpoints, named so no call site builds a path by hand. */
 export const api = {
@@ -62,10 +93,25 @@ export const api = {
   devices: () => get("/api/audio/devices"),
   selectDevice: (body) => post("/api/audio/device", body),
 
+  // The recording library. `audio.file_path` is a path on the server, which a browser cannot
+  // resolve from a file picker — so the server lists what it has and accepts uploads into it.
+  audioFiles: () => get("/api/audio/files"),
+  uploadAudioFile: (file) => upload("/api/audio/files", file),
+  deleteAudioFile: (path) => del(`/api/audio/files?path=${encodeURIComponent(path)}`),
+
   asrModels: () => get("/api/asr/models"),
   loadModel: (body) => post("/api/asr/load", body),
   unloadModel: () => post("/api/asr/unload"),
   setPrompt: (body) => post("/api/asr/prompt", body),
+
+  llmConfig: () => get("/api/llm/config"),
+  llmStatus: () => get("/api/llm/status"),
+  llmModels: () => get("/api/llm/models"),
+  // Takes the unsaved form values, so the button tests the address on screen rather than the one
+  // last saved — which is the whole point of pressing it after typing a new one.
+  testLlm: (overrides = {}) => post("/api/llm/test", overrides),
+  storeLlmCredential: (provider, value) => put("/api/llm/credential", { provider, value }),
+  clearLlmCredential: (provider) => del(`/api/llm/credential/${encodeURIComponent(provider)}`),
 
   config: () => get("/api/config"),
   patchConfig: (changes, layer = "runtime") => patch("/api/config", { changes, layer }),

@@ -1,0 +1,75 @@
+{# The settings tab list.
+
+   Five tabs, matching the five configuration areas the backend exposes. Vertical on a wide screen
+   and horizontal when the dialog goes narrow — a vertical rail costs width the panels need more. #}
+
+<nav class="settings__nav" role="tablist" aria-label="Settings sections" data-settings-nav>
+  <button
+    type="button"
+    class="settings__tab"
+    role="tab"
+    id="settings-tab-audio"
+    aria-controls="settings-panel-audio"
+    aria-selected="true"
+    data-settings-tab="audio"
+  >
+    Audio
+    <span class="settings__tab-hint">Source, levels, speech detection</span>
+  </button>
+
+  <button
+    type="button"
+    class="settings__tab"
+    role="tab"
+    id="settings-tab-asr"
+    aria-controls="settings-panel-asr"
+    aria-selected="false"
+    tabindex="-1"
+    data-settings-tab="asr"
+  >
+    Transcription
+    <span class="settings__tab-hint">Speech model, buffering, terms</span>
+  </button>
+
+  <button
+    type="button"
+    class="settings__tab"
+    role="tab"
+    id="settings-tab-llm"
+    aria-controls="settings-panel-llm"
+    aria-selected="false"
+    tabindex="-1"
+    data-settings-tab="llm"
+  >
+    Assistant
+    <span class="settings__tab-hint">Language model and connection</span>
+  </button>
+
+  <button
+    type="button"
+    class="settings__tab"
+    role="tab"
+    id="settings-tab-context"
+    aria-controls="settings-panel-context"
+    aria-selected="false"
+    tabindex="-1"
+    data-settings-tab="context"
+  >
+    Context
+    <span class="settings__tab-hint">Summaries, glossary, budget</span>
+  </button>
+
+  <button
+    type="button"
+    class="settings__tab"
+    role="tab"
+    id="settings-tab-storage"
+    aria-controls="settings-panel-storage"
+    aria-selected="false"
+    tabindex="-1"
+    data-settings-tab="storage"
+  >
+    Storage
+    <span class="settings__tab-hint">Where sessions are kept</span>
+  </button>
+</nav>

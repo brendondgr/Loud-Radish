@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
 from ..models.session import SessionMetadata
 from ..schemas.api import (
@@ -24,10 +24,19 @@ from ..schemas.api import (
 )
 from ..services.asr import available_backends
 from ..services.asr.contract import AsrLoadError
-from ..services.audio import DeviceEnumerationError, device_support_available, list_devices
+from ..services.audio import (
+    DeviceEnumerationError,
+    device_support_available,
+    library,
+    list_devices,
+)
 from ..services.session import SessionError
 
 router = APIRouter(prefix="/api", tags=["session"])
+
+#: Bound once rather than in the signature default, where ruff's B008 correctly objects to a call
+#: evaluated at import time.
+UPLOADED_FILE = File(...)
 
 
 def _manager(request: Request):  # noqa: ANN201 - returns SessionManager
@@ -115,6 +124,56 @@ async def get_devices() -> dict[str, Any]:
             else "Live capture needs the optional audio backend: uv sync --extra audio-device"
         ),
     }
+
+
+@router.get("/audio/files")
+async def get_audio_files(request: Request) -> dict[str, Any]:
+    """Recordings the file source can replay.
+
+    ``audio.file_path`` is a path on this machine, and a browser can neither browse that filesystem
+    nor resolve one from a file picker. Without this list the only way to choose a recording is to
+    edit the config file by hand — which is the kind of step this application exists not to need.
+    """
+    config = request.app.state.config.resolve()
+    files = library.list_files(config.audio.file_path)
+    return {
+        "files": [file.as_dict() for file in files],
+        "directory": str(library.library_dir()),
+        "current": config.audio.file_path or "",
+        "max_upload_bytes": library.MAX_UPLOAD_BYTES,
+    }
+
+
+@router.post("/audio/files")
+async def upload_audio_file(request: Request, file: UploadFile = UPLOADED_FILE) -> dict[str, Any]:
+    """Add a recording to the library and select it.
+
+    Selecting it immediately is the point: uploading a file and then having to pick it from a list
+    is two steps to express one intention.
+    """
+    try:
+        stored = library.store_upload(file.filename or "recording.wav", await file.read())
+    except library.AudioLibraryError as exc:
+        raise HTTPException(status_code=422, detail=_error("upload-rejected", str(exc))) from exc
+
+    request.app.state.config.update({"audio.source_type": "file", "audio.file_path": stored.path})
+    return {"file": stored.as_dict(), "selected": True}
+
+
+@router.delete("/audio/files")
+async def delete_audio_file(request: Request, path: str) -> dict[str, Any]:
+    """Remove a recording from the library. Refuses anything outside it."""
+    try:
+        removed = library.delete_file(path)
+    except library.AudioLibraryError as exc:
+        raise HTTPException(status_code=422, detail=_error("delete-refused", str(exc))) from exc
+
+    config = request.app.state.config
+    if removed and config.resolve().audio.file_path == path:
+        # Leaving the pipeline pointed at a file that no longer exists turns a tidy-up into a
+        # failure the next time the user presses record.
+        config.update({"audio.file_path": None})
+    return {"removed": removed}
 
 
 @router.post("/audio/device")

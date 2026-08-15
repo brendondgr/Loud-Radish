@@ -1,0 +1,199 @@
+{# Assistant: which language model answers questions about the transcript.
+
+   Both configurations persist regardless of which mode is active (FE §7.3), so switching to a
+   hosted API to check something and back again re-enters nothing.
+
+   The connection test reports one of four specific outcomes rather than "failed" — the remedy for
+   "nothing is listening" and the remedy for "that key was rejected" have nothing in common. #}
+
+<section
+  class="settings__panel"
+  role="tabpanel"
+  id="settings-panel-llm"
+  aria-labelledby="settings-tab-llm"
+  data-settings-panel="llm"
+  hidden
+>
+  <div class="settings__group">
+    <h3 class="settings__heading">Where the model runs</h3>
+
+    <div class="field">
+      <label class="field__label" for="llm-mode">Mode</label>
+      <select class="field__control" id="llm-mode" data-config="llm.mode">
+        <option value="local">On this machine or network</option>
+        <option value="api">A hosted API</option>
+      </select>
+      <p class="field__hint" data-llm-privacy></p>
+    </div>
+  </div>
+
+  {# -- local ------------------------------------------------------------------------- #}
+
+  <div class="settings__group" data-when="llm.mode=local">
+    <h3 class="settings__heading">Local server</h3>
+    <p class="settings__blurb">
+      Anything speaking the OpenAI chat API works — Ollama, LM Studio, llama.cpp, vLLM, or a relay
+      in front of them. The address is the API base, ending in <code>/v1</code>.
+    </p>
+
+    <div class="field">
+      <label class="field__label" for="llm-endpoint">Address</label>
+      <div class="field__row">
+        <input
+          class="field__control"
+          id="llm-endpoint"
+          type="text"
+          spellcheck="false"
+          placeholder="http://localhost:11434/v1"
+          data-config="llm.local.endpoint"
+        />
+        <select class="field__control field__control--compact" data-llm-preset aria-label="Common servers">
+          <option value="">Common…</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field__label" for="llm-local-model">Model</label>
+      <div class="field__row">
+        <select class="field__control" id="llm-local-model" data-llm-model-select data-llm-mode="local">
+          <option value="">Test the connection to list models</option>
+        </select>
+        <button type="button" class="button" data-llm-test>Test connection</button>
+      </div>
+      <p class="settings__result" data-llm-result role="status" aria-live="polite"></p>
+    </div>
+
+    <div class="field field--inline">
+      <label class="field__label field__label--inline" for="llm-local-context">Context window</label>
+      <input
+        class="field__control field__control--number"
+        id="llm-local-context"
+        type="number"
+        min="512"
+        max="1000000"
+        step="512"
+        data-config="llm.local.context_window"
+      />
+      <span class="field__value">tokens</span>
+      <p class="field__hint">
+        Set this to what the model actually supports. Too high and the server truncates the prompt
+        from the front, silently removing the instructions.
+      </p>
+    </div>
+  </div>
+
+  {# -- hosted ------------------------------------------------------------------------ #}
+
+  <div class="settings__group" data-when="llm.mode=api">
+    <h3 class="settings__heading">Hosted provider</h3>
+    <p class="settings__blurb settings__blurb--warning">
+      Transcript excerpts are sent to this provider. The header will stop saying <em>fully
+      local</em> while this mode is active.
+    </p>
+
+    <div class="field">
+      <label class="field__label" for="llm-provider">Provider</label>
+      <select class="field__control" id="llm-provider" data-config="llm.api.provider"></select>
+    </div>
+
+    <div class="field">
+      <label class="field__label" for="llm-key">API key</label>
+      <div class="field__row">
+        <input
+          class="field__control"
+          id="llm-key"
+          type="password"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="Stored in your OS credential store"
+          data-llm-key
+        />
+        <button type="button" class="button" data-llm-key-save>Store</button>
+        <button type="button" class="button button--quiet" data-llm-key-clear>Remove</button>
+      </div>
+      <p class="field__hint" data-llm-key-note></p>
+    </div>
+
+    <div class="field">
+      <label class="field__label" for="llm-api-model">Model</label>
+      <div class="field__row">
+        <select class="field__control" id="llm-api-model" data-llm-model-select data-llm-mode="api">
+          <option value="">Test the connection to list models</option>
+        </select>
+        <button type="button" class="button" data-llm-test>Test connection</button>
+      </div>
+      <p class="settings__result" data-llm-result role="status" aria-live="polite"></p>
+    </div>
+
+    <div class="field">
+      <label class="field__label" for="llm-base-url">Base URL override</label>
+      <input
+        class="field__control"
+        id="llm-base-url"
+        type="text"
+        spellcheck="false"
+        placeholder="Leave empty for the provider's default"
+        data-config="llm.api.base_url"
+        data-config-nullable
+      />
+    </div>
+
+    <div class="field field--inline">
+      <label class="field__label field__label--inline" for="llm-api-context">Context window</label>
+      <input
+        class="field__control field__control--number"
+        id="llm-api-context"
+        type="number"
+        min="512"
+        max="1000000"
+        step="1024"
+        data-config="llm.api.context_window"
+      />
+      <span class="field__value">tokens</span>
+    </div>
+  </div>
+
+  {# -- generation --------------------------------------------------------------------- #}
+
+  <div class="settings__group">
+    <h3 class="settings__heading">Answers</h3>
+
+    <div class="field field--inline">
+      <label class="field__label field__label--inline" for="llm-temperature">Temperature</label>
+      <input
+        class="field__control field__control--range"
+        id="llm-temperature"
+        type="range"
+        min="0"
+        max="1.5"
+        step="0.05"
+        data-config="llm.generation.temperature"
+        data-config-output="llm-temperature-out"
+      />
+      <output class="field__value" id="llm-temperature-out"></output>
+      <p class="field__hint">
+        Low is right for questions about a transcript: the answer should come from what was said,
+        not from invention.
+      </p>
+    </div>
+
+    <div class="field field--inline">
+      <label class="field__label field__label--inline" for="llm-max-tokens">Longest answer</label>
+      <input
+        class="field__control field__control--number"
+        id="llm-max-tokens"
+        type="number"
+        min="16"
+        max="32000"
+        step="64"
+        data-config="llm.generation.max_output_tokens"
+      />
+      <span class="field__value">tokens</span>
+      <p class="field__hint">
+        A reasoning model spends part of this budget thinking before it writes anything. If answers
+        come back empty, this is the first thing to raise.
+      </p>
+    </div>
+  </div>
+</section>

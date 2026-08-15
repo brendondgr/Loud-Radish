@@ -1,0 +1,69 @@
+{% import "macros/icons.html" as icons %}
+
+{# The settings dialog.
+
+   The one modal in the application, and it is one deliberately: settings are a thing you go and
+   do, not a thing that happens to you mid-talk. Error banners are never modals for exactly the
+   opposite reason (FE §6.3) — they arrive uninvited and must not block the transcript.
+
+   Every value here is owned by the backend. Controls declare a dotted path with `data-config` and
+   the binding layer reads and writes it; nothing in this file holds a default, because a default
+   written twice is a default that will disagree with itself. #}
+
+<div class="modal" data-settings hidden>
+  <div class="modal__scrim" data-settings-close aria-hidden="true"></div>
+
+  <div
+    class="modal__dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="settings-title"
+    data-settings-dialog
+  >
+    <header class="modal__header">
+      <h2 class="modal__title" id="settings-title">Settings</h2>
+      <p class="modal__subtitle" data-settings-source>Loading…</p>
+      <button
+        type="button"
+        class="button button--icon button--quiet modal__close"
+        data-settings-close
+        aria-label="Close settings"
+      >
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M2.5 2.5 11.5 11.5M11.5 2.5 2.5 11.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+        </svg>
+      </button>
+    </header>
+
+    <div class="modal__body">
+      {% include "partials/settings/nav.html" %}
+
+      <div class="settings__panels" data-settings-panels>
+        {% include "partials/settings/audio.html" %}
+        {% include "partials/settings/asr.html" %}
+        {% include "partials/settings/llm.html" %}
+        {% include "partials/settings/context.html" %}
+        {% include "partials/settings/storage.html" %}
+      </div>
+    </div>
+
+    <footer class="modal__footer">
+      {# The preset control sits in the footer rather than in a tab: it cuts across every tab, and
+         putting it inside one would imply it only affects that one. #}
+      <div class="settings__presets">
+        <label class="field__label" for="settings-preset">Profile</label>
+        <select class="field__control field__control--compact" id="settings-preset" data-preset-select>
+          <option value="">Custom</option>
+        </select>
+        <p class="field__hint" data-preset-hint></p>
+      </div>
+
+      <div class="settings__footer-actions">
+        {# `role="status"` so a change applied by keyboard is announced rather than only shown. #}
+        <p class="settings__status" data-settings-status role="status" aria-live="polite"></p>
+        <button type="button" class="button" data-settings-save>Save to disk</button>
+        <button type="button" class="button button--primary" data-settings-close>Done</button>
+      </div>
+    </footer>
+  </div>
+</div>

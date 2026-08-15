@@ -52,6 +52,9 @@ Served by `web/backend/app/routes/`. All paths are prefixed `/api`.
 |---|---|---|---|
 | `GET` | `/api/audio/devices` | Input and loopback devices in one merged list, each tagged with its type | **Implemented** |
 | `POST` | `/api/audio/device` | Select the capture device | **Implemented** |
+| `GET` | `/api/audio/files` | Recordings the file source can replay, with duration and sample rate. A configured file outside the library is included. | **Implemented** |
+| `POST` | `/api/audio/files` | Upload a WAV into the library and select it. Multipart. | **Implemented** |
+| `DELETE` | `/api/audio/files?path=` | Remove a recording. Refuses any path outside the library. | **Implemented** |
 | `POST` | `/api/audio/preprocess` | Set gain normalisation and high-pass toggles | Use `PATCH /api/config` — these are ordinary live settings |
 
 ### Speech recognition

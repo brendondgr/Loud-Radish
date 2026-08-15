@@ -1,0 +1,103 @@
+{# Storage: where sessions are written and what is kept.
+
+   Audio retention is off by default and stated plainly, because a recording of a room full of
+   people is a different thing from a transcript of it. #}
+
+<section
+  class="settings__panel"
+  role="tabpanel"
+  id="settings-panel-storage"
+  aria-labelledby="settings-tab-storage"
+  data-settings-panel="storage"
+  hidden
+>
+  <div class="settings__group">
+    <h3 class="settings__heading">Location</h3>
+
+    <div class="field">
+      <label class="field__label" for="storage-dir">Session folder</label>
+      <input
+        class="field__control"
+        id="storage-dir"
+        type="text"
+        spellcheck="false"
+        data-config="storage.session_dir"
+      />
+      <p class="field__hint">
+        A path on the machine running this application. One SQLite file per session, written as the
+        talk proceeds rather than at the end — so a crash costs seconds, not the session.
+      </p>
+    </div>
+
+    <div class="field field--inline">
+      <label class="field__label field__label--inline" for="storage-autosave">Write through every</label>
+      <input
+        class="field__control field__control--number"
+        id="storage-autosave"
+        type="number"
+        min="0.5"
+        max="120"
+        step="0.5"
+        data-config="storage.autosave_interval_s"
+      />
+      <span class="field__value">s</span>
+    </div>
+  </div>
+
+  <div class="settings__group">
+    <h3 class="settings__heading">Retention</h3>
+
+    <div class="field field--switch">
+      <input type="checkbox" id="storage-audio" data-config="storage.retain_audio" />
+      <label class="field__label field__label--inline" for="storage-audio">
+        Keep the audio as well as the transcript
+      </label>
+      <p class="field__hint settings__hint--warning">
+        Off by default, deliberately. A recording of a room is a materially different thing to hold
+        than a transcript of it, and it is also large — roughly 115 MB an hour.
+      </p>
+    </div>
+
+    <div class="field field--inline">
+      <label class="field__label field__label--inline" for="storage-retention">Delete sessions after</label>
+      <input
+        class="field__control field__control--number"
+        id="storage-retention"
+        type="number"
+        min="1"
+        max="3650"
+        step="1"
+        placeholder="Never"
+        data-config="storage.retention_days"
+        data-config-nullable
+      />
+      <span class="field__value">days</span>
+      <p class="field__hint">Leave empty to keep everything.</p>
+    </div>
+  </div>
+
+  <div class="settings__group">
+    <h3 class="settings__heading">Export</h3>
+
+    <div class="field">
+      <label class="field__label" for="storage-format">Default format</label>
+      <select class="field__control" id="storage-format" data-config="storage.default_export_format">
+        <option value="text">Plain text</option>
+        <option value="markdown">Markdown — timestamps as headings</option>
+        <option value="srt">SRT subtitles</option>
+        <option value="vtt">WebVTT subtitles</option>
+        <option value="json">JSON — every field, for processing</option>
+      </select>
+    </div>
+
+    <div class="field__row field__row--actions">
+      <button type="button" class="button" data-export-now>Export this session</button>
+      <p class="field__hint" data-export-note></p>
+    </div>
+  </div>
+
+  <div class="settings__group settings__group--advanced">
+    <h3 class="settings__heading">This installation</h3>
+    <dl class="settings__facts" data-settings-facts></dl>
+  </div>
+</section>

@@ -23,4 +23,7 @@
 
   {% include "partials/status_bar.html" %}
 </div>
+
+{# Outside `.app` so the dialog is not constrained by the grid the application layout sets up. #}
+{% include "partials/settings/modal.html" %}
 {% endblock %}

@@ -40,6 +40,10 @@ class Failure:
     remedy: dict[str, Any] | None = None
     #: Label for that action.
     remedy_label: str = ""
+    #: A settings tab that fixes it, when no single configuration change would. Some failures have
+    #: no one-click answer — "the device was unplugged" needs the user to pick a different one —
+    #: and a labelled button with nothing behind it is worse than no button.
+    opens_settings: str = ""
     #: Whether transcription can continue. Only an audio or model failure stops it.
     transcription_continues: bool = True
 
@@ -51,6 +55,7 @@ class Failure:
             "severity": str(self.severity),
             "remedy": self.remedy,
             "remedy_label": self.remedy_label,
+            "opens_settings": self.opens_settings,
             "transcription_continues": self.transcription_continues,
         }
 
@@ -74,6 +79,7 @@ def device_lost(device_name: str) -> Failure:
         ),
         severity=Severity.CRITICAL,
         remedy_label="Choose a device",
+        opens_settings="audio",
         transcription_continues=False,
     )
 
@@ -86,7 +92,8 @@ def model_load_failed(model: str, detail: str) -> Failure:
         message=detail,
         severity=Severity.CRITICAL,
         remedy={"asr.model": fallback} if fallback else None,
-        remedy_label=f"Use {fallback} instead" if fallback else "",
+        remedy_label=f"Use {fallback} instead" if fallback else "Choose another model",
+        opens_settings="" if fallback else "asr",
         transcription_continues=False,
     )
 
@@ -170,5 +177,7 @@ def llm_unavailable(detail: str) -> Failure:
         code="llm-unavailable",
         message=detail,
         severity=Severity.WARNING,
+        remedy_label="Open assistant settings",
+        opens_settings="llm",
         transcription_continues=True,
     )

@@ -1,0 +1,445 @@
+/* The settings interface: tab rail, panels, and the field vocabulary.
+ *
+ * Every control here is at least 32px tall and its label is a real `<label>` bound by `for`, so
+ * clicking the text focuses the control. That is not decoration — a 12px checkbox with an unbound
+ * caption beside it is a target most people miss on the first try.
+ *
+ * Field layout is deliberately plain: label above control, hint below, one column. A settings
+ * dialog laid out in two columns reads faster and scans worse, and these are settings people read
+ * carefully once rather than skim weekly.
+ */
+
+/* -- tab rail --------------------------------------------------------------------------- */
+
+.settings__nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 0 0 210px;
+  padding: var(--space-7) var(--space-5);
+  border-right: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+  overflow-y: auto;
+}
+
+.settings__tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-height: 44px;
+  padding: var(--space-4) var(--space-6);
+  text-align: left;
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) ease,
+    color var(--duration-fast) ease;
+}
+
+.settings__tab:hover {
+  background: var(--surface-control);
+  color: var(--text-primary);
+}
+
+.settings__tab[aria-selected="true"] {
+  color: var(--text-primary);
+  background: var(--surface-control);
+  border-color: var(--border-control);
+}
+
+.settings__tab-hint {
+  font-size: var(--text-xs);
+  font-weight: 400;
+  color: var(--text-faint);
+}
+
+/* -- panels ----------------------------------------------------------------------------- */
+
+.settings__panels {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: var(--space-9) var(--space-10);
+}
+
+.settings__panel[hidden] {
+  display: none;
+}
+
+.settings__group + .settings__group {
+  margin-top: var(--space-12);
+  padding-top: var(--space-9);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.settings__heading {
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin: 0 0 var(--space-6);
+}
+
+.settings__blurb {
+  font-size: var(--text-base);
+  line-height: 1.55;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-8);
+  max-width: 62ch;
+}
+
+.settings__blurb--warning {
+  color: var(--warning-text);
+}
+
+.settings__blurb code {
+  font-family: var(--font-mono);
+  font-size: 0.94em;
+  color: var(--text-secondary);
+}
+
+/* Sections a user does not need on their first run. Present, not hidden — but visually quieter,
+ * so the eye lands on the settings that matter before the ones that rarely do. */
+.settings__group--advanced .settings__blurb,
+.settings__group--advanced .field__hint {
+  color: var(--text-dim);
+}
+
+/* -- fields ------------------------------------------------------------------------------ */
+
+.field {
+  margin-bottom: var(--space-8);
+}
+
+.field:last-child {
+  margin-bottom: 0;
+}
+
+.field__label {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-3);
+  cursor: pointer;
+}
+
+.field__label--inline {
+  display: inline-block;
+  margin-bottom: 0;
+}
+
+.field__hint {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-faint);
+  margin: var(--space-3) 0 0;
+  max-width: 62ch;
+}
+
+.settings__hint--warning {
+  color: var(--warning-text);
+}
+
+.field__control {
+  width: 100%;
+  min-height: 34px;
+  padding: var(--space-3) var(--space-5);
+  font-family: var(--font-ui);
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  background: var(--surface-input);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius);
+  transition: border-color var(--duration-fast) ease;
+}
+
+.field__control:hover {
+  border-color: var(--border-strong);
+}
+
+.field__control:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+.field__control:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* A control mid-write. Not a spinner — the write is over loopback and finishes in a few
+ * milliseconds, so a spinner would only ever be seen as a flicker. */
+.field__control[aria-busy="true"] {
+  border-color: var(--accent-border);
+}
+
+.field__control--compact {
+  width: auto;
+  min-width: 130px;
+  flex: 0 0 auto;
+}
+
+.field__control--number {
+  width: 92px;
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.field__control--range {
+  flex: 1;
+  min-width: 120px;
+  max-width: 260px;
+  min-height: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  accent-color: var(--accent);
+}
+
+.field__control--text {
+  font-family: var(--font-ui);
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 72px;
+}
+
+select.field__control {
+  cursor: pointer;
+}
+
+.field__value {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  white-space: nowrap;
+  min-width: 42px;
+}
+
+.field__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.field__row--spread {
+  justify-content: space-between;
+  margin-top: var(--space-5);
+}
+
+.field__row--actions {
+  margin-top: var(--space-7);
+  flex-wrap: wrap;
+}
+
+.field--inline {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+}
+
+.field--inline .field__hint {
+  flex-basis: 100%;
+  margin-top: 0;
+}
+
+/* A checkbox and its label, with the hint indented under both so it reads as belonging to the
+ * setting rather than to the next one. */
+.field--switch {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-2) var(--space-5);
+  align-items: center;
+}
+
+.field--switch input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.field--switch .field__hint {
+  grid-column: 2;
+  margin-top: var(--space-1);
+}
+
+.field[hidden],
+.settings__group[hidden] {
+  display: none;
+}
+
+/* -- the level meter --------------------------------------------------------------------- */
+
+.settings__meter {
+  height: 8px;
+  background: var(--surface-input);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.settings__meter-fill {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  border-radius: var(--radius-pill);
+  transition: width 90ms linear;
+}
+
+/* Clipping is signalled by colour *and* by the note beneath, never by colour alone (FE §13). */
+.settings__meter[data-clipping="true"] .settings__meter-fill {
+  background: var(--danger);
+}
+
+/* -- model load progress ------------------------------------------------------------------ */
+
+.settings__progress {
+  height: 4px;
+  margin-top: var(--space-6);
+  background: var(--surface-input);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.settings__progress[hidden] {
+  display: none;
+}
+
+.settings__progress-fill {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width var(--duration) ease;
+}
+
+/* -- inline results ------------------------------------------------------------------------ */
+
+.settings__inline-status,
+.settings__status {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.settings__result {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-muted);
+  margin: var(--space-5) 0 0;
+  padding: var(--space-4) var(--space-6);
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+}
+
+.settings__result:empty {
+  display: none;
+}
+
+/* Each outcome carries its own words as well as its own colour — the message says what to do, so
+ * the colour is reinforcement rather than the only signal. */
+.settings__result[data-result="connected"] {
+  color: var(--accent-bright);
+  background: var(--accent-wash);
+  border-color: var(--accent-border);
+}
+
+.settings__result[data-result="no_server"],
+.settings__result[data-result="server_error"] {
+  color: var(--warning-text);
+  background: var(--warning-wash);
+  border-color: var(--warning-border);
+}
+
+.settings__result[data-result="auth_rejected"] {
+  color: var(--danger-text);
+  background: var(--danger-wash);
+  border-color: var(--danger-border);
+}
+
+.settings__status[data-tone="error"] {
+  color: var(--danger-text);
+}
+
+.settings__status[data-tone="ok"] {
+  color: var(--accent-dim);
+}
+
+/* -- footer preset control ------------------------------------------------------------------ */
+
+.settings__presets {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.settings__presets .field__hint {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+/* -- facts list ------------------------------------------------------------------------------ */
+
+.settings__facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-3) var(--space-8);
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+.settings__facts dt {
+  color: var(--text-faint);
+}
+
+.settings__facts dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+/* -- narrow ---------------------------------------------------------------------------------
+ * These live here rather than in layout.css. Component stylesheets load after it, and a media
+ * query adds no specificity — rules written there are silently overridden by the base rules
+ * above, which is a bug that looks exactly like the media query never matching.
+ */
+
+@media (max-width: 900px) {
+  .settings__nav {
+    flex: 0 0 auto;
+    flex-direction: row;
+    overflow-x: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .settings__tab {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .settings__tab-hint {
+    display: none;
+  }
+
+  .settings__panels {
+    padding: var(--space-8);
+  }
+}
