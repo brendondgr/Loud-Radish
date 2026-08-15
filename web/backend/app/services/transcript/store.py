@@ -22,7 +22,14 @@ from pathlib import Path
 from typing import Any
 
 from ...models.segment import Segment
-from ...models.session import ChatMessage, GlossaryTerm, SessionMetadata, SessionStats, Summary
+from ...models.session import (
+    ChatMessage,
+    GlossaryTerm,
+    PolishedBlock,
+    SessionMetadata,
+    SessionStats,
+    Summary,
+)
 from ..asr.contract import WordToken
 
 logger = logging.getLogger(__name__)
@@ -260,6 +267,48 @@ class TranscriptStore:
             for row in self._query("SELECT * FROM summaries ORDER BY start")
         ]
 
+    def add_polished_block(
+        self, start: float, end: float, text: str, source_ids: list[int] | None = None
+    ) -> PolishedBlock:
+        """Append one polished block and return it with its assigned id."""
+        created = datetime.now(UTC)
+        ids = list(source_ids or [])
+        with self._lock:
+            cursor = self._connection.execute(
+                """
+                INSERT INTO polished_blocks (start, end, text, source_ids_json, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (start, end, text, json.dumps(ids), created.isoformat()),
+            )
+            self._connection.commit()
+            block_id = int(cursor.lastrowid or 0)
+        return PolishedBlock(
+            id=block_id, start=start, end=end, text=text, source_ids=ids, created_at=created
+        )
+
+    def polished_blocks(self) -> list[PolishedBlock]:
+        """Every polished block, oldest first."""
+        return [
+            PolishedBlock(
+                id=row["id"],
+                start=row["start"],
+                end=row["end"],
+                text=row["text"],
+                source_ids=_decode_ids(row["source_ids_json"]),
+                created_at=datetime.fromisoformat(row["created_at"]),
+            )
+            for row in self._query("SELECT * FROM polished_blocks ORDER BY start, id")
+        ]
+
+    def last_polished_end(self) -> float:
+        """How far into the talk has been polished, in session-relative seconds.
+
+        Read at session start so a resumed store does not re-polish what it already holds.
+        """
+        row = self._query_one("SELECT MAX(end) AS max_end FROM polished_blocks")
+        return float(row["max_end"]) if row and row["max_end"] is not None else 0.0
+
     def add_glossary_term(self, term: str, definition: str, first_seen: float) -> GlossaryTerm:
         """Record a term, keeping the earliest first-use timestamp if it is already known."""
         created = datetime.now(UTC)
@@ -355,6 +404,7 @@ class TranscriptStore:
         )
         summaries = self._query_one("SELECT COUNT(*) AS n FROM summaries")
         glossary = self._query_one("SELECT COUNT(*) AS n FROM glossary")
+        polished = self._query_one("SELECT COUNT(*) AS n FROM polished_blocks")
 
         return SessionStats(
             segment_count=int(row["segments"]) if row else 0,
@@ -362,6 +412,7 @@ class TranscriptStore:
             duration_seconds=float(row["duration"]) if row else 0.0,
             summary_count=int(summaries["n"]) if summaries else 0,
             glossary_count=int(glossary["n"]) if glossary else 0,
+            polished_count=int(polished["n"]) if polished else 0,
         )
 
     # -- internals -----------------------------------------------------------------
@@ -404,6 +455,17 @@ def _decode_words(raw: str | None) -> list[WordToken]:
         WordToken(text=entry["t"], start=entry["s"], end=entry["e"], confidence=entry.get("c"))
         for entry in entries
     ]
+
+
+def _decode_ids(raw: str | None) -> list[int]:
+    """Read a JSON array of segment ids, tolerating a row written by an older schema."""
+    if not raw:
+        return []
+    try:
+        entries = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    return [int(entry) for entry in entries] if isinstance(entries, list) else []
 
 
 def _row_to_segment(row: sqlite3.Row) -> Segment:

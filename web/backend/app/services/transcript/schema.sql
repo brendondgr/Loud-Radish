@@ -72,6 +72,21 @@ CREATE TABLE IF NOT EXISTS summaries (
     created_at  TEXT    NOT NULL
 );
 
+-- Minute-by-minute polished blocks: the transcript rewritten for reading (D-018).
+--
+-- Additive, never destructive. The segments a block covers stay exactly as they were written, so a
+-- bad rewrite costs one redundant row rather than a corrupted record, and export still emits the
+-- verbatim text.
+CREATE TABLE IF NOT EXISTS polished_blocks (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    start           REAL    NOT NULL,
+    end             REAL    NOT NULL,
+    text            TEXT    NOT NULL,
+    -- JSON array of the segment ids this block was built from.
+    source_ids_json TEXT    NOT NULL DEFAULT '[]',
+    created_at      TEXT    NOT NULL
+);
+
 -- Glossary terms, with the timestamp of first use (BE §9.3).
 CREATE TABLE IF NOT EXISTS glossary (
     term        TEXT PRIMARY KEY,

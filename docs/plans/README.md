@@ -19,4 +19,5 @@ conventions in [../skills/planner/SKILL.md](../skills/planner/SKILL.md).
 
 | Plan | Topic | Status |
 |---|---|---|
-| [live-seminar-transcriber.md](live-seminar-transcriber.md) | Full vertical slice — live audio capture, streaming ASR, transcript store, LLM chat, and the Jinja2 + ES module frontend | In progress (9 / 14 phases: 1–8 and 11) |
+| [live-seminar-transcriber.md](live-seminar-transcriber.md) | Full vertical slice — live audio capture, streaming ASR, transcript store, LLM chat, and the Jinja2 + ES module frontend | Complete (14 / 14 phases) |
+| [minute-based-transcript-polish.md](minute-based-transcript-polish.md) | A background pass that rewrites each finished minute of transcript into clean block text, without changing what was said | In progress (0 / 7 steps) |
