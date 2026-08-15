@@ -41,7 +41,7 @@ That gives a working application with a scripted mock speech model — enough to
 work. For real use:
 
 ```bash
-uv sync --extra asr-whisper --extra audio-device
+uv sync
 ```
 
 | Extra | Adds | Without it |

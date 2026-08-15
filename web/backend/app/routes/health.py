@@ -67,7 +67,7 @@ def _mode_availability(
 ) -> dict[str, dict[str, Any]]:
     """Per capture mode: whether it can run, what it is missing, and how to get it."""
     remedies = {
-        "audio_device": "Install the audio backend: uv sync --extra audio-device",
+        "audio_device": "The audio backend is missing. Reinstall with: uv sync",
         # Whatever the probe found, verbatim — it already names the one thing to install.
         "window_capture": capture_reason or "Window recording is not available on this machine.",
     }

@@ -305,11 +305,13 @@ class TestDeviceEnumeration:
 
 
 class TestDeviceSource:
-    def test_it_explains_how_to_install_the_optional_backend(
+    def test_a_missing_backend_says_how_to_put_it_back(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        """It is no longer an optional extra (D-023), so its absence means a broken install and
+        the remedy is a reinstall rather than an opt-in."""
         monkeypatch.setitem(sys.modules, "sounddevice", None)
-        with pytest.raises(DeviceUnavailableError, match="audio-device"):
+        with pytest.raises(DeviceUnavailableError, match="uv sync"):
             DeviceSource(device_id="0").start(lambda frame: None)
 
     def test_selecting_the_file_device_points_at_the_right_class(self) -> None:

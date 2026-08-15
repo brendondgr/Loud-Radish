@@ -145,7 +145,7 @@ class DeviceSource(AudioSource):
         except (ImportError, OSError) as exc:
             raise DeviceUnavailableError(
                 "Live capture needs the optional audio backend. "
-                "Install it with: uv sync --extra audio-device"
+                "Reinstall the dependencies with: uv sync"
             ) from exc
         self._sd = sounddevice
         return sounddevice

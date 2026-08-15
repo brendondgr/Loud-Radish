@@ -137,7 +137,7 @@ def _faster_whisper_info() -> BackendInfo:
         family="Autoregressive encoder-decoder",
         available=available,
         unavailable_reason=(
-            "" if available else "Not installed. Add it with: uv sync --extra asr-whisper"
+            "" if available else "Not installed. Reinstall the dependencies with: uv sync"
         ),
         capabilities=FasterWhisperBackend().capabilities,
         models=[

@@ -97,7 +97,7 @@ def detect() -> Acceleration:
             hardware=hardware,
             device_name=name,
             summary="Real transcription is not installed, so nothing runs on a GPU yet.",
-            remedy=["uv sync --extra asr-whisper"],
+            remedy=["uv sync"],
         )
 
     usable, precisions = _ctranslate2_gpu_support()

@@ -172,7 +172,7 @@ class PortalSession:
             from jeepney.io.blocking import open_dbus_connection
         except ImportError as exc:
             raise PortalUnavailable(
-                "Window capture needs one extra package: uv sync --extra capture-window"
+                "The D-Bus client is missing. Reinstall the dependencies with: uv sync"
             ) from exc
 
         try:

@@ -100,7 +100,7 @@ def test_transcription_not_installed_is_reported_before_anything_about_gpus(mach
     machine(hardware="rocm", name="AMD GPU", ct2_installed=False)
     report = acceleration.detect()
 
-    assert report.remedy == ["uv sync --extra asr-whisper"]
+    assert report.remedy == ["uv sync"]
     assert "not installed" in report.summary
 
 

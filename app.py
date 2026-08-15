@@ -45,13 +45,17 @@ DEFAULT_PORT = 8395
 #: to a network interface would publish an unauthenticated transcript of a private room.
 DEFAULT_HOST = "127.0.0.1"
 
-#: Optional dependency groups, and what each one adds. Reported at startup so a missing capability
-#: is visible now rather than as a confusing failure when the user presses record.
-OPTIONAL_GROUPS: dict[str, tuple[str, str]] = {
-    "faster_whisper": ("Real transcription", "uv sync --extra asr-whisper"),
-    "sounddevice": ("Microphone and loopback capture", "uv sync --extra audio-device"),
-    "onnxruntime": ("Silero voice-activity detection", "uv sync --extra vad-silero"),
-    "keyring": ("OS credential store for API keys", "uv sync --extra credentials"),
+#: Every capability the application has, and the module that provides it (D-023).
+#:
+#: **None of these are optional any more.** They are all ordinary dependencies, so `uv run app.py`
+#: installs the lot and this list is a *health check* rather than a menu: anything missing here
+#: means a broken or partial install, not a decision someone made.
+CAPABILITIES: dict[str, str] = {
+    "faster_whisper": "Real transcription",
+    "sounddevice": "Microphone and loopback capture",
+    "onnxruntime": "Silero voice detection",
+    "keyring": "OS credential store for API keys",
+    "jeepney": "Window capture (screen-sharing portal)",
 }
 
 
@@ -89,11 +93,11 @@ def _load_env_file(path: Path) -> int:
     return loaded
 
 
-def _optional_capabilities() -> list[tuple[str, str, bool, str]]:
-    """Which optional groups are installed, without importing any of them."""
+def _capabilities() -> list[tuple[str, str, bool]]:
+    """Which capabilities are present, without importing any of them."""
     return [
-        (module, description, importlib.util.find_spec(module) is not None, install)
-        for module, (description, install) in OPTIONAL_GROUPS.items()
+        (module, description, importlib.util.find_spec(module) is not None)
+        for module, description in CAPABILITIES.items()
     ]
 
 
@@ -288,15 +292,18 @@ def _print_banner(host: str, port: int, reload: bool) -> None:
     print(f"  {url}")
     print()
 
-    for _, description, present, install in _optional_capabilities():
-        mark = "✓" if present else "·"
-        suffix = "" if present else f"   ({install})"
-        print(f"    {mark} {description}{suffix}")
+    capabilities = _capabilities()
+    missing = [description for _, description, present in capabilities if not present]
 
-    if not any(present for _, _, present, _ in _optional_capabilities()):
+    for _, description, present in capabilities:
+        print(f"    {'✓' if present else '✗'} {description}")
+
+    # Anything absent now means a broken install rather than a choice, so it is reported as a
+    # problem with a fix, not as an upsell.
+    if missing:
         print()
-        print("    Nothing optional is installed, so the scripted mock backend will run.")
-        print("    That transcribes placeholder text — enough to see the interface work.")
+        print("    Some of the above are missing, which means the install is incomplete.")
+        print("    Put them back with:  uv sync")
 
     for line in _acceleration_lines():
         print(line)

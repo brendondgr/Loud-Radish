@@ -116,7 +116,7 @@ class SileroVad(VoiceActivityDetector):
         except ImportError as exc:
             raise SileroUnavailableError(
                 "The Silero detector needs the optional VAD backend. "
-                "Install it with: uv sync --extra vad-silero — or switch vad.detector to 'energy', "
+                "Reinstall with: uv sync — or switch vad.detector to 'energy', "
                 "which needs nothing."
             ) from exc
 

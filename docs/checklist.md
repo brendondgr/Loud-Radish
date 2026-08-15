@@ -185,6 +185,10 @@ each was invisible to reading and obvious to using, which is the argument for th
       right trade for a launcher, and `psutil` would make it portable if the project ever runs
       somewhere else.
 
+- [x] **One command installs and runs everything (D-023).** No optional dependency groups remain;
+      `uv run app.py` is the whole story. GStreamer and a desktop portal are still system packages
+      and are named in `docs/workflow.md`.
+
 Known blockers and open questions carried by these plans:
 
 - [x] **The tray animation specification.** Supplied 2026-08-15 and extracted into

@@ -114,7 +114,7 @@ def list_devices(include_file: bool = True) -> list[AudioDevice]:
     if sd is None:
         logger.info(
             "No audio device backend; only the file source is available. "
-            "Install with: uv sync --extra audio-device"
+            "Reinstall the dependencies with: uv sync"
         )
         return devices
 

@@ -90,7 +90,7 @@ def test_no_dbus_client_names_the_extra(monkeypatch) -> None:
     verdict = probe.detect()
 
     assert verdict.missing == "dbus-client"
-    assert "uv sync --extra capture-window" in verdict.reason
+    assert "uv sync" in verdict.reason
 
 
 def test_no_portal_names_the_packages_that_provide_one(monkeypatch) -> None:

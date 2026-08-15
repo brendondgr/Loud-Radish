@@ -250,7 +250,7 @@ class FasterWhisperBackend(AsrBackend):
         except ImportError as exc:
             raise AsrLoadError(
                 "faster-whisper is not installed. Install it with: "
-                "uv sync --extra asr-whisper — or set asr.backend to 'mock' to run the pipeline "
+                "uv sync — or set asr.backend to 'mock' to run the pipeline "
                 "without a real model."
             ) from exc
         return WhisperModel

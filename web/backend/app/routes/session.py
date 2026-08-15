@@ -170,7 +170,7 @@ async def get_devices() -> dict[str, Any]:
         "note": (
             ""
             if supported
-            else "Live capture needs the optional audio backend: uv sync --extra audio-device"
+            else "The audio backend is missing. Reinstall the dependencies with: uv sync"
         ),
     }
 

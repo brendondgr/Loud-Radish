@@ -32,7 +32,7 @@ is enough to see the interface work without downloading a model. For real transc
 capture:
 
 ```bash
-uv sync --extra asr-whisper --extra audio-device
+uv sync
 ```
 
 Then choose your microphone and your model in **Settings**, inside the application. Settings → Audio

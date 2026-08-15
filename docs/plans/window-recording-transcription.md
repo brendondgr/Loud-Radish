@@ -109,10 +109,10 @@ grab, and the whole feature has a permission dialog in the middle of it that can
   `probe.py` — checks in order: a Wayland or X11 session, the `org.freedesktop.portal.ScreenCast`
   interface and its version, `AvailableSourceTypes` including `WINDOW`, the `gst-launch-1.0` binary,
   and each required GStreamer element by name; returns a structured verdict with the *specific*
-  missing piece and its remedy. `pyproject.toml` gains an optional group `capture-window` with a
-  pure-Python D-Bus client (`jeepney` — no compilation, works inside the `uv` virtualenv, and
-  supports the Unix file-descriptor passing `OpenPipeWireRemote` requires). `web/backend/app/routes/health.py`
-  reports the verdict. `docs/workflow.md` documents `uv sync --extra capture-window` and the system
+  missing piece and its remedy. `pyproject.toml` gains a pure-Python D-Bus client (`jeepney` — no compilation, works inside the
+  `uv` virtualenv, and supports the Unix file-descriptor passing `OpenPipeWireRemote` requires) as
+  an ordinary dependency, not an extra (D-023). `web/backend/app/routes/health.py`
+  reports the verdict. `docs/workflow.md` documents the system
   packages GStreamer needs. Tests: `tests/transcription/test_capture_probe.py` against a faked D-Bus
   and a faked element list.
 - **Rationale**: this mode has five distinct ways to be unavailable and they need five distinct

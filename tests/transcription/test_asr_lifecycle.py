@@ -179,7 +179,7 @@ class TestFasterWhisperGuards:
             FasterWhisperBackend().load()
 
         message = str(excinfo.value)
-        assert "uv sync --extra asr-whisper" in message
+        assert "uv sync" in message
         assert "mock" in message
 
     def test_it_declares_that_it_is_not_streaming_native(self) -> None:

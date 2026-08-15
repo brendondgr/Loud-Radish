@@ -3,6 +3,15 @@ name = "transcriber-prototype"
 version = "0.1.0"
 description = "Web application for audio transcription — Python API and transcription pipeline."
 requires-python = ">=3.11"
+# Everything the application can do is installed by `uv sync`, which `uv run app.py` performs on
+# its own. There are **no optional groups** — see Decision D-023.
+#
+# This reverses D-012, which kept the speech model behind an extra to make installation fast and
+# the test suite free of model downloads. Both of those were real, and neither survived contact
+# with the actual cost: a user pressing record and being told to go and run a second command is a
+# worse first five minutes than a slower first install, and the model weights were never in the
+# wheel anyway — `faster-whisper` downloads them on first use, so `uv sync` was never the step that
+# fetched them.
 dependencies = [
     "aiosqlite>=0.22.1",
     "fastapi>=0.141.1",
@@ -14,22 +23,16 @@ dependencies = [
     "python-multipart>=0.0.32",
     "soxr>=1.1.0",
     "uvicorn[standard]>=0.52.3",
-]
-
-[project.optional-dependencies]
-asr-whisper = [
+    # Real transcription. Uses CTranslate2 rather than torch, which is why this is tens of
+    # megabytes and not gigabytes.
     "faster-whisper>=1.2.1",
-]
-audio-device = [
+    # Microphone and system-loopback capture.
     "sounddevice>=0.5.5",
-]
-vad-silero = [
+    # The Silero voice detector, and the decoder's own speech filter (D-019).
     "onnxruntime>=1.28.0",
-]
-credentials = [
+    # The OS credential store, so API keys never land in a config file (D-017).
     "keyring>=25.7.0",
-]
-capture-window = [
+    # D-Bus, for the screen-cast portal that window capture negotiates through (D-022).
     "jeepney>=0.9.0",
 ]
 

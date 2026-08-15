@@ -2,7 +2,7 @@
 
 Window capture has **five independent ways to be unavailable**, and each has a different fix:
 
-1. The Python D-Bus client is not installed — ``uv sync --extra capture-window``.
+1. The Python D-Bus client is not installed — ``uv sync`` puts it back.
 2. The desktop has no screen-cast portal at all — a compositor problem, not ours.
 3. The portal exists but does not offer *window* sources — some only share whole monitors.
 4. GStreamer is not installed — a system package.
@@ -213,7 +213,7 @@ def _detect() -> CaptureSupport:
         return CaptureSupport(
             available=False,
             missing="dbus-client",
-            reason="Window capture needs one extra package: uv sync --extra capture-window",
+            reason="The D-Bus client is missing. Reinstall the dependencies with: uv sync",
             session_type=kind,
         )
 

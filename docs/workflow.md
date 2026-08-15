@@ -28,28 +28,25 @@ committed and authoritative; never hand-edit it.
 uv sync
 ```
 
-This gives a lean environment: the API, the pipeline, and the test suite, with no model weights and no
-audio device bindings.
+That is the whole install, and **`uv run app.py` performs it for you** — there is nothing else to
+add and no second command to remember (Decision **D-023**).
 
-### Optional dependency groups
+Everything the application can do is an ordinary dependency: real transcription
+(`faster-whisper`), microphone and loopback capture (`sounddevice`), the Silero voice detector
+(`onnxruntime`), the OS credential store (`keyring`), and the D-Bus client window capture needs
+(`jeepney`). **There are no optional groups.** If `GET /api/health` reports a capability missing,
+that means a broken or partial install rather than a choice, and `uv sync` puts it back.
 
-Each adds one capability. Install only what you need.
+Two things are still outside Python and cannot be installed by `uv`:
 
-| Group | Adds | Install |
-|---|---|---|
-| `asr-whisper` | Real transcription via `faster-whisper` | `uv sync --extra asr-whisper` |
-| `audio-device` | Live microphone and loopback capture via `sounddevice` | `uv sync --extra audio-device` |
-| `vad-silero` | The Silero voice-activity detector | `uv sync --extra vad-silero` |
-| `credentials` | OS credential store for API keys via `keyring` | `uv sync --extra credentials` |
+| Needed for | Install |
+|---|---|
+| Window capture — GStreamer and its plugins | `sudo dnf install gstreamer1 gstreamer1-plugins-good gstreamer1-plugins-base` |
+| Window capture — a desktop screen-sharing portal | `sudo dnf install xdg-desktop-portal-kde` (or `-gnome`, `-wlr`) |
 
-Several at once:
-
-```bash
-uv sync --extra asr-whisper --extra audio-device --extra credentials
-```
-
-`GET /api/health` reports which groups are present, so a missing one surfaces there rather than as a
-confusing failure at record time.
+Model *weights* are not in the install either. `faster-whisper` downloads them the first time a
+model is loaded, which is why adding it to the base dependencies did not make `uv sync` fetch
+gigabytes.
 
 ## Adding Dependencies
 
@@ -62,7 +59,7 @@ uv add --dev <package>
 ```
 
 ```bash
-uv add --optional <group> <package>
+uv add <package>   # there are no optional groups — see D-023
 ```
 
 ## Run
@@ -76,7 +73,7 @@ uv run app.py
 Then open <http://127.0.0.1:8395>.
 
 `app.py` is a launcher and holds no application logic. It loads `.env`, creates `data/` and
-`logs/`, reports which optional dependency groups are installed, settles the port, and starts the
+`logs/`, reports which capabilities are present, settles the port, and starts the
 server.
 
 **Running it again takes the port back.** Starting it twice is the ordinary case — you run it,
@@ -138,7 +135,7 @@ uv run python scripts/make_fixture_wav.py --out data/fixtures
 uv run python scripts/run_file_session.py data/fixtures/alternating-20s.wav
 ```
 
-With a real model, once the optional group is installed:
+With a real model, which is installed by default:
 
 ```bash
 uv run python scripts/run_file_session.py talk.wav --backend faster-whisper --model small
