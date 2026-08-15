@@ -86,6 +86,19 @@ async def start_session(request: Request, body: StartSessionRequest) -> dict[str
     manager = _manager(request)
     import uuid
 
+    # Checked before the "not built yet" refusal, so a combination that can never work is named as
+    # such rather than reported as a missing feature. The client refuses this too; that check is a
+    # courtesy and this one is the rule.
+    if body.options is not None and body.options.records_nothing:
+        raise HTTPException(
+            status_code=422,
+            detail=_error(
+                "records-nothing",
+                "With live transcription, post-processing, and video all off, "
+                "there would be nothing to record.",
+            ),
+        )
+
     if body.mode in _UNIMPLEMENTED_MODES:
         # 501 rather than 409: the request is valid and the state is fine — this build simply does
         # not have the feature, which is a different problem with a different remedy.

@@ -8,13 +8,14 @@
 
 import { on } from "./core/bus.js";
 import { $ } from "./core/dom.js";
-import { IDLE, STOPPING } from "./core/modes.js";
+import { ARMING, IDLE, STOPPING } from "./core/modes.js";
 import * as prefs from "./core/storage.js";
 import { Banners } from "./components/banners.js";
 import { ChatPane } from "./components/chat-pane.js";
 import { GlossaryPanel } from "./components/glossary-panel.js";
 import { Header } from "./components/header.js";
 import { ModeSwitcher } from "./components/mode-switcher.js";
+import { Preflight } from "./components/preflight.js";
 import { TranscriptSelection } from "./components/selection.js";
 import { SettingsModal } from "./components/settings-modal.js";
 import { StatusBar } from "./components/status-bar.js";
@@ -59,12 +60,13 @@ function boot() {
 
   new ModeSwitcher($("[data-mode-switcher]"));
 
+  const preflight = new Preflight($("[data-preflight]"), {
+    onOpenSettings: (section) => settings.show(section),
+  });
+
   const header = new Header($(".header"), {
-    onStart: (name) => start(name, banners, settings),
-    // Window capture collects its options and picks a window before anything is captured. Neither
-    // exists yet, so arming currently falls straight through to start — which the server refuses
-    // by name until Plan 4 lands, and that refusal is the correct thing for a user to see.
-    onArm: (name) => start(name, banners, settings),
+    onStart: (name) => start(name, null, banners, settings),
+    onArm: (name) => arm(name, preflight, banners, settings),
     onStop: ({ armedOnly }) => stop(armedOnly, banners),
     onOpenSettings: (section) => settings.show(section),
   });
@@ -281,9 +283,27 @@ async function hydrate(chatPane, glossary) {
   await Promise.allSettled([chatPane?.load(), glossary?.load()]);
 }
 
-async function start(captureMode, banners, settings) {
+/**
+ * Arm a mode: collect this run's options, then start it.
+ *
+ * Cancelling here has captured nothing and starts nothing, which is why `arming` is a run state of
+ * its own rather than the first moment of `recording`.
+ */
+async function arm(captureMode, preflight, banners, settings) {
+  if (preflight.isOpen) return;
+
+  mode.setState(ARMING);
+  const options = await preflight.show();
+  if (!options) {
+    mode.setState(IDLE);
+    return;
+  }
+  await start(captureMode, options, banners, settings);
+}
+
+async function start(captureMode, options, banners, settings) {
   try {
-    await api.startSession({ mode: captureMode });
+    await api.startSession(options ? { mode: captureMode, options } : { mode: captureMode });
   } catch (error) {
     mode.fail(error.message);
 

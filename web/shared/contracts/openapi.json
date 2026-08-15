@@ -1534,6 +1534,29 @@
         ],
         "title": "Body_upload_audio_file_api_audio_files_post"
       },
+      "CaptureOptions": {
+        "properties": {
+          "live_transcription": {
+            "type": "boolean",
+            "title": "Live Transcription",
+            "default": true
+          },
+          "post_transcription": {
+            "type": "boolean",
+            "title": "Post Transcription",
+            "default": true
+          },
+          "video": {
+            "type": "boolean",
+            "title": "Video",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "CaptureOptions",
+        "description": "Per-run switches collected before capture begins (D-020).\n\nDeliberately per-run rather than configuration: a user who recorded one window without video\nshould not silently get no video the next time. Only ``window`` mode reads them; the other two\nhave nothing to choose.\n\nAll three false records nothing and is refused. The interface refuses it as a courtesy \u2014 this\nis the rule."
+      },
       "ChatHistoryResponse": {
         "properties": {
           "messages": {
@@ -2177,6 +2200,16 @@
             ],
             "title": "Mode",
             "default": "live"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CaptureOptions"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,

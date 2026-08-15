@@ -1,0 +1,162 @@
+/* The pre-flight options sheet (D-020).
+ *
+ * Reuses the modal shell — the scrim, the dialog frame, the header — and only describes what is
+ * different: a narrower dialog, three option rows, the audio note, and the refusal.
+ */
+
+.preflight__dialog {
+  width: min(560px, 100%);
+  max-height: min(640px, 100%);
+}
+
+.preflight__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-9);
+  overflow-y: auto;
+}
+
+.preflight__options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.preflight__legend {
+  /* The heading above already says this; the legend exists for the fieldset's accessible name. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.preflight__option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-5);
+  /* 44px minimum including padding, meeting the touch-target floor. */
+  min-height: 44px;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--surface-control);
+  cursor: pointer;
+}
+
+.preflight__option:hover {
+  border-color: var(--border-control);
+  background: var(--surface-control-hover);
+}
+
+.preflight__option input {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.preflight__option-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.preflight__option-name {
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.preflight__option-hint {
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+/* The audio-source note. Warning-toned rather than neutral, because a user who assumes a window's
+ * own sound is being captured and finds out afterwards has lost the recording — and there is no
+ * second chance at a talk. */
+.preflight__note {
+  margin: 0;
+  padding: var(--space-5) var(--space-6);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius);
+  background: var(--warning-wash);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.preflight__note strong {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--warning-text);
+}
+
+.preflight__link {
+  padding: 0;
+  font: inherit;
+  color: var(--accent-bright);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* -- footer ------------------------------------------------------------------------------- */
+
+.preflight__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+  padding: var(--space-7) var(--space-9);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+}
+
+/* Sits beside the buttons rather than replacing them, so the cause and the disabled confirm are
+ * readable at the same time. */
+.preflight__refusal {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--warning-text);
+}
+
+.preflight__refusal[hidden] {
+  display: none;
+}
+
+.preflight__actions {
+  display: flex;
+  gap: var(--space-5);
+  margin-left: auto;
+}
+
+@media (max-width: 480px) {
+  .preflight__body {
+    padding: var(--space-6);
+  }
+
+  .preflight__footer {
+    padding: var(--space-6);
+  }
+
+  .preflight__actions {
+    width: 100%;
+  }
+
+  .preflight__actions .button {
+    flex: 1 1 0;
+  }
+}

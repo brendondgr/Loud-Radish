@@ -40,6 +40,26 @@ class ErrorResponse(_Model):
 # -- session ---------------------------------------------------------------------------
 
 
+class CaptureOptions(_Model):
+    """Per-run switches collected before capture begins (D-020).
+
+    Deliberately per-run rather than configuration: a user who recorded one window without video
+    should not silently get no video the next time. Only ``window`` mode reads them; the other two
+    have nothing to choose.
+
+    All three false records nothing and is refused. The interface refuses it as a courtesy — this
+    is the rule.
+    """
+
+    live_transcription: bool = True
+    post_transcription: bool = True
+    video: bool = True
+
+    @property
+    def records_nothing(self) -> bool:
+        return not (self.live_transcription or self.post_transcription or self.video)
+
+
 class StartSessionRequest(_Model):
     """Optional metadata for a new session. Everything else comes from configuration."""
 
@@ -49,6 +69,8 @@ class StartSessionRequest(_Model):
     #: Which capture mode to run (D-020). Defaults to the original behaviour, so a client that
     #: predates capture modes keeps working unchanged.
     mode: CaptureMode = "live"
+    #: Only meaningful for ``window``. Absent means the defaults above.
+    options: CaptureOptions | None = None
 
 
 class SessionResponse(_Model):

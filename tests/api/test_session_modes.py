@@ -70,6 +70,43 @@ def test_a_refused_mode_does_not_start_anything(client: TestClient) -> None:
     assert client.get("/api/session").json()["running"] is False
 
 
+# -- per-run options --------------------------------------------------------------------
+
+
+def test_all_options_off_is_refused_as_recording_nothing(client: TestClient) -> None:
+    """Refused ahead of the not-built-yet check, so the message names the real problem."""
+    response = client.post(
+        "/api/session/start",
+        json={
+            "mode": modes.WINDOW,
+            "options": {"live_transcription": False, "post_transcription": False, "video": False},
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"]["error"]["code"] == "records-nothing"
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {"live_transcription": True, "post_transcription": False, "video": False},
+        {"live_transcription": False, "post_transcription": True, "video": False},
+        {"live_transcription": False, "post_transcription": False, "video": True},
+        {"live_transcription": True, "post_transcription": True, "video": True},
+    ],
+)
+def test_every_other_combination_gets_past_validation(client: TestClient, options: dict) -> None:
+    """Video with no transcription, and transcription with no video, are both legitimate."""
+    response = client.post("/api/session/start", json={"mode": modes.WINDOW, "options": options})
+    # 501 because window capture is not built; the point is that it was not 422.
+    assert response.status_code == 501
+
+
+def test_options_are_optional(client: TestClient) -> None:
+    response = client.post("/api/session/start", json={"mode": modes.RECORDED})
+    assert response.status_code == 501
+
+
 # -- mode availability, which is what the interface disables a mode from -----------------
 
 
