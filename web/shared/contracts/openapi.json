@@ -1448,6 +1448,120 @@
         }
       }
     },
+    "/api/recordings": {
+      "get": {
+        "tags": [
+          "recordings"
+        ],
+        "summary": "List Recordings",
+        "description": "Every recording still on disk, newest first.\n\nA recording present here has *not* been transcribed, or was kept deliberately: the pass deletes\nits audio on success unless audio retention is on. So this list is mostly a list of things that\nwent wrong, which is exactly what it is for.",
+        "operationId": "list_recordings_api_recordings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response List Recordings Api Recordings Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recordings/{name}/transcribe": {
+      "post": {
+        "tags": [
+          "recordings"
+        ],
+        "summary": "Transcribe Recording",
+        "description": "Run \u2014 or re-run \u2014 a transcription pass over a recording on disk.\n\nWrites into a **new** session rather than the one that produced the recording. The original\nsession's database may hold a partial transcript from a pass that failed halfway, and appending\na second attempt to it would interleave two runs into one unreadable record.",
+        "operationId": "transcribe_recording_api_recordings__name__transcribe_post",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Transcribe Recording Api Recordings  Name  Transcribe Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recordings/{name}": {
+      "delete": {
+        "tags": [
+          "recordings"
+        ],
+        "summary": "Delete Recording",
+        "description": "Remove a recording. Refuses one a transcription pass is currently reading.",
+        "operationId": "delete_recording_api_recordings__name__delete",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Delete Recording Api Recordings  Name  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "tags": [

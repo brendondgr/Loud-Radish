@@ -8,7 +8,7 @@
 
 import { on } from "./core/bus.js";
 import { $ } from "./core/dom.js";
-import { ARMING, IDLE, STOPPING, WINDOW } from "./core/modes.js";
+import { ARMING, IDLE, PROCESSING, STOPPING, WINDOW } from "./core/modes.js";
 import * as prefs from "./core/storage.js";
 import { Banners } from "./components/banners.js";
 import { ChatPane } from "./components/chat-pane.js";
@@ -25,6 +25,7 @@ import {
   ASR_PROGRESS,
   AUDIO_LEVEL,
   CONNECTION_CHANGED,
+  RECORDING_PROGRESS,
   SESSION_STARTED,
   SESSION_STATE,
   SESSION_STOPPED,
@@ -32,6 +33,9 @@ import {
   TRANSCRIPT_COMMITTED,
   TRANSCRIPT_HYPOTHESIS,
   TRANSCRIPT_POLISHED,
+  TRANSCRIPTION_DONE,
+  TRANSCRIPTION_FAILED,
+  TRANSCRIPTION_PROGRESS,
   VAD_STATE,
 } from "./transport/events.js";
 import { TranscriptSocket } from "./transport/socket.js";
@@ -40,6 +44,7 @@ import { config } from "./stores/config.js";
 import { health } from "./stores/health.js";
 import { MODE_CHANGED, mode } from "./stores/mode.js";
 import { polish } from "./stores/polish.js";
+import { recording } from "./stores/recording.js";
 import { session } from "./stores/session.js";
 import { transcript } from "./stores/transcript.js";
 
@@ -92,6 +97,7 @@ function boot() {
 
   wireTranscript(socket, pane);
   wireHealth();
+  wireRecording(banners);
   wireSession(header);
   wireControls(pane);
   wireChat(chatPane);
@@ -141,6 +147,38 @@ function wireTranscript(socket, pane) {
   window.transcriptPane = pane; // used by citation and glossary navigation in later phases
 }
 
+/**
+ * The recording and the transcription pass that follows it (D-021).
+ *
+ * The run state is driven from the server's events rather than guessed locally, because the pass
+ * outlives the page: a reload halfway through must resume showing progress.
+ */
+function wireRecording(banners) {
+  on(RECORDING_PROGRESS, (payload) => recording.setRecording(payload));
+
+  on(TRANSCRIPTION_PROGRESS, (payload) => {
+    recording.setTranscription(payload);
+    mode.setState(PROCESSING);
+  });
+
+  on(TRANSCRIPTION_DONE, (payload) => {
+    recording.setTranscription(payload);
+    mode.setState(IDLE);
+  });
+
+  on(TRANSCRIPTION_FAILED, (payload) => {
+    recording.setTranscription(payload);
+    mode.fail(payload.error || "The recording could not be transcribed.");
+    // The audio survives a failed pass, and the message says where. That is the whole recovery, so
+    // it goes in a banner rather than only into the header's tooltip.
+    banners.show({
+      code: "transcription-failed",
+      severity: "critical",
+      message: payload.error || "The recording could not be transcribed.",
+    });
+  });
+}
+
 function wireHealth() {
   on(AUDIO_LEVEL, (level) => health.setLevel(level));
   on(VAD_STATE, ({ speaking }) => health.setSpeaking(speaking));
@@ -155,6 +193,7 @@ function wireSession(header) {
     transcript.reset();
     polish.reset();
     session.start(payload);
+    recording.reset();
     // The server is authoritative about the mode: a reload mid-recording, or a session started
     // from somewhere other than this tab, must show what is actually being recorded.
     mode.adoptSession({ running: true, mode: session.mode });
@@ -167,7 +206,11 @@ function wireSession(header) {
 
   on(SESSION_STATE, (state) => {
     session.hydrate(state);
+    recording.hydrate(state);
     mode.adoptSession({ running: session.running, mode: session.mode });
+    // After adoptSession, which would otherwise reset a reconnecting client to idle while a pass
+    // it cannot see is still running.
+    if (recording.isTranscribing) mode.setState(PROCESSING);
   });
   void header;
 }
@@ -271,7 +314,9 @@ async function hydrate(chatPane, glossary) {
   try {
     const state = await api.session();
     session.hydrate(state);
+    recording.hydrate(state);
     mode.adoptSession({ running: session.running, mode: session.mode });
+    if (recording.isTranscribing) mode.setState(PROCESSING);
     if (state.metrics) health.setStatus(state.metrics);
 
     if (state.running) {

@@ -28,6 +28,19 @@ TRANSCRIPT_HYPOTHESIS: Final = "transcript.hypothesis"
 #: held, so a client that does not understand this event simply keeps showing raw text.
 TRANSCRIPT_POLISHED: Final = "transcript.polished"
 
+# -- recording and the post-capture pass (D-021) --------------------------------------
+#: How much audio the current recording has captured. Coalescing: only the latest matters.
+RECORDING_PROGRESS: Final = "recording.progress"
+#: How far the post-capture transcription pass has got. Also coalescing, and for the same reason —
+#: a figure from ten seconds ago is worse than useless on a progress bar.
+TRANSCRIPTION_PROGRESS: Final = "transcription.progress"
+#: The pass finished. Critical: dropping it leaves the interface showing a progress bar for a pass
+#: that ended, with no way to learn otherwise short of a reload.
+TRANSCRIPTION_DONE: Final = "transcription.done"
+#: The pass failed, and the recording is still on disk. Critical for the same reason, and because
+#: the message names the file the audio survives in.
+TRANSCRIPTION_FAILED: Final = "transcription.failed"
+
 # -- health ---------------------------------------------------------------------------
 AUDIO_LEVEL: Final = "audio.level"
 VAD_STATE: Final = "vad.state"
@@ -52,6 +65,10 @@ ALL_EVENTS: Final[tuple[str, ...]] = (
     TRANSCRIPT_COMMITTED,
     TRANSCRIPT_HYPOTHESIS,
     TRANSCRIPT_POLISHED,
+    RECORDING_PROGRESS,
+    TRANSCRIPTION_PROGRESS,
+    TRANSCRIPTION_DONE,
+    TRANSCRIPTION_FAILED,
     AUDIO_LEVEL,
     VAD_STATE,
     STATUS,
@@ -66,7 +83,14 @@ ALL_EVENTS: Final[tuple[str, ...]] = (
 #: Events safe to drop when a client is slow: only the latest carries meaning. A level meter frame
 #: from two seconds ago is worse than useless — it would draw a stale bar.
 COALESCING_EVENTS: Final[frozenset[str]] = frozenset(
-    {TRANSCRIPT_HYPOTHESIS, AUDIO_LEVEL, VAD_STATE, STATUS}
+    {
+        TRANSCRIPT_HYPOTHESIS,
+        AUDIO_LEVEL,
+        VAD_STATE,
+        STATUS,
+        RECORDING_PROGRESS,
+        TRANSCRIPTION_PROGRESS,
+    }
 )
 
 #: Events that must never be dropped, whatever the backlog. Losing one loses transcript.
@@ -78,6 +102,9 @@ CRITICAL_EVENTS: Final[frozenset[str]] = frozenset(
         TRANSCRIPT_POLISHED,
         SESSION_STARTED,
         SESSION_STOPPED,
+        # A transcription that ended and never said so leaves a progress bar running forever.
+        TRANSCRIPTION_DONE,
+        TRANSCRIPTION_FAILED,
         CHAT_DELTA,
         CHAT_DONE,
         ERROR,

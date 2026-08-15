@@ -16,6 +16,7 @@ import { timestamp } from "../core/format.js";
 import { ARMING, ERROR, IDLE, PROCESSING, RECORDING, STOPPING } from "../core/modes.js";
 import { HEALTH_CHANGED, health } from "../stores/health.js";
 import { MODE_CHANGED, mode as modeStore } from "../stores/mode.js";
+import { RECORDING_CHANGED, recording } from "../stores/recording.js";
 import { SESSION_CHANGED, session } from "../stores/session.js";
 
 /**
@@ -56,6 +57,7 @@ export class Header {
 
     on(SESSION_CHANGED, () => this.render());
     on(MODE_CHANGED, () => this.render());
+    on(RECORDING_CHANGED, () => this.render());
     on(HEALTH_CHANGED, () => this.renderIdentity());
 
     // The clock ticks once a second but is *derived* from the start time, so it stays correct
@@ -72,10 +74,23 @@ export class Header {
     // instead was tried and is wrong twice over: a sentence naming a file path stretches the
     // header until the primary control is pushed off a narrow screen, and it duplicates what the
     // banner directly below is already saying and already announcing.
-    setText(this.stateLabel, shown.label);
+    setText(
+      this.stateLabel,
+      modeStore.state === PROCESSING && recording.totalSeconds > 0
+        ? `Transcribing ${recording.percent}%`
+        : shown.label
+    );
     setAttr(this.state, "title", modeStore.state === ERROR ? modeStore.message : "");
 
-    setText(this.toggle, shown.button);
+    // The one state whose label carries a number. A pass over a long recording can run for half
+    // an hour, and a control that says only "Transcribing…" for that long is indistinguishable
+    // from one that has hung.
+    const label =
+      modeStore.state === PROCESSING && recording.totalSeconds > 0
+        ? `Transcribing… ${recording.percent}%`
+        : shown.button;
+
+    setText(this.toggle, label);
     if (this.toggle) {
       this.toggle.disabled = !shown.enabled;
       // Danger styling only while there is something to lose. `stopping` has already been asked

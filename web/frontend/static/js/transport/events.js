@@ -16,6 +16,16 @@ export const TRANSCRIPT_HYPOTHESIS = "transcript.hypothesis";
  *  them — a client that ignores this event keeps showing raw text, which is the right fallback. */
 export const TRANSCRIPT_POLISHED = "transcript.polished";
 
+/** How much audio the current recording has captured (D-021). Coalescing. */
+export const RECORDING_PROGRESS = "recording.progress";
+/** How far the post-capture transcription pass has got. Coalescing — a figure from ten seconds ago
+ *  is worse than useless on a progress bar. */
+export const TRANSCRIPTION_PROGRESS = "transcription.progress";
+/** The pass finished. Never dropped: losing it leaves a progress bar running for a pass that ended. */
+export const TRANSCRIPTION_DONE = "transcription.done";
+/** The pass failed, and the recording is still on disk. The payload names the file it survives in. */
+export const TRANSCRIPTION_FAILED = "transcription.failed";
+
 export const AUDIO_LEVEL = "audio.level";
 export const VAD_STATE = "vad.state";
 export const STATUS = "status";

@@ -31,6 +31,7 @@ import { $, $$, el, setText, toggle } from "../core/dom.js";
 import { pluralise, timestamp, wallClock } from "../core/format.js";
 import { IDLE, LIVE, PROCESSING, RECORDED, RECORDING, WINDOW } from "../core/modes.js";
 import { MODE_CHANGED, mode as modeStore } from "../stores/mode.js";
+import { RECORDING_CHANGED, recording } from "../stores/recording.js";
 import { POLISH_CHANGED, polish } from "../stores/polish.js";
 import {
   HYPOTHESIS_CHANGED_TOPIC,
@@ -135,6 +136,9 @@ export class TranscriptPane {
     this.emptyTitle = $("[data-empty-title]", root);
     this.emptyBody = $("[data-empty-body]", root);
     this.emptyHint = $("[data-empty-hint]", root);
+    this.emptyProgress = $("[data-empty-progress]", root);
+    this.progressFill = $("[data-progress-fill]", root);
+    this.progressLabel = $("[data-progress-label]", root);
     this.hypothesisWrap = $(".hypothesis", root);
     this.hypothesisText = $(".hypothesis__text", root);
     this.hypothesisNote = $(".hypothesis__note", root);
@@ -156,6 +160,7 @@ export class TranscriptPane {
     // The empty copy depends on the mode and run state as well as on whether there is content, so
     // it has to re-render when those change and not only when a segment arrives.
     on(MODE_CHANGED, () => this._renderEmptyState());
+    on(RECORDING_CHANGED, () => this._renderEmptyState());
 
     this._renderEmptyState();
   }
@@ -316,6 +321,19 @@ export class TranscriptPane {
     if (this.emptyBody) this.emptyBody.innerHTML = copy.body;
     setText(this.emptyHint, copy.hint ?? "");
     toggle(this.emptyHint, Boolean(copy.hint));
+
+    // The progress bar belongs to the pass, not to the mode: it shows whenever one is running,
+    // whichever mode produced the recording.
+    const transcribing = modeStore.state === PROCESSING && recording.totalSeconds > 0;
+    toggle(this.emptyProgress, transcribing);
+    if (transcribing) {
+      if (this.progressFill) this.progressFill.style.width = `${recording.percent}%`;
+      setText(
+        this.progressLabel,
+        `Transcribed ${timestamp(recording.transcribedSeconds)} of ` +
+          `${timestamp(recording.totalSeconds)} — ${recording.percent}%`
+      );
+    }
   }
 
   /** Drop the oldest rendered segments once the list grows past the render budget. */

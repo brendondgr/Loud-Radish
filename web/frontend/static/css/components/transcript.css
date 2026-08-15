@@ -260,6 +260,46 @@
   color: var(--text-faint);
 }
 
+.transcript-empty__hint[hidden] {
+  display: none;
+}
+
+/* -- the post-capture transcription pass (D-021) ----------------------------------------------
+ * A pass over a long recording can take longer than the recording did. A bar with a figure on it
+ * is the whole difference between "working" and "hung", which is why it carries the elapsed and
+ * total as text rather than only a width.
+ */
+
+.transcript-empty__progress {
+  margin-top: var(--space-8);
+}
+
+.transcript-empty__progress[hidden] {
+  display: none;
+}
+
+.progress-bar {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--surface-control);
+  overflow: hidden;
+}
+
+.progress-bar__fill {
+  height: 100%;
+  background: var(--accent);
+  /* Only the width moves, and only in response to real progress — this is not a looping
+   * animation, which the motion rule forbids in a two-hour interface. */
+  transition: width var(--duration) var(--ease);
+}
+
+.transcript-empty__progress-label {
+  margin: var(--space-4) 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+}
+
 /* -- selection menu ---------------------------------------------------------------------------
  * "Ask about this" — reading something confusing and asking about it in one gesture is the
  * highest-value interaction in the application (FE §4.5).

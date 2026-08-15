@@ -284,3 +284,37 @@ async def test_shutdown_does_not_wait_out_a_running_pass(manager) -> None:
     started = time.monotonic()
     await session.shutdown()
     assert time.monotonic() - started < 10.0
+
+
+async def test_shutdown_does_not_close_a_store_the_pass_is_writing_to(manager) -> None:
+    """Regression. `keep_store` was an argument to teardown, and `shutdown` reaches teardown by a
+    second path that had no way to know a pass was running — so it closed the database underneath
+    the runner and the pass died with "Cannot operate on a closed database". The flag is instance
+    state now, held by whoever handed the store over."""
+    session, _store, recorder, tmp_path = manager
+    await session.start(recorded_session())
+    time.sleep(0.5)
+    await session.stop()
+    await session.shutdown()
+
+    failures = [
+        event
+        for event in recorder.of("transcription.failed")
+        if "closed database" in event.get("error", "")
+    ]
+    assert not failures, f"shutdown closed the store underneath the pass: {failures}"
+
+
+async def test_the_transcript_is_readable_while_the_pass_runs(manager) -> None:
+    """A reload during a half-hour pass must show the segments already committed, not an empty
+    page — so the store stays *readable* even though the runner owns closing it."""
+    session, _store, recorder, tmp_path = manager
+    await session.start(recorded_session())
+    time.sleep(0.5)
+    await session.stop()
+
+    # Either the pass is still going, in which case the store must still be readable, or it has
+    # already finished, in which case the reference must have been dropped.
+    if session.jobs.is_busy:
+        assert session.store is not None, "the transcript became unreadable mid-pass"
+    recorder.wait_for("transcription.done")

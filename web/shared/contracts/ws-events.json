@@ -51,6 +51,22 @@
       "critical": true,
       "coalescing": false
     },
+    "recording.progress": {
+      "critical": false,
+      "coalescing": true
+    },
+    "transcription.progress": {
+      "critical": false,
+      "coalescing": true
+    },
+    "transcription.done": {
+      "critical": true,
+      "coalescing": false
+    },
+    "transcription.failed": {
+      "critical": true,
+      "coalescing": false
+    },
     "audio.level": {
       "action": "replace",
       "note": "Drives the input meter.",

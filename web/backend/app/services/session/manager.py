@@ -120,6 +120,10 @@ class SessionManager:
         #: it *outlives* the session, which is the whole shape of the mode.
         self.jobs = JobRegistry()
         self._runner: TranscriptionRunner | None = None
+        #: True while a transcription pass owns the store. Instance state rather than an argument
+        #: to `_teardown`, because `shutdown` reaches teardown by a second path that has no way to
+        #: know — and did exactly that, closing a database a running pass was still writing to.
+        self._store_handed_over = False
 
     # -- state ---------------------------------------------------------------------
 
@@ -132,6 +136,11 @@ class SessionManager:
     def store(self) -> TranscriptStore | None:
         """The current session's store, if any."""
         return self._store
+
+    @property
+    def emit(self) -> EmitFn:
+        """The transport's publish function, so a pass started outside a session can use it."""
+        return self._emit
 
     @property
     def asr(self) -> AsrLifecycle:
@@ -318,11 +327,11 @@ class SessionManager:
         # In `recorded` mode the session's work is only now beginning. The pass is handed the store
         # — which is why `mark_ended` is not called here for it: the recording is not finished until
         # its transcript exists.
-        handed_over = self._start_transcription(self._metadata)
-        if not handed_over and self._store is not None:
+        self._store_handed_over = self._start_transcription(self._metadata)
+        if not self._store_handed_over and self._store is not None:
             self._store.mark_ended(self._metadata.ended_at)
 
-        await self._teardown(keep_store=handed_over)
+        await self._teardown()
         self._emit("session.stopped", {"session_id": session_id, "stats": stats.as_dict()})
         logger.info("Session %s stopped: %s", session_id, stats.as_dict())
         return stats
@@ -471,6 +480,16 @@ class SessionManager:
             metrics = self.metrics()
             self._emit("status", metrics.as_event())
 
+            # In `recorded` mode this is the *only* sign the application is doing anything: no
+            # transcript is being produced, so a figure that climbs is what distinguishes recording
+            # from having silently stopped (D-021).
+            sink = self._sink
+            if sink is not None and not sink.is_closed:
+                self._emit(
+                    "recording.progress",
+                    {"duration_s": round(sink.duration_s, 2), "bytes": sink.bytes_written},
+                )
+
             # Only warn once the model has actually run: a factor of zero before the speaker starts
             # is not the system falling behind.
             if metrics.engine.inference_passes > 3 and 0.0 < metrics.real_time_factor < 1.0:
@@ -583,6 +602,7 @@ class SessionManager:
             window_s=config.recording.batch_window_s,
             overlap_s=config.recording.batch_overlap_s,
             max_segment_s=config.streaming.max_segment_s,
+            on_released=self._on_transcription_released,
         )
         started = self._runner.start(
             job=job,
@@ -590,11 +610,15 @@ class SessionManager:
             retain_audio=config.storage.retain_audio,
             prompt=self._prompts.build() if self._prompts else None,
         )
-        if started:
-            # Ownership has moved. Clearing it here is what makes the store's single owner
-            # unambiguous, and is why `_teardown` must be told not to close it.
-            self._store = None
+        # The reference is deliberately *kept*, unlike ownership. `GET /api/transcript/...` serves
+        # from it, and a reload during a half-hour pass must still show the segments already
+        # committed rather than an empty page. The runner alone closes it, and tells us when.
         return started
+
+    def _on_transcription_released(self) -> None:
+        """The pass has closed the store. Stop reading from it, and reclaim ownership."""
+        self._store = None
+        self._store_handed_over = False
 
     def _open_store(self, config: AppConfig, session: SessionMetadata) -> TranscriptStore:
         directory = self._session_dir or Path(config.storage.session_dir)
@@ -630,12 +654,13 @@ class SessionManager:
             self._emit_failure(failure)
             raise SessionError(failure.message) from exc
 
-    async def _teardown(self, keep_store: bool = False) -> None:
+    async def _teardown(self) -> None:
         """Stop the workers and release the session's resources.
 
-        ``keep_store`` is set when a transcription pass has taken ownership of the store and is
-        still writing to it. Closing it here would pull a SQLite connection out from under a thread
-        mid-write.
+        The store is left alone while a transcription pass owns it — closing it here would pull a
+        SQLite connection out from under a thread mid-write, which is exactly what happened when
+        this was a parameter instead of instance state: `shutdown` reaches teardown by a path that
+        had no way to know a pass was running.
         """
         # Before the store closes, and before the ordinary stop path is assumed to have run: an
         # abrupt shutdown reaches here without passing through `stop`, and a polish task still
@@ -656,9 +681,7 @@ class SessionManager:
         self._queue = DropOldestQueue(QUEUE_CAPACITY)
         self._worker = Worker("asr-worker", self._queue, self._handle_frame)  # type: ignore[arg-type]
 
-        # Not closed if a transcription pass owns it. It is already `None` in that case — cleared
-        # when ownership moved — so this is belt and braces against a future caller that forgets.
-        if self._store is not None and not keep_store:
+        if self._store is not None and not self._store_handed_over:
             self._store.close()
             self._store = None
 

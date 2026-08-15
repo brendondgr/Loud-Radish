@@ -46,9 +46,15 @@ class TranscriptionRunner:
         window_s: float = 30.0,
         overlap_s: float = 1.0,
         max_segment_s: float = 30.0,
+        on_released: Callable[[], None] | None = None,
     ) -> None:
         self._registry = registry
         self._emit = emit
+        #: Called once the store has been closed, so whoever handed it over stops reading from it.
+        #: The transcript routes keep serving from that store *during* the pass — a reload
+        #: mid-transcription must still show the segments already committed — which is only safe
+        #: while someone is guaranteed to say when it goes away.
+        self._on_released = on_released
         self._transcribe = transcribe
         self._window_s = window_s
         self._overlap_s = overlap_s
@@ -76,7 +82,7 @@ class TranscriptionRunner:
         """
         if not self._registry.claim(job):
             logger.warning("A transcription pass is already running; %s refused.", job.session_id)
-            store.close()
+            self._release(store)
             return False
 
         self._stop.clear()
@@ -136,7 +142,7 @@ class TranscriptionRunner:
 
         job.finish()
         store.mark_ended()
-        store.close()
+        self._release(store)
 
         # Only once the transcript is safely written. Deleting earlier would make a failed pass
         # unrecoverable, and the audio is the only remaining copy of what was said.
@@ -172,12 +178,24 @@ class TranscriptionRunner:
             self._last_progress = now
             self._emit("transcription.progress", job.as_event())
 
-    def _fail(self, job: TranscriptionJob, store: TranscriptStore, message: str) -> None:
-        job.fail(message)
+    def _release(self, store: TranscriptStore) -> None:
+        """Close the store and tell its previous owner it is gone.
+
+        The notification comes *after* the close, which leaves a window of microseconds in which a
+        transcript request could hit a closed connection. Narrowing it further would mean holding a
+        lock across every read on the hot path to save one possible 500 at the instant a pass ends,
+        which is the wrong trade.
+        """
         try:
             store.close()
         except Exception:  # noqa: BLE001 - closing a broken store must not mask the real failure
-            logger.exception("Could not close the store after a failed pass")
+            logger.exception("Could not close the store after the pass")
+        if self._on_released is not None:
+            self._on_released()
+
+    def _fail(self, job: TranscriptionJob, store: TranscriptStore, message: str) -> None:
+        job.fail(message)
+        self._release(store)
 
         # **The audio is kept, whatever the retention setting says.** It is now the only copy of
         # what was said, and the failure message names its path so the pass can be re-run.

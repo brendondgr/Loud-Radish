@@ -163,6 +163,14 @@ each was invisible to reading and obvious to using, which is the argument for th
 - **The primary control was pushed off-screen at 320 px.** The header has wrapped since Phase 12,
   but each header *group* was a non-wrapping row — fine at three items, not at four.
 
+- [ ] **A finished transcript is not reloadable until the sessions page is opened.** When a session
+      ends the store closes, so `GET /api/session` reports no stats and the page cannot re-fetch its
+      segments; a reload shows an empty transcript. This is **pre-existing live-mode behaviour**, not
+      something recorded mode introduced — but it lands harder here, because the transcript arrives
+      *after* the toggle and a reload a moment later loses text the user has only just seen. The
+      record itself is safe on disk and readable from `/sessions`. Worth closing by keeping the last
+      session's store open for reading until the next one starts.
+
 Known blockers and open questions carried by these plans:
 
 - [x] **The tray animation specification.** Supplied 2026-08-15 and extracted into

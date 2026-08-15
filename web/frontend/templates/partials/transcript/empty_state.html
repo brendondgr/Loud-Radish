@@ -16,4 +16,16 @@
   <p class="transcript-empty__hint" data-empty-hint>
     Check your input device first — it is the one check worth doing every time.
   </p>
+
+  {# Shown only while a post-capture pass runs. A pass over a long recording can take longer than
+     the recording did, so a bar with a figure on it is the difference between "working" and
+     "hung" (D-021). #}
+  <div class="transcript-empty__progress" data-empty-progress hidden>
+    <div class="progress-bar">
+      <div class="progress-bar__fill" data-progress-fill style="width: 0%"></div>
+    </div>
+    <p class="transcript-empty__progress-label" data-progress-label aria-live="polite">
+      Transcribing…
+    </p>
+  </div>
 </div>
