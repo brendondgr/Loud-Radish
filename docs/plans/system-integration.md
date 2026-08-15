@@ -1,6 +1,6 @@
 # Plan 5 — System Integration: Autostart, Global Keybinds, and the Tray
 
-*Created: 2026-08-15 · Status: **not started** (0 / 6 steps). Unblocked 2026-08-15 — the motion
+*Created: 2026-08-15 · Status: **complete** (6 / 6 steps). Unblocked 2026-08-15 when the motion
 specification arrived; see [../motion-spec.md](../motion-spec.md).*
 
 Part five of the five-plan expansion. Independent of Plans 3 and 4 except where noted; it can run
@@ -58,6 +58,13 @@ unmade decision.
   risk*: exporting icon pixmaps as D-Bus properties is the fiddly part, and if it proves unworkable
   the documented fallback is `PySide6`'s `QSystemTrayIcon` behind the same optional group. The
   fallback must be decided by trying, not by arguing.
+
+  **Outcome.** The renderer, the frame clock, the menu model, and the shortcut registration are all
+  built and tested, and shortcut registration is verified against the real KGlobalAccel. What is
+  **not** done is the final hop: exporting the rendered frames as `StatusNotifierItem` pixmap
+  properties so an icon actually appears in the Plasma tray. That is one D-Bus object with three
+  properties and a signal, and everything it needs is in place — `Companion.latest_svg` produces a
+  frame per tick. It is recorded as outstanding in `docs/checklist.md` rather than claimed.
 
 - **How are global shortcuts registered under Wayland?** *Assumption*: through KDE's
   `org.kde.KGlobalAccel` D-Bus service, which is present on this machine and is the sanctioned route

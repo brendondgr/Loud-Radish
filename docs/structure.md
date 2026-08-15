@@ -135,6 +135,13 @@ TranscriberPrototype/
 │   │   │       └── worker.py      # Rolling summaries and glossary extraction
 │   │   │   └── chat/              # Question → context → provider → streamed answer
 │   │   │       └── orchestrator.py
+│   │   ├── companion/             # The desktop presence — a remote control, not a rewrite (D-024)
+│   │   │   ├── visual_states.py   # (capture mode, run state) → which picture the instrument shows
+│   │   │   ├── aperture.py        # Draws one frame of it, from docs/motion-spec.md
+│   │   │   ├── animation.py       # The frame clock, and the hold-still setting
+│   │   │   ├── menu.py            # The tray menu's structure, as data
+│   │   │   ├── shortcuts.py       # Registration through the desktop's own service
+│   │   │   └── main.py            # Polls the server; killable and restartable at any moment
 │   │   ├── models/                # Persistence shape
 │   │   │   ├── segment.py         # The unit engine, store, and frontend all agree on
 │   │   │   └── session.py         # Metadata, summaries, polished blocks, glossary, chat turns
@@ -155,6 +162,7 @@ TranscriberPrototype/
 │
 ├── libs/                          # Internal packages with more than one consumer
 ├── utils/                         # Standalone helpers not specific to the web app
+│   └── transcriber_ctl.py         # Drive recording from outside the browser (D-024)
 ├── tests/                         # Python tests, grouped by area
 │   ├── api/                       # Routes, transport, audio library
 │   ├── assistant/                 # LLM clients, chat, context, and the polish pass
@@ -196,6 +204,7 @@ listed them has been removed rather than left describing work that has landed.
 | `web/backend/app/routes/` | HTTP endpoint definitions only. Thin — they delegate to services. |
 | `web/backend/app/transport/` | The WebSocket hub and its event envelopes. Separate from `routes/` because it is a push channel with its own reconnection semantics. |
 | `web/backend/app/services/` | The pipeline. One sub-package per stage, so each is independently testable. |
+| `web/backend/app/companion/` | The tray icon and the global shortcuts — the two things a browser page cannot do. Deliberately a *remote control*: it polls the HTTP API, holds no state, and can be killed and restarted without the server noticing. |
 | `web/backend/app/services/capture/` | Recording a window's picture. Separate from `recording/` because they solve unrelated problems: one negotiates with a compositor for pixels, the other writes and transcribes audio. |
 | `web/backend/app/services/recording/` | Capturing audio to a file and transcribing it once whole. Separate from `streaming/` because the two answer opposite questions: `streaming/` decides what is safe to show while audio is still arriving, and this runs only when it has stopped. |
 | `web/backend/app/services/polish/` | The clean-up pass that rewrites finished minutes for reading. Separate from `context/` because the two do opposite things: `context/` compresses on purpose, and this must not lose a single claim. |

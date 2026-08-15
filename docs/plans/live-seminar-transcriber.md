@@ -1,6 +1,7 @@
 # Live Seminar Transcriber — Implementation Plan
 
-*Created: 2026-08-14 · Status: **In progress** — nine of fourteen phases complete.*
+*Created: 2026-08-14 · Status: **complete** (14 / 14 phases). The header said nine for a while
+after the last five landed; `docs/checklist.md` has recorded all fourteen as done since Phase 14.*
 
 **Where this stands.** The backend is complete and tested end to end, and the application runs: a
 session captures audio, transcribes it, persists the transcript, and streams it to a browser that

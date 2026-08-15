@@ -262,6 +262,28 @@ State these explicitly rather than implying coverage:
 - **Live LLM endpoints.** Provider clients are tested against a stubbed HTTP transport. Pointing at a
   real Ollama or Anthropic endpoint is a manual step.
 
+## The desktop presence (D-024)
+
+Start with your session, and get global shortcuts:
+
+```bash
+uv run scripts/install_autostart.py
+```
+
+Drive it from anywhere without the browser:
+
+```bash
+uv run utils/transcriber_ctl.py toggle
+```
+
+`toggle` starts if idle and stops if running — one command, because a keystroke cannot know which.
+`--mode recorded` and `--mode window` pick the others; `arm --mode window` opens the options sheet
+rather than starting, since window capture has three switches to answer first.
+
+Shortcuts are registered with **your desktop's own service** and are revocable from its settings.
+This application never reads input devices. Settings → Shortcuts shows whether they are actually
+registered, and names the command to bind by hand if your desktop has no such service.
+
 ## Documentation Maintenance
 
 Documentation updates ship with the code, not after it. The full trigger table is in

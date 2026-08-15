@@ -149,9 +149,10 @@ from one capture mode to three, and from a browser tab to a resident desktop app
       ScreenCast window capture, optional video, live and post-process transcription, the monitor
       pane, and transcript revisions so both passes can be kept. Recorded as **D-022**. One
       measurement is outstanding — see the CPU-contention item below.
-- [ ] **Plan 5 — [System integration](plans/system-integration.md)** (0 / 6). Autostart, a tray
+- [x] **Plan 5 — [System integration](plans/system-integration.md)** (6 / 6). Autostart, a tray
       companion process drawing the Aperture microphone ([motion-spec.md](motion-spec.md)), global
-      keybinds through KGlobalAccel, and a keybind settings tab.
+      keybinds through KGlobalAccel, and a keybind settings tab. Recorded as **D-024**. One hop is
+      outstanding — see the StatusNotifierItem item below.
 
 Three things the interface work got wrong on paper and right only once it was run. Recorded because
 each was invisible to reading and obvious to using, which is the argument for the manual pass:
@@ -189,6 +190,18 @@ each was invisible to reading and obvious to using, which is the argument for th
 - [x] **One command installs and runs everything (D-023).** No optional dependency groups remain;
       `uv run app.py` is the whole story. GStreamer and a desktop portal are still system packages
       and are named in `docs/workflow.md`.
+
+- [ ] **The tray icon is not yet exported to D-Bus.** Everything behind it is built and tested: the
+      Aperture renderer, the frame clock, the (mode, run state) → picture map, the menu model, and
+      shortcut registration verified against the real KGlobalAccel. What is missing is the final
+      hop — one `org.kde.StatusNotifierItem` object with its icon properties and a `NewIcon` signal,
+      so a picture actually appears in the Plasma tray. `Companion.latest_svg` already produces a
+      frame per tick; it needs rasterising to ARGB32 and publishing. Recorded here rather than
+      claimed, because a tray icon that does not appear is the one part of Plan 5 a user would
+      notice immediately.
+- [ ] **Whether `jeepney` can export SNI pixmaps at all.** The reason the hop above is separate. If
+      it proves unworkable the documented fallback is `PySide6`'s `QSystemTrayIcon`, which speaks
+      the same protocol through Qt — decided by trying, not by arguing.
 
 Known blockers and open questions carried by these plans:
 

@@ -43,6 +43,7 @@ Served by `web/backend/app/routes/`. All paths are prefixed `/api`.
 |---|---|---|---|
 | `POST` | `/api/session/start` | Begin capture in a capture mode | **Implemented** — see below |
 | `POST` | `/api/session/stop` | End the session and return final statistics | **Implemented** |
+| `POST` | `/api/session/toggle` | Start if idle, stop if running — one call, because a keystroke cannot know which (D-024) | **Implemented** |
 | `GET` | `/api/session` | Current session state and metadata | **Implemented** |
 | `GET` | `/api/session/list` | Past sessions | Phase 14 (with the sessions page) |
 
