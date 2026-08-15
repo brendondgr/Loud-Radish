@@ -1,6 +1,6 @@
 # Plan 1 — Multi-Mode Interface: Design
 
-*Created: 2026-08-15 · Status: **not started** (0 / 5 steps)*
+*Created: 2026-08-15 · Status: **complete** (5 / 5 steps)*
 
 Part one of the five-plan expansion. See [README.md](README.md) for the set and the order they run in.
 
