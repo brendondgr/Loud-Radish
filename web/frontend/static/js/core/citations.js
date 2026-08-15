@@ -13,12 +13,18 @@
 import { el } from "./dom.js";
 
 /**
- * `[12:34]`, `[1:02:03]`, and the ranges models write unprompted: `[00:03-00:15]`.
+ * `[12:34]`, `[1:02:03]`, the ranges models write unprompted (`[00:03-00:15]`), and the lists they
+ * write when one claim spans two moments: `[00:02, 00:52]`.
  *
- * The range form is not in the prompt but arrives anyway. Matching only the exact form asked for
- * leaves the commonest citation in a live answer as unclickable text.
+ * Neither the range nor the list form is in the prompt, but both arrive anyway. Matching only the
+ * exact form asked for leaves the commonest citations in a live answer as unclickable text.
  */
-const CITATION = /\[(\d{1,2}:\d{2}(?::\d{2})?)(?:\s*[–—-]\s*(\d{1,2}:\d{2}(?::\d{2})?))?\]/g;
+const TIME = String.raw`\d{1,2}:\d{2}(?::\d{2})?`;
+/** One citation entry: a single moment, or a range whose start is what we seek to. */
+const ENTRY = String.raw`${TIME}(?:\s*[–—-]\s*${TIME})?`;
+const CITATION = new RegExp(String.raw`\[(${ENTRY}(?:\s*[,;]\s*${ENTRY})*)\]`, "g");
+const SEPARATOR = /\s*[,;]\s*/;
+const LEADING_TIME = new RegExp(String.raw`^${TIME}`);
 
 /** Parse `MM:SS` or `HH:MM:SS` into seconds. Returns null if it is neither. */
 export function parseTimestamp(label) {
@@ -45,18 +51,35 @@ export function renderWithCitations(target, text, onSeek) {
       target.append(document.createTextNode(text.slice(cursor, match.index)));
     }
 
-    const seconds = parseTimestamp(match[1]);
-    if (seconds === null) {
-      target.append(document.createTextNode(match[0]));
-    } else {
-      target.append(citationButton(match[0], seconds, onSeek));
-    }
+    target.append(...citationNodes(match[0], match[1], onSeek));
     cursor = match.index + match[0].length;
   }
 
   if (cursor < text.length) {
     target.append(document.createTextNode(text.slice(cursor)));
   }
+}
+
+/**
+ * The nodes one bracket becomes.
+ *
+ * A single entry keeps its text verbatim, brackets and all. A list becomes one button per moment —
+ * `[00:02, 00:52]` renders as `[00:02] [00:52]` — because a single button covering both can only
+ * seek to one of them, and the second moment is the one the reader cannot otherwise reach.
+ */
+function citationNodes(source, inner, onSeek) {
+  const entries = inner.split(SEPARATOR);
+  const seek = entries.map((entry) => parseTimestamp(entry.match(LEADING_TIME)?.[0] ?? ""));
+  if (seek.some((seconds) => seconds === null)) return [document.createTextNode(source)];
+
+  if (entries.length === 1) return [citationButton(source, seek[0], onSeek)];
+
+  const nodes = [];
+  entries.forEach((entry, index) => {
+    if (index > 0) nodes.push(document.createTextNode(" "));
+    nodes.push(citationButton(`[${entry}]`, seek[index], onSeek));
+  });
+  return nodes;
 }
 
 function citationButton(label, seconds, onSeek) {
