@@ -52,6 +52,19 @@ class AsrResult:
     inference_seconds: float = 0.0
     #: Which backend and model produced this, for the segment's ``model_id`` field.
     model_id: str = ""
+    #: The model's own estimate that this audio contained **no speech**, 0–1.
+    #:
+    #: The single most useful signal there is for catching invented text, and the reason it is on
+    #: the contract rather than hidden in one backend: a model given non-speech audio does not fail,
+    #: it confidently returns the phrases its training data ends with — "thank you", "bye". Nothing
+    #: downstream can tell those from speech by reading the words, and the model already knows.
+    #:
+    #: ``None`` when the backend cannot provide one, which must be read as "no opinion" rather than
+    #: "definitely speech". Never fabricated: a made-up value here silently deletes real words.
+    no_speech_prob: float | None = None
+    #: Mean log-probability the model assigned to the tokens it emitted. Strongly negative means it
+    #: was guessing. ``None`` when unavailable, with the same reading as above.
+    avg_logprob: float | None = None
 
     @property
     def text(self) -> str:

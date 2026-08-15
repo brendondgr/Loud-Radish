@@ -58,6 +58,34 @@ class VadConfig(_Base):
     pause_ms: int = Field(default=500, ge=100, le=5000)
 
 
+class HallucinationConfig(_Base):
+    """Thresholds for discarding text the speech model invented rather than heard.
+
+    Every one of these can in principle delete something real, so the defaults are conservative and
+    each test is switchable on its own. Raising a threshold keeps more invented text; lowering one
+    risks deleting quiet or accented speech, which is the speech least well served by being lost.
+    """
+
+    enabled: bool = True
+    #: Drop a pass the model itself scored as this likely to contain no speech. Whisper's
+    #: ``no_speech_prob`` sits near 1.0 on exactly the passes that invent text.
+    no_speech_threshold: float = Field(default=0.6, ge=0.0, le=1.0)
+    #: Corroboration for the above: the mean token log-probability must also be at or below this.
+    #: Strongly negative means the model was guessing. Ignored when the backend reports none.
+    logprob_threshold: float = Field(default=-1.0, ge=-10.0, le=0.0)
+    #: Above this, the model's no-speech estimate needs no corroboration at all. Measured against
+    #: `tiny` on a non-speech fixture: it invented "Oh" at 0.901 with a log-probability of -0.99,
+    #: which the corroborated rule missed by a hundredth. At this level the model is not hedging.
+    no_speech_certain: float = Field(default=0.85, ge=0.0, le=1.0)
+    #: Drop a pass whose words averaged less confidence than this. Zero switches it off, which is
+    #: the default: it is a blunt instrument and it punishes quiet speakers.
+    min_word_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    #: Drop a short pass whose *entire* output is a phrase the model emits over silence.
+    drop_phrases_enabled: bool = True
+    #: How short. The same two words over twenty seconds of audio came from a speaker.
+    max_phrase_seconds: float = Field(default=3.0, ge=0.5, le=30.0)
+
+
 class AsrConfig(_Base):
     """Speech model selection and term biasing (BE §6)."""
 
@@ -71,6 +99,10 @@ class AsrConfig(_Base):
     use_session_prompt: bool = True
     use_rolling_prompt: bool = True
     rolling_prompt_chars: int = Field(default=220, ge=0, le=2000)
+    #: Whisper's built-in Silero filter, which strips non-speech from the buffer before decoding.
+    #: The first line of defence: text that is never decoded cannot be invented.
+    vad_filter: bool = True
+    hallucination: HallucinationConfig = Field(default_factory=HallucinationConfig)
 
 
 class StreamingConfig(_Base):

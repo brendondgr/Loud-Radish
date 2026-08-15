@@ -30,6 +30,10 @@ class PipelineMetrics:
     #: How the audio arrived — a device name, or a file name.
     source: str = ""
     detector: str = ""
+    #: Passes discarded as text the speech model invented rather than heard. Published because a
+    #: filter that deletes speech invisibly is a worse bug than the one it fixes — a number rising
+    #: steadily while someone is talking is how you find out the thresholds are too tight.
+    suppressed: int = 0
 
     @property
     def real_time_factor(self) -> float:
@@ -73,6 +77,7 @@ class PipelineMetrics:
             "source": self.source,
             "detector": self.detector,
             "dropped_frames": self.dropped_frames,
+            "suppressed": self.suppressed,
             "audio_seconds": round(self.engine.audio_seconds, 1),
             "committed_words": self.engine.committed_words,
             "correction_rate": round(self.engine.correction_rate, 3),
@@ -89,6 +94,7 @@ class PipelineMetrics:
             f"queue            {self.queue.depth if self.queue else 0} deep, "
             f"{self.queue_fill:.0%} full",
             f"dropped audio    {self.dropped_frames} events (should be zero)",
+            f"suppressed       {self.suppressed} passes of invented text",
             f"corrections      {self.engine.correction_rate:.0%} of passes",
             f"forced commits   {self.engine.forced_commit_rate:.0%} of commits",
         ]

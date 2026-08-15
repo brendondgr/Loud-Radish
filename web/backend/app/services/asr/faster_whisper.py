@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import logging
 import time
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -39,6 +40,19 @@ MAX_AUDIO_SECONDS = 30.0
 LANGUAGES = ["*"]
 
 
+@dataclass(frozen=True)
+class PassConfidence:
+    """What the model thought of its own output on one pass.
+
+    Both are ``None`` when the model reported nothing, which downstream must read as *no opinion*
+    rather than as a clean bill of health. Filtering on a value that was never measured deletes real
+    words.
+    """
+
+    no_speech_prob: float | None = None
+    avg_logprob: float | None = None
+
+
 class FasterWhisperBackend(AsrBackend):
     """Drives a `faster-whisper` model behind the ASR interface."""
 
@@ -50,6 +64,7 @@ class FasterWhisperBackend(AsrBackend):
         language: str | None = "en",
         beam_size: int = 1,
         model_factory: Any | None = None,
+        vad_filter: bool = True,
     ) -> None:
         self._model_name = model
         self._device = device
@@ -57,6 +72,9 @@ class FasterWhisperBackend(AsrBackend):
         self._language = language
         self._beam_size = beam_size
         self._model_factory = model_factory
+        #: Whisper's built-in Silero filter. The first line of defence against invented text:
+        #: non-speech that is never decoded cannot be transcribed into something.
+        self._vad_filter = vad_filter
         self._model: Any | None = None
 
     # -- identity ------------------------------------------------------------------
@@ -145,14 +163,20 @@ class FasterWhisperBackend(AsrBackend):
             word_timestamps=True,
             initial_prompt=prompt or None,
             condition_on_previous_text=False,
+            # Strips non-speech from the buffer before decoding. The cheapest fix for invented
+            # text there is, because text that is never decoded cannot be invented — and the
+            # filter is a small Silero model, which is far cheaper than the Whisper pass it saves.
+            vad_filter=self._vad_filter,
         )
-        words = self._collect_words(segments)
+        words, confidence = self._collect(segments)
 
         return AsrResult(
             words=words,
             language=getattr(info, "language", self._language),
             inference_seconds=time.monotonic() - started,
             model_id=self.model_id,
+            no_speech_prob=confidence.no_speech_prob,
+            avg_logprob=confidence.avg_logprob,
         )
 
     def warm_up(self) -> None:
@@ -164,14 +188,35 @@ class FasterWhisperBackend(AsrBackend):
     # -- internals -----------------------------------------------------------------
 
     @staticmethod
-    def _collect_words(segments: Any) -> list[WordToken]:
-        """Flatten faster-whisper's nested segment/word output into word tokens.
+    def _collect(segments: Any) -> tuple[list[WordToken], PassConfidence]:
+        """Flatten faster-whisper's nested output into word tokens, keeping its confidence.
 
         ``segments`` is a generator, so this is also where inference actually happens — the
         ``transcribe`` call above returns before doing any work.
+
+        Each segment carries ``no_speech_prob`` and ``avg_logprob`` alongside its words. An earlier
+        version read the words and dropped the rest, which is why hallucinated text was invisible to
+        everything downstream: the model had already said it was probably not speech, and nobody was
+        listening.
         """
         words: list[WordToken] = []
+        no_speech: list[tuple[float, float]] = []
+        logprobs: list[tuple[float, float]] = []
+
         for segment in segments:
+            start = _as_float(getattr(segment, "start", None))
+            end = _as_float(getattr(segment, "end", None))
+            # Weight by how much audio the segment covers, so a half-second aside cannot outvote
+            # twenty seconds of speech. A zero-length segment still counts, minimally.
+            weight = max(end - start, 0.0) if start is not None and end is not None else 0.0
+
+            probability = _as_float(getattr(segment, "no_speech_prob", None))
+            if probability is not None:
+                no_speech.append((probability, weight))
+            logprob = _as_float(getattr(segment, "avg_logprob", None))
+            if logprob is not None:
+                logprobs.append((logprob, weight))
+
             for word in getattr(segment, "words", None) or []:
                 text = str(getattr(word, "word", "")).strip()
                 if not text:
@@ -185,7 +230,11 @@ class FasterWhisperBackend(AsrBackend):
                         confidence=float(probability) if probability is not None else None,
                     )
                 )
-        return words
+
+        return words, PassConfidence(
+            no_speech_prob=_weighted_mean(no_speech),
+            avg_logprob=_weighted_mean(logprobs),
+        )
 
     def _resolved_device(self) -> str:
         """Turn ``auto`` into a concrete device."""
@@ -302,3 +351,34 @@ def compute_support() -> dict[str, list[str]]:
     # "auto" resolves to CUDA when present, so it can offer whatever that device can.
     support["auto"] = support["cuda"] if cuda_count > 0 else support["cpu"]
     return {"devices": devices, **support}
+
+
+def _as_float(value: Any) -> float | None:
+    """Read a numeric attribute, or ``None`` when it is absent or unreadable.
+
+    Absent is deliberately distinct from zero. ``no_speech_prob`` of 0.0 means the model is certain
+    there *is* speech; a missing attribute means it did not say, and the two must not be conflated
+    by a filter that will delete words on the strength of it.
+    """
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number == number else None  # NaN is not an opinion either
+
+
+def _weighted_mean(samples: list[tuple[float, float]]) -> float | None:
+    """Average ``(value, weight)`` pairs by weight, falling back to a plain mean.
+
+    Weighted by segment duration so a half-second aside cannot outvote twenty seconds of speech.
+    The fallback matters: a pass can legitimately produce segments with no duration between them,
+    and returning nothing there would look like the model having no opinion when it had one.
+    """
+    if not samples:
+        return None
+    total_weight = sum(weight for _, weight in samples)
+    if total_weight <= 0:
+        return sum(value for value, _ in samples) / len(samples)
+    return sum(value * weight for value, weight in samples) / total_weight

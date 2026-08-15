@@ -109,6 +109,10 @@ class MockScript:
         repeat_ngram: when set, degenerate into looping this phrase, reproducing Whisper's
             repetition failure mode so the repetition filter can be tested.
         inference_seconds: simulated inference cost, for real-time factor tests.
+        no_speech_prob: what the model claims to think of its own output. Paired with
+            ``hallucinate_on_silence`` this reproduces the whole failure: text that reads as speech,
+            over audio the model itself scored as almost certainly not speech.
+        avg_logprob: the mean token log-probability to report. Strongly negative means guessing.
     """
 
     words: list[str] = field(default_factory=list)
@@ -121,6 +125,8 @@ class MockScript:
     repeat_after_pass: int = 0
     inference_seconds: float = 0.0
     confidence: float | None = None
+    no_speech_prob: float | None = None
+    avg_logprob: float | None = None
 
 
 class MockAsrBackend(AsrBackend):
@@ -216,7 +222,7 @@ class MockAsrBackend(AsrBackend):
             time.sleep(self._script.inference_seconds)
 
         if self._is_silent(array) and not self._script.hallucinate_on_silence:
-            return AsrResult(words=[], model_id=self._model_id)
+            return AsrResult(words=[], model_id=self._model_id, **self._confidence())
 
         offset = decode_position(array)
         words = (
@@ -229,7 +235,15 @@ class MockAsrBackend(AsrBackend):
             language="en",
             inference_seconds=self._script.inference_seconds,
             model_id=self._model_id,
+            **self._confidence(),
         )
+
+    def _confidence(self) -> dict[str, float | None]:
+        """What the script says the model thought of its own output."""
+        return {
+            "no_speech_prob": self._script.no_speech_prob,
+            "avg_logprob": self._script.avg_logprob,
+        }
 
     def _words_in_window(self, start: float, seconds: float) -> list[WordToken]:
         """Return the scripted words that fall inside the submitted audio, as a real model would.

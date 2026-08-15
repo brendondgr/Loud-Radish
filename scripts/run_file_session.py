@@ -32,8 +32,10 @@ sys.path.insert(0, str(REPO_ROOT / "web" / "backend"))
 
 from app.config.schema import AsrConfig, StreamingConfig, VadConfig  # noqa: E402
 from app.services.asr import PromptBuilder, build_backend  # noqa: E402
-from app.services.asr.contract import AsrLoadError  # noqa: E402
+from app.services.asr.contract import AsrLoadError, AsrResult  # noqa: E402
+from app.services.asr.hallucination import judge  # noqa: E402
 from app.services.asr.mock import MockScript, positional_audio  # noqa: E402
+from app.services.audio.formats import SAMPLE_RATE  # noqa: E402
 from app.services.audio.sources import WavFileSource  # noqa: E402
 from app.services.streaming import CommittedSegment, EngineNotice, HypothesisUpdate  # noqa: E402
 from app.services.streaming.passthrough import build_engine  # noqa: E402
@@ -98,6 +100,7 @@ def build_asr(args: argparse.Namespace):  # noqa: ANN201 - returns an AsrBackend
         device=args.device,
         precision=args.precision,
         session_prompt=args.prompt,
+        vad_filter=not args.no_vad_filter,
     )
     backend = build_backend(config)
 
@@ -109,6 +112,29 @@ def build_asr(args: argparse.Namespace):  # noqa: ANN201 - returns an AsrBackend
     backend.warm_up()
     print(f"Ready: {backend.model_id}\n", flush=True)
     return backend, config
+
+
+def filtered_transcribe(backend, config: AsrConfig):  # noqa: ANN001, ANN201
+    """Wrap a backend so this runner suppresses invented text exactly as the application does.
+
+    The application filters inside :class:`AsrLifecycle`; this script drives a backend directly, so
+    without this the console numbers would describe a pipeline nobody runs. Measuring the unfiltered
+    path and reporting it as the product's behaviour is how a fix gets believed into existence.
+    """
+    suppressed = 0
+
+    def transcribe(audio, prompt=None):  # noqa: ANN001, ANN202
+        nonlocal suppressed
+        result = backend.transcribe(audio, prompt)
+        verdict = judge(result, audio.size / SAMPLE_RATE, config.hallucination)
+        if verdict is None:
+            return result
+        suppressed += 1
+        print(f"  [suppressed {verdict.code}] {verdict.text!r}", flush=True)
+        return AsrResult(words=[], model_id=result.model_id)
+
+    transcribe.suppressed = lambda: suppressed  # type: ignore[attr-defined]
+    return transcribe
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -123,6 +149,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--agreement", type=int, default=2, help="passes that must agree")
     parser.add_argument("--prompt", default="", help="session biasing prompt")
     parser.add_argument("--no-vad", action="store_true", help="transcribe every frame")
+    parser.add_argument(
+        "--no-vad-filter",
+        action="store_true",
+        help="disable the decoder's own speech filter, for measuring what it costs",
+    )
     parser.add_argument("--no-hypothesis", action="store_true", help="committed text only")
     args = parser.parse_args(argv)
 
@@ -135,7 +166,7 @@ def main(argv: list[str] | None = None) -> int:
     streaming = StreamingConfig(step_s=args.step, agreement_count=args.agreement)
     engine = build_engine(
         config=streaming,
-        transcribe=backend.transcribe,
+        transcribe=filtered_transcribe(backend, asr_config),
         capabilities=backend.capabilities,
         model_id=backend.model_id,
         prompt_builder=PromptBuilder(asr_config),
