@@ -45,21 +45,25 @@ QUIET_PEAK_DBFS = -40.0
 #: Above this the signal is loud enough to be worth warning about before it clips.
 HOT_PEAK_DBFS = -3.0
 
-#: A loud signal whose zero-crossing rate is below this is not audio.
+#: A signal that essentially never changes sign is not audio.
 #:
-#: Every real acoustic signal oscillates about zero — that is what sound *is*. A loud capture that
-#: never changes sign is a device handing back something that is not a waveform: an uninitialised
-#: buffer, a channel-count mismatch, a DC-biased input. Observed on this project's own development
-#: machine, where the ALSA ``default`` device returned samples peaking *above* digital full scale
-#: with no zero crossings at all, while reporting itself as a perfectly ordinary microphone.
+#: Every acoustic signal oscillates about zero — that is what sound *is* — so a capture that holds
+#: one sign throughout is a device handing back something that is not a waveform: an uninitialised
+#: buffer, a channel-count mismatch, a DC-biased input.
 #:
-#: Without this check the level meter reads "loud", the probe says "close to clipping", and the
-#: user is told to lower a gain that is not the problem — while the VAD, correctly, gates every
-#: frame and the transcript stays empty with no explanation.
-MIN_CREDIBLE_ZCR = 0.002
+#: Set deliberately low. An earlier version measured the rate over only the samples above a
+#: fraction of the peak, on the reasoning that dither in the quiet stretches would dominate
+#: otherwise — but the samples near zero *are* the crossings, so filtering them out reported a rate
+#: of zero for a perfectly good microphone as readily as for a broken one. It is now measured over
+#: the whole signal, and the threshold is what "never crosses zero" actually means rather than a
+#: tuned discriminator.
+MIN_CREDIBLE_ZCR = 0.001
 
-#: Samples above digital full scale. Real captured audio cannot exceed 1.0 in a normalised float
-#: format; anything that does has not come through a working conversion.
+#: Samples above digital full scale.
+#:
+#: The one unambiguous signal that capture is wrong: correctly converted audio is normalised to
+#: −1.0…+1.0, so anything beyond that did not come through a working conversion, whatever it
+#: sounds like. Unlike a level or a rate, this needs no threshold-tuning to be certain about.
 IMPOSSIBLE_PEAK = 1.0001
 
 
@@ -175,24 +179,15 @@ def probe_device(
 
 
 def zero_crossing_rate(audio: np.ndarray) -> float:
-    """How often the signal changes sign, over the parts of it that are loud enough to count.
+    """How often the signal changes sign, across the whole recording.
 
-    Measured only where there is signal: a recording that is mostly silence has a meaningless
-    overall rate, dominated by dither in the quiet stretches.
+    Measured over every sample, not a loud subset. Filtering to the samples above some fraction of
+    the peak discards precisely the samples *at* the crossings, and then reports a rate of zero for
+    a working microphone — which is the signature this is supposed to identify.
     """
     if audio.size < 2:
         return 0.0
-    peak = float(np.abs(audio).max())
-    if peak <= 0.0:
-        return 0.0
-    # Relative to this recording's own peak rather than an absolute floor. A fixed threshold
-    # discards every sample of a genuinely quiet device, leaves nothing to measure, and reports a
-    # rate of zero — which is the signature this function exists to detect. Calling a quiet
-    # microphone broken is worse than the bug it was guarding against.
-    loud = audio[np.abs(audio) > max(1e-5, peak * 0.1)]
-    if loud.size < 2:
-        return 0.0
-    return float(np.mean(np.abs(np.diff(np.signbit(loud)))))
+    return float(np.mean(np.abs(np.diff(np.signbit(audio)))))
 
 
 def _describe(
@@ -213,18 +208,26 @@ def _describe(
         "peak_dbfs": peak_dbfs,
     }
 
-    # Checked before loudness, because this failure *presents* as loudness and the advice for it —
-    # turn the gain down — is wrong and wastes the user's time. Restricted to signals that are
-    # actually loud: for a quiet one "it is quiet" is both true and the more useful thing to say.
-    if (peak_dbfs >= QUIET_PEAK_DBFS or peak > IMPOSSIBLE_PEAK) and (
-        zcr < MIN_CREDIBLE_ZCR or peak > IMPOSSIBLE_PEAK
-    ):
+    # Checked before loudness, because both of these failures *present* as loudness and the advice
+    # for that — turn the gain down — is wrong and wastes the user's time while the VAD correctly
+    # gates every frame and the transcript stays empty with nothing to explain it.
+    if peak > IMPOSSIBLE_PEAK:
         return ProbeResult(
             result="invalid",
             message=(
-                f"{name} is returning data that is not audio — a loud signal that never crosses "
-                f"zero. This is usually a virtual or default device that does not map to a real "
-                f"input. Choose a specific microphone from the list instead."
+                f"{name} is returning samples beyond full scale, which correctly captured audio "
+                f"cannot be. This is usually a virtual or default device that does not map to a "
+                f"real input. Choose a specific microphone from the list instead."
+            ),
+            **common,
+        )
+
+    if peak_dbfs >= QUIET_PEAK_DBFS and zcr < MIN_CREDIBLE_ZCR:
+        return ProbeResult(
+            result="invalid",
+            message=(
+                f"{name} is returning a loud signal that never crosses zero, which is not a "
+                f"waveform. Choose a specific microphone from the list instead."
             ),
             **common,
         )

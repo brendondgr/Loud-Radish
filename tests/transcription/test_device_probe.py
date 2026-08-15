@@ -116,10 +116,9 @@ def test_a_hot_device_is_warned_about_before_it_clips() -> None:
 def test_a_loud_signal_that_never_crosses_zero_is_not_audio() -> None:
     """The failure this check exists for, seen on a real machine.
 
-    The ALSA ``default`` device returned samples peaking above digital full scale with no zero
-    crossings at all. Loudness alone reads as "close to clipping", so the user is told to lower a
-    gain that is not the problem — while the VAD correctly gates every frame and the transcript
-    stays empty with nothing to explain it.
+    Loudness alone reads as "close to clipping", so the user is told to lower a gain that is not
+    the problem — while the VAD correctly gates every frame and the transcript stays empty with
+    nothing to explain it.
     """
     dc = np.full(16_000, 0.7, dtype=np.float32)
     result = probe(dc)
@@ -129,12 +128,37 @@ def test_a_loud_signal_that_never_crosses_zero_is_not_audio() -> None:
     assert "never crosses zero" in result.message
 
 
+def test_the_zero_crossing_rate_is_measured_over_the_whole_signal() -> None:
+    """The bug this replaced.
+
+    An earlier version measured the rate only over samples above a fraction of the peak — which
+    discards precisely the samples *at* the crossings. Measured against real hardware it returned
+    0.0000 for a working microphone as readily as for a broken one, and a plain sine wave is enough
+    to show it.
+    """
+    from app.services.audio.probe import zero_crossing_rate
+
+    assert zero_crossing_rate(tone(0.5)) > 0.01
+    assert zero_crossing_rate(np.full(1000, 0.7, dtype=np.float32)) == 0.0
+
+
 def test_samples_above_full_scale_are_not_audio_either() -> None:
-    """Normalised float capture cannot exceed 1.0; anything that does did not convert correctly."""
+    """The one unambiguous signal that capture is wrong.
+
+    Correctly converted audio is normalised to −1.0…+1.0, so anything beyond it did not come
+    through a working conversion — no threshold-tuning required to be sure.
+    """
     impossible = (tone(0.5) + 1.2).astype(np.float32)
     result = probe(impossible)
 
     assert result.result == "invalid"
+    assert "full scale" in result.message
+
+
+def test_ordinary_loud_speech_is_never_called_invalid() -> None:
+    """The regression that matters: this check misfired on a working microphone once already."""
+    for peak in (0.2, 0.5, 0.9, 0.99):
+        assert probe(tone(peak)).result != "invalid", f"peak {peak} misreported"
 
 
 def test_a_real_waveform_is_not_mistaken_for_invalid() -> None:
