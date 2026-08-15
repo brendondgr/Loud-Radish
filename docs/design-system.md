@@ -150,7 +150,10 @@ Rules that fall out of the table:
   the colour rule above.
 - **The recording dot does not pulse.** Existing motion rule: nothing loops or animates in an
   interface that is on screen for two hours. Under `prefers-reduced-motion` there is nothing extra to
-  disable, which is the point.
+  disable, which is the point. The animated instrument in [motion-spec.md](motion-spec.md) is
+  therefore **not** adopted in the header — it belongs to the system tray, which is glanced at rather
+  than sat in front of. Its six state hues are the same ones this table uses, so the two indicators
+  agree on what each state looks like even though only one of them moves.
 
 ### Pre-flight options
 

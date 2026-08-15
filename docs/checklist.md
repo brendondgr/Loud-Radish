@@ -149,7 +149,8 @@ from one capture mode to three, and from a browser tab to a resident desktop app
       ScreenCast window capture, optional video, live and post-process transcription, the monitor
       pane, and transcript revisions so both passes can be kept.
 - [ ] **Plan 5 — [System integration](plans/system-integration.md)** (0 / 6). Autostart, a tray
-      companion process, global keybinds through KGlobalAccel, and a keybind settings tab.
+      companion process drawing the Aperture microphone ([motion-spec.md](motion-spec.md)), global
+      keybinds through KGlobalAccel, and a keybind settings tab.
 
 Three things the interface work got wrong on paper and right only once it was run. Recorded because
 each was invisible to reading and obvious to using, which is the argument for the manual pass:
@@ -164,10 +165,18 @@ each was invisible to reading and obvious to using, which is the argument for th
 
 Known blockers and open questions carried by these plans:
 
-- [ ] **The tray animation specification was never supplied.** Plan 5 step 5 references an "attached
-      document" naming the animation per state; no such document exists in this repository or was
-      provided. The mechanism is built against a drop-in manifest with placeholder frames, and the
-      step cannot be reported complete against the brief until the specification arrives.
+- [x] **The tray animation specification.** Supplied 2026-08-15 and extracted into
+      [motion-spec.md](motion-spec.md): "The Aperture microphone", Rev A.03 — a thirteen-element
+      ribbon grille that is both grille and meter, colourless at rest, with five states plus fault.
+      Plan 5 step 5 is rewritten to implement it. Two structural findings came out of reading it
+      against D-020, both recorded in `motion-spec.md` §5: the indicator is a function of **(mode,
+      run state)**, not run state alone — the spec draws live-mode and recorded-mode recording as
+      different pictures — and its *Rewriting* state is the polish pass, which runs concurrently
+      with a session rather than as a phase of one.
+- [ ] **Whether the Aperture instrument replaces the header's record indicator.** Not adopted by
+      default: D-020's motion rule forbids anything that loops in an interface on screen for two
+      hours, and a breathing thirteen-bar capsule is exactly that. Recorded as considered rather
+      than overlooked. If adopted, the reduced-motion path must hold every bar at rest.
 - [ ] **Whether software video encoding and live transcription fit on one CPU.** This machine has no
       hardware encoder — `x264enc` and every VAAPI encoder are absent, leaving software VP8 or
       OpenH264 competing with a speech model already measured at RTF ≈ 1.5. Plan 4 step 7 measures

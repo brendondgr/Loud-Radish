@@ -1,6 +1,7 @@
 # Plan 5 — System Integration: Autostart, Global Keybinds, and the Tray
 
-*Created: 2026-08-15 · Status: **not started** (0 / 6 steps) · **Blocked in part — see section 2**·*
+*Created: 2026-08-15 · Status: **not started** (0 / 6 steps). Unblocked 2026-08-15 — the motion
+specification arrived; see [../motion-spec.md](../motion-spec.md).*
 
 Part five of the five-plan expansion. Independent of Plans 3 and 4 except where noted; it can run
 after [Plan 2](multi-mode-ui-implementation.md), but its keybind targets are not all present until
@@ -27,14 +28,27 @@ unmade decision.
 
 ## 2. Gaps & Unanswered Questions
 
-- **The state animations document is missing.** *Human intervention is needed to answer this
-  question.* The brief says to "refer to the attached document for the specific animations to use per
-  state", and no such document is present in this repository or was supplied with the request. Step 5
-  therefore builds the **mechanism** — a frame-cycling tray icon driven by the application's current
-  state, with the frame sets loaded from files rather than hard-coded — and ships deliberately plain
-  placeholder frames. Dropping in the real animations becomes a matter of replacing image files and
-  one manifest, with no code change. **Step 5 may not be reported as complete against the brief until
-  that document is supplied.**
+- **~~The state animations document is missing.~~ Resolved 2026-08-15.** "The Aperture microphone",
+  Rev A.03, was supplied and is extracted into [../motion-spec.md](../motion-spec.md) — the original
+  was a design-doc canvas depending on a generated runtime harness and lived outside this
+  repository, so the specification was captured rather than the file copied. Step 5 now implements a
+  named design instead of placeholders.
+
+  **Two things the specification changed about the plan**, both worth reading before step 5:
+
+  1. **The indicator is a function of (mode, run state), not run state alone.** The spec draws
+     *Live transcription* and *Recording* as different pictures — a travelling teal sine versus a red
+     grille pulsing as one body — and in D-020's vocabulary those are the *same* run state in
+     different modes. A manifest keyed on run state alone would collapse them and lose the
+     distinction the whole design is built around.
+  2. **The spec's *Rewriting* state has no run state to attach to.** It is the polish pass (D-018),
+     which runs in the background *during* a live session rather than as a phase of one. The spec
+     draws a linear flow ending in it; this application can be in it and recording at once. Whether
+     the tray shows it mid-session or reserves it for the post-capture pass is a decision step 5
+     must make deliberately.
+
+  The spec also has no entry for `arming` or `stopping`. `motion-spec.md` §5 proposes both as held
+  half-transitions rather than new inventions.
 
 - **What owns the tray icon?** *Assumption*: a small helper process implementing
   `org.kde.StatusNotifierItem` directly over D-Bus with `jeepney`, the same pure-Python client Plan 4
@@ -172,31 +186,44 @@ unmade decision.
   shortcuts start audio recording immediately and open the options sheet for window capture, and are
   editable in settings.`
 
-### Step 5: State-driven tray animation
+### Step 5: The Aperture microphone as the tray indicator
 
-> **Blocked on the missing animations document — see section 2.** Build the mechanism, ship
-> placeholders, and do not report this step complete against the brief until the real specification
-> arrives.
+Implements [../motion-spec.md](../motion-spec.md). Read it first — it carries the geometry, the six
+state treatments, the keyframes, the closed-form amplitudes, and the transitions.
 
-- **Locations**: `web/backend/app/companion/animation.py` — a frame-cycling driver reading a
-  manifest that maps each application state (`idle`, `arming`, `recording`, `stopping`, `processing`,
-  `error`, `server-down`) to an ordered frame list and a frame interval, emitting `NewIcon` as it
-  advances and holding a single static frame where a state has one. New
-  `web/backend/app/companion/icons/manifest.json` and the placeholder frame files.
-  `docs/structure.md` documents the icons directory as the drop-in point.
-  Tests: `tests/utils/test_companion_animation.py` — every state in the Plan 1 vocabulary has a
-  manifest entry, frames cycle at the declared interval, and a missing frame file degrades to the
-  static fallback instead of crashing the companion.
-- **Rationale**: driving the animation from the same `RecordState` vocabulary Plan 1 fixed means the
-  tray cannot show a state the application does not have, and the parity test that already guards the
-  vocabulary extends to cover the tray for free. Loading frames from a manifest is what makes the
-  missing document a content gap rather than a code gap.
+- **Locations**:
+  - `web/backend/app/companion/aperture.py` — renders one frame of the instrument: the thirteen bars
+    at the amplitudes §3 gives for a state and a time, the capsule outline, the three LEDs, and each
+    state's extra furniture (live's two aura rings, recording's halo, transcribing's read head,
+    rewriting's counter-rotating arcs, fault's slash and four stubs). Renders to the ARGB32 pixmap
+    the StatusNotifierItem property wants.
+  - `web/backend/app/companion/animation.py` — the frame clock: which visual state the instrument is
+    in, how fast to advance, and when to emit `NewIcon`. **Its input is (mode, run state), not run
+    state alone** — that is the specification's central structural requirement, per §5.
+  - `web/backend/app/companion/visual_states.py` — the (mode, run state) → visual state map, its
+    hues, and its periods, as data rather than branching. The same shape as `MODE_STATES` in
+    `services/session/modes.py`, and for the same reason.
+  - `docs/motion-spec.md` gains a note if implementation forces any departure from the spec.
+  - Tests: `tests/utils/test_aperture_render.py` (bar count, symmetry about the centre, amplitudes
+    within each state's declared range, the fault state's four stubs) and
+    `tests/utils/test_visual_states.py` (every (mode, run state) pair the vocabulary allows maps to a
+    visual state; live-mode recording and recorded-mode recording map to *different* ones).
+- **Rationale**: the tray draws frames rather than running a stylesheet, which is why §3's
+  closed-form amplitudes matter as much as the keyframes — a CSS `@keyframes` cannot be handed to
+  D-Bus. Deriving the visual state from a data map keyed on both mode and run state is what stops the
+  two "recording" pictures collapsing into one, and it makes the pairing testable rather than
+  scattered through render branches.
+- **The one deliberate omission**: `prefers-reduced-motion` has no equivalent in a system tray, and
+  the tray has no way to ask. The frame clock therefore takes an interval from configuration with a
+  documented "hold still" setting that renders each state's resting amplitude and stops advancing —
+  the honest substitute for a media query that does not exist there.
 - **Action**: Undergo the verification/tests/validation process for this phase — `uv run pytest
-  tests/utils/test_companion_animation.py`, plus a manual pass watching the icon through a full
-  idle → recording → processing → idle cycle. **Report explicitly that the animations are
-  placeholders pending the specification.** Once validated, commit stating: `System Integration
-  (5 / 6) Complete: The tray icon animates per application state from a drop-in manifest, currently
-  carrying placeholder frames.`
+  tests/utils/test_aperture_render.py tests/utils/test_visual_states.py`, plus a manual pass watching
+  the tray through idle → live → recording → transcribing → idle and confirming each state is
+  distinguishable at 22 px, which is the size that actually matters and the one a 200×224 viewBox
+  can most easily fail at. Once validated, commit stating: `System Integration (5 / 6) Complete: The
+  tray draws the Aperture microphone, its visual state derived from the capture mode and the run
+  state together.`
 
 ### Step 6: Documentation and the security review
 
@@ -236,13 +263,15 @@ unmade decision.
 | Tray item | StatusNotifierItem over D-Bus, properties and signals | `web/backend/app/companion/tray.py` |
 | Tray menu | Listening toggle, per-mode start/stop, Open, Settings, Quit | `web/backend/app/companion/menu.py` |
 | Global shortcuts | KGlobalAccel registration, conflict reporting, manual fallback | `web/backend/app/companion/shortcuts.py` |
-| Animation driver | State → frame set from a drop-in manifest | `web/backend/app/companion/animation.py` |
-| Icon manifest and frames | The replaceable content the missing document will specify | `web/backend/app/companion/icons/` |
+| Aperture renderer | One frame of the instrument: 13 bars, capsule, LEDs, per-state furniture | `web/backend/app/companion/aperture.py` |
+| Frame clock | Advances the animation and emits `NewIcon`; input is (mode, run state) | `web/backend/app/companion/animation.py` |
+| Visual-state map | (mode, run state) → visual state, hue, and period, as data | `web/backend/app/companion/visual_states.py` |
 | Shortcuts settings tab | Capture a combination, show conflicts, say when inert | `web/frontend/templates/partials/settings/shortcuts.html`, `.../settings/shortcuts.js` |
 | Arm-on-load | `?arm=<mode>` opens the existing pre-flight sheet | `web/frontend/static/js/main.js` |
 | Toggle tests | Start-if-idle, stop-if-running, and the mode argument | `tests/api/test_session_toggle.py` |
 | CLI tests | Every subcommand against a stubbed HTTP client | `tests/utils/test_transcriber_ctl.py` |
 | Companion tests | Menu structure per state; server state → tray status, including server-down | `tests/utils/test_companion_menu.py`, `tests/utils/test_companion_state.py` |
-| Animation tests | Every state has frames; cycling interval; missing-file fallback | `tests/utils/test_companion_animation.py` |
+| Render tests | Bar count and symmetry, per-state amplitude ranges, the fault state's four stubs | `tests/utils/test_aperture_render.py` |
+| Visual-state tests | Every allowed pair maps somewhere; the two "recording" pictures stay distinct | `tests/utils/test_visual_states.py` |
 | Shortcut config tests | Defaults, validation, hot-swap classification | `tests/utils/test_shortcuts_config.py` |
 | Decision D-023 | Companion process over desktop rewrite; KGlobalAccel over input reading; security posture | `docs/documentation.md` |

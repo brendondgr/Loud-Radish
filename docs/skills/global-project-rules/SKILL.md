@@ -27,7 +27,8 @@ Additionally, read the skill that matches the task:
 - Implementation plans, roadmaps, staged work → `docs/skills/planner/SKILL.md`
 
 For work touching the web application, also read `docs/architecture.md`, `docs/routes.md`,
-`docs/data-flow.md`, `docs/component-map.md`, `docs/api-contract.md`, and `docs/design-system.md`.
+`docs/data-flow.md`, `docs/component-map.md`, `docs/api-contract.md`, `docs/design-system.md`,
+and — for anything that draws the application's state — `docs/motion-spec.md`.
 
 ## 2. Environment Manager Rules
 

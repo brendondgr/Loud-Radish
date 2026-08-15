@@ -40,7 +40,8 @@ TranscriberPrototype/
 │   ├── data-flow.md               # How data moves through the pipeline
 │   ├── api-contract.md            # HTTP shapes and the WebSocket event contract
 │   ├── deployment.md              # Build, environment, and run targets
-│   └── design-system.md           # Design tokens, UI conventions, a11y baseline
+│   ├── design-system.md           # Design tokens, UI conventions, a11y baseline
+│   └── motion-spec.md             # The Aperture microphone — state indicator motion, Rev A.03
 │
 ├── web/                           # ALL web application code
 │   ├── backend/app/
