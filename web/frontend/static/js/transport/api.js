@@ -108,6 +108,10 @@ export const api = {
   transcribeRecording: (name) => post(`/api/recordings/${encodeURIComponent(name)}/transcribe`),
   deleteRecording: (name) => del(`/api/recordings/${encodeURIComponent(name)}`),
 
+  captureState: () => get("/api/capture/state"),
+  transcriptRevisions: () => get("/api/transcript/revisions"),
+  transcriptAt: (revision) => get(`/api/transcript/at/${revision}`),
+
   asrModels: () => get("/api/asr/models"),
   loadModel: (body) => post("/api/asr/load", body),
   unloadModel: () => post("/api/asr/unload"),

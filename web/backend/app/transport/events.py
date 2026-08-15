@@ -41,6 +41,10 @@ TRANSCRIPTION_DONE: Final = "transcription.done"
 #: the message names the file the audio survives in.
 TRANSCRIPTION_FAILED: Final = "transcription.failed"
 
+#: The window capture started, stopped, or failed (D-022). Critical: a client that missed the
+#: window-closed frame would keep showing a live preview of a capture that ended.
+CAPTURE_STATE: Final = "capture.state"
+
 # -- health ---------------------------------------------------------------------------
 AUDIO_LEVEL: Final = "audio.level"
 VAD_STATE: Final = "vad.state"
@@ -69,6 +73,7 @@ ALL_EVENTS: Final[tuple[str, ...]] = (
     TRANSCRIPTION_PROGRESS,
     TRANSCRIPTION_DONE,
     TRANSCRIPTION_FAILED,
+    CAPTURE_STATE,
     AUDIO_LEVEL,
     VAD_STATE,
     STATUS,
@@ -105,6 +110,7 @@ CRITICAL_EVENTS: Final[frozenset[str]] = frozenset(
         # A transcription that ended and never said so leaves a progress bar running forever.
         TRANSCRIPTION_DONE,
         TRANSCRIPTION_FAILED,
+        CAPTURE_STATE,
         CHAT_DELTA,
         CHAT_DONE,
         ERROR,

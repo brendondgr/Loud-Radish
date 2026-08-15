@@ -67,6 +67,10 @@
       "critical": true,
       "coalescing": false
     },
+    "capture.state": {
+      "critical": true,
+      "coalescing": false
+    },
     "audio.level": {
       "action": "replace",
       "note": "Drives the input meter.",

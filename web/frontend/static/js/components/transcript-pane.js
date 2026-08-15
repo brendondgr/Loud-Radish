@@ -146,11 +146,16 @@ export class TranscriptPane {
     this.jumpWrap = $(".jump-to-live", root);
     this.jumpCount = $(".jump-to-live__count", root);
     this.countLabel = $("[data-segment-count]", root);
+    this.revisionSwitch = $("[data-revision-switch]", root);
 
     this.scroll = new ScrollController(this.scroller);
     this.lastTimestampShown = -Infinity;
 
     this.jumpButton?.addEventListener("click", () => this.scroll.jumpToLive());
+
+    for (const button of root?.querySelectorAll("[data-revision]") ?? []) {
+      button.addEventListener("click", () => this.showRevision(Number(button.dataset.revision)));
+    }
 
     on(TRANSCRIPT_CHANGED, (payload) => this._onTranscriptChanged(payload));
     on(POLISH_CHANGED, (payload) => this._onPolishChanged(payload));
@@ -163,6 +168,27 @@ export class TranscriptPane {
     on(RECORDING_CHANGED, () => this._renderEmptyState());
 
     this._renderEmptyState();
+  }
+
+  // -- transcript revisions (D-022) --------------------------------------------------
+
+  /**
+   * Offer the Live/Final switch, but only when the session actually holds two passes.
+   *
+   * A switch between one thing and itself is chrome that explains nothing, and it would appear on
+   * every ordinary session — where there is exactly one transcript and nothing to choose.
+   */
+  setRevisions(available, current) {
+    if (!this.revisionSwitch) return;
+    this.revisionSwitch.hidden = (available?.length ?? 0) < 2;
+    for (const button of this.revisionSwitch.querySelectorAll("[data-revision]")) {
+      button.setAttribute("aria-pressed", String(Number(button.dataset.revision) === current));
+    }
+  }
+
+  /** Replace the transcript with one pass's segments. Set by the entry point. */
+  async showRevision(revision) {
+    await this.onRevisionChange?.(revision);
   }
 
   // -- rendering -------------------------------------------------------------------

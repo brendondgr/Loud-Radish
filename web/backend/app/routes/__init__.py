@@ -7,7 +7,18 @@ channel with a replay contract is a different thing from a request/response endp
 
 from fastapi import APIRouter
 
-from . import chat, config, health, llm, pages, recordings, session, sessions, transcript
+from . import (
+    capture,
+    chat,
+    config,
+    health,
+    llm,
+    pages,
+    recordings,
+    session,
+    sessions,
+    transcript,
+)
 
 
 def build_router() -> APIRouter:
@@ -21,6 +32,7 @@ def build_router() -> APIRouter:
     router.include_router(chat.router)
     router.include_router(sessions.router)
     router.include_router(recordings.router)
+    router.include_router(capture.router)
     # Pages last: their catch-all-ish paths must not shadow an API route.
     router.include_router(pages.router)
     return router

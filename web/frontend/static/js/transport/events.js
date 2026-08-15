@@ -26,6 +26,10 @@ export const TRANSCRIPTION_DONE = "transcription.done";
 /** The pass failed, and the recording is still on disk. The payload names the file it survives in. */
 export const TRANSCRIPTION_FAILED = "transcription.failed";
 
+/** The window capture started, stopped, or failed (D-022). Never dropped: a missed window-closed
+ *  frame leaves a live preview showing for a capture that ended. */
+export const CAPTURE_STATE = "capture.state";
+
 export const AUDIO_LEVEL = "audio.level";
 export const VAD_STATE = "vad.state";
 export const STATUS = "status";

@@ -6,6 +6,17 @@
   <div class="pane-header__group">
     <span class="label">Transcript</span>
     <span class="numeric" data-segment-count style="color: var(--text-dim)">0 segments</span>
+
+    {# Shown only when a session actually holds two transcription passes (D-022). A switch between
+       one thing and itself is chrome that explains nothing. #}
+    <div class="revision-switch" data-revision-switch role="group" aria-label="Transcript version" hidden>
+      <button type="button" class="revision-switch__option" data-revision="0" aria-pressed="false">
+        Live
+      </button>
+      <button type="button" class="revision-switch__option" data-revision="1" aria-pressed="true">
+        Final
+      </button>
+    </div>
   </div>
 
   <div class="pane-header__group">

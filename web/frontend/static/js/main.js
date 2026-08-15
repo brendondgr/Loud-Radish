@@ -16,6 +16,7 @@ import { GlossaryPanel } from "./components/glossary-panel.js";
 import { Header } from "./components/header.js";
 import { ModeSwitcher } from "./components/mode-switcher.js";
 import { Preflight } from "./components/preflight.js";
+import { RecordingMonitor } from "./components/recording-monitor.js";
 import { TranscriptSelection } from "./components/selection.js";
 import { SettingsModal } from "./components/settings-modal.js";
 import { StatusBar } from "./components/status-bar.js";
@@ -25,6 +26,7 @@ import {
   ASR_PROGRESS,
   AUDIO_LEVEL,
   CONNECTION_CHANGED,
+  CAPTURE_STATE,
   RECORDING_PROGRESS,
   SESSION_STARTED,
   SESSION_STATE,
@@ -44,6 +46,7 @@ import { config } from "./stores/config.js";
 import { health } from "./stores/health.js";
 import { MODE_CHANGED, mode } from "./stores/mode.js";
 import { polish } from "./stores/polish.js";
+import { capture } from "./stores/capture.js";
 import { recording } from "./stores/recording.js";
 import { session } from "./stores/session.js";
 import { transcript } from "./stores/transcript.js";
@@ -52,6 +55,9 @@ function boot() {
   const socket = new TranscriptSocket();
 
   const pane = new TranscriptPane($("[data-transcript-pane]"));
+  // Swapping which transcription pass is on screen is a fetch plus a reset, and the pane does not
+  // own either — it is handed a callback, which is what keeps the dependency one-way.
+  pane.onRevisionChange = (revision) => showRevision(pane, revision);
   new StatusBar($("[data-status-bar]"));
 
   const settings = new SettingsModal($("[data-settings]"));
@@ -64,6 +70,18 @@ function boot() {
   });
 
   new ModeSwitcher($("[data-mode-switcher]"));
+
+  const monitor = new RecordingMonitor($("[data-monitor-pane]"), {
+    // The timer follows what is actually on screen: in the narrow layout the pane exists but is
+    // the inactive tab, and encoding frames for it would be pure waste.
+    isVisible: () => {
+      const pane = $("[data-monitor-pane]");
+      if (!pane || pane.hidden) return false;
+      const main = $(".app__main");
+      const narrow = window.matchMedia("(max-width: 900px)").matches;
+      return !narrow || main?.dataset.activePane === "monitor";
+    },
+  });
 
   const preflight = new Preflight($("[data-preflight]"), {
     onOpenSettings: (section) => settings.show(section),
@@ -94,6 +112,8 @@ function boot() {
       showPane("chat", { persist: false });
     },
   });
+
+  window.recordingMonitor = monitor;
 
   wireTranscript(socket, pane);
   wireHealth();
@@ -155,6 +175,7 @@ function wireTranscript(socket, pane) {
  */
 function wireRecording(banners) {
   on(RECORDING_PROGRESS, (payload) => recording.setRecording(payload));
+  on(CAPTURE_STATE, (payload) => capture.set(payload));
 
   on(TRANSCRIPTION_PROGRESS, (payload) => {
     recording.setTranscription(payload);
@@ -164,6 +185,9 @@ function wireRecording(banners) {
   on(TRANSCRIPTION_DONE, (payload) => {
     recording.setTranscription(payload);
     mode.setState(IDLE);
+    // A second pass over a session that also transcribed live has just created a revision to
+    // switch to, which is the one moment the switch becomes worth offering.
+    void refreshRevisions(window.transcriptPane);
   });
 
   on(TRANSCRIPTION_FAILED, (payload) => {
@@ -194,6 +218,7 @@ function wireSession(header) {
     polish.reset();
     session.start(payload);
     recording.reset();
+    capture.reset();
     // The server is authoritative about the mode: a reload mid-recording, or a session started
     // from somewhere other than this tab, must show what is actually being recorded.
     mode.adoptSession({ running: true, mode: session.mode });
@@ -207,6 +232,7 @@ function wireSession(header) {
   on(SESSION_STATE, (state) => {
     session.hydrate(state);
     recording.hydrate(state);
+    capture.set(state?.capture);
     mode.adoptSession({ running: session.running, mode: session.mode });
     // After adoptSession, which would otherwise reset a reconnecting client to idle while a pass
     // it cannot see is still running.
@@ -297,6 +323,7 @@ function showPane(name, { persist = true } = {}) {
     tab.setAttribute("aria-selected", String(tab.dataset.paneTab === name));
   }
   if (name === "chat") chat.markRead();
+  window.recordingMonitor?.visibilityChanged();
 }
 
 /** Fetch state over HTTP on load, so the page is correct before the socket says anything. */
@@ -315,6 +342,7 @@ async function hydrate(chatPane, glossary) {
     const state = await api.session();
     session.hydrate(state);
     recording.hydrate(state);
+    capture.set(state?.capture);
     mode.adoptSession({ running: session.running, mode: session.mode });
     if (recording.isTranscribing) mode.setState(PROCESSING);
     if (state.metrics) health.setStatus(state.metrics);
@@ -362,6 +390,35 @@ async function arm(captureMode, preflight, banners, settings) {
     return;
   }
   await start(captureMode, options, banners, settings);
+}
+
+/**
+ * Show one transcription pass (D-022).
+ *
+ * A whole replacement rather than a merge: the two passes cover the same audio with different
+ * segment ids, and interleaving them would produce a transcript that says everything twice.
+ */
+async function showRevision(pane, revision) {
+  try {
+    const { segments } = await api.transcriptAt(revision);
+    transcript.reset();
+    polish.reset();
+    transcript.commitMany(segments);
+    const { revisions } = await api.transcriptRevisions();
+    pane.setRevisions(revisions, revision);
+  } catch (error) {
+    if (error instanceof ApiError) console.warn("Could not switch transcript:", error.message);
+  }
+}
+
+/** Offer the Live/Final switch if this session ended up with two passes. */
+async function refreshRevisions(pane) {
+  try {
+    const { revisions, latest } = await api.transcriptRevisions();
+    pane.setRevisions(revisions, latest);
+  } catch {
+    /* No session, or none yet. The switch simply stays hidden. */
+  }
 }
 
 async function start(captureMode, options, banners, settings) {

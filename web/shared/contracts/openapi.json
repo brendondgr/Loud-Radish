@@ -1629,6 +1629,50 @@
         }
       }
     },
+    "/api/capture/state": {
+      "get": {
+        "tags": [
+          "capture"
+        ],
+        "summary": "Capture State",
+        "description": "What the monitor pane draws. Reports `recording: false` when nothing is capturing.",
+        "operationId": "capture_state_api_capture_state_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Capture State Api Capture State Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/capture/preview.jpg": {
+      "get": {
+        "tags": [
+          "capture"
+        ],
+        "summary": "Preview",
+        "description": "The most recent preview frame.\n\n404 whenever there is not one \u2014 no capture, no `jpegenc`, or the first frame not yet written.\nThe monitor treats that as its documented degraded state and shows a static card, because a\nblack rectangle and a broken preview look identical (D-020).",
+        "operationId": "preview_api_capture_preview_jpg_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "tags": [
