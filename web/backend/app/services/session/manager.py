@@ -98,6 +98,11 @@ class SessionManager:
         self._last_level_emit = 0.0
         self._source_info: SourceInfo | None = None
         self._warned_backpressure = False
+        #: Produces rolling summaries and glossary terms while a session runs. Attached by the app
+        #: factory rather than constructed here: it needs a language model, and the pipeline must
+        #: keep working on a machine that has none.
+        self.context_worker_factory: Callable[[TranscriptStore, AppConfig], Any] | None = None
+        self._context_worker: Any = None
 
     # -- state ---------------------------------------------------------------------
 
@@ -115,6 +120,21 @@ class SessionManager:
     def asr(self) -> AsrLifecycle:
         """The ASR lifecycle, so routes can load and swap models."""
         return self._asr
+
+    @property
+    def session_seconds(self) -> float:
+        """How far into the talk the pipeline has reached, in session-relative seconds.
+
+        Taken from the engine — audio actually consumed — rather than from a wall clock, so it
+        matches the timestamps on the transcript exactly. A file replayed at 8× would otherwise
+        report a "now" eight times further along than any segment the assistant can cite.
+
+        Falls back to the stored transcript's duration once the engine is gone, so a question asked
+        after a session ends is still positioned correctly.
+        """
+        if self._engine is not None:
+            return float(self._engine.session_seconds)
+        return self._store.stats().duration_seconds if self._store is not None else 0.0
 
     def state(self) -> dict[str, Any]:
         """A JSON-safe description of the session, for ``GET /api/session``."""
@@ -186,6 +206,7 @@ class SessionManager:
             raise SessionError(str(exc)) from exc
 
         self._metadata = session
+        self._start_context_worker(config)
         self._emit(
             "session.started",
             {
@@ -208,6 +229,10 @@ class SessionManager:
 
         if self._source is not None:
             self._source.stop()
+
+        # Stopped before the store is torn down, because its final pass summarises the tail — which
+        # is where a talk's conclusions live.
+        await self._stop_context_worker()
 
         # Drain what capture already queued before flushing: those frames are audio the speaker
         # produced, and discarding them would silently truncate the end of the talk.
@@ -362,6 +387,30 @@ class SessionManager:
                 )
 
     # -- construction --------------------------------------------------------------
+
+    def _start_context_worker(self, config: AppConfig) -> None:
+        """Start rolling summarisation, if anything is configured to do it.
+
+        Wrapped: a failure to build the worker must not prevent a session from starting. The
+        assistant is a tool, the transcript is the document.
+        """
+        if self.context_worker_factory is None or self._store is None:
+            return
+        try:
+            self._context_worker = self.context_worker_factory(self._store, config)
+            self._context_worker.start()
+        except Exception:  # noqa: BLE001 - never fatal to a recording
+            logger.warning("Rolling summaries are unavailable this session", exc_info=True)
+            self._context_worker = None
+
+    async def _stop_context_worker(self) -> None:
+        worker, self._context_worker = self._context_worker, None
+        if worker is None:
+            return
+        try:
+            await worker.stop()
+        except Exception:  # noqa: BLE001 - a failed final summary must not fail the stop
+            logger.warning("Final summary failed", exc_info=True)
 
     def _open_store(self, config: AppConfig, session: SessionMetadata) -> TranscriptStore:
         directory = self._session_dir or Path(config.storage.session_dir)

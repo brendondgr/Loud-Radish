@@ -24,6 +24,9 @@ from fastapi.templating import Jinja2Templates
 from . import paths
 from .config import ConfigStore, CredentialStore
 from .routes import build_router
+from .services.chat import ChatService
+from .services.context import ContextWorker
+from .services.llm import build_llm
 from .services.session import SessionManager
 from .transport import EventHub, ws_router
 
@@ -59,6 +62,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        chat = getattr(app.state, "chat", None)
+        if chat is not None:
+            await chat.shutdown()
+
         session = getattr(app.state, "session_manager", None)
         if session is not None:
             await session.shutdown()
@@ -88,12 +95,42 @@ def create_app(config: ConfigStore | None = None) -> FastAPI:
     # calling `hub.emit` from whichever thread produced the event, and the hub marshals.
     app.state.hub = EventHub()
     app.state.session_manager = SessionManager(app.state.config, emit=app.state.hub.emit)
+    _wire_assistant(app)
 
     app.include_router(build_router())
     app.include_router(ws_router)
     _mount_static(app)
 
     return app
+
+
+def _wire_assistant(app: FastAPI) -> None:
+    """Attach chat orchestration and rolling summarisation to the session manager.
+
+    Both are built from *providers* rather than from resolved objects, so that changing the model in
+    settings takes effect on the next question rather than at the next restart. A backend captured
+    once here would silently keep answering from whatever was configured at boot.
+    """
+    manager = app.state.session_manager
+
+    def backend_factory():  # noqa: ANN202 - returns LlmBackend
+        return build_llm(app.state.config.resolve().llm, app.state.credentials)
+
+    app.state.chat = ChatService(
+        store_provider=lambda: manager.store,
+        config_provider=lambda: app.state.config.resolve(),
+        backend_factory=backend_factory,
+        emit=app.state.hub.emit,
+        clock=lambda: manager.session_seconds,
+    )
+
+    manager.context_worker_factory = lambda store, config: ContextWorker(
+        store=store,
+        config=config,
+        backend_factory=backend_factory,
+        emit=app.state.hub.emit,
+        clock=lambda: manager.session_seconds,
+    )
 
 
 def _build_templates() -> Jinja2Templates | None:

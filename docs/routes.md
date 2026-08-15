@@ -1,10 +1,10 @@
 # Route Map
 
-*Last updated: 2026-08-14 (Phase 9 — LLM abstraction)*
+*Last updated: 2026-08-14 (Phase 10 — chat orchestration)*
 
-> **Status column is authoritative.** Session, audio, ASR, transcript, configuration, and the
-> language-model group are implemented and tested, as is the WebSocket. The chat group lands in the
-> phase named beside it. Update this file in the same change that adds, removes, or changes a route.
+> **Status column is authoritative.** Every API group is implemented and tested, as is the
+> WebSocket. Only the `/sessions` page remains. Update this file in the same change that adds,
+> removes, or changes a route.
 
 The upload-and-poll job routes recorded at initialization are **gone** — see Decision D-010 in
 `docs/documentation.md`. There is no `/api/transcriptions` surface.
@@ -85,11 +85,12 @@ state is a second place for it to drift.
 
 | Method | Path | Purpose | Status |
 |---|---|---|---|
-| `POST` | `/api/chat/send` | Ask a question. The answer streams over the WebSocket. | Phase 10 |
-| `POST` | `/api/chat/cancel` | Cancel an in-flight request | Phase 10 |
-| `GET` | `/api/chat/history` | Conversation history | Phase 10 |
-| `DELETE` | `/api/chat/history` | Clear the conversation | Phase 10 |
-| `GET` | `/api/chat/quick-actions` | The configured quick-action prompts | Phase 10 |
+| `POST` | `/api/chat/send` | Ask a question. Returns a `request_id` immediately; the answer streams over the WebSocket. | **Implemented** |
+| `POST` | `/api/chat/cancel` | Cancel an in-flight request. Cancelling nothing is not an error. | **Implemented** |
+| `GET` | `/api/chat/history` | Conversation history | **Implemented** |
+| `DELETE` | `/api/chat/history` | Clear the conversation. The transcript is untouched. | **Implemented** |
+| `GET` | `/api/chat/quick-actions` | The configured quick-action prompts | **Implemented** |
+| `POST` | `/api/chat/read` | Record how far the user has read, for "what did I miss" | **Implemented** |
 
 ### Transcript
 
