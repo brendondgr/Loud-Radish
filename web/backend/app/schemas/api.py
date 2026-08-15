@@ -10,6 +10,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ..services.session.modes import CaptureMode
+
 
 class _Model(BaseModel):
     """Reject unknown keys, so a typo in a request is an error rather than a silent no-op."""
@@ -44,6 +46,9 @@ class StartSessionRequest(_Model):
     title: str = ""
     venue: str = ""
     speaker: str = ""
+    #: Which capture mode to run (D-020). Defaults to the original behaviour, so a client that
+    #: predates capture modes keeps working unchanged.
+    mode: CaptureMode = "live"
 
 
 class SessionResponse(_Model):

@@ -33,7 +33,7 @@ from ..services.audio import (
     probe,
 )
 from ..services.audio.probe import probe_device
-from ..services.session import SessionError
+from ..services.session import SessionError, modes
 
 router = APIRouter(prefix="/api", tags=["session"])
 
@@ -64,17 +64,42 @@ async def get_session(request: Request) -> dict[str, Any]:
     return _manager(request).state()
 
 
+#: Capture modes whose pipeline wiring has landed. The others are accepted by the schema — the
+#: vocabulary is fixed (D-020) and the frontend offers all three — but refused here until their plan
+#: is implemented, so an unfinished mode gives a named error rather than a session that starts and
+#: records nothing. Each plan deletes its own entry from this set.
+_UNIMPLEMENTED_MODES: dict[str, str] = {
+    modes.RECORDED: (
+        "Recorded transcription is not built yet. Use live transcription for now — "
+        "see docs/plans/recorded-transcription.md."
+    ),
+    modes.WINDOW: (
+        "Window recording is not built yet. Use live transcription for now — "
+        "see docs/plans/window-recording-transcription.md."
+    ),
+}
+
+
 @router.post("/session/start", response_model=SessionResponse)
 async def start_session(request: Request, body: StartSessionRequest) -> dict[str, Any]:
-    """Begin capture and transcription."""
+    """Begin capture and transcription in the requested capture mode."""
     manager = _manager(request)
     import uuid
+
+    if body.mode in _UNIMPLEMENTED_MODES:
+        # 501 rather than 409: the request is valid and the state is fine — this build simply does
+        # not have the feature, which is a different problem with a different remedy.
+        raise HTTPException(
+            status_code=501,
+            detail=_error("mode-unavailable", _UNIMPLEMENTED_MODES[body.mode]),
+        )
 
     metadata = SessionMetadata(
         session_id=uuid.uuid4().hex[:12],
         title=body.title,
         venue=body.venue,
         speaker=body.speaker,
+        mode=body.mode,
     )
     try:
         await manager.start(metadata)

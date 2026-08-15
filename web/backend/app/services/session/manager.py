@@ -232,11 +232,17 @@ class SessionManager:
             {
                 "session_id": session.session_id,
                 "started_at": session.started_at.isoformat(),
+                "mode": session.mode,
                 "config": session.config,
                 "source": self._source_info.describe() if self._source_info else "",
             },
         )
-        logger.info("Session %s started from %s", session.session_id, self._source_info)
+        logger.info(
+            "Session %s started in %s mode from %s",
+            session.session_id,
+            session.mode,
+            self._source_info,
+        )
         return session
 
     async def stop(self) -> SessionStats:

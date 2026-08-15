@@ -58,7 +58,7 @@
           "session"
         ],
         "summary": "Start Session",
-        "description": "Begin capture and transcription.",
+        "description": "Begin capture and transcription in the requested capture mode.",
         "operationId": "start_session_api_session_start_post",
         "requestBody": {
           "content": {
@@ -2167,6 +2167,16 @@
             "type": "string",
             "title": "Speaker",
             "default": ""
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "live",
+              "recorded",
+              "window"
+            ],
+            "title": "Mode",
+            "default": "live"
           }
         },
         "additionalProperties": false,

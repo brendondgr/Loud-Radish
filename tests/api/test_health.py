@@ -24,7 +24,15 @@ def test_health_reports_ok(client: TestClient) -> None:
 def test_health_reports_which_optional_groups_are_installed(client: TestClient) -> None:
     """A missing model backend should surface here, not as a failure when the user hits record."""
     optional = client.get("/api/health").json()["optional"]
-    assert set(optional) == {"asr_whisper", "audio_device", "vad_silero", "credentials"}
+    assert set(optional) == {
+        "asr_whisper",
+        "audio_device",
+        "vad_silero",
+        "credentials",
+        # Not a dependency group but reported alongside them, because it is the same question from
+        # the user's side: can this machine do the thing, and if not what is missing (D-020).
+        "window_capture",
+    }
     assert all(isinstance(value, bool) for value in optional.values())
 
 

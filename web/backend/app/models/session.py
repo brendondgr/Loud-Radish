@@ -8,7 +8,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
+
+if TYPE_CHECKING:
+    # Imported for typing only. ``services.session`` imports this module at run time, so importing
+    # it back eagerly would be a cycle; ``from __future__ import annotations`` means the dataclass
+    # never evaluates the annotation, so the type is available to checkers and costs nothing here.
+    from ..services.session.modes import CaptureMode
 
 ChatRole = Literal["user", "assistant", "system"]
 
@@ -27,6 +33,9 @@ class SessionMetadata:
     title: str = ""
     venue: str = ""
     speaker: str = ""
+    #: Which capture mode this session runs in (D-020). Fixed at start and never changed: switching
+    #: would mean rebuilding the pipeline underneath a transcript that is still accumulating.
+    mode: CaptureMode = "live"
     #: The biasing prompt the user supplied before the talk (BE §6.5).
     session_prompt: str = ""
     #: Snapshot of the configuration the session ran with, for reproducibility.
@@ -46,6 +55,7 @@ class SessionMetadata:
             "title": self.title,
             "venue": self.venue,
             "speaker": self.speaker,
+            "mode": self.mode,
             "session_prompt": self.session_prompt,
             "running": self.is_running,
         }
