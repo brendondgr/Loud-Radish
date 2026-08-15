@@ -205,6 +205,26 @@ class StorageConfig(_Base):
     default_export_format: ExportFormat = "markdown"
 
 
+class RecordingConfig(_Base):
+    """Capturing audio to a file, and transcribing it once it is whole (D-021).
+
+    Read by `recorded` mode and by `window` mode. Not by `live`, which writes no file.
+    """
+
+    #: Where recordings are written. Separate from ``audio.file_path``'s library, which holds
+    #: recordings the *file source replays* — mixing the machine's own captures into the list a
+    #: user picks fixtures from is a way to delete the wrong thing.
+    recording_dir: str = "./data/recordings"
+    #: Stop after this long. A toggle is easy to forget, and an unattended microphone will fill a
+    #: disk overnight. Reaching it stops cleanly and says so rather than truncating in silence.
+    max_minutes: float = Field(default=240.0, ge=1.0, le=1440.0)
+    #: Seconds of audio handed to the model per pass in the batch transcription. Long enough that
+    #: the model has real context, short enough that progress moves and a failure loses little.
+    batch_window_s: float = Field(default=30.0, ge=5.0, le=300.0)
+    #: Overlap between consecutive windows, so a word split across a boundary is seen whole once.
+    batch_overlap_s: float = Field(default=1.0, ge=0.0, le=10.0)
+
+
 class QuickAction(_Base):
     """A parameterised prompt template surfaced as a one-tap button (BE §11.3)."""
 
@@ -226,5 +246,6 @@ class AppConfig(_Base):
     llm: LlmConfig = Field(default_factory=LlmConfig)
     context: ContextConfig = Field(default_factory=ContextConfig)
     polish: PolishConfig = Field(default_factory=PolishConfig)
+    recording: RecordingConfig = Field(default_factory=RecordingConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     quick_actions: list[QuickAction] = Field(default_factory=list)

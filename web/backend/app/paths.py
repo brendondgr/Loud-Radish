@@ -20,6 +20,10 @@ TEMPLATES_DIR: Path = FRONTEND_DIR / "templates"
 STATIC_DIR: Path = FRONTEND_DIR / "static"
 
 DATA_DIR: Path = REPO_ROOT / "data"
+#: Audio captured by `recorded` and `window` sessions. Deliberately *not* ``data/audio``, which is
+#: the library of recordings the file source replays — one is the machine's own output and the
+#: other is the user's input, and a single list mixing them invites deleting the wrong thing.
+RECORDINGS_DIR: Path = DATA_DIR / "recordings"
 LOGS_DIR: Path = REPO_ROOT / "logs"
 
 

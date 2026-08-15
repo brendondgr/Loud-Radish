@@ -46,6 +46,11 @@ RESTART_SESSION_PATHS: frozenset[str] = frozenset(
     {
         "storage.session_dir",
         "storage.retain_audio",
+        # Both are read when a recording *opens* its file. Changing either mid-recording would
+        # either move the file underneath the sink or move the cap past a recording already
+        # written against the old one (D-021).
+        "recording.recording_dir",
+        "recording.max_minutes",
     }
 )
 
