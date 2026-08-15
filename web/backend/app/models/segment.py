@@ -39,6 +39,10 @@ class Segment:
     #: Reserved for diarisation. Always ``None`` in v1 — present so adding it later is not a
     #: schema migration (BE §21.6).
     speaker: str | None = None
+    #: Which transcription pass produced this (D-022). ``0`` is the live one, ``1`` the
+    #: post-capture pass over the recorded audio. Both are kept rather than one replacing the
+    #: other: the live transcript is what the user watched and what any chat citation points into.
+    revision: int = 0
 
     @property
     def duration(self) -> float:
@@ -55,6 +59,7 @@ class Segment:
         payload: dict[str, Any] = {
             "id": self.id,
             "text": self.text,
+            "revision": self.revision,
             "start": round(self.start, 3),
             "end": round(self.end, 3),
             "wall_clock": self.wall_clock.isoformat(),

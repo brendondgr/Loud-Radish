@@ -46,6 +46,7 @@ class TranscriptionRunner:
         window_s: float = 30.0,
         overlap_s: float = 1.0,
         max_segment_s: float = 30.0,
+        revision: int = 0,
         on_released: Callable[[], None] | None = None,
     ) -> None:
         self._registry = registry
@@ -59,6 +60,7 @@ class TranscriptionRunner:
         self._window_s = window_s
         self._overlap_s = overlap_s
         self._max_segment_s = max_segment_s
+        self._revision = revision
 
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
@@ -126,6 +128,7 @@ class TranscriptionRunner:
                 overlap_s=self._overlap_s,
                 max_segment_s=self._max_segment_s,
                 first_segment_id=store.last_segment_id() + 1,
+                revision=self._revision,
                 prompt=prompt,
                 on_progress=lambda seconds, segments: self._on_window(
                     job, store, seconds, segments

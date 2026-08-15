@@ -477,6 +477,73 @@
         }
       }
     },
+    "/api/transcript/revisions": {
+      "get": {
+        "tags": [
+          "transcript"
+        ],
+        "summary": "Revisions",
+        "description": "Which transcription passes this session holds (D-022).\n\nUsually one. A window session that ran both a live pass and a post-capture one holds two, and\nthe transcript pane offers a Live/Final switch only when it does \u2014 a switch between one thing\nand itself is chrome that explains nothing.",
+        "operationId": "revisions_api_transcript_revisions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Revisions Api Transcript Revisions Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/transcript/at/{revision}": {
+      "get": {
+        "tags": [
+          "transcript"
+        ],
+        "summary": "At Revision",
+        "description": "Every segment from one pass. What the Live/Final switch fetches.",
+        "operationId": "at_revision_api_transcript_at__revision__get",
+        "parameters": [
+          {
+            "name": "revision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Revision"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SegmentListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/transcript/since/{segment_id}": {
       "get": {
         "tags": [

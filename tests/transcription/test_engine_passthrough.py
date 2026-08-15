@@ -120,6 +120,8 @@ class TestOutputParity:
             "confidence",
             "model_id",
             "speaker",
+            # Which transcription pass produced it (D-022). Always 0 on the live path.
+            "revision",
         }
 
     def test_segment_ids_are_monotonic(self) -> None:

@@ -22,7 +22,7 @@ from __future__ import annotations
 import logging
 import wave
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import numpy as np
@@ -143,6 +143,7 @@ def transcribe_file(
     overlap_s: float = 1.0,
     max_segment_s: float = 30.0,
     first_segment_id: int = 1,
+    revision: int = 0,
     prompt: str | None = None,
     on_progress: ProgressFn | None = None,
     should_stop: Callable[[], bool] | None = None,
@@ -177,6 +178,9 @@ def transcribe_file(
         # are punctuation and the duration cap. Claiming a pause we did not detect would split
         # sentences at arbitrary points.
         segments = segmenter.add(words, model_id=getattr(result, "model_id", ""))
+        # Stamped here rather than by the segmenter: which *pass* produced a segment is a fact
+        # about this function's caller, and the segmenter is shared with the live path.
+        segments = [replace(segment, revision=revision) for segment in segments]
         produced.extend(segments)
         if on_progress is not None:
             on_progress(window.end_s, segments)
@@ -185,6 +189,7 @@ def transcribe_file(
     # which loses the end of every recording — the part a speaker most often uses for conclusions.
     tail = segmenter.flush()
     if tail is not None:
+        tail = replace(tail, revision=revision)
         produced.append(tail)
         if on_progress is not None:
             on_progress(duration, [tail])

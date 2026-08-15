@@ -34,11 +34,19 @@ CREATE TABLE IF NOT EXISTS segments (
     model_id    TEXT    NOT NULL DEFAULT '',
     speaker     TEXT,
     -- Word-level detail as JSON, for click-to-seek and low-confidence marking. Optional.
-    words_json  TEXT
+    words_json  TEXT,
+    -- Which transcription pass produced this (D-022). 0 is the live one; 1 is the post-capture
+    -- pass over the recorded audio. Both are kept: the live transcript is what the user watched
+    -- and what any chat citation points into, so replacing it would invalidate a conversation
+    -- that already happened. Defaulted so a database written before this column reads as live.
+    revision    INTEGER NOT NULL DEFAULT 0
 );
 
 -- Range queries drive "summarise the last ten minutes" and the frontend's time navigation.
 CREATE INDEX IF NOT EXISTS idx_segments_start ON segments (start);
+
+-- Nearly every read filters on revision, and a session with two passes has twice the rows.
+CREATE INDEX IF NOT EXISTS idx_segments_revision ON segments (revision, id);
 
 -- Full-text search over the transcript, kept in step by triggers. `content=` makes this an external
 -- content table: the text is not stored twice.

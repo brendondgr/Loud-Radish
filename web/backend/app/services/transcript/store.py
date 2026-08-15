@@ -69,9 +69,41 @@ class TranscriptStore:
         self.close()
 
     def _create_schema(self) -> None:
+        # **Migration first.** The schema script creates an index on `segments (revision, id)`, and
+        # on a database written before that column existed the whole script fails on that one
+        # statement — which was found by the test for exactly this case, not by reading it.
+        self._migrate()
         with self._lock:
             self._connection.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
             self._connection.commit()
+
+    def _migrate(self) -> None:
+        """Bring an older session file up to the current schema.
+
+        `CREATE TABLE IF NOT EXISTS` does nothing to a table that already exists, so a column added
+        later never appears in a database written before it. This matters because
+        `services/transcript/archive.py` opens session files this application wrote months ago, and
+        an unguarded query against a missing column raises rather than returning nothing.
+
+        A no-op on a fresh database, where there is no `segments` table yet for the script below to
+        have missed anything in.
+        """
+        with self._lock:
+            existing = self._connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'segments'"
+            ).fetchone()
+            if existing is None:
+                return
+
+            columns = {
+                row["name"] for row in self._connection.execute("PRAGMA table_info(segments)")
+            }
+            if "revision" not in columns:
+                self._connection.execute(
+                    "ALTER TABLE segments ADD COLUMN revision INTEGER NOT NULL DEFAULT 0"
+                )
+                self._connection.commit()
+                logger.info("Added the revision column to %s", self._path.name)
 
     # -- session metadata ----------------------------------------------------------
 
@@ -158,6 +190,7 @@ class TranscriptStore:
                 segment.model_id,
                 segment.speaker,
                 _encode_words(segment.words) if store_words else None,
+                segment.revision,
             )
             for segment in segments
         ]
@@ -165,8 +198,9 @@ class TranscriptStore:
             self._connection.executemany(
                 """
                 INSERT OR IGNORE INTO segments
-                    (id, text, start, end, wall_clock, confidence, model_id, speaker, words_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (id, text, start, end, wall_clock, confidence, model_id, speaker,
+                     words_json, revision)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 rows,
             )
@@ -177,9 +211,32 @@ class TranscriptStore:
         row = self._query_one("SELECT * FROM segments WHERE id = ?", (segment_id,))
         return _row_to_segment(row) if row else None
 
+    def revisions(self) -> list[int]:
+        """Which transcription passes this session holds, ascending (D-022).
+
+        Usually just ``[0]``. A window session that ran both a live pass and a post-capture one
+        holds ``[0, 1]``, and the interface offers a Live/Final switch only when it does.
+        """
+        rows = self._query("SELECT DISTINCT revision FROM segments ORDER BY revision")
+        return [int(row["revision"]) for row in rows]
+
+    def latest_revision(self) -> int:
+        """The newest pass present, which is what a reader is shown by default."""
+        row = self._query_one("SELECT MAX(revision) AS newest FROM segments")
+        return int(row["newest"]) if row and row["newest"] is not None else 0
+
     def all_segments(self) -> list[Segment]:
         """Every segment, in id order."""
         return [_row_to_segment(row) for row in self._query("SELECT * FROM segments ORDER BY id")]
+
+    def segments_at(self, revision: int) -> list[Segment]:
+        """Every segment from one transcription pass, in order."""
+        return [
+            _row_to_segment(row)
+            for row in self._query(
+                "SELECT * FROM segments WHERE revision = ? ORDER BY id", (revision,)
+            )
+        ]
 
     def segments_since(self, segment_id: int, limit: int | None = None) -> list[Segment]:
         """Everything after ``segment_id`` — the reconnection replay path (BE §12.4).
@@ -490,6 +547,9 @@ def _row_to_segment(row: sqlite3.Row) -> Segment:
         confidence=row["confidence"],
         model_id=row["model_id"],
         speaker=row["speaker"],
+        # `keys()` rather than a bare lookup: `archive.py` opens session files written before this
+        # column existed, and sqlite3.Row raises IndexError on a name it does not have.
+        revision=row["revision"] if "revision" in row.keys() else 0,
     )
 
 

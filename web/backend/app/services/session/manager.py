@@ -767,6 +767,11 @@ class SessionManager:
             source_path=str(path),
             total_seconds=sink.duration_s,
         )
+        # A session that also transcribed live already holds revision 0, so the post-capture pass
+        # writes revision 1 and both are kept (D-022). A `recorded` session has no live pass, so
+        # its only transcript is revision 0 and a switch would have nothing to switch between.
+        revision = 1 if self._engine is not None else 0
+
         self._runner = TranscriptionRunner(
             registry=self.jobs,
             emit=self._emit,
@@ -774,6 +779,7 @@ class SessionManager:
             window_s=config.recording.batch_window_s,
             overlap_s=config.recording.batch_overlap_s,
             max_segment_s=config.streaming.max_segment_s,
+            revision=revision,
             on_released=self._on_transcription_released,
         )
         started = self._runner.start(

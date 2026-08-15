@@ -40,6 +40,36 @@ def _store(request: Request):  # noqa: ANN201 - returns TranscriptStore
     return store
 
 
+@router.get("/revisions")
+async def revisions(request: Request) -> dict[str, Any]:
+    """Which transcription passes this session holds (D-022).
+
+    Usually one. A window session that ran both a live pass and a post-capture one holds two, and
+    the transcript pane offers a Live/Final switch only when it does — a switch between one thing
+    and itself is chrome that explains nothing.
+    """
+    store = _store(request)
+    available = store.revisions()
+    return {
+        "revisions": available,
+        "latest": store.latest_revision(),
+        # Named rather than numbered in the interface: "Final" means something to a reader and
+        # "revision 1" does not.
+        "labels": {"0": "Live", "1": "Final"},
+    }
+
+
+@router.get("/at/{revision}", response_model=SegmentListResponse)
+async def at_revision(request: Request, revision: int) -> dict[str, Any]:
+    """Every segment from one pass. What the Live/Final switch fetches."""
+    store = _store(request)
+    segments = store.segments_at(revision)
+    return {
+        "segments": [segment.as_event() for segment in segments],
+        "last_id": store.last_segment_id(),
+    }
+
+
 @router.get("/since/{segment_id}", response_model=SegmentListResponse)
 async def since(request: Request, segment_id: int, limit: int = Query(500, ge=1, le=5000)) -> dict:
     """Everything after ``segment_id``. Ordered by id, which makes the replay idempotent."""

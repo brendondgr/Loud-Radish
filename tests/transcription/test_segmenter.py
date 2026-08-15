@@ -154,6 +154,8 @@ class TestSegmentModel:
             "confidence",
             "model_id",
             "speaker",
+            # Which transcription pass produced it (D-022). Always 0 on the live path.
+            "revision",
         }
         assert payload["speaker"] is None
 
