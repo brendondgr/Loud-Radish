@@ -10,10 +10,19 @@ audio already on disk, the right answer is to transcribe the whole thing with ev
 available rather than to decide what is safe to show before the talk has finished.
 """
 
+from .batch import BatchError, plan_windows, read_wav, transcribe_file
+from .job import JobRegistry, JobState, TranscriptionJob
 from .sink import RecordingLimitReached, SinkError, WavSink
 
 __all__ = [
+    "BatchError",
+    "JobRegistry",
+    "JobState",
     "RecordingLimitReached",
     "SinkError",
+    "TranscriptionJob",
     "WavSink",
+    "plan_windows",
+    "read_wav",
+    "transcribe_file",
 ]
