@@ -21,4 +21,4 @@ conventions in [../skills/planner/SKILL.md](../skills/planner/SKILL.md).
 |---|---|---|
 | [live-seminar-transcriber.md](live-seminar-transcriber.md) | Full vertical slice — live audio capture, streaming ASR, transcript store, LLM chat, and the Jinja2 + ES module frontend | Complete (14 / 14 phases) |
 | [minute-based-transcript-polish.md](minute-based-transcript-polish.md) | A background pass that rewrites each finished minute of transcript into clean block text, without changing what was said | Complete (7 / 7 steps) |
-| [transcript-polish-refinements.md](transcript-polish-refinements.md) | Dialogue accuracy: spoken code references written properly, timestamps retained for retrieval, and continuous prose instead of constant line breaks | In progress (0 / 5 steps) |
+| [transcript-polish-refinements.md](transcript-polish-refinements.md) | Dialogue accuracy: spoken code references written properly, timestamps retained for retrieval, and continuous prose instead of constant line breaks | Complete (5 / 5 steps) |

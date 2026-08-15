@@ -18,7 +18,8 @@ TranscriberPrototype/
 │   ├── plans/
 │   │   ├── README.md              # Plan conventions and index
 │   │   ├── live-seminar-transcriber.md   # The 14-phase build plan
-│   │   └── minute-based-transcript-polish.md  # The clean-up pass (D-018)
+│   │   ├── minute-based-transcript-polish.md  # The clean-up pass (D-018)
+│   │   └── transcript-polish-refinements.md   # Dialogue accuracy, timestamps, prose
 │   ├── skills/                    # Canonical skill definitions used by every agent tool
 │   │   ├── global-project-rules/SKILL.md
 │   │   ├── planner/{SKILL.md,SETUP.md,planner.md}
@@ -86,7 +87,8 @@ TranscriberPrototype/
 │   │   │       └── passthrough.py # Bypass path for streaming-native models
 │   │   │   └── polish/            # The minute-by-minute clean-up pass (D-018)
 │   │   │       ├── chunker.py     # When a chunk is ready: a minute, then a pause
-│   │   │       ├── guard.py       # Strips decoration; rejects a summary posing as a tidy-up
+│   │   │       ├── source.py      # The chunk flattened to one run, timestamps placed
+│   │   │       ├── guard.py       # Strips decoration and invented timestamps; catches summaries
 │   │   │       ├── prompts.py     # The instruction list, and the no-reasoning hints
 │   │   │       └── worker.py      # The background loop and every failure path
 │   │   │   └── transcript/        # The durable record

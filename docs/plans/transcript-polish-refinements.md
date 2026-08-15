@@ -1,6 +1,6 @@
 # Transcript Polish — Dialogue Accuracy, Timestamps, and Continuous Prose
 
-*Created: 2026-08-15 · Status: in progress (0 / 5 steps)*
+*Created: 2026-08-15 · Status: **complete** (5 / 5 steps)*
 
 ## 1. Introduction
 
@@ -19,7 +19,7 @@ technical terms into their written form and repairing the grammar around each co
 carry the markers through to the points where that material ended up; and the result is checked so
 that a marker the model invented, moved backwards, or lost cannot corrupt retrieval. On the page,
 consecutive blocks then flow as consecutive paragraphs of prose with the timestamps rendered as
-quiet inline anchors the reader can click.
+quiet inline marks.
 
 The safety properties of D-018 are unchanged and are not up for renegotiation by this plan: the
 pass stays additive, the raw segments stay untouched, and every failure still falls back to showing
@@ -70,10 +70,16 @@ the transcript exactly as the speech model produced it.
   to its moment; feeding polished text to the assistant is a separate decision about what the
   assistant is allowed to read, and is recorded as a follow-up rather than smuggled in here.
 
+- **Whether an inline timestamp should be clickable.** Decided during step 4, against the first
+  sketch in this plan, which called for anchors. A citation in a chat answer points *somewhere else*
+  and needs a click to get there; a timestamp sitting in the transcript is already at the moment it
+  names, so a button there would seek to itself. They are rendered as quiet non-interactive marks,
+  which also leaves the region with no focusable elements — the same keyboard surface it had before.
+
 - **The uncommitted change to `core/citations.js`.** The working tree carries someone's in-progress
-  edit to that file, broadening the citation regex. This plan reuses `renderWithCitations()` and
-  works against either version, since it only ever emits the plain `[MM:SS]` form. *Assumption*:
-  that file is left strictly alone and never staged by this work.
+  edit to that file, broadening the citation regex. This work uses only `parseTimestamp()` from it,
+  which both versions export unchanged. *Assumption*: that file is left strictly alone and never
+  staged by this work.
 
 ---
 
@@ -137,23 +143,20 @@ the transcript exactly as the speech model produced it.
 ### Step 4: The page reads as continuous prose
 
 - **Locations**:
-  - `web/frontend/static/js/components/transcript-pane.js` — render block text through
-    `renderWithCitations()` so the inline `[MM:SS]` markers become seek buttons; drop the per-block
-    timestamp header.
+  - `web/frontend/static/js/components/transcript-pane.js` — render the inline `[MM:SS]` markers as
+    quiet non-interactive time marks; drop the per-block timestamp header.
   - `web/frontend/static/css/components/transcript.css` — consecutive blocks flow as consecutive
     paragraphs: no rule, no header line, ordinary paragraph spacing. A quiet inline treatment for
-    the timestamp anchors, distinct from the chat's citation buttons.
+    the timestamp marks, distinct from the chat's citation buttons.
   - `web/frontend/templates/partials/settings/context.html` — expose `polish.timestamp_interval_s`.
   - `docs/component-map.md`, `docs/design-system.md` — updated in this step.
 - **Rationale**: the third requested change is a reading experience, and it is only half solved in
   the backend. A single-paragraph block still reads as a broken page if the pane draws a rule and a
   header above every one of them.
 - **Action**: Undergo the verification/tests/validation process for this phase (`uv run pytest`,
-  `uv run ruff check .`, plus manual browser QA: a seek from an inline timestamp, consecutive blocks
-  flowing, 320 px, and a keyboard pass — the anchors are new focusable elements, which the previous
-  version of this component did not have). Once validated, commit stating: Transcript Polish
-  Refinements (4 / 5) Complete: Polished minutes flow as continuous prose with clickable inline
-  timestamps.
+  `uv run ruff check .`, plus manual browser QA: the inline marks, consecutive blocks flowing,
+  their contrast, 320 px, and a keyboard pass). Once validated, commit stating: Transcript Polish
+  Refinements (4 / 5) Complete: Polished minutes flow as continuous prose with inline timestamps.
 
 ### Step 5: Documentation, full verification, and merge
 
@@ -185,7 +188,7 @@ the transcript exactly as the speech model produced it.
 | Paragraph collapse | Enforces the single-paragraph rule the model may ignore | `web/backend/app/services/polish/guard.py` |
 | Dialogue-accuracy prompt | Spoken-form correction, grammar repair, one paragraph, markers carried | `web/backend/app/services/polish/prompts.py` |
 | Worker rewiring | Source builder and guard composed into the pass | `web/backend/app/services/polish/worker.py` |
-| Inline seek anchors | Block text rendered with clickable timestamps | `web/frontend/static/js/components/transcript-pane.js` |
+| Inline time marks | Block text rendered with quiet non-interactive timestamps | `web/frontend/static/js/components/transcript-pane.js` |
 | Flowing prose styling | Consecutive blocks read as consecutive paragraphs | `web/frontend/static/css/components/transcript.css` |
 | Settings control | The marker interval, in Settings → Context | `web/frontend/templates/partials/settings/context.html` |
 | Source builder tests | Interval placement, boundaries, the supplied-label set | `tests/assistant/test_polish_source.py` |
@@ -198,8 +201,8 @@ the transcript exactly as the speech model produced it.
 
 | Step | Title | Status |
 |---|---|---|
-| 1 | The timestamped source paragraph | Not started |
-| 2 | Reconciling timestamps and enforcing one paragraph | Not started |
-| 3 | The prompt and the worker | Not started |
-| 4 | The page reads as continuous prose | Not started |
-| 5 | Documentation, verification, merge | Not started |
+| 1 | The timestamped source paragraph | ✅ Complete |
+| 2 | Reconciling timestamps and enforcing one paragraph | ✅ Complete |
+| 3 | The prompt and the worker | ✅ Complete |
+| 4 | The page reads as continuous prose | ✅ Complete |
+| 5 | Documentation, verification, merge | ✅ Complete |

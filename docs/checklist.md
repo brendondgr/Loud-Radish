@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-08-15 (minute-based transcript polish)*
+*Last updated: 2026-08-15 (polish: dialogue accuracy, timestamps, continuous prose)*
 
 The active work list for TranscriberPrototype. Update it whenever a task is finished or new work is
 discovered.
@@ -102,6 +102,21 @@ Deliberately out of scope, recorded so the absences are not mistaken for oversig
 
 ---
 
+## Part 3c — Polish: Dialogue Accuracy, Timestamps, Continuous Prose
+
+Tracked in [plans/transcript-polish-refinements.md](plans/transcript-polish-refinements.md).
+**All five steps are complete.** The pass now aims at accurate dialogue rather than literal
+transcription.
+
+- [x] The chunk is flattened into one timestamped run before the model sees it (`polish/source.py`)
+- [x] Invented, reversed, and duplicated markers are reconciled away; line breaks are collapsed
+- [x] The prompt writes out spoken code references and repairs the grammar around them
+- [x] Polished minutes flow as consecutive paragraphs with quiet inline timestamps
+- [x] Documentation: D-018 amended, plus `structure`, `architecture`, `data-flow`, `api-contract`,
+      `routes`, `component-map`, `design-system`
+
+---
+
 ## Part 4 — Still Open
 
 - [ ] **Default ASR model and compute device.** Depends entirely on the user's hardware. A
@@ -128,7 +143,20 @@ Deliberately out of scope, recorded so the absences are not mistaken for oversig
       clear how often anyone wants to.
 - [ ] **Tuning `polish.min_retained_ratio`.** The 0.6 default is a starting point chosen without a
       real model behind it. It is a length check, not a meaning check, and the right value can only
-      come from watching what a real model actually returns.
+      come from watching what a real model actually returns. Writing out spoken code references now
+      shortens a rewrite legitimately ("guard dot py" is three words and `guard.py` is one), which
+      pushes in the same direction as a summary would — another reason the floor needs real data.
+- [ ] **Whether the assistant should answer from polished text.** It currently assembles context
+      from raw segments, which are the verbatim record. Now that polished text carries the same
+      `[MM:SS]` markers the assistant cites, feeding it the polished version instead would give it
+      cleaner input — but it is a decision about what the assistant is allowed to read, not a
+      refactor, and it was deliberately not smuggled into the polish work.
+- [ ] **ASR hallucination on silence and noise.** Reported from real use: the transcript picks up
+      room noise and invents speech that was never said — "thank you", "bye", and stray single
+      words are the recurring ones. Reproduced on a synthetic tone fixture, which produced a
+      segment reading "you". This is the well-known Whisper failure on non-speech audio and it
+      needs its own plan; the likely levers are the model's own `no_speech_prob`, gating inference
+      on the VAD rather than only preferring its pauses, and a blocklist of the specific phrases.
 
 ---
 

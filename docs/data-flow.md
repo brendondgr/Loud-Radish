@@ -41,12 +41,25 @@ never uploaded; it is captured locally and consumed in flight.
 7. POLISH                                     services/polish/
    Once about a minute of committed transcript has accumulated, the worker waits for
    the speaker to stop for ~2 s and cuts there, at the end of the newest committed
-   segment. The chunk goes to the language model with an instruction list — repair
-   punctuation, sentences, and paragraphs, change nothing else — and comes back as a
-   POLISHED BLOCK, published as `transcript.polished`. The segments it covers are
-   left exactly as they are; the block is an additional row, never a replacement.
-   With no language model, or on any failure, nothing is emitted and the page keeps
-   showing raw segments. That fallback is the design, not the error path.
+   segment. Four steps, of which only the second involves a model:
+
+     a. FLATTEN     the chunk becomes ONE continuous run of text with [MM:SS] markers
+                    already placed in it, every ~15 s, from the segments' own start
+                    times. It reads as nonsense here — that is what concatenated
+                    speech-model output is.
+     b. REWRITE     the model rewrites that whole run at once, not fragment by
+                    fragment: repair punctuation and sentences, write out anything
+                    dictated aloud ("guard dot py" is guard.py), carry the markers
+                    through, return one continuous paragraph, change nothing else.
+     c. RECONCILE   markers the model invented, reversed, or repeated are removed;
+                    line breaks it inserted anyway are collapsed away.
+     d. CHECK       a rewrite far shorter than the source is a summary, and discarded.
+
+   The result is a POLISHED BLOCK, published as `transcript.polished`. The segments it
+   covers are left exactly as they are; the block is an additional row, never a
+   replacement. With no language model, or on any failure at any step, nothing is
+   emitted and the page keeps showing raw segments. That fallback is the design, not
+   the error path.
 
 8. SUMMARISE                                  services/context/
    In the background, at low priority: rolling summaries and glossary terms. Never
