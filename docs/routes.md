@@ -80,6 +80,19 @@ server is still reachable from any page in any other tab, so a traversal here wo
 read. A re-run writes into a new session rather than the one that produced the recording, because
 the original may hold a partial transcript from the pass that failed.
 
+### Window capture
+
+| Method | Path | Purpose | Status |
+|---|---|---|---|
+| `GET` | `/api/capture/state` | What the monitor pane draws | **Implemented** |
+| `GET` | `/api/capture/preview.jpg` | The most recent preview frame; `404` when there is none | **Implemented** |
+
+The preview is **pulled as an image on a timer, never pushed over the WebSocket** (D-022). The
+socket's backpressure policy makes transcript events undroppable, and video frames sharing that
+channel are the one thing capable of delaying a committed segment. A `404` is ordinary — no capture,
+no JPEG encoder, or the first frame not yet written — and the monitor shows a card rather than a
+black rectangle.
+
 ### Audio
 
 | Method | Path | Purpose | Status |
@@ -136,6 +149,8 @@ state is a second place for it to drift.
 | `GET` | `/api/transcript/export` | Export as text, Markdown, SRT, VTT, or JSON | **Implemented** |
 | `GET` | `/api/transcript/glossary` | The session glossary | **Implemented** |
 | `GET` | `/api/transcript/summaries` | The rolling outline | **Implemented** |
+| `GET` | `/api/transcript/revisions` | Which transcription passes this session holds (D-022) | **Implemented** |
+| `GET` | `/api/transcript/at/{revision}` | Every segment from one pass — what the Live/Final switch fetches | **Implemented** |
 | `GET` | `/api/transcript/polished` | Finished minutes rewritten for reading, with inline `[MM:SS]` markers. Empty with no language model, which is the ordinary state and not an error | **Implemented** |
 
 ### Configuration

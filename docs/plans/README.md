@@ -35,7 +35,7 @@ live transcription — to three capture modes plus a desktop presence. Plans 1 a
 | 1 | [multi-mode-ui-design.md](multi-mode-ui-design.md) | The mode and run-state vocabulary, the header's two controls, the pre-flight sheet, and the monitor pane — specified, not built | **Complete (5 / 5)** |
 | 2 | [multi-mode-ui-implementation.md](multi-mode-ui-implementation.md) | Building it: mode selector, six-state record control, pre-flight sheet, third pane, mode carried through the API | **Complete (6 / 6)** |
 | 3 | [recorded-transcription.md](recorded-transcription.md) | Toggle on to capture audio with no inference; toggle off to transcribe the whole file in one pass | **Complete (6 / 6)** |
-| 4 | [window-recording-transcription.md](window-recording-transcription.md) | Wayland portal window capture, optional video, live and post-process transcription, the monitor pane, transcript revisions | Not started (0 / 7) |
+| 4 | [window-recording-transcription.md](window-recording-transcription.md) | Wayland portal window capture, optional video, live and post-process transcription, the monitor pane, transcript revisions | **Complete (7 / 7)** |
 | 5 | [system-integration.md](system-integration.md) | Autostart, a tray companion process drawing the Aperture microphone, global keybinds, and a keybind settings tab | Not started (0 / 6) |
 
 Execution order is 1 → 2 → 3 → 4, with 5 runnable any time after 2. Plan 5's animation step is

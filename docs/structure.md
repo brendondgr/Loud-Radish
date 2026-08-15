@@ -59,6 +59,7 @@ TranscriberPrototype/
 │   │   │   ├── session.py         # Start/stop, devices, model loading, prompts
 │   │   │   ├── transcript.py      # Replay, ranges, search, summaries, export
 │   │   │   ├── recordings.py      # List, re-run, and delete captured audio (D-021)
+│   │   │   ├── capture.py         # The window capture's preview frame and state (D-022)
 │   │   │   └── config.py          # Read, patch with hot-swap cost, presets, save
 │   │   ├── transport/             # The push channel — separate from routes/
 │   │   │   ├── events.py          # The event vocabulary and coalescing rules
@@ -94,6 +95,12 @@ TranscriberPrototype/
 │   │   │       ├── events.py      # The committed / hypothesis output contract
 │   │   │       ├── engine.py      # Orchestrator for offline models
 │   │   │       └── passthrough.py # Bypass path for streaming-native models
+│   │   │   └── capture/           # Recording a window's video, via the desktop portal (D-022)
+│   │   │       ├── probe.py       # Five distinct verdicts on whether this machine can
+│   │   │       ├── portal.py      # ScreenCast over D-Bus: consent, and a PipeWire node
+│   │   │       ├── pipeline.py    # The GStreamer launch line, built from what is installed
+│   │   │       ├── recorder.py    # The subprocess, its lifetime, and its finalisation
+│   │   │       └── mux.py         # Combines the video with the session's audio afterwards
 │   │   │   └── recording/         # Capture to disk, and transcribe it whole (D-021)
 │   │   │       ├── sink.py        # Incremental WAV writer; crash-safe header, duration cap
 │   │   │       ├── batch.py       # Whole-file pass in overlapping windows; bypasses agreement
@@ -156,6 +163,7 @@ TranscriberPrototype/
 │   └── utils/                     # Configuration and standalone helpers
 ├── scripts/                       # Developer and operational scripts
 │   ├── make_fixture_wav.py        # Generates synthetic WAV fixtures for pipeline tests
+│   ├── measure_capture_cost.py    # Encoding vs. inference contention (D-022)
 │   ├── run_file_session.py        # Console-only pipeline run over a WAV file (BE M4)
 │   └── generate_contracts.py      # Writes openapi.json and ws-events.json
 ├── data/                          # Sessions, config file, audio, recordings (gitignored)
@@ -188,6 +196,7 @@ listed them has been removed rather than left describing work that has landed.
 | `web/backend/app/routes/` | HTTP endpoint definitions only. Thin — they delegate to services. |
 | `web/backend/app/transport/` | The WebSocket hub and its event envelopes. Separate from `routes/` because it is a push channel with its own reconnection semantics. |
 | `web/backend/app/services/` | The pipeline. One sub-package per stage, so each is independently testable. |
+| `web/backend/app/services/capture/` | Recording a window's picture. Separate from `recording/` because they solve unrelated problems: one negotiates with a compositor for pixels, the other writes and transcribes audio. |
 | `web/backend/app/services/recording/` | Capturing audio to a file and transcribing it once whole. Separate from `streaming/` because the two answer opposite questions: `streaming/` decides what is safe to show while audio is still arriving, and this runs only when it has stopped. |
 | `web/backend/app/services/polish/` | The clean-up pass that rewrites finished minutes for reading. Separate from `context/` because the two do opposite things: `context/` compresses on purpose, and this must not lose a single claim. |
 | `web/backend/app/models/` | Persistence shape, separated so storage concerns do not leak into routes. |

@@ -99,7 +99,7 @@ Specified in `docs/design-system.md` § Capture Modes; built by
 |---|---|---|
 | `ModeSwitcher` | The three-way capture-mode `radiogroup` | Separate from `Header` so the header stays a renderer rather than a controller. One tab stop for the group; arrows move within and skip unavailable options rather than landing on one and refusing. Disabled whenever the run state is not `idle` |
 | `Preflight` | The window pre-flight sheet's three toggles | Reuses `FocusTrap` and the modal styling rather than adding a second dialog primitive. `show()` returns a promise, because arming is a sequence. Refuses the all-off combination; the server refuses it again |
-| `RecordingMonitor` *(Plan 4)* | The third pane's contents: preview, elapsed, output size, active options | The pane, its tab, and its states exist now; only the live data is outstanding. Will pull the preview as a still image on a timer — the socket must never carry video, because transcript events on it are undroppable |
+| `RecordingMonitor` | The third pane's contents: preview, elapsed, output size, active options | Pulls the preview as a still image on a timer, stopped whenever nobody is looking. The socket never carries video, because transcript events on it are undroppable. Distinguishes its degraded states — no capture, no encoder, window closed, recorder failed — because a black rectangle and a broken capture look identical |
 
 `Header` keeps the record control but no longer derives its appearance from a boolean: it renders
 the six run states from a presentation table and asks `stores/mode.js` what pressing the control
@@ -122,6 +122,7 @@ session can hold two transcription passes it also grows a Live/Final revision sw
 | `chat` | Settled messages plus the streaming one | `store.chat.changed`, `store.chat.stream` |
 | `mode` | Selected capture mode, current run state, per-mode availability, the pending run's options | `store.mode.changed` |
 | `recording` | Bytes and duration captured, and the post-capture pass's progress. Authoritative from the server, because the pass outlives the page (D-021) | `store.recording.changed` |
+| `capture` | The window recording's state. Also server-authoritative: the recorder is a subprocess the browser has no view of (D-022) | `store.capture.changed` |
 
 ## Adding a component
 

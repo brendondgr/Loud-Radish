@@ -31,6 +31,7 @@ from ..asr.contract import AsrLoadError
 from ..audio import LevelMeter, WavFileSource
 from ..audio.sources import AudioSource, DeviceSource, SourceInfo
 from ..capture import (
+    MuxResult,
     PortalDeclined,
     PortalError,
     PortalSession,
@@ -38,6 +39,7 @@ from ..capture import (
     RecorderState,
     WindowRecorder,
     build_pipeline,
+    mux_audio_video,
 )
 from ..capture import detect as detect_capture
 from ..recording import (
@@ -147,6 +149,8 @@ class SessionManager:
         #: `None` in every other mode, and either may be `None` in this one — video is optional.
         self._recorder: WindowRecorder | None = None
         self._portal: PortalSession | None = None
+        #: Where the video landed, kept past teardown so the audio can be muxed into it.
+        self._video_path = ""
         #: The per-run options a window session was armed with.
         self._options: CaptureOptions | None = None
         #: The post-capture transcription pass. Deliberately owned here rather than by the session:
@@ -386,6 +390,9 @@ class SessionManager:
 
         stats = self._store.stats() if self._store else SessionStats(0, 0, 0.0)
         self._metadata.ended_at = datetime.now(UTC)
+        # Both files are closed by now — the recorder finalised its container above, and the sink
+        # is about to. Muxing needs both complete, which is why it is here and not in either.
+        self._mux_if_wanted()
         if self._store is not None:
             self._store.write_metadata(self._metadata)
 
@@ -682,6 +689,7 @@ class SessionManager:
         if recorder is not None:
             try:
                 recorder.stop()
+                self._video_path = recorder.state.video_path
             except Exception:  # noqa: BLE001 - a failed teardown must not fail the stop
                 logger.exception("The video recorder did not stop cleanly")
 
@@ -690,6 +698,32 @@ class SessionManager:
             # Closing the portal session is what makes the compositor's sharing indicator go away.
             # Leaving it open shows the user they are still sharing a window when they are not.
             portal.close()
+
+    def _mux_if_wanted(self) -> None:
+        """Combine the video with the session's audio, when there is both and it was asked for.
+
+        Never fatal. Failing costs one convenience — two files instead of one — and both are
+        playable on their own, so a mux must not be able to fail a recording.
+        """
+        video, self._video_path = self._video_path, ""
+        sink = self._sink
+        if not video or sink is None or sink.samples == 0:
+            return
+        if not self._config.resolve().capture.mux_audio:
+            return
+
+        # The sink has to be closed before ffmpeg reads it, and closing it here rather than leaving
+        # it to `_start_transcription` is safe: `close()` is idempotent.
+        try:
+            audio = sink.close()
+        except SinkError:
+            return
+
+        result: MuxResult = mux_audio_video(video, audio, keep_sources=True)
+        if not result.ok:
+            logger.warning("Could not combine audio and video: %s", result.reason)
+            return
+        logger.info("Recording saved with audio: %s", result.path)
 
     def _on_recorder_stopped(self, state: RecorderState) -> None:
         """The video ended without being asked to. Usually the window was closed."""

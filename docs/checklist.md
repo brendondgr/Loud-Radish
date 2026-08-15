@@ -145,9 +145,10 @@ from one capture mode to three, and from a browser tab to a resident desktop app
 - [x] **Plan 3 — [Recorded transcription](plans/recorded-transcription.md)** (6 / 6). Capture to a
       WAV with no inference; transcribe the whole file in one pass on stop; delete the audio
       afterwards unless retention is on, and keep it when the pass fails. Recorded as **D-021**.
-- [ ] **Plan 4 — [Window recording](plans/window-recording-transcription.md)** (0 / 7). Portal
+- [x] **Plan 4 — [Window recording](plans/window-recording-transcription.md)** (7 / 7). Portal
       ScreenCast window capture, optional video, live and post-process transcription, the monitor
-      pane, and transcript revisions so both passes can be kept.
+      pane, and transcript revisions so both passes can be kept. Recorded as **D-022**. One
+      measurement is outstanding — see the CPU-contention item below.
 - [ ] **Plan 5 — [System integration](plans/system-integration.md)** (0 / 6). Autostart, a tray
       companion process drawing the Aperture microphone ([motion-spec.md](motion-spec.md)), global
       keybinds through KGlobalAccel, and a keybind settings tab.
@@ -203,11 +204,16 @@ Known blockers and open questions carried by these plans:
       default: D-020's motion rule forbids anything that loops in an interface on screen for two
       hours, and a breathing thirteen-bar capsule is exactly that. Recorded as considered rather
       than overlooked. If adopted, the reduced-motion path must hold every bar at rest.
-- [ ] **Whether software video encoding and live transcription fit on one CPU.** This machine has no
-      hardware encoder — `x264enc` and every VAAPI encoder are absent, leaving software VP8 or
-      OpenH264 competing with a speech model already measured at RTF ≈ 1.5. Plan 4 step 7 measures
-      it with `scripts/measure_capture_cost.py` rather than assuming; the documented remedy if it
-      does not fit is to record video and transcribe afterwards instead of live.
+- [ ] **Whether software video encoding and live transcription fit on one CPU — still open, and
+      the measurement needs a real recording.** `scripts/measure_capture_cost.py` exists and runs,
+      but its synthetic fixture cannot answer the question: Whisper is autoregressive and emits its
+      no-speech token after a handful of steps on anything that is not speech, so a tone decodes
+      in a fraction of the time a talk would and the real-time factor comes back at 30–150×. That
+      figure measures the short-circuit, not the contention. **The script refuses to conclude from
+      a run that produced no transcript** and says to re-run with `--audio path/to/a/talk.wav`.
+      Do that with a real recording on the machine you will use. Encoding alone measured 13× real
+      time at 720p15 with VP8, which is the one half that *is* answered — the encoder has ample
+      headroom on its own; what is unknown is what it does to inference running beside it.
 - [ ] **Whether the StatusNotifierItem protocol can be spoken directly with `jeepney`.** Plan 5
       avoids pulling a GUI toolkit into the virtualenv for one tray icon. Exporting icon pixmaps as
       D-Bus properties is the part that may not be worth it; the fallback is `PySide6`'s

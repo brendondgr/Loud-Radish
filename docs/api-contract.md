@@ -47,6 +47,7 @@ Every frame is `{"event": "<name>", "data": { … }}`.
 | `transcription.progress` | `session_id`, `state`, `progress`, `transcribed_seconds`, `total_seconds`, `segments`, `error` | The post-capture pass. Progress is by **audio position** — honest, monotonic, and needing no instrumentation inside the model |
 | `transcription.done` | same shape | The pass finished. Never dropped: losing it leaves a progress bar running for a pass that ended |
 | `transcription.failed` | same shape, with `error` | The pass failed **and the recording is still on disk**. The message names the file, because it is now the only copy of what was said and `/api/recordings` can run the pass again against it |
+| `capture.state` | `recording`, `window_closed`, `failed`, `error`, `video_path`, `bytes`, `duration_s`, `preview`, `options` | The window capture started, stopped, or failed (D-022). Never dropped: a missed window-closed frame leaves a live preview showing for a capture that ended |
 | `audio.level` | `rms`, `peak`, `clipping` | Drives the level meter |
 | `vad.state` | `speaking` (bool) | Drives the speaking indicator |
 | `status` | `rtf`, `queue_depth`, `commit_latency_s`, `model_id`, `device`, `dropped_frames`, `suppressed` | Health telemetry. `suppressed` counts passes discarded as invented speech |
@@ -141,6 +142,11 @@ phase each belongs to are in [routes.md](routes.md). The shapes below are the on
 built against.
 
 ### Segment
+
+Every segment carries a `revision` (D-022): `0` is the live pass and `1` a post-capture one. Both
+are kept rather than one replacing the other, so a client showing revision 1 must **replace** the
+transcript rather than merge — the two cover the same audio with different ids, and interleaving
+them says everything twice.
 
 The unit the transcript store holds, the frontend renders as a paragraph, and the context pipeline
 chunks on.

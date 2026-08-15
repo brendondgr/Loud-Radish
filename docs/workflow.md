@@ -229,6 +229,28 @@ Report failures with the actual output.
 To exercise the recovery path, kill the server mid-pass. The recording survives; the next start
 lists it under Settings → Storage → *Recordings on disk*, with a button to transcribe it again.
 
+### Window capture, by hand
+
+The portal puts a dialog on screen and waits for a human, so this cannot be automated. Choose
+**Window**, press record, and check that:
+
+1. **Your desktop's own picker appears.** It is the compositor's, not ours — this application never
+   sees the list of windows.
+2. **Cancelling it records nothing at all**, and says so, rather than quietly starting an
+   audio-only recording you did not ask for.
+3. **Granting it starts the monitor pane**, whose preview updates about once a second.
+4. **Closing the captured window ends the video and not the session** — the banner says so and
+   audio keeps recording.
+5. **A `.webm` lands in `data/recordings/` and plays**, and with `capture.mux_audio` on there is
+   also a `-with-audio.webm` beside it.
+
+To measure whether video encoding and live transcription fit together on your machine, run it
+against a **real recording** — a synthetic tone cannot answer the question, and the script says so:
+
+```bash
+uv run scripts/measure_capture_cost.py --audio path/to/a/talk.wav
+```
+
 ### What cannot be verified in a headless environment
 
 State these explicitly rather than implying coverage:

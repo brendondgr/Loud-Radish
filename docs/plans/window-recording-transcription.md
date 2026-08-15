@@ -1,6 +1,6 @@
 # Plan 4 — Window Recording and Transcription
 
-*Created: 2026-08-15 · Status: **not started** (0 / 7 steps)*
+*Created: 2026-08-15 · Status: **complete** (7 / 7 steps), with one measurement outstanding*
 
 Part four of the five-plan expansion. Depends on [Plan 2](multi-mode-ui-implementation.md) and
 [Plan 3](recorded-transcription.md).
@@ -83,6 +83,15 @@ grab, and the whole feature has a permission dialog in the middle of it that can
   configurable, defaults conservatively (720p at 15 fps, VP8), and **step 7 measures it and records
   the result**. If it does not fit, the documented remedy is to turn live transcription off and use
   the post-process pass, which is precisely why both toggles exist.
+
+  **Partly answered, and the rest is recorded as outstanding rather than guessed.** Encoding alone
+  runs at ≈13× real time at 720p15 with VP8, so the encoder has ample headroom by itself. The
+  contention figure is *not* answered: the measurement script's synthetic fixture cannot produce it,
+  because Whisper emits its no-speech token after a handful of steps on anything that is not speech
+  and therefore decodes a tone in a fraction of the time a talk would — the resulting 30–150× is
+  the short-circuit, not the contention. The script now **refuses to conclude** from a run that
+  produced no transcript and directs the user to `--audio path/to/a/talk.wav`. Answering it needs a
+  real recording, which is verification debt in `docs/checklist.md`, not a gap in the design.
 
 - **What happens when the captured window closes mid-recording?** *Assumption*: the PipeWire stream
   ends, the recorder is torn down cleanly, the video file is finalised at whatever length it reached,
