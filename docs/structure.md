@@ -1,6 +1,6 @@
 # Repository Structure
 
-*Last updated: 2026-08-15 (minute-based transcript polish)*
+*Last updated: 2026-08-15 (the multi-mode expansion — plans and the mode vocabulary)*
 
 Canonical map of TranscriberPrototype. This file documents **purpose**, not source code. Update it in
 the same change that adds, moves, renames, or removes a directory or significant file.
@@ -20,7 +20,12 @@ TranscriberPrototype/
 │   │   ├── live-seminar-transcriber.md   # The 14-phase build plan
 │   │   ├── minute-based-transcript-polish.md  # The clean-up pass (D-018)
 │   │   ├── transcript-polish-refinements.md   # Dialogue accuracy, timestamps, prose
-│   │   └── asr-hallucination-suppression.md   # Invented speech on silence (D-019)
+│   │   ├── asr-hallucination-suppression.md   # Invented speech on silence (D-019)
+│   │   ├── multi-mode-ui-design.md            # Expansion 1 — mode vocabulary and interface design
+│   │   ├── multi-mode-ui-implementation.md    # Expansion 2 — building that interface
+│   │   ├── recorded-transcription.md          # Expansion 3 — toggle to record, transcribe on stop
+│   │   ├── window-recording-transcription.md  # Expansion 4 — portal window capture and video
+│   │   └── system-integration.md              # Expansion 5 — autostart, tray, global keybinds
 │   ├── skills/                    # Canonical skill definitions used by every agent tool
 │   │   ├── global-project-rules/SKILL.md
 │   │   ├── planner/{SKILL.md,SETUP.md,planner.md}
@@ -98,6 +103,7 @@ TranscriberPrototype/
 │   │   │       ├── store.py       # Append-only writes, the four queries, search
 │   │   │       └── export.py      # Text, Markdown, SRT, VTT, JSON
 │   │   │   └── session/           # Wiring, workers, health, degradation
+│   │   │       ├── modes.py       # Capture modes and run states (D-020); mirrored in the frontend
 │   │   │       ├── workers.py     # Drop-oldest queue and the threads draining it
 │   │   │       ├── metrics.py     # Pipeline health, gathered in one place
 │   │   │       ├── degradation.py # What each failure means and what to do
@@ -129,6 +135,7 @@ TranscriberPrototype/
 │   │   └── static/
 │   │       ├── css/               # tokens, base, layout + one file per component
 │   │       └── js/                # main + core/, transport/, stores/, components/, a11y/
+│   │           └── core/modes.js  # Mirror of services/session/modes.py; kept identical by test
 │   └── shared/contracts/          # Generated: openapi.json, ws-events.json
 │
 ├── libs/                          # Internal packages with more than one consumer

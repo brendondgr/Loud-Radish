@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-08-15 (suppressing invented speech)*
+*Last updated: 2026-08-15 (the multi-mode expansion)*
 
 The active work list for TranscriberPrototype. Update it whenever a task is finished or new work is
 discovered.

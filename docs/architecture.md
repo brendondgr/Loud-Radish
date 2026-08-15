@@ -34,6 +34,47 @@ The backend still owns the entire pipeline and publishes a complete HTTP plus We
 packaged desktop shell could serve exactly the same frontend later without touching the backend — the
 contract is what keeps that option open, and choosing the packaging is not urgent.
 
+> **Not to be confused with capture mode.** "Application mode" above is the *repository layout*
+> vocabulary from `docs/skills/repository-structure/`. What a session is *doing* is a **capture
+> mode**, described next. The collision is unfortunate and predates the expansion; both names are
+> load-bearing in their own document, so neither was renamed.
+
+## Capture modes
+
+*Decision **D-020**. Vocabulary: `web/backend/app/services/session/modes.py`, mirrored in
+`web/frontend/static/js/core/modes.js`. Interface: `docs/design-system.md` § Capture Modes.*
+
+A session runs in one of three capture modes, fixed when it starts and not changeable while it runs.
+The mode determines which stages of the pipeline below are started at all — it is not a display
+setting.
+
+| Mode | Capture | Streaming engine | Recording sink | Video | Transcript produced |
+|---|---|---|---|---|---|
+| `live` | Device | **Running** | — | — | As it arrives |
+| `recorded` | Device | **Not started** | WAV | — | One batch pass, on stop |
+| `window` | Device + portal screen-cast | Optional | WAV | Optional | Live, or batch, or both |
+
+Three consequences worth stating separately, because each is a constraint on everything downstream:
+
+- **`recorded` runs no inference during capture.** That is the mode's reason to exist: a laptop
+  records a two-hour talk at the cost of writing a WAV, and pays the transcription cost once,
+  afterwards, with full context available. The LocalAgreement commit policy is deliberately bypassed
+  for that pass — agreement exists to decide what is safe to show before the audio has finished
+  arriving, and when it has finished arriving the right answer is simply to transcribe it.
+
+- **A session may hold more than one transcript.** When `window` mode runs live *and* post-process
+  transcription, both results are kept as separate revisions rather than one overwriting the other.
+  The live transcript is what the user watched and what any chat citation points into; replacing it
+  would invalidate a conversation that already happened. This is the additive principle D-018
+  established for polished blocks, applied again.
+
+- **`window` capture is a negotiated stream, not a screen grab.** Under Wayland an application
+  cannot enumerate windows or read another window's pixels. The only route is
+  `org.freedesktop.portal.ScreenCast` over D-Bus: the compositor shows its own picker, the user
+  consents, and the application receives a PipeWire node it may read. This puts a permission dialog
+  that can be declined in the middle of the mode, and it means the application never learns what
+  windows exist. See **D-022**.
+
 ## The pipeline
 
 ```text

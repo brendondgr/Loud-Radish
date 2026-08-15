@@ -153,13 +153,18 @@ whole expansion is most likely to produce.
 
 - **Locations**: `docs/documentation.md` (Decision **D-020**, and the Status table gains a
   multi-mode row); `docs/structure.md` (`services/session/modes.py`, `static/js/core/modes.js`);
-  `docs/architecture.md` ("Application mode" section, which currently describes a single mode);
-  `docs/checklist.md` (a new part tracking the five-plan expansion); `docs/plans/README.md` (index
-  entries for all five plans).
+  `docs/architecture.md` (a **new** "Capture modes" section); `docs/checklist.md` (a new part
+  tracking the five-plan expansion); `docs/plans/README.md` (index entries for all five plans).
 - **Rationale**: `docs/` is the source of truth, and D-020 is where the reasoning for two controls
   rather than one, and for the mode vocabulary living in two mirrored files, has to survive. The
-  architecture document currently states the application has one mode; leaving that uncorrected while
-  building three is the exact drift the repository rules exist to prevent.
+  architecture document has to say which pipeline stages each mode starts, because that is the fact
+  Plans 3 and 4 are both built on.
+- **Correction made during execution**: this step was drafted expecting to rewrite the existing
+  "Application mode" section, on the assumption it described capture mode. It does not — it is the
+  *repository layout* vocabulary (Mode G) from the repository-structure skill, and rewriting it would
+  have destroyed a different document's meaning. A separate "Capture modes" section was added
+  instead, with a note pointing out the name collision so the next reader does not make the same
+  assumption.
 - **Action**: Undergo the verification/tests/validation process for this phase — `uv run pytest`,
   `uv run ruff check .`, `uv run ruff format --check .`, and a read-through confirming no document
   still describes a single-mode application. Once validated, commit stating: `Multi-Mode UI Design
