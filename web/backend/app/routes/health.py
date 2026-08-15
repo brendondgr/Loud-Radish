@@ -21,9 +21,11 @@ async def health(request: Request) -> dict[str, Any]:
     """Report that the process is alive, and which optional capabilities are installed."""
     from ..config import CredentialStore
     from ..services.asr.acceleration import detect
+    from ..services.capture import detect as detect_capture
 
     credentials: CredentialStore = request.app.state.credentials
-    optional = _optional_capabilities()
+    capture = detect_capture()
+    optional = _optional_capabilities(capture.available)
     return {
         "status": "ok",
         "credentials_backend": credentials.backend_name,
@@ -34,11 +36,14 @@ async def health(request: Request) -> dict[str, Any]:
         # Which capture modes this build can actually run, and why not when it cannot. The frontend
         # shows every mode always and disables the unavailable ones with the reason, so a missing
         # capability reads as something to install rather than a feature that does not exist.
-        "modes": _mode_availability(optional),
+        "modes": _mode_availability(optional, capture.reason),
+        # Which part of the window-capture stack is missing, when one is. Five distinct verdicts
+        # rather than one, because each has a different fix (D-022).
+        "capture": capture.as_dict(),
     }
 
 
-def _optional_capabilities() -> dict[str, bool]:
+def _optional_capabilities(window_capture: bool = False) -> dict[str, bool]:
     """Which optional dependency groups are present in this environment.
 
     Reported rather than assumed so a missing model backend shows up here instead of as a confusing
@@ -51,18 +56,20 @@ def _optional_capabilities() -> dict[str, bool]:
         "audio_device": util.find_spec("sounddevice") is not None,
         "vad_silero": util.find_spec("onnxruntime") is not None,
         "credentials": util.find_spec("keyring") is not None,
-        # Window capture needs a desktop screen-cast portal and a capture backend. Detecting that
-        # properly is Plan 4's first step; until it lands the honest answer is a flat no, which is
-        # not the same as the key being absent.
-        "window_capture": False,
+        # Not a dependency group: window capture needs a portal, GStreamer, and an encoder as
+        # well as a Python package, so the answer comes from the probe rather than from an import.
+        "window_capture": window_capture,
     }
 
 
-def _mode_availability(optional: dict[str, bool]) -> dict[str, dict[str, Any]]:
+def _mode_availability(
+    optional: dict[str, bool], capture_reason: str = ""
+) -> dict[str, dict[str, Any]]:
     """Per capture mode: whether it can run, what it is missing, and how to get it."""
     remedies = {
         "audio_device": "Install the audio backend: uv sync --extra audio-device",
-        "window_capture": "Window recording is not built yet — see docs/plans/",
+        # Whatever the probe found, verbatim — it already names the one thing to install.
+        "window_capture": capture_reason or "Window recording is not available on this machine.",
     }
 
     availability: dict[str, dict[str, Any]] = {}

@@ -1360,6 +1360,9 @@ asr-whisper = [
 audio-device = [
     { name = "sounddevice" },
 ]
+capture-window = [
+    { name = "jeepney" },
+]
 credentials = [
     { name = "keyring" },
 ]
@@ -1382,6 +1385,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.141.1" },
     { name = "faster-whisper", marker = "extra == 'asr-whisper'", specifier = ">=1.2.1" },
     { name = "httpx", specifier = ">=0.28.1" },
+    { name = "jeepney", marker = "extra == 'capture-window'", specifier = ">=0.9.0" },
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "keyring", marker = "extra == 'credentials'", specifier = ">=25.7.0" },
     { name = "numpy", specifier = ">=2.4.6" },
@@ -1393,7 +1397,7 @@ requires-dist = [
     { name = "soxr", specifier = ">=1.1.0" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.52.3" },
 ]
-provides-extras = ["asr-whisper", "audio-device", "vad-silero", "credentials"]
+provides-extras = ["asr-whisper", "audio-device", "vad-silero", "credentials", "capture-window"]
 
 [package.metadata.requires-dev]
 dev = [

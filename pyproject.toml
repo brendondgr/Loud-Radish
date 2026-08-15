@@ -29,6 +29,9 @@ vad-silero = [
 credentials = [
     "keyring>=25.7.0",
 ]
+capture-window = [
+    "jeepney>=0.9.0",
+]
 
 [dependency-groups]
 dev = [

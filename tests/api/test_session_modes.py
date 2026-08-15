@@ -137,11 +137,23 @@ def test_an_unavailable_mode_names_a_remedy(client: TestClient) -> None:
             assert entry["reason"], f"{mode} is unavailable with no remedy"
 
 
-def test_window_capture_is_reported_absent_until_it_is_built(client: TestClient) -> None:
-    # A flat "no" is the honest answer while Plan 4 is outstanding, and is not the same thing as
-    # the key being missing — the frontend distinguishes "unavailable" from "unknown".
-    assert client.get("/api/health").json()["optional"]["window_capture"] is False
-    assert client.get("/api/health").json()["modes"][modes.WINDOW]["available"] is False
+def test_window_capture_availability_is_probed_rather_than_assumed(client: TestClient) -> None:
+    """It depends on the machine — a portal, GStreamer, and an encoder — so it is measured.
+
+    Deliberately does not assert *which* answer: this suite has to pass on a headless CI box and on
+    the KDE Wayland desktop the feature was built for, and those give opposite results. What must
+    hold either way is that the two reports agree with each other and that an unavailable mode
+    still names its remedy.
+    """
+    body = client.get("/api/health").json()
+    supported = body["optional"]["window_capture"]
+
+    assert isinstance(supported, bool)
+    assert body["modes"][modes.WINDOW]["available"] is supported
+    assert body["capture"]["available"] is supported
+    if not supported:
+        assert body["capture"]["missing"], "unavailable without naming which piece"
+        assert body["modes"][modes.WINDOW]["reason"], "unavailable without a remedy"
 
 
 # -- live mode is unchanged --------------------------------------------------------------
