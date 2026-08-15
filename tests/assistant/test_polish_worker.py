@@ -69,14 +69,30 @@ RAW = [
     "and that holds across all three of the runs",
 ]
 
+#: The same minute as the model is given it: one continuous run, timestamps already placed. The
+#: segments are 16 s apart and the default marker interval is 15 s, so every one of them gets a
+#: marker.
+MARKED_SOURCE = (
+    "[00:00] um so the the first thing to say is that "
+    "[00:16] the measurement was forty two microseconds "
+    "[00:32] which is uh well below the threshold we set "
+    "[00:48] and that holds across all three of the runs"
+)
+
+#: What a cooperative model returns: one paragraph, filler gone, markers carried through to the
+#: material they belong to.
 POLISHED = (
-    "So the first thing to say is that the measurement was forty two microseconds, which is "
-    "well below the threshold we set, and that holds across all three of the runs."
+    "[00:00] So the first thing to say is that "
+    "[00:16] the measurement was forty two microseconds, "
+    "[00:32] which is well below the threshold we set, "
+    "[00:48] and that holds across all three of the runs."
 )
 
 #: The same, for the tests that only write the first two segments. It has to be the right length —
 #: the guard rejects a rewrite that is wildly longer than what it was given, which is the point.
-POLISHED_HALF = "So the first thing to say is that the measurement was forty two microseconds."
+POLISHED_HALF = (
+    "[00:00] So the first thing to say is that [00:16] the measurement was forty two microseconds."
+)
 
 
 def fill(store, texts=RAW, seconds_each: float = 16.0) -> None:
@@ -131,13 +147,17 @@ class TestTheHappyPath:
 
         assert [segment.text for segment in store.all_segments()] == RAW
 
-    async def test_the_model_is_sent_the_speech_and_not_the_timestamps(self, store) -> None:
+    async def test_the_model_is_sent_one_continuous_run_with_the_timestamps_in_it(
+        self, store
+    ) -> None:
+        """Step one of the pass: rewrite the whole passage, not fragment by fragment."""
         fill(store)
         backend = ScriptedBackend(replies=[POLISHED])
         worker, _, _ = build(store, backend)
         await worker.poll()
 
-        assert backend.calls[0] == " ".join(RAW)
+        assert backend.calls[0] == MARKED_SOURCE
+        assert "\n" not in backend.calls[0]
 
     async def test_decoration_the_model_added_is_stripped_before_storage(self, store) -> None:
         """The pane renders through textContent, so `**` would reach the reader as asterisks."""
@@ -164,6 +184,66 @@ class TestTheHappyPath:
         worker, _, _ = build(store, ScriptedBackend(replies=[POLISHED]))
 
         assert worker.cursor == 47.0
+
+
+class TestTimestamps:
+    """They are what makes a polished stretch traceable back to the moment it was said."""
+
+    async def test_the_markers_the_model_carried_through_are_stored(self, store) -> None:
+        fill(store)
+        worker, _, _ = build(store, ScriptedBackend(replies=[POLISHED]))
+        await worker.poll()
+
+        assert store.polished_blocks()[0].text == POLISHED
+
+    async def test_a_marker_the_model_invented_never_reaches_the_page(self, store) -> None:
+        """It would look identical to a real one until the reader clicked it."""
+        fill(store)
+        invented = POLISHED.replace("[00:32]", "[00:37]")
+        worker, _, _ = build(store, ScriptedBackend(replies=[invented]))
+        await worker.poll()
+
+        text = store.polished_blocks()[0].text
+        assert "[00:37]" not in text
+        assert "[00:16]" in text
+
+    async def test_a_model_that_dropped_every_marker_still_leaves_the_block_locatable(
+        self, store
+    ) -> None:
+        fill(store)
+        unmarked = " ".join(word for word in POLISHED.split() if not word.startswith("[0"))
+        worker, _, _ = build(store, ScriptedBackend(replies=[unmarked]))
+        await worker.poll()
+
+        assert store.polished_blocks()[0].text.startswith("[00:00] ")
+
+    async def test_the_interval_controls_how_many_markers_are_offered(self, store) -> None:
+        fill(store)
+        backend = ScriptedBackend(replies=[POLISHED])
+        worker, _, _ = build(store, backend, timestamp_interval_s=60.0)
+        await worker.poll()
+
+        assert backend.calls[0].count("[") == 1
+
+
+class TestOneContinuousParagraph:
+    """The requirement: a transcript that breaks to a new line constantly is disruptive to read."""
+
+    async def test_a_model_that_returns_three_paragraphs_stores_one(self, store) -> None:
+        fill(store)
+        broken = POLISHED.replace(", [00:32]", ".\n\n[00:32]").replace(", [00:48]", ".\n\n[00:48]")
+        worker, _, _ = build(store, ScriptedBackend(replies=[broken]))
+        await worker.poll()
+
+        assert "\n" not in store.polished_blocks()[0].text
+
+    async def test_a_list_the_speaker_enumerated_keeps_its_shape(self, store) -> None:
+        fill(store)
+        listed = "[00:00] There were three reasons:\n\n- cost\n- time\n- accuracy and repeatability"
+        worker, _, _ = build(store, ScriptedBackend(replies=[listed]), min_retained_ratio=0.0)
+        await worker.poll()
+
+        assert store.polished_blocks()[0].text == listed
 
 
 class TestWaitingForABreak:
