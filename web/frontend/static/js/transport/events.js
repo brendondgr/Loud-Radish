@@ -12,6 +12,9 @@ export const SESSION_STATE = "session.state";
 
 export const TRANSCRIPT_COMMITTED = "transcript.committed";
 export const TRANSCRIPT_HYPOTHESIS = "transcript.hypothesis";
+/** A finished minute rewritten for reading. Hides the raw segments in `source_ids`, never deletes
+ *  them — a client that ignores this event keeps showing raw text, which is the right fallback. */
+export const TRANSCRIPT_POLISHED = "transcript.polished";
 
 export const AUDIO_LEVEL = "audio.level";
 export const VAD_STATE = "vad.state";

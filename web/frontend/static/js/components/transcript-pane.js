@@ -1,19 +1,32 @@
 /**
  * The transcript pane.
  *
- * Renders the committed segment list and, separately, the single hypothesis tail. The separation
- * is structural, not stylistic: the tail is one element that always sits last and is replaced
- * wholly, and it is never inserted into the segment list (FE §4.1).
+ * Renders three regions, in reading order:
+ *
+ * 1. **Polished blocks** — finished minutes rewritten for reading. Empty, and therefore invisible,
+ *    whenever no language model is available, which is why the pane below it still has to work on
+ *    its own.
+ * 2. **Committed segments** — the raw tail: the minute currently accumulating, exactly as the
+ *    speech model produced it.
+ * 3. **The hypothesis** — a single element, replaced wholly, never a list entry (FE §4.1).
+ *
+ * The separation is structural rather than stylistic. Polished text always covers older material
+ * than the raw tail, so two sibling containers keep them in the right order with no interleaving
+ * logic — and it lets only the middle one be a live region. A polished block restates what a
+ * screen reader has already announced, and announcing a whole minute twice would make the page
+ * unusable (FE §13).
+ *
+ * A segment covered by a block is removed from this region but **not** from the store: the record
+ * is intact, and a block that turns out to be wrong costs nothing but its own row.
  *
  * Timestamps appear at intervals rather than on every segment — one per line is a wall of noise
- * (FE §4.2) — and the whole committed region is a polite live region so a screen reader announces
- * new text. **Only committed text is announced**; announcing the constantly-rewritten hypothesis
- * would be unusable (FE §13).
+ * (FE §4.2).
  */
 
 import { on } from "../core/bus.js";
-import { $, el, setText, toggle } from "../core/dom.js";
+import { $, $$, el, setText, toggle } from "../core/dom.js";
 import { pluralise, timestamp, wallClock } from "../core/format.js";
+import { POLISH_CHANGED, polish } from "../stores/polish.js";
 import {
   HYPOTHESIS_CHANGED_TOPIC,
   TRANSCRIPT_CHANGED,
@@ -35,12 +48,22 @@ const TIMESTAMP_INTERVAL_S = 30;
  */
 const MAX_RENDERED_SEGMENTS = 300;
 
+/**
+ * Keep at most this many polished blocks in the DOM.
+ *
+ * One block a minute, so this is four hours — longer than any talk the application is for, and a
+ * bound rather than a limit anyone will meet. It exists because the blocks region is not trimmed
+ * by the segment budget above and would otherwise grow without one.
+ */
+const MAX_RENDERED_BLOCKS = 240;
+
 export class TranscriptPane {
   constructor(root) {
     this.root = root;
     this.scroller = $(".transcript__scroller", root);
     this.column = $(".transcript__column", root);
     this.list = $(".transcript__segments", root);
+    this.polishedList = $("[data-transcript-polished]", root);
     this.emptyState = $(".transcript-empty", root);
     this.hypothesisWrap = $(".hypothesis", root);
     this.hypothesisText = $(".hypothesis__text", root);
@@ -56,6 +79,7 @@ export class TranscriptPane {
     this.jumpButton?.addEventListener("click", () => this.scroll.jumpToLive());
 
     on(TRANSCRIPT_CHANGED, (payload) => this._onTranscriptChanged(payload));
+    on(POLISH_CHANGED, (payload) => this._onPolishChanged(payload));
     on(HYPOTHESIS_CHANGED_TOPIC, (payload) => this._renderHypothesis(payload));
     on(FOLLOW_CHANGED, ({ following }) => toggle(this.jumpWrap, !following));
     on(UNREAD_CHANGED, ({ unread }) => this._renderUnread(unread));
@@ -68,12 +92,19 @@ export class TranscriptPane {
   _onTranscriptChanged({ segments, batch, added, reset }) {
     if (reset) {
       this.list.replaceChildren();
+      this.polishedList?.replaceChildren();
       this.lastTimestampShown = -Infinity;
       this._renderEmptyState();
       return;
     }
 
-    const incoming = batch ?? (added ? [added] : []);
+    // A segment already covered by a polished block is not rendered at all. This is what makes the
+    // two regions independent of arrival order: on a page reload the blocks and the segments are
+    // fetched separately, and either can land first without duplicating a minute of text.
+    const incoming = (batch ?? (added ? [added] : [])).filter(
+      (segment) => !polish.coversSegment(segment.id)
+    );
+    setText(this.countLabel, pluralise(segments.length, "segment"));
     if (!incoming.length) return;
 
     const restore = this.scroll.beginUpdate();
@@ -85,7 +116,64 @@ export class TranscriptPane {
 
     this.scroll.noteArrival(incoming.length);
     this._renderEmptyState();
-    setText(this.countLabel, pluralise(segments.length, "segment"));
+  }
+
+  /**
+   * A finished minute has been rewritten. Show it, and drop the raw segments it replaces.
+   *
+   * Dropped from the DOM only — the store keeps every segment, so search, citation navigation, and
+   * export are unaffected by whether a stretch happens to have been polished.
+   */
+  _onPolishChanged({ batch, added, reset }) {
+    if (!this.polishedList) return;
+    if (reset) {
+      this.polishedList.replaceChildren();
+      return;
+    }
+
+    const incoming = batch ?? (added ? [added] : []);
+    if (!incoming.length) return;
+
+    const restore = this.scroll.beginUpdate();
+    for (const block of incoming) {
+      this._insertBlock(block);
+      for (const id of block.source_ids ?? []) {
+        this.list.querySelector(`[data-segment-id="${id}"]`)?.remove();
+      }
+    }
+    this._trimBlocks();
+    restore();
+    this._renderEmptyState();
+  }
+
+  /** Insert a block in time order, which the replay can deliver out of. */
+  _insertBlock(block) {
+    const node = this._buildBlock(block);
+    const later = [...this.polishedList.children].find(
+      (child) => Number(child.dataset.start) > block.start
+    );
+    this.polishedList.insertBefore(node, later ?? null);
+  }
+
+  _buildBlock(block) {
+    const time = el("span", {
+      className: "polished__time numeric",
+      text: timestamp(block.start),
+      attrs: { "data-start": block.start },
+    });
+
+    return el("article", {
+      className: "polished",
+      attrs: {
+        "data-block-id": block.id,
+        "data-start": block.start,
+        "data-end": block.end,
+        // Comma-separated rather than an array, because search highlighting matches against it and
+        // a dataset value is a string either way.
+        "data-segment-ids": (block.source_ids ?? []).join(","),
+      },
+      children: [time, el("div", { className: "polished__body", children: renderProse(block.text) })],
+    });
   }
 
   _buildSegment(segment) {
@@ -146,18 +234,38 @@ export class TranscriptPane {
     }
   }
 
+  _trimBlocks() {
+    const excess = this.polishedList.childElementCount - MAX_RENDERED_BLOCKS;
+    for (let i = 0; i < excess; i += 1) {
+      this.polishedList.firstElementChild?.remove();
+    }
+  }
+
   // -- navigation ------------------------------------------------------------------
 
-  /** Scroll to the segment covering a session-absolute time — used by citations and glossary. */
+  /** Scroll to the moment a citation or glossary term points at.
+   *
+   * Tries the raw segment first and falls back to the polished block covering that time, because
+   * whether a given moment is still on screen as a segment depends on whether its minute has been
+   * polished yet — and a citation that silently does nothing is worse than an approximate one.
+   */
   scrollToTime(seconds) {
     const segment = transcript.segmentAt(seconds);
-    if (!segment) return false;
-    const node = this.list.querySelector(`[data-segment-id="${segment.id}"]`);
+    const node =
+      (segment && this.list.querySelector(`[data-segment-id="${segment.id}"]`)) ||
+      this._blockNodeAt(seconds);
     if (!node) return false;
+
     this.scroll.scrollTo(node);
     node.classList.add("segment--current-match");
     setTimeout(() => node.classList.remove("segment--current-match"), 2000);
     return true;
+  }
+
+  _blockNodeAt(seconds) {
+    const block = polish.blockAt(seconds);
+    if (!block) return null;
+    return this.polishedList?.querySelector(`[data-block-id="${block.id}"]`) ?? null;
   }
 
   /** Highlight matching segments in place, rather than filtering them out.
@@ -168,14 +276,49 @@ export class TranscriptPane {
   highlight(segmentIds) {
     const wanted = new Set(segmentIds);
     for (const node of this.list.children) {
-      const id = Number(node.dataset.segmentId);
-      node.classList.toggle("segment--match", wanted.has(id));
+      node.classList.toggle("segment--match", wanted.has(Number(node.dataset.segmentId)));
+    }
+
+    // Search runs against the segments, which are what the full-text index holds. A block is a
+    // match when any segment it was built from is — otherwise searching a polished session would
+    // find nothing, since the matching segments are no longer on screen.
+    for (const node of this.polishedList?.children ?? []) {
+      const covered = (node.dataset.segmentIds || "").split(",").filter(Boolean).map(Number);
+      node.classList.toggle("segment--match", covered.some((id) => wanted.has(id)));
     }
   }
 
   clearHighlight() {
-    for (const node of this.list.children) {
+    for (const node of $$(".segment--match, .segment--current-match", this.root)) {
       node.classList.remove("segment--match", "segment--current-match");
     }
   }
+}
+
+/**
+ * Turn polished text into paragraphs and lists.
+ *
+ * The only two structures the prompt permits, and the backend has already stripped everything
+ * else. Built as elements rather than parsed as markup: every string here is model output, so it
+ * goes through `textContent` and can never become HTML no matter what the model wrote.
+ */
+function renderProse(text) {
+  return (text ?? "")
+    .split(/\n{2,}/)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean)
+    .map((chunk) => {
+      const lines = chunk.split("\n").map((line) => line.trim());
+      const items = lines.filter((line) => line.startsWith("- "));
+
+      // A block is a list only if it is entirely a list. A stray dash inside a paragraph — which a
+      // speaker's aside routinely produces — must not fragment the paragraph into bullets.
+      if (items.length === lines.length) {
+        return el("ul", {
+          className: "polished__list",
+          children: items.map((line) => el("li", { text: line.slice(2).trim() })),
+        });
+      }
+      return el("p", { className: "polished__paragraph", text: lines.join(" ") });
+    });
 }

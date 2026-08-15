@@ -38,6 +38,11 @@ Every interface in this repository must meet these. They are requirements, not a
 - Every meaningful image has alt text; decorative images have `alt=""`.
 - One `<h1>` per page; heading levels descend without skipping.
 - Status changes — upload progress, job completion, errors — announce via a live region.
+- **A live region announces new information, never a restatement of it.** Committed transcript is
+  announced; the constantly-rewritten hypothesis is not, and neither are the polished blocks, which
+  say again what a screen reader has already read out. All three are equally readable — it is only
+  the automatic announcement that is scoped, by keeping the other two outside the live region
+  rather than by hiding them.
 - Errors identify the field and say how to fix it, in text.
 
 ### Motion
@@ -81,6 +86,7 @@ conspicuous to everyone sitting behind you.
 | Surfaces | `--surface-base` → `--surface-panel`, plus `--surface-control{,-hover}`, `--surface-input` | Four depths. The transcript sits on the lowest so it reads as the document |
 | Text | `--text-primary`, `--text-transcript`, `--text-secondary`, `--text-muted`, `--text-faint`, `--text-dim` | `--text-transcript` is warmer and softer than white; it is read for two hours |
 | The tentative tail | `--text-hypothesis` | ~7:1 against the transcript surface. "Faded" text is easy to under-contrast |
+| Polished blocks | *(no new tokens)* | Same face, size, and colour as a raw segment — it is the same speech. A quiet `--border-control` rule marks the region; on a working setup nearly the whole page is polished, so a loud treatment would just be a loud page |
 | Borders | `--border-subtle` → `--border-strong` | Four weights |
 | Accent | `--accent`, `--accent-bright`, `--accent-dim`, `--accent-wash{,-strong}`, `--accent-border` | One hue. The wash variants are translucent and composite over whatever is behind them |
 | Semantic | `--danger`, `--warning`, each with `-text`, `-wash`, `-border` | Never used alone — see the colour rule below |

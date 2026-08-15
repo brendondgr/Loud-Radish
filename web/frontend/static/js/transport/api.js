@@ -134,6 +134,9 @@ export const api = {
   range: (start, end) => get(`/api/transcript/range?start=${start}&end=${end}`),
   search: (query, limit = 50) =>
     get(`/api/transcript/search?q=${encodeURIComponent(query)}&limit=${limit}`),
+  // Empty whenever no language model has been available, which is the signal to keep showing
+  // raw segments rather than an error.
+  polished: () => get("/api/transcript/polished"),
   summaries: () => get("/api/transcript/summaries"),
   glossary: () => get("/api/transcript/glossary"),
   exportUrl: (fmt) => `/api/transcript/export?fmt=${encodeURIComponent(fmt)}`,

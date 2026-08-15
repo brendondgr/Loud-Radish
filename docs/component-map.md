@@ -37,7 +37,7 @@ web/frontend/
         ├── sessions.js         the sessions page's entry point
         ├── core/               DOM helpers, the event bus, formatting, preferences
         ├── transport/          HTTP client, WebSocket, event names
-        ├── stores/             state: transcript, session, health, config, chat
+        ├── stores/             state: transcript, polish, session, health, config, chat
         ├── components/         one class per region, plus settings/ per tab
         └── a11y/               the focus trap
 ```
@@ -77,7 +77,7 @@ browser owns is genuinely its own — pane widths, text size, which pane is show
 | Component | Owns | Notes |
 |---|---|---|
 | `Header` | Record control, clock, model and privacy identity | Stopping asks first — an accidental stop mid-talk cannot be undone |
-| `TranscriptPane` | Committed segments, the hypothesis tail, search highlighting | Trims to 300 rendered segments; committed and hypothesis are structurally separate |
+| `TranscriptPane` | Polished blocks, committed segments, the hypothesis tail, search highlighting | Three sibling regions, only the middle one a live region; trims to 300 segments and 240 blocks |
 | `ScrollController` | Follow-the-live-edge behaviour | Stops following the instant the user scrolls |
 | `TranscriptSelection` | "Ask about this", copy-with-timestamp | Positions from the selection rectangle, reads the time from the enclosing segment |
 | `ChatPane` | Conversation, quick actions, composer, streaming | Mutates the streaming message in place rather than re-rendering |
@@ -93,6 +93,7 @@ browser owns is genuinely its own — pane widths, text size, which pane is show
 | Store | Holds | Published on |
 |---|---|---|
 | `transcript` | Committed segments and the single hypothesis | `store.transcript.changed` |
+| `polish` | Finished minutes rewritten for reading, and which segments they cover | `store.polish.changed` |
 | `session` | Whether recording, for how long, resolved config | `store.session.changed` |
 | `health` | Level, speech, RTF, latency, connection | `store.health.changed`, throttled to ~4 Hz |
 | `config` | The backend's resolved configuration | `config:changed` |
