@@ -1,6 +1,6 @@
 # Component Map
 
-*Last updated: 2026-08-15 (Phase 14 — final documentation pass)*
+*Last updated: 2026-08-15 (capture modes — D-020)*
 
 > **Status: implemented.** Update this file in the same change that adds, moves, or renames a
 > component.
@@ -88,6 +88,23 @@ browser owns is genuinely its own — pane widths, text size, which pane is show
 | `settings/*` | One tab each, plus `bindings.js` | Controls declare a dotted config path; the binding layer does the rest |
 | `FocusTrap` | Modal focus containment and restoration | Recomputes candidates per Tab — the dialog changes shape constantly |
 
+### Planned — the multi-mode expansion (D-020)
+
+Specified in `docs/design-system.md` § Capture Modes; built by
+[plans/multi-mode-ui-implementation.md](plans/multi-mode-ui-implementation.md) and the two mode plans
+after it. Listed here so the ownership boundaries are settled before any of them is written.
+
+| Component | Owns | Notes |
+|---|---|---|
+| `ModeSwitcher` | The three-way capture-mode `radiogroup` | Separate from `Header` so the header stays a renderer rather than a controller. Disabled whenever the run state is not `idle`; a mode whose requirements are missing is disabled with the reason, never hidden |
+| `Preflight` | The window pre-flight sheet's three toggles | Reuses `FocusTrap` and the existing modal styling. Refuses the all-off combination in the sheet; the server refuses it again |
+| `RecordingMonitor` | The third pane: preview, elapsed, output size, active options | Pulls the preview as a still image on a timer, paused when hidden — the socket must never carry video, because transcript events on it are undroppable |
+
+`Header` keeps the record control, but stops deriving its appearance from a boolean: it renders the
+six run states from `stores/mode.js` and asks that store what pressing the control means. The
+transcript pane grows a mode-specific empty state and, once a session can hold two transcription
+passes, a Live/Final revision switch in its toolbar.
+
 ## Stores
 
 | Store | Holds | Published on |
@@ -98,6 +115,7 @@ browser owns is genuinely its own — pane widths, text size, which pane is show
 | `health` | Level, speech, RTF, latency, connection | `store.health.changed`, throttled to ~4 Hz |
 | `config` | The backend's resolved configuration | `config:changed` |
 | `chat` | Settled messages plus the streaming one | `store.chat.changed`, `store.chat.stream` |
+| `mode` *(planned)* | Selected capture mode, current run state, per-mode availability, the pending run's options | `store.mode.changed` |
 
 ## Adding a component
 

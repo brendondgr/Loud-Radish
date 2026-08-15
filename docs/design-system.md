@@ -1,6 +1,6 @@
 # Design System
 
-*Last updated: 2026-08-15 (Phase 14 — final documentation pass)*
+*Last updated: 2026-08-15 (capture modes — D-020)*
 
 > **Status: implemented.** The tokens below are the ones in
 > `web/frontend/static/css/tokens.css`, which remains the source of truth — this file is the
@@ -72,6 +72,150 @@ incomplete:
 For this project specifically: the live level meter, the real-time-factor indicator, model-loading
 progress, and long-transcript rendering performance all need deliberate treatment. The
 upload-and-poll job states this paragraph once listed are gone — see Decision D-010.
+
+## Capture Modes
+
+*Specified 2026-08-15 (D-020). The vocabulary is `web/backend/app/services/session/modes.py` and its
+mirror `web/frontend/static/js/core/modes.js`; this section is the interface built on it.*
+
+The application has three capture modes and each recording passes through some subset of six run
+states. **These are two different questions and they get two different controls.**
+
+| | Answers | Control | Changeable while running |
+|---|---|---|---|
+| **Capture mode** | What kind of recording this will be | A three-way `radiogroup` in the header | No |
+| **Run state** | Where this recording has got to | The primary record control | It *is* the run state |
+
+One control doing both was considered and rejected. A single button that cycles
+*idle → recording → stopping → idle → next mode* changes what it means depending on how many times
+it has already been pressed, which means a user cannot know what pressing it will do without reading
+its current label — and the label is what changes. The two controls sit adjacent so the pair still
+reads as one unit.
+
+### The modes
+
+| Mode | What it does | Reachable states |
+|---|---|---|
+| **Live** | Continuous capture, transcribed as it arrives. The original behaviour. | idle, recording, stopping, error |
+| **Recorded** | Captures to a file with no inference; transcribes the whole file on stop. | idle, recording, stopping, **processing**, error |
+| **Window** | A chosen window, with live transcription, post-process transcription, and video each switchable first. | idle, **arming**, recording, stopping, processing, error |
+
+**All three are always visible.** A mode whose requirements are missing is *disabled and carries the
+reason*, never hidden — a feature that disappears when its dependency is absent is indistinguishable
+from a feature that does not exist, whereas a disabled one naming the install command is actionable.
+This mirrors how `GET /api/health` already reports optional dependency groups.
+
+**The selector is disabled whenever the run state is not `idle`.** Switching capture mode mid-session
+would mean rebuilding the pipeline underneath a transcript that is still accumulating, and there is
+no user need for it. Changing mode while idle does **not** clear the transcript: the transcript is
+cleared on `session.started` and nowhere else.
+
+### The record control's six states
+
+| State | Label | Dot | Enabled | Announced |
+|---|---|---|---|---|
+| `idle` | *Start recording* | `--text-dim` | Yes | — |
+| `arming` | *Choose a window…* | `--accent` | Yes — cancels | "Waiting for a window to be chosen" |
+| `recording` | *Stop* | `--danger` | Yes | "Recording" |
+| `stopping` | *Stopping…* | `--danger`, dimmed | **No** | "Stopping" |
+| `processing` | *Transcribing… NN%* | `--accent` | **No** | "Transcribing, NN percent" |
+| `error` | *Start recording* | `--warning` | Yes | The failure, in plain language |
+
+Rules that fall out of the table:
+
+- **`stopping` and `processing` disable the control rather than hiding it.** A hidden control makes
+  the header reflow mid-recording; a disabled one keeps the layout still and says why.
+- **`processing` is not a cancel button.** Cancelling a transcription pass after a forty-minute
+  recording discards the only transcript of audio that is about to be deleted. The honest recoveries
+  are to let it finish or to stop the server, and the audio is on disk in the meantime.
+- **`error` returns the control to its idle affordance** and puts the message in the banner region,
+  which already exists and is already announced. The dot stays warning-coloured so the previous run's
+  failure is still visible next to a button that says *Start recording*.
+- **Announcement lives on the state label, not the button.** `aria-live="polite"` on a `<button>`
+  whose text changes announces the *new label* — "Stop" — which describes what pressing it would do,
+  not what happened. The separate `.record-state__label` announces the state itself.
+- **No new tokens.** `--danger` for recording, `--accent` for arming and processing, `--warning` for
+  error, `--text-dim` for idle, all already measured. Every state pairs its colour with a word, per
+  the colour rule above.
+- **The recording dot does not pulse.** Existing motion rule: nothing loops or animates in an
+  interface that is on screen for two hours. Under `prefers-reduced-motion` there is nothing extra to
+  disable, which is the point.
+
+### Pre-flight options
+
+Some modes need options answered *before* capture begins. They are **per-run**, not settings: a user
+who recorded one window without video should not silently get no video next time.
+
+| Mode | Opens a pre-flight | Why |
+|---|---|---|
+| Live | No | Nothing to choose |
+| Recorded | No | Nothing to choose |
+| Window | **Always** | Three toggles, and the desktop's window picker follows |
+
+The window pre-flight carries exactly three toggles:
+
+| Toggle | Default | Off means |
+|---|---|---|
+| **Live transcription** | On | No transcript until the recording ends |
+| **Post-process transcription** | On | The live transcript is the only one |
+| **Video capture** | On | Audio is recorded and transcribed; no video file |
+
+**All three off is refused** — it would record nothing — with the reason shown next to the confirm
+button rather than as an alert. Every other combination is valid, including video with no
+transcription and transcription with no video. The refusal is enforced on the server as well; the
+client check is a courtesy and the server check is the rule.
+
+The sheet is a focus-trapped dialog reusing `a11y/focus-trap.js` and the existing modal styling — not
+a new dialog primitive, because focus trapping and restoration are the accessibility behaviour most
+easily got wrong twice. `Escape` cancels and starts nothing.
+
+**The window is chosen after the sheet is confirmed, by the desktop's own picker, not inside the
+sheet.** Under Wayland an application cannot enumerate windows (see D-022 and
+[plans/window-recording-transcription.md](plans/window-recording-transcription.md)). The interface
+must therefore never imply it can: no thumbnail grid, no window list, no pre-selection. The sheet's
+confirm button says *Choose a window…* so the next thing that happens is the thing the button
+promised.
+
+The sheet also states, in text, that **audio is the machine's, not that window's** — the screen-cast
+portal carries video only. A user who assumes per-window audio and records the wrong source has lost
+the recording, and that sentence is the entire defence against it.
+
+### The recording monitor
+
+Window capture gets a **third pane**, peer to the transcript and the assistant, shown only in that
+mode. Not a modal and not a floating window: live transcription and asking the assistant questions
+must keep working *during* the recording, and anything overlaying the other two panes prevents
+exactly that.
+
+It shows the preview, the elapsed clock, the output file and its growing size, and which of the three
+options are active. In the narrow layout it joins the existing tab set as a third tab — **present
+only in window mode**, because three permanent tabs at 320 px spends scarce width on a pane that is
+empty in two modes out of three.
+
+**Its degraded state is specified up front**: when no preview is available, the pane shows a static
+card naming the captured window and the reason. A black rectangle and a broken preview look
+identical, and the difference between "this window is dark" and "capture has failed" is the whole
+value of looking at the monitor.
+
+The preview is a still image refreshed on a timer, never frames pushed over the WebSocket — the
+socket's backpressure policy makes transcript events critical and undroppable, and video sharing that
+channel is the one thing capable of delaying a committed segment. The timer pauses when the pane is
+hidden or the tab is backgrounded.
+
+### Per-mode empty states
+
+The transcript pane's empty state is mode-specific, because "no transcript yet" means something
+different in each and a blank pane during a recording reads as a broken transcriber.
+
+| Mode and state | What the transcript pane says |
+|---|---|
+| Any mode, idle | The existing empty state — what this is and how to start |
+| Live, recording | Nothing; the transcript is filling |
+| Recorded, recording | *"Recording. Nothing is being transcribed yet — the whole recording is transcribed when you stop."* plus the elapsed time and level meter |
+| Recorded/window, processing | A progress card: seconds transcribed of seconds recorded |
+| Window, recording, live transcription off | *"Recording. Live transcription is off for this run."* |
+| Window, recording, live transcription on | Nothing; the transcript is filling |
+| Any mode, error | The failure and what to do, per the Required States rule |
 
 ## Design Tokens
 
