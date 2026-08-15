@@ -24,6 +24,10 @@ DATA_DIR: Path = REPO_ROOT / "data"
 #: the library of recordings the file source replays — one is the machine's own output and the
 #: other is the user's input, and a single list mixing them invites deleting the wrong thing.
 RECORDINGS_DIR: Path = DATA_DIR / "recordings"
+#: Where a hand-installed wheel is kept so a later ``uv sync`` that replaces it can be undone
+#: without downloading it again. Only the ROCm build of CTranslate2 lives here today; nothing
+#: creates the directory, so its absence simply means no wheel has been kept.
+WHEELS_DIR: Path = DATA_DIR / "wheels"
 LOGS_DIR: Path = REPO_ROOT / "logs"
 
 

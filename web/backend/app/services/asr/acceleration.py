@@ -22,12 +22,16 @@ on a machine where the ROCm libraries would abort the process rather than raise.
 from __future__ import annotations
 
 import importlib.util
+import json
 import logging
 import os
 import re
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from ... import paths
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +53,11 @@ ROCM_LIBRARIES = (
 
 #: The release archive carrying the ROCm build, by CTranslate2 version.
 ROCM_WHEEL_URL = "https://github.com/OpenNMT/CTranslate2/releases/download/v{version}/rocm-python-wheels-Linux.zip"
+
+#: Where a previously downloaded wheel is kept. ``uv sync`` reinstalls CTranslate2 from PyPI
+#: whenever it touches the package, silently replacing the ROCm build with the CPU/CUDA one — so
+#: this is not a rare recovery path, it is the one that gets used.
+KEPT_WHEEL_DIR = paths.WHEELS_DIR
 
 
 @dataclass
@@ -130,7 +139,10 @@ def detect() -> Acceleration:
                     f"Missing runtime {'libraries' if len(missing) > 1 else 'library'}: "
                     f"{', '.join(missing)}."
                     if missing
-                    else "The CPU/CUDA build from PyPI is installed rather than the ROCm build."
+                    else (
+                        "The CPU/CUDA build from PyPI is installed rather than the ROCm build, "
+                        "which is what a `uv sync` touching CTranslate2 leaves behind."
+                    )
                 )
             ),
             remedy=_rocm_remedy(missing),
@@ -262,6 +274,15 @@ def _rocm_remedy(missing: list[str]) -> list[str]:
             )
 
     version = _ctranslate2_version()
+
+    kept = _kept_wheel(version)
+    if kept is not None:
+        # The common case by far: the wheel was installed once and a later sync replaced it. One
+        # command restores it. If this wheel turns out not to be the ROCm build, the next start
+        # reports the same thing again rather than claiming success — so guessing here is safe.
+        steps.append(f"uv pip install --reinstall {_display_path(kept)}")
+        return steps
+
     steps.extend(
         [
             f"curl -LO {ROCM_WHEEL_URL.format(version=version)}",
@@ -272,9 +293,132 @@ def _rocm_remedy(missing: list[str]) -> list[str]:
             f"'*cp{_python_tag()}-cp{_python_tag()}-manylinux*x86_64.whl'",
             f"uv pip install --reinstall ./ctranslate2-{version}"
             f"-cp{_python_tag()}-cp{_python_tag()}-*.whl",
+            # Keeping it turns the three steps above into the one step below, next time.
+            f"mkdir -p {_display_path(KEPT_WHEEL_DIR)} && mv ./ctranslate2-{version}"
+            f"-cp{_python_tag()}-cp{_python_tag()}-*.whl {_display_path(KEPT_WHEEL_DIR)}/",
         ]
     )
     return steps
+
+
+def _kept_wheel(version: str) -> Path | None:
+    """A previously downloaded wheel matching this CTranslate2 and this Python, if one was kept.
+
+    Matched on version and interpreter tag because a wheel for either a different CTranslate2 or a
+    different Python will not install, and offering a command that fails is worse than offering the
+    download. The build itself is not inspected: telling a ROCm wheel from a CUDA one means reading
+    the ELF headers of a forty-megabyte compressed library, which is far too much work for something
+    that runs on every startup.
+    """
+    tag = _python_tag()
+    try:
+        candidates = sorted(KEPT_WHEEL_DIR.glob(f"ctranslate2-{version}-cp{tag}-cp{tag}-*.whl"))
+    except OSError:
+        return None
+    return candidates[0] if candidates else None
+
+
+# -- putting the ROCm build back -----------------------------------------------------------
+
+#: Set to ``1`` to stop the launcher restoring the kept wheel, for anyone who wants the environment
+#: left exactly as the lockfile describes it.
+REPAIR_OFF = "TRANSCRIBER_NO_GPU_REPAIR"
+
+
+def repair_kept_wheel() -> str | None:
+    """Reinstall the kept ROCm wheel when the environment manager has replaced it.
+
+    ``uv run app.py`` synchronises the environment against the lockfile before Python starts, and
+    the lockfile says *PyPI* — so every single launch silently swaps the ROCm build for the CPU/CUDA
+    one. Documenting a recovery command does not help when the thing that breaks it is the command
+    used to start the application. The launcher therefore puts it back.
+
+    Deliberately narrow. It fires only when all of the following hold, and does nothing otherwise:
+
+    * the machine has an AMD GPU;
+    * a wheel matching the installed CTranslate2 version and this interpreter is kept on disk;
+    * the installed CTranslate2 did *not* come from that wheel.
+
+    That last check is why this is safe to run on every start. A wheel installed from a file records
+    its origin in ``direct_url.json``; one installed from an index does not. Reading it costs a
+    single small file, and after a successful repair the condition is false — so this cannot loop.
+
+    Returns the message to print, or ``None`` when there was nothing to do.
+    """
+    if os.environ.get(REPAIR_OFF) == "1":
+        return None
+    if _detect_hardware()[0] != "rocm":
+        return None
+
+    version = _installed_version()
+    wheel = _kept_wheel(version) if version else None
+    if wheel is None or _installed_from(wheel):
+        return None
+
+    executable = shutil.which("uv")
+    if executable is None:
+        return None
+
+    import subprocess
+
+    logger.info("Restoring the ROCm build of CTranslate2 from %s", wheel)
+    try:
+        result = subprocess.run(  # noqa: S603 - fixed executable, path from our own directory
+            [executable, "pip", "install", "--quiet", "--reinstall", str(wheel)],
+            capture_output=True,
+            text=True,
+            timeout=300,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return f"Could not restore the ROCm build of CTranslate2: {exc}"
+
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip().splitlines()
+        return f"Could not restore the ROCm build of CTranslate2 from {wheel.name}" + (
+            f": {detail[-1]}" if detail else "."
+        )
+    return f"Restored the ROCm build of CTranslate2 from {wheel.name} (uv had replaced it)."
+
+
+def _installed_version() -> str:
+    """The installed CTranslate2's version, read from its metadata rather than by importing it."""
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        return version("ctranslate2")
+    except PackageNotFoundError:
+        return ""
+
+
+def _installed_from(wheel: Path) -> bool:
+    """Whether the installed CTranslate2 was installed from ``wheel``.
+
+    ``direct_url.json`` is written by the installer for anything installed from a file or URL and
+    omitted for anything resolved from an index, which makes its absence a reliable signal that the
+    PyPI build is what is present.
+    """
+    from importlib.metadata import PackageNotFoundError, distribution
+
+    try:
+        raw = distribution("ctranslate2").read_text("direct_url.json")
+    except (PackageNotFoundError, OSError):
+        return False
+    if not raw:
+        return False
+    try:
+        url = str(json.loads(raw).get("url", ""))
+    except ValueError:
+        return False
+    return url.endswith(wheel.name)
+
+
+def _display_path(path: Path) -> str:
+    """A path as the user would type it — relative to the repository when it lies inside it."""
+    try:
+        return f"./{path.relative_to(paths.REPO_ROOT)}"
+    except ValueError:
+        return str(path)
 
 
 #: Which package ships each library. Fedora names; other distributions differ, which the remedy

@@ -266,10 +266,7 @@ class FasterWhisperBackend(AsrBackend):
                 "Try a smaller model, or set asr.device to 'cpu'."
             )
         if "cuda" in detail or "cudnn" in detail or "cublas" in detail:
-            return (
-                f"The CUDA runtime rejected loading {self._model_name}. "
-                "Check the NVIDIA driver and cuDNN installation, or set asr.device to 'cpu'."
-            )
+            return self._gpu_rejection_message()
         if "no such file" in detail or "not found" in detail or "404" in detail:
             return (
                 f"Model {self._model_name!r} could not be found or downloaded. "
@@ -278,6 +275,33 @@ class FasterWhisperBackend(AsrBackend):
         return (
             f"Could not load {self._model_name} on {device} at {self._precision} "
             f"({type(exc).__name__}: {exc})."
+        )
+
+    def _gpu_rejection_message(self) -> str:
+        """Say which GPU stack failed, which is not always the one the exception names.
+
+        CTranslate2 drives ROCm through the CUDA API, so an AMD machine whose ROCm build has been
+        replaced — which is what any ``uv sync`` touching CTranslate2 does — raises an error saying
+        *CUDA*. Repeating that back sends the owner of a Radeon to check an NVIDIA driver they will
+        never have. The acceleration report knows what hardware is actually present, so it is asked.
+        """
+        try:
+            from .acceleration import detect
+
+            report = detect()
+        except Exception:  # noqa: BLE001 - a diagnosis must never replace the failure it explains
+            report = None
+
+        if report is not None and report.hardware == "rocm":
+            steps = "; ".join(report.remedy)
+            return (
+                f"The GPU runtime rejected loading {self._model_name}. {report.summary} "
+                + (f"Fix it with: {steps} — or set asr.device to 'cpu'." if steps else "")
+            ).strip()
+
+        return (
+            f"The CUDA runtime rejected loading {self._model_name}. "
+            "Check the NVIDIA driver and cuDNN installation, or set asr.device to 'cpu'."
         )
 
 

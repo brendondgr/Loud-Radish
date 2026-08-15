@@ -158,10 +158,41 @@ Two caveats worth knowing before committing to this:
 - **It replaces the CPU/CUDA build.** The same package name provides both, so installing the ROCm
   wheel means that environment no longer has a CUDA build. On a machine with only an AMD GPU that
   costs nothing.
-- **`uv sync` will put the PyPI wheel back**, because `pyproject.toml` names `ctranslate2` without
-  knowing which build you want. Keep the wheel — `data/wheels/` is the conventional place here —
-  and re-install it after any sync that touches CTranslate2. The startup banner will tell you when
-  that has happened, so it is noticed at the next launch rather than at the next recording.
+- **`uv run app.py` puts the PyPI wheel back — on every launch.** `pyproject.toml` names
+  `ctranslate2` without knowing which build you want, and `uv run` synchronises against the lockfile
+  before any of this repository's code executes. So the command that starts the application is the
+  command that removes its GPU support. It is not a `uv sync` you can avoid; it is every start.
+
+  **Keep the wheel in `data/wheels/` and the launcher undoes it for you**, printing one line when it
+  does:
+
+  ```
+  Restored the ROCm build of CTranslate2 from ctranslate2-4.8.1-cp314-…whl (uv had replaced it).
+  ```
+
+  It fires only when the machine has an AMD GPU, a wheel matching the installed CTranslate2 and this
+  interpreter is on disk, and the installed build did not come from that wheel — read from the
+  installer's own `direct_url.json`, so it costs one small file read and cannot loop. Set
+  `TRANSCRIBER_NO_GPU_REPAIR=1` to leave the environment exactly as the lockfile describes it.
+
+  With no kept wheel, the banner prints the three download steps instead, ending with a `mv` into
+  `data/wheels/` so that every launch after it is automatic.
+
+### What it is worth
+
+Measured here on `large-v3-turbo`, 25 s of real speech, identical transcripts on every row:
+
+| Device | Precision | Real time |
+| --- | --- | --- |
+| Radeon 8060S | `float16` | 33× |
+| Radeon 8060S | `int8_float16` | 35× |
+| Radeon 8060S | `int8` | 35× |
+| CPU | `int8` | 8.3× |
+
+The GPU is worth roughly 4× over the CPU. **Precision is not worth choosing between** on this iGPU —
+the three rows are within run-to-run noise of each other, so `int8` costs nothing and `float16`
+buys nothing. On a discrete card with real tensor cores the gap would be larger; do not carry these
+numbers there.
 
 ### Startup tells you where you stand
 
