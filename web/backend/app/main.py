@@ -27,6 +27,7 @@ from .routes import build_router
 from .services.chat import ChatService
 from .services.context import ContextWorker
 from .services.llm import build_llm
+from .services.polish import PolishWorker
 from .services.session import SessionManager
 from .transport import EventHub, ws_router
 
@@ -130,6 +131,17 @@ def _wire_assistant(app: FastAPI) -> None:
         backend_factory=backend_factory,
         emit=app.state.hub.emit,
         clock=lambda: manager.session_seconds,
+    )
+
+    # The polish worker takes a config *provider* rather than a snapshot. Its settings — how often
+    # to run, whether to run at all — are ones a user adjusts while listening to a talk, and a
+    # snapshot would defer that until the next session.
+    manager.polish_worker_factory = lambda store: PolishWorker(
+        store=store,
+        config_provider=lambda: app.state.config.resolve(),
+        backend_factory=backend_factory,
+        emit=app.state.hub.emit,
+        silence_provider=lambda: manager.silence_seconds,
     )
 
 

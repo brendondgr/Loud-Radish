@@ -326,6 +326,90 @@ class TestEmittedEvents:
             await session.stop()
 
 
+class FakePolishWorker:
+    """Records its lifecycle. The real one needs a language model; the manager must not."""
+
+    def __init__(self, store) -> None:
+        self.store = store
+        self.started = False
+        self.stopped = False
+
+    def start(self) -> None:
+        self.started = True
+
+    async def stop(self) -> None:
+        self.stopped = True
+
+
+class TestPolishWorkerLifecycle:
+    """The polish pass is attached through a factory so the pipeline never imports a model."""
+
+    async def test_it_starts_and_stops_with_the_session(self, manager) -> None:
+        session, _, _ = manager
+        built: list[FakePolishWorker] = []
+
+        def build(store) -> FakePolishWorker:
+            built.append(FakePolishWorker(store))
+            return built[-1]
+
+        session.polish_worker_factory = build
+
+        await session.start()
+        assert built[0].started is True
+        await session.stop()
+
+        assert built[0].stopped is True
+        assert built[0].store is not None
+
+    async def test_no_factory_means_no_polish_and_no_complaint(self, manager) -> None:
+        """The ordinary state on a machine with transcription set up and no model."""
+        session, _, recorder = manager
+        await session.start()
+        await session.stop()
+
+        assert "error" not in recorder.names()
+
+    async def test_a_worker_that_cannot_be_built_does_not_stop_the_recording(self, manager) -> None:
+        session, _, recorder = manager
+
+        def explode(store):
+            raise RuntimeError("no model is configured")
+
+        session.polish_worker_factory = explode
+        await session.start()
+        try:
+            assert recorder.wait_for("transcript.committed"), "recording did not survive"
+        finally:
+            stats = await session.stop()
+
+        assert stats.segment_count > 0
+
+    async def test_a_failing_final_pass_does_not_fail_the_stop(self, manager) -> None:
+        session, _, _ = manager
+
+        class Failing(FakePolishWorker):
+            async def stop(self) -> None:
+                raise RuntimeError("the model went away")
+
+        session.polish_worker_factory = Failing
+        await session.start()
+        stats = await session.stop()
+
+        assert not session.is_running
+        assert stats.segment_count >= 0
+
+    async def test_the_silence_reading_is_available_while_recording(self, manager) -> None:
+        """It is what the polish worker cuts a chunk on."""
+        session, _, _ = manager
+        assert session.silence_seconds == 0.0
+
+        await session.start()
+        try:
+            assert session.silence_seconds >= 0.0
+        finally:
+            await session.stop()
+
+
 class TestLiveConfig:
     async def test_live_settings_reach_the_running_pipeline(self, manager) -> None:
         session, config, _ = manager
