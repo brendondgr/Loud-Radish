@@ -20,6 +20,7 @@ import { AudioSettings } from "./settings/audio.js";
 import { AsrSettings } from "./settings/asr.js";
 import { LlmSettings } from "./settings/llm.js";
 import { ContextSettings, StorageSettings } from "./settings/misc.js";
+import { ShortcutSettings } from "./settings/shortcuts.js";
 import { attach, hydrate, refreshDependants } from "./settings/bindings.js";
 
 /** Published when the dialog closes, so the header can re-read the assistant's state. */
@@ -53,6 +54,7 @@ export class SettingsModal {
       llm: new LlmSettings(this.panels, handlers),
       context: new ContextSettings(this.panels),
       storage: new StorageSettings(this.panels, handlers),
+      shortcuts: new ShortcutSettings(this.panels),
     };
 
     this._wire();
@@ -159,6 +161,7 @@ export class SettingsModal {
       this.tabs.asr.load(),
       this.tabs.llm.load(),
       this.tabs.storage.load(),
+      this.tabs.shortcuts.load(),
     ]);
     this.syncTabs();
   }

@@ -244,6 +244,27 @@ class CaptureConfig(_Base):
     mux_audio: bool = True
 
 
+class ShortcutsConfig(_Base):
+    """Global keyboard shortcuts, registered by the companion process (Plan 5).
+
+    **A web page cannot register these.** Under Wayland an application cannot grab keys at all, and
+    reading `/dev/input` directly would mean a keylogger running as the user — not a reasonable
+    thing for a transcription tool to install. They go through the desktop's own shortcut service,
+    which is the sanctioned route and the one that can be revoked from System Settings.
+
+    The distinction the brief asks for lives in the action names rather than in a branch: `toggle_*`
+    starts or stops immediately, and `arm_window` opens the options sheet first, because window
+    capture has three switches that must be answered before anything is captured.
+    """
+
+    enabled: bool = True
+    toggle_live: str = "Meta+Alt+L"
+    toggle_recorded: str = "Meta+Alt+R"
+    arm_window: str = "Meta+Alt+W"
+    stop: str = "Meta+Alt+S"
+    open_app: str = "Meta+Alt+T"
+
+
 class QuickAction(_Base):
     """A parameterised prompt template surfaced as a one-tap button (BE §11.3)."""
 
@@ -267,5 +288,6 @@ class AppConfig(_Base):
     polish: PolishConfig = Field(default_factory=PolishConfig)
     recording: RecordingConfig = Field(default_factory=RecordingConfig)
     capture: CaptureConfig = Field(default_factory=CaptureConfig)
+    shortcuts: ShortcutsConfig = Field(default_factory=ShortcutsConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     quick_actions: list[QuickAction] = Field(default_factory=list)

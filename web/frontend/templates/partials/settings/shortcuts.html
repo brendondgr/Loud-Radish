@@ -1,0 +1,86 @@
+{# Global keyboard shortcuts (Plan 5).
+
+   These are registered by the **companion process**, not by this page. A page in a browser tab
+   cannot register a system-wide hotkey — under Wayland an application cannot grab keys at all — so
+   the panel says plainly when the companion is not running and the bindings are therefore inert.
+   A settings page that silently stores keys nothing listens for is worse than one that admits it. #}
+
+<section
+  class="settings__panel"
+  role="tabpanel"
+  id="settings-panel-shortcuts"
+  aria-labelledby="settings-tab-shortcuts"
+  data-settings-panel="shortcuts"
+  hidden
+>
+  <div class="settings__group">
+    <h3 class="settings__heading">Global shortcuts</h3>
+
+    <div class="field field--switch">
+      <input type="checkbox" id="shortcuts-enabled" data-config="shortcuts.enabled" />
+      <label class="field__label field__label--inline" for="shortcuts-enabled">
+        Listen for these keys anywhere
+      </label>
+      <p class="field__hint">
+        Registered through your desktop's own shortcut service, which is the only sanctioned way
+        under Wayland — and the reason they can be revoked from your system settings. This
+        application never reads input devices directly.
+      </p>
+    </div>
+
+    <p class="field__hint settings__hint--warning" data-shortcuts-status>Checking…</p>
+  </div>
+
+  <div class="settings__group">
+    <h3 class="settings__heading">Keys</h3>
+
+    <div class="field field--inline">
+      <label class="field__label field__label--inline" for="shortcut-live">Live transcription</label>
+      <input class="field__control" id="shortcut-live" type="text" spellcheck="false"
+             data-config="shortcuts.toggle_live" data-shortcut-capture />
+      <p class="field__hint">Starts, or stops if it is already recording.</p>
+    </div>
+
+    <div class="field field--inline">
+      <label class="field__label field__label--inline" for="shortcut-recorded">Recording only</label>
+      <input class="field__control" id="shortcut-recorded" type="text" spellcheck="false"
+             data-config="shortcuts.toggle_recorded" data-shortcut-capture />
+      <p class="field__hint">Captures audio immediately, with no transcription until you stop.</p>
+    </div>
+
+    <div class="field field--inline">
+      <label class="field__label field__label--inline" for="shortcut-window">Record a window</label>
+      <input class="field__control" id="shortcut-window" type="text" spellcheck="false"
+             data-config="shortcuts.arm_window" data-shortcut-capture />
+      <p class="field__hint">
+        Opens the options first rather than starting. Window capture has three switches that have
+        to be answered before anything is captured, so this one asks.
+      </p>
+    </div>
+
+    <div class="field field--inline">
+      <label class="field__label field__label--inline" for="shortcut-stop">Stop</label>
+      <input class="field__control" id="shortcut-stop" type="text" spellcheck="false"
+             data-config="shortcuts.stop" data-shortcut-capture />
+    </div>
+
+    <div class="field field--inline">
+      <label class="field__label field__label--inline" for="shortcut-open">Open the interface</label>
+      <input class="field__control" id="shortcut-open" type="text" spellcheck="false"
+             data-config="shortcuts.open_app" data-shortcut-capture />
+    </div>
+  </div>
+
+  <div class="settings__group">
+    <h3 class="settings__heading">Starting with your session</h3>
+    <p class="field__hint">
+      The shortcuts only work while the application is running, so it is worth having it start with
+      your desktop. From a terminal in the project folder:
+    </p>
+    <pre class="settings__command">uv run scripts/install_autostart.py</pre>
+    <p class="field__hint">
+      Removing it again is <code>--uninstall</code> on the same command. It writes one systemd user
+      unit and nothing else.
+    </p>
+  </div>
+</section>

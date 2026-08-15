@@ -123,7 +123,7 @@ function boot() {
   wireChat(chatPane);
 
   socket.connect();
-  hydrate(chatPane, glossary);
+  hydrate(chatPane, glossary).then(() => armFromUrl(preflight, banners, settings));
 }
 
 /** Keep the narrow-layout tab badge in step with unread answers. */
@@ -398,6 +398,22 @@ async function arm(captureMode, preflight, banners, settings) {
  * A whole replacement rather than a merge: the two passes cover the same audio with different
  * segment ids, and interleaving them would produce a transcript that says everything twice.
  */
+/**
+ * Open the pre-flight sheet because a global shortcut asked for it (Plan 5).
+ *
+ * `?arm=window` rather than a second native dialog: the browser already has a sheet for those three
+ * switches, and building another would mean two implementations to keep in step.
+ */
+async function armFromUrl(preflight, banners, settings) {
+  const wanted = new URLSearchParams(window.location.search).get("arm");
+  if (!wanted || !mode.select(wanted)) return;
+
+  // Cleared from the address bar first, so a reload does not re-arm a recording the user has
+  // since cancelled.
+  window.history.replaceState({}, "", window.location.pathname);
+  if (mode.action === "arm") await arm(wanted, preflight, banners, settings);
+}
+
 async function showRevision(pane, revision) {
   try {
     const { segments } = await api.transcriptAt(revision);

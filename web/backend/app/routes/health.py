@@ -40,6 +40,25 @@ async def health(request: Request) -> dict[str, Any]:
         # Which part of the window-capture stack is missing, when one is. Five distinct verdicts
         # rather than one, because each has a different fix (D-022).
         "capture": capture.as_dict(),
+        # Whether the tray companion is running and how many shortcuts it registered. The keys can
+        # be perfectly well configured and still do nothing, so the settings panel reports on the
+        # *process* rather than on the configuration.
+        "companion": _companion_status(),
+    }
+
+
+def _companion_status() -> dict[str, Any]:
+    """Whether a companion process has registered its shortcuts with the desktop.
+
+    Read from the desktop's own shortcut service rather than from a file we wrote: a stale marker
+    would tell the settings panel the keys work when the process behind them has gone.
+    """
+    from ..companion.shortcuts import ACTIONS, service_available
+
+    return {
+        "running": service_available(),
+        "registered": len(ACTIONS) if service_available() else 0,
+        "total": len(ACTIONS),
     }
 
 

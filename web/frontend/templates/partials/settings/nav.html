@@ -1,6 +1,6 @@
 {# The settings tab list.
 
-   Five tabs, matching the five configuration areas the backend exposes. Vertical on a wide screen
+   Six tabs, matching the configuration areas the backend exposes. Vertical on a wide screen
    and horizontal when the dialog goes narrow — a vertical rail costs width the panels need more. #}
 
 <nav class="settings__nav" role="tablist" aria-label="Settings sections" data-settings-nav>
@@ -71,5 +71,19 @@
   >
     Storage
     <span class="settings__tab-hint">Where sessions are kept</span>
+  </button>
+
+  <button
+    type="button"
+    class="settings__tab"
+    role="tab"
+    id="settings-tab-shortcuts"
+    aria-controls="settings-panel-shortcuts"
+    aria-selected="false"
+    tabindex="-1"
+    data-settings-tab="shortcuts"
+  >
+    Shortcuts
+    <span class="settings__tab-hint">Global keys, starting with your session</span>
   </button>
 </nav>
