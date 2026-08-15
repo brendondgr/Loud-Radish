@@ -203,7 +203,7 @@ listed them has been removed rather than left describing work that has landed.
 | `data/` | Sessions, the user config file, and optionally retained audio. Gitignored: large, local, and often sensitive. |
 | `logs/` | Runtime log output. Gitignored. Never contains transcript content. |
 | `.claude/`, `.agents/`, `.cursor/` | Tool-specific pointer files. Frontmatter plus a reading list aimed at `docs/`. Never rule content. |
-| `app.py` | The entry point: `uv run python app.py`. A launcher only — it loads `.env`, prepares directories, checks the port, and starts the server. It is not an exception to "web application code lives under `web/`", because it contains none: everything it starts lives under `web/`. |
+| `app.py` | The entry point: `uv run app.py`. A launcher only — it loads `.env`, prepares directories, checks the port, and starts the server. It is not an exception to "web application code lives under `web/`", because it contains none: everything it starts lives under `web/`. |
 
 ## Test Layout
 

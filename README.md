@@ -22,7 +22,7 @@ uv sync
 ```
 
 ```bash
-uv run python app.py
+uv run app.py
 ```
 
 Then open <http://127.0.0.1:8395>.

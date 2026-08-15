@@ -57,7 +57,7 @@ the device, Settings → Transcription for the model. Nothing needs a config fil
 ## Running
 
 ```bash
-uv run python app.py
+uv run app.py
 ```
 
 Then open <http://127.0.0.1:8395>. Flags: `--port`, `--host`, `--reload`, `--open`, `--log-level`.

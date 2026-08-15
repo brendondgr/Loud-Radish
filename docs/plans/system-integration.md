@@ -116,13 +116,17 @@ unmade decision.
 ### Step 2: Autostart
 
 - **Locations**: New `scripts/install_autostart.py` — writes
-  `~/.config/systemd/user/transcriber.service` pointing at `uv run python app.py` with the repository
+  `~/.config/systemd/user/transcriber.service` pointing at `uv run app.py --no-takeover` with the repository
   path resolved at install time, runs `systemctl --user daemon-reload` and `enable --now`, and
   supports `--uninstall`. New `scripts/transcriber.desktop.in` — an XDG desktop entry that opens the
   interface in a browser application window, used both for the menu entry and as the documented
   non-systemd autostart alternative. `docs/deployment.md` documents both routes, what each writes
   where, and how to undo them. `app.py` gains a `--systemd` notification-friendly startup log line so
   `systemctl --user status` is informative.
+- **`--no-takeover` in the unit is deliberate.** The launcher's default is to stop an older
+  instance and take the port, which is right at a terminal and wrong under a supervisor: systemd
+  restarting a unit that then kills the instance systemd is already tracking is a loop. The service
+  should fail and let systemd decide.
 - **Rationale**: a user unit is the right mechanism on this machine — it starts with the session
   rather than the machine, restarts on failure, and is inspectable with `journalctl --user`, none of
   which an XDG autostart entry gives. Writing it from a script rather than documenting a file to

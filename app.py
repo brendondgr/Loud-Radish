@@ -4,9 +4,15 @@
 One command starts everything: the API, the WebSocket event stream, and the browser interface, all
 from a single process.
 
-    uv run python app.py
+    uv run app.py
 
 Then open http://127.0.0.1:8395.
+
+**Running it again takes the port back.** Starting this twice is the ordinary case — you run it,
+leave it, and come back without remembering the first is still up — so the second run stops the
+first rather than refusing. It will only ever stop a server it has positively identified as this
+application; anything else on the port is left alone and reported. ``--no-takeover`` restores the
+old refusal.
 
 This file is a launcher, not application code — it holds no logic of its own. Everything it starts
 lives under ``web/``, per the layout rule in ``docs/structure.md``.
@@ -124,6 +130,156 @@ def _port_is_free(host: str, port: int) -> bool:
     return True
 
 
+# -- taking the port back ------------------------------------------------------------------
+#
+# Starting this application twice is the ordinary case, not the exceptional one: you run it, leave
+# it, come back, and run it again without remembering the first is still up. Refusing with "port in
+# use" made that a chore, so the second run takes the port from the first.
+#
+# **It will only ever stop a server it has identified as this application.** Something else on 8395
+# is refused exactly as before, because a launcher that kills whatever is in its way is a launcher
+# that will one day kill a database. Identification is two independent checks that must both pass:
+# the port answers `/api/health` the way this application does, *and* the process holding it has
+# this repository's launcher or its uvicorn entry point on its command line.
+
+
+def _identifies_as_ours(host: str, port: int, timeout: float = 1.5) -> bool:
+    """Whether whatever is on ``port`` answers ``/api/health`` the way this application does."""
+    import json
+    import urllib.error
+    import urllib.request
+
+    url = f"http://{host}:{port}/api/health"
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as response:  # noqa: S310 - loopback
+            payload = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, OSError, ValueError, TimeoutError):
+        return False
+
+    # Shape, not just a 200. Any web server can return JSON; only this one returns these keys.
+    return (
+        isinstance(payload, dict)
+        and payload.get("status") == "ok"
+        and isinstance(payload.get("optional"), dict)
+        and isinstance(payload.get("modes"), dict)
+    )
+
+
+def _pids_on_port(port: int) -> list[int]:
+    """Every process holding ``port``, found through ``/proc``.
+
+    Linux-only and deliberately dependency-free: ``psutil`` for one lookup in a launcher is not a
+    trade worth making, and ``lsof``/``ss`` are not guaranteed installed. Returns an empty list on
+    any other platform, which downgrades takeover to the old refusal rather than breaking it.
+
+    More than one pid is normal. Under ``--reload`` uvicorn's parent owns the listening socket and
+    its child inherits, so both appear — and stopping only one leaves the other to rebind.
+    """
+    if not sys.platform.startswith("linux"):
+        return []
+
+    inodes = _socket_inodes_for_port(port)
+    if not inodes:
+        return []
+
+    pids: list[int] = []
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            for descriptor in (entry / "fd").iterdir():
+                try:
+                    target = os.readlink(descriptor)
+                except OSError:
+                    continue
+                if target.startswith("socket:[") and target[8:-1] in inodes:
+                    pids.append(int(entry.name))
+                    break
+        except OSError:
+            # A process that exited between the listing and the read, or one we do not own.
+            continue
+    return pids
+
+
+def _socket_inodes_for_port(port: int) -> set[str]:
+    """Inodes of listening sockets bound to ``port``, from ``/proc/net/tcp{,6}``."""
+    wanted = f"{port:04X}"
+    inodes: set[str] = set()
+    for name in ("tcp", "tcp6"):
+        try:
+            lines = Path("/proc/net", name).read_text(encoding="utf-8").splitlines()[1:]
+        except OSError:
+            continue
+        for line in lines:
+            fields = line.split()
+            if len(fields) < 10:
+                continue
+            local = fields[1]
+            # "0A" is TCP_LISTEN. A connected socket to the same port is somebody's client, not the
+            # server, and killing its owner would be killing a browser.
+            if local.endswith(f":{wanted}") and fields[3] == "0A":
+                inodes.add(fields[9])
+    return inodes
+
+
+def _process_looks_like_this_app(pid: int) -> bool:
+    """Whether ``pid``'s command line is this launcher or the uvicorn entry point it starts."""
+    try:
+        cmdline = Path(f"/proc/{pid}/cmdline").read_bytes().decode("utf-8", "replace")
+    except OSError:
+        return False
+    parts = cmdline.split("\0")
+    return any("app.py" in part or "app.main:app" in part for part in parts)
+
+
+def _take_over_port(host: str, port: int) -> bool:
+    """Stop this application's own server on ``port``. Returns whether the port came free.
+
+    Asks politely first. ``SIGTERM`` lets the server run its shutdown — which flushes the last
+    words of a session in progress and closes the transcript database cleanly. ``SIGKILL`` is a last
+    resort after five seconds, and it costs the tail of whatever was recording.
+    """
+    import signal
+    import time
+
+    if not _identifies_as_ours(host, port):
+        return False
+
+    pids = [pid for pid in _pids_on_port(port) if _process_looks_like_this_app(pid)]
+    if not pids:
+        return False
+
+    print(f"  Port {port} is already serving this application — taking it over.")
+    print(f"  Stopping {'process' if len(pids) == 1 else 'processes'} {', '.join(map(str, pids))}…")
+    sys.stdout.flush()
+
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except (OSError, ProcessLookupError):
+            continue
+
+    deadline = time.monotonic() + 5.0
+    while time.monotonic() < deadline:
+        if _port_is_free(host, port):
+            return True
+        time.sleep(0.1)
+
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except (OSError, ProcessLookupError):
+            continue
+
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline:
+        if _port_is_free(host, port):
+            print("  It did not stop on request and was killed.")
+            return True
+        time.sleep(0.1)
+    return False
+
+
 def _print_banner(host: str, port: int, reload: bool) -> None:
     """Say what is running, where, and what it can and cannot do."""
     url = f"http://{host}:{port}"
@@ -205,6 +361,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--open", action="store_true", help="Open the interface in a browser.")
     parser.add_argument(
+        "--no-takeover",
+        action="store_true",
+        help="Refuse if the port is busy, instead of stopping an older instance of this app.",
+    )
+    parser.add_argument(
         "--log-level",
         default=os.environ.get("LOG_LEVEL", "info"),
         choices=["critical", "error", "warning", "info", "debug"],
@@ -230,13 +391,23 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if not _port_is_free(args.host, args.port):
-        print(
-            f"Port {args.port} is already in use on {args.host}.\n"
-            f"Either stop what is using it, or choose another:\n\n"
-            f"    uv run python app.py --port {args.port + 1}\n",
-            file=sys.stderr,
-        )
-        return 1
+        taken_over = not args.no_takeover and _take_over_port(args.host, args.port)
+        if not taken_over:
+            # Either something else owns the port, or takeover was declined, or the old server
+            # would not die. All three want the same message: this is not ours to reclaim.
+            hint = (
+                "It is not this application, so it has been left alone."
+                if not args.no_takeover
+                else "Takeover is off (--no-takeover)."
+            )
+            print(
+                f"Port {args.port} is already in use on {args.host}.\n"
+                f"{hint}\n"
+                f"Either stop what is using it, or choose another:\n\n"
+                f"    uv run app.py --port {args.port + 1}\n",
+                file=sys.stderr,
+            )
+            return 1
 
     _print_banner(args.host, args.port, args.reload)
 

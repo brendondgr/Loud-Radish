@@ -180,6 +180,11 @@ each was invisible to reading and obvious to using, which is the argument for th
       matches Whisper's own window, but whether a longer window measurably improves a recorded
       transcript over a live one is the question the mode exists to exploit, and it is unmeasured.
 
+- [ ] **Port takeover is Linux-only.** `app.py` finds the process holding its port through `/proc`;
+      on any other platform it degrades to the old "port in use" refusal. Dependency-free was the
+      right trade for a launcher, and `psutil` would make it portable if the project ever runs
+      somewhere else.
+
 Known blockers and open questions carried by these plans:
 
 - [x] **The tray animation specification.** Supplied 2026-08-15 and extracted into

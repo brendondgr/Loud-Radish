@@ -70,14 +70,28 @@ uv add --optional <group> <package>
 One command starts everything — API, WebSocket, and the browser interface, from a single process:
 
 ```bash
-uv run python app.py
+uv run app.py
 ```
 
 Then open <http://127.0.0.1:8395>.
 
 `app.py` is a launcher and holds no application logic. It loads `.env`, creates `data/` and
-`logs/`, reports which optional dependency groups are installed, checks the port is free, and
-starts the server.
+`logs/`, reports which optional dependency groups are installed, settles the port, and starts the
+server.
+
+**Running it again takes the port back.** Starting it twice is the ordinary case — you run it,
+leave it, and come back without remembering the first is still up — so the second run stops the
+first instead of refusing. `SIGTERM` first, so the old server flushes the last words of any session
+in progress and closes its transcript database cleanly; `SIGKILL` only after five seconds.
+
+It will only ever stop a server it has **positively identified as this application**, by two
+independent checks that must both pass: the port answers `/api/health` with this application's own
+response shape, *and* the process holding it has `app.py` or `app.main:app` on its command line.
+Anything else on 8395 is left alone and reported, because a launcher that kills whatever is in its
+way is one that will eventually kill a database. Use `--no-takeover` to restore the old refusal.
+
+Process lookup reads `/proc`, so takeover is Linux-only; on any other platform it degrades to the
+refusal rather than misbehaving.
 
 | Flag | Effect |
 |---|---|
@@ -85,12 +99,13 @@ starts the server.
 | `--host H` | Bind another interface (default `127.0.0.1`) |
 | `--reload` | Restart when anything under `web/backend/app/` changes |
 | `--open` | Open the interface in a browser |
+| `--no-takeover` | Refuse if the port is busy, rather than stopping an older instance |
 | `--log-level L` | `critical`, `error`, `warning`, `info`, or `debug` |
 
 For development, with auto-restart:
 
 ```bash
-uv run python app.py --reload
+uv run app.py --reload
 ```
 
 It binds to `127.0.0.1`. That is deliberate: the application is single-user and unauthenticated, so
