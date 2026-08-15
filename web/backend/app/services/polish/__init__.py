@@ -16,7 +16,13 @@ showing the raw segments it already shows today.
 """
 
 from .chunker import CutDecision, decide_cut
-from .guard import ContentCheck, preserves_content, strip_decoration
+from .guard import (
+    ContentCheck,
+    collapse_to_paragraph,
+    preserves_content,
+    reconcile_timestamps,
+    strip_decoration,
+)
 from .source import PolishSource, build_source, strip_markers
 from .worker import PolishWorker
 
@@ -26,8 +32,10 @@ __all__ = [
     "PolishSource",
     "PolishWorker",
     "build_source",
+    "collapse_to_paragraph",
     "decide_cut",
     "preserves_content",
+    "reconcile_timestamps",
     "strip_decoration",
     "strip_markers",
 ]

@@ -1,6 +1,6 @@
 """What the model gives back, checked before it is shown.
 
-Two problems, and neither is hypothetical — both were the reason this module exists.
+Four problems, and none of them is hypothetical — each is why a piece of this module exists.
 
 **Decoration.** The prompt forbids bold and italics; models emit them anyway, roughly one time in
 five. The transcript pane renders model output through ``textContent`` and never as markup, so an
@@ -14,12 +14,24 @@ transcript. There is no cheap way to verify meaning, but there is a cheap way to
 failure — a rewrite that came back a third of the length was not a rewrite. The check is a floor on
 length, not a semantic verifier, and it is stated as such so nobody mistakes it for one. A model
 that paraphrases at similar length passes it; the prompt is the only defence against that.
+
+**Invented timestamps.** The model is given markers and asked only to carry them along, but it will
+occasionally move one, drop one, duplicate one, or write a new one that looks exactly like the
+others. A wrong timestamp is worse than a missing one: it is indistinguishable from a real one until
+the reader clicks it and lands somewhere the claim was never made. So the answer's markers are
+reconciled against what was actually supplied, and anything unaccounted for is removed.
+
+**Line breaks.** The prompt asks for one continuous paragraph, because a transcript broken into a
+new line every few seconds is disruptive to read. Models comply unevenly. Compliance is therefore
+enforced here rather than hoped for.
 """
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+
+from .source import MARKER, strip_markers
 
 #: ``**bold**`` and ``__bold__``.
 _STRONG = re.compile(r"(\*\*|__)(?=\S)(.+?)(?<=\S)\1", re.DOTALL)
@@ -75,9 +87,13 @@ def preserves_content(source: str, result: str, min_ratio: float) -> ContentChec
 
     A length check, not a meaning check. It catches the failure that matters — a model that
     summarised when it was told to tidy — and nothing subtler.
+
+    Timestamp markers are removed from both sides before counting. They are navigation, not speech,
+    and a chunk with six of them would otherwise measure as six words of content the model was
+    obliged to keep.
     """
-    source_words = len(source.split())
-    result_words = len(result.split())
+    source_words = len(strip_markers(source).split())
+    result_words = len(strip_markers(result).split())
 
     if not result_words:
         return ContentCheck(False, "the model returned nothing", 0.0)
@@ -99,3 +115,80 @@ def preserves_content(source: str, result: str, min_ratio: float) -> ContentChec
             ratio,
         )
     return ContentCheck(True, "", ratio)
+
+
+def reconcile_timestamps(text: str, supplied: list[str], fallback: str = "") -> str:
+    """Keep only the markers that were given to the model, in an order that can be true.
+
+    Three things are removed, and each one would otherwise produce a timestamp that seeks to the
+    wrong place:
+
+    * a marker that was never supplied — the model wrote it, and it points at a moment nobody
+      chose;
+    * a marker that runs backwards past one already kept — the chunk is a minute of one talk, so
+      time in it only moves forwards, and the earlier of the two is the one that has already been
+      trusted;
+    * a marker immediately repeating the one before it, which is noise rather than navigation.
+
+    If nothing survives, ``fallback`` is prepended so the stretch is still locatable at all. Losing
+    a good rewrite over a mishandled marker would be the wrong trade: the raw segments underneath
+    carry exact times regardless, and the block's own start is never in doubt.
+    """
+    allowed = set(supplied)
+    order = {label: index for index, label in enumerate(supplied)}
+    kept: list[str] = []
+    highest = -1
+
+    def keep(match: re.Match[str]) -> str:
+        nonlocal highest
+        label = match.group(1)
+        if label not in allowed:
+            return ""
+        position = order[label]
+        if position < highest or (kept and label == kept[-1]):
+            return ""
+        highest = position
+        kept.append(label)
+        return match.group(0)
+
+    cleaned = _collapse_spaces(MARKER.sub(keep, text or ""))
+    if kept or not fallback:
+        return cleaned
+    return f"[{fallback}] {cleaned}".strip() if cleaned else ""
+
+
+def collapse_to_paragraph(text: str) -> str:
+    """Join everything that is not a list into one continuous paragraph.
+
+    The prompt asks for this and models comply unevenly, so it is enforced rather than hoped for: a
+    transcript that starts a new line every few seconds is disruptive to read, which is the whole
+    reason the polish pass produces prose instead of segments.
+
+    A run of list items keeps its shape. A speaker who enumerated three things enumerated them, and
+    flattening that into a sentence would be the pass changing what was said rather than how it
+    reads.
+    """
+    blocks: list[str] = []
+    prose: list[str] = []
+
+    for chunk in re.split(r"\n{2,}", text or ""):
+        lines = [line.strip() for line in chunk.splitlines() if line.strip()]
+        if not lines:
+            continue
+        if all(line.startswith("- ") for line in lines):
+            if prose:
+                blocks.append(" ".join(prose))
+                prose = []
+            blocks.append("\n".join(lines))
+        else:
+            prose.append(" ".join(lines))
+
+    if prose:
+        blocks.append(" ".join(prose))
+    return _collapse_spaces("\n\n".join(blocks))
+
+
+def _collapse_spaces(text: str) -> str:
+    """Tidy the whitespace a removal leaves behind, without touching line structure."""
+    lines = [re.sub(r"[ \t]{2,}", " ", line).strip() for line in text.splitlines()]
+    return "\n".join(lines).strip()
