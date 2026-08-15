@@ -2143,6 +2143,30 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Metrics"
+          },
+          "transcription": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcription"
+          },
+          "recording": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recording"
           }
         },
         "additionalProperties": false,

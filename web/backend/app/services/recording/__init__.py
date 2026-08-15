@@ -2,7 +2,8 @@
 
 * ``sink``  — writes the canonical stream to a WAV file while a session records
 * ``batch`` — transcribes a finished file in one pass
-* ``job``   — the state of one such pass, and the one-at-a-time rule
+* ``job``    — the state of one such pass, and the one-at-a-time rule
+* ``runner`` — runs a pass on its own thread, outliving the session that produced the recording
 
 This is what `recorded` mode is made of, and half of what `window` mode uses. It exists because the
 live path's two-to-four second commit latency buys nothing when nobody is reading along: with the
@@ -12,6 +13,7 @@ available rather than to decide what is safe to show before the talk has finishe
 
 from .batch import BatchError, plan_windows, read_wav, transcribe_file
 from .job import JobRegistry, JobState, TranscriptionJob
+from .runner import TranscriptionRunner
 from .sink import RecordingLimitReached, SinkError, WavSink
 
 __all__ = [
@@ -21,6 +23,7 @@ __all__ = [
     "RecordingLimitReached",
     "SinkError",
     "TranscriptionJob",
+    "TranscriptionRunner",
     "WavSink",
     "plan_windows",
     "read_wav",

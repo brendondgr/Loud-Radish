@@ -30,12 +30,19 @@ from ..asr import AsrLifecycle, LoadProgress, PromptBuilder
 from ..asr.contract import AsrLoadError
 from ..audio import LevelMeter, WavFileSource
 from ..audio.sources import AudioSource, DeviceSource, SourceInfo
+from ..recording import (
+    JobRegistry,
+    SinkError,
+    TranscriptionJob,
+    TranscriptionRunner,
+    WavSink,
+)
 from ..streaming.events import CommittedSegment, EngineNotice, HypothesisUpdate
 from ..streaming.guards import Severity
 from ..streaming.passthrough import build_engine
 from ..transcript import TranscriptStore
 from ..vad import SpeechGate, build_gate
-from . import degradation
+from . import degradation, modes
 from .metrics import PipelineMetrics
 from .workers import DropOldestQueue, Worker
 
@@ -107,6 +114,12 @@ class SessionManager:
         #: and for the same reason: it needs a language model, and the pipeline must not.
         self.polish_worker_factory: Callable[[TranscriptStore], Any] | None = None
         self._polish_worker: Any = None
+        #: `recorded` mode's file, open only while such a session runs (D-021).
+        self._sink: WavSink | None = None
+        #: The post-capture transcription pass. Deliberately owned here rather than by the session:
+        #: it *outlives* the session, which is the whole shape of the mode.
+        self.jobs = JobRegistry()
+        self._runner: TranscriptionRunner | None = None
 
     # -- state ---------------------------------------------------------------------
 
@@ -159,6 +172,19 @@ class SessionManager:
             "asr": self._asr.status(),
             "stats": stats.as_dict() if stats else None,
             "metrics": self.metrics().as_event(),
+            # The post-capture pass, when one is running or has just finished. Read on page load
+            # so a reload during a half-hour transcription resumes showing its progress rather than
+            # an idle interface with no explanation for the missing transcript (D-021).
+            "transcription": (job.as_event() if (job := self.jobs.current) else None),
+            # Whether a recording is currently being written, and how much of one.
+            "recording": (
+                {
+                    "duration_s": round(self._sink.duration_s, 2),
+                    "bytes": self._sink.bytes_written,
+                }
+                if self._sink is not None
+                else None
+            ),
         }
 
     def metrics(self) -> PipelineMetrics:
@@ -196,15 +222,27 @@ class SessionManager:
 
         self._store = self._open_store(config, session)
         self._prompts = PromptBuilder(config.asr)
+        # The gate runs in every mode. In `recorded` it gates nothing — it feeds the level meter
+        # and the speaking indicator, so the interface stays informative while no text is produced.
+        # Skipping silence at *capture* time would produce a file whose timestamps no longer match
+        # the clock, and the timestamps are what the transcript is indexed by.
         self._gate = build_gate(config.vad, frame_ms=config.audio.frame_ms)
-        self._engine = build_engine(
-            config=config.streaming,
-            transcribe=self._asr.transcribe,
-            capabilities=self._asr.backend.capabilities if self._asr.backend else None,  # type: ignore[arg-type]
-            model_id=self._asr.model_id,
-            prompt_builder=self._prompts,
-            first_segment_id=self._store.last_segment_id() + 1,
-        )
+
+        # The engine is what makes a session transcribe as it goes, so `recorded` mode simply does
+        # not build one. That is the mode: no inference while capturing, which is what makes it
+        # cheap enough to run for two hours on a laptop.
+        if session.mode == modes.RECORDED:
+            self._sink = self._open_sink(config, session)
+            self._engine = None
+        else:
+            self._engine = build_engine(
+                config=config.streaming,
+                transcribe=self._asr.transcribe,
+                capabilities=self._asr.backend.capabilities if self._asr.backend else None,  # type: ignore[arg-type]
+                model_id=self._asr.model_id,
+                prompt_builder=self._prompts,
+                first_segment_id=self._store.last_segment_id() + 1,
+            )
 
         self._queue.clear()
         self._meter.reset()
@@ -276,9 +314,15 @@ class SessionManager:
         self._metadata.ended_at = datetime.now(UTC)
         if self._store is not None:
             self._store.write_metadata(self._metadata)
+
+        # In `recorded` mode the session's work is only now beginning. The pass is handed the store
+        # — which is why `mark_ended` is not called here for it: the recording is not finished until
+        # its transcript exists.
+        handed_over = self._start_transcription(self._metadata)
+        if not handed_over and self._store is not None:
             self._store.mark_ended(self._metadata.ended_at)
 
-        await self._teardown()
+        await self._teardown(keep_store=handed_over)
         self._emit("session.stopped", {"session_id": session_id, "stats": stats.as_dict()})
         logger.info("Session %s stopped: %s", session_id, stats.as_dict())
         return stats
@@ -314,10 +358,18 @@ class SessionManager:
         if self.is_running:
             try:
                 await self.stop()
-                return
             except SessionError:
                 pass
-        await self._teardown()
+        else:
+            await self._teardown()
+
+        # After the stop, not instead of it: stopping is what *starts* the pass in recorded mode.
+        # It is asked to finish at the next window rather than waited out — a server taking half an
+        # hour to exit is one nobody will let start automatically, and every segment produced so
+        # far is already committed.
+        if self._runner is not None:
+            self._runner.stop()
+            self._runner = None
         await self._asr.unload()
 
     # -- capture path --------------------------------------------------------------
@@ -329,6 +381,16 @@ class SessionManager:
             return
 
         result = gate.process(frame)
+
+        # Written here, on the capture thread, rather than through the queue. The queue is
+        # drop-oldest by design — it protects inference latency by discarding audio — and audio
+        # discarded from a *recording* is a hole in the only copy of the talk. A buffered write of
+        # a kilobyte is several orders of magnitude cheaper than the inference pass the queue
+        # exists to decouple from, so this does not reintroduce the blocking it guards against.
+        sink = self._sink
+        if sink is not None and sink.write(frame) and not sink.is_closed:
+            self._emit_failure(degradation.recording_capped(sink.duration_s / 60.0))
+
         dropped = self._queue.put(
             CapturedFrame(audio=frame, speaking=result.speaking, pause=result.pause_event)
         )
@@ -468,6 +530,72 @@ class SessionManager:
         except Exception:  # noqa: BLE001 - a failed final pass must not fail the stop
             logger.warning("The final polish pass failed", exc_info=True)
 
+    def _open_sink(self, config: AppConfig, session: SessionMetadata) -> WavSink:
+        """Open the file this session records into.
+
+        A failure here is fatal to the session on purpose, unlike almost everything else in this
+        class: `recorded` mode with no file is a mode that records nothing and then reports
+        success, which is the worst possible outcome for a talk that will not happen twice.
+        """
+        directory = Path(config.recording.recording_dir)
+        stamp = session.started_at.strftime("%Y%m%d-%H%M%S")
+        try:
+            return WavSink(
+                directory / f"{stamp}-{session.session_id}.wav",
+                max_minutes=config.recording.max_minutes,
+            )
+        except SinkError as exc:
+            raise SessionError(str(exc)) from exc
+
+    def _start_transcription(self, session: SessionMetadata) -> bool:
+        """Begin the post-capture pass, if this session produced a recording.
+
+        Returns whether the store was handed to the runner, which then owns closing it.
+        """
+        sink, self._sink = self._sink, None
+        if sink is None or self._store is None:
+            return False
+
+        try:
+            path = sink.close()
+        except SinkError as exc:
+            logger.error("Could not finalise the recording: %s", exc)
+            self._emit_failure(degradation.disk_full(str(exc)))
+            return False
+
+        if sink.samples == 0:
+            # A session that captured nothing has nothing to transcribe, and an empty file left on
+            # disk is only ever confusing.
+            path.unlink(missing_ok=True)
+            logger.info("Session %s captured no audio; nothing to transcribe.", session.session_id)
+            return False
+
+        config = self._config.resolve()
+        job = TranscriptionJob(
+            session_id=session.session_id,
+            source_path=str(path),
+            total_seconds=sink.duration_s,
+        )
+        self._runner = TranscriptionRunner(
+            registry=self.jobs,
+            emit=self._emit,
+            transcribe=self._asr.transcribe,
+            window_s=config.recording.batch_window_s,
+            overlap_s=config.recording.batch_overlap_s,
+            max_segment_s=config.streaming.max_segment_s,
+        )
+        started = self._runner.start(
+            job=job,
+            store=self._store,
+            retain_audio=config.storage.retain_audio,
+            prompt=self._prompts.build() if self._prompts else None,
+        )
+        if started:
+            # Ownership has moved. Clearing it here is what makes the store's single owner
+            # unambiguous, and is why `_teardown` must be told not to close it.
+            self._store = None
+        return started
+
     def _open_store(self, config: AppConfig, session: SessionMetadata) -> TranscriptStore:
         directory = self._session_dir or Path(config.storage.session_dir)
         path = directory / f"{session.started_at.strftime('%Y%m%d-%H%M%S')}-{session.session_id}.db"
@@ -502,8 +630,13 @@ class SessionManager:
             self._emit_failure(failure)
             raise SessionError(failure.message) from exc
 
-    async def _teardown(self) -> None:
-        """Stop the workers and release the session's resources."""
+    async def _teardown(self, keep_store: bool = False) -> None:
+        """Stop the workers and release the session's resources.
+
+        ``keep_store`` is set when a transcription pass has taken ownership of the store and is
+        still writing to it. Closing it here would pull a SQLite connection out from under a thread
+        mid-write.
+        """
         # Before the store closes, and before the ordinary stop path is assumed to have run: an
         # abrupt shutdown reaches here without passing through `stop`, and a polish task still
         # ticking against a closed database would raise once a second.
@@ -523,9 +656,17 @@ class SessionManager:
         self._queue = DropOldestQueue(QUEUE_CAPACITY)
         self._worker = Worker("asr-worker", self._queue, self._handle_frame)  # type: ignore[arg-type]
 
-        if self._store is not None:
+        # Not closed if a transcription pass owns it. It is already `None` in that case — cleared
+        # when ownership moved — so this is belt and braces against a future caller that forgets.
+        if self._store is not None and not keep_store:
             self._store.close()
             self._store = None
+
+        # An abrupt teardown that never reached `stop` still has a file open. Discarded rather than
+        # kept: nothing has been transcribed from it and nothing knows it exists.
+        if self._sink is not None:
+            self._sink.discard()
+            self._sink = None
 
         self._engine = None
         self._gate = None

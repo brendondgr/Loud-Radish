@@ -201,3 +201,43 @@ def llm_unavailable(detail: str) -> Failure:
         opens_settings="llm",
         transcription_continues=True,
     )
+
+
+def recording_capped(minutes: float) -> Failure:
+    """A recording hit its duration cap and stopped writing (D-021).
+
+    Reported rather than left silent. A recording that stopped without saying so is
+    indistinguishable from one that failed, and the difference matters: everything captured up to
+    the cap is intact and will still be transcribed.
+    """
+    return Failure(
+        code="recording-capped",
+        message=(
+            f"Recording reached its {minutes:.0f}-minute limit and stopped capturing audio. "
+            "Everything recorded so far is intact and will be transcribed. "
+            "Raise the limit in Settings → Storage if you need longer sessions."
+        ),
+        severity=Severity.WARNING,
+        opens_settings="storage",
+        transcription_continues=True,
+    )
+
+
+def transcription_failed(path: str, detail: str) -> Failure:
+    """The post-capture transcription pass failed (D-021).
+
+    Names the recording, because it is now the only copy of what was said and the pass can be
+    re-run against it. A message that said only "transcription failed" would leave a user believing
+    the talk was lost when it is sitting on disk.
+    """
+    return Failure(
+        code="transcription-failed",
+        message=(
+            f"The recording could not be transcribed: {detail} "
+            f"The audio is kept at {path} — you can run the transcription again from "
+            "Settings → Storage."
+        ),
+        severity=Severity.CRITICAL,
+        remedy_label="Open storage settings",
+        opens_settings="storage",
+    )

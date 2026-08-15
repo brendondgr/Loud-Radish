@@ -69,10 +69,6 @@ async def get_session(request: Request) -> dict[str, Any]:
 #: is implemented, so an unfinished mode gives a named error rather than a session that starts and
 #: records nothing. Each plan deletes its own entry from this set.
 _UNIMPLEMENTED_MODES: dict[str, str] = {
-    modes.RECORDED: (
-        "Recorded transcription is not built yet. Use live transcription for now — "
-        "see docs/plans/recorded-transcription.md."
-    ),
     modes.WINDOW: (
         "Window recording is not built yet. Use live transcription for now — "
         "see docs/plans/window-recording-transcription.md."

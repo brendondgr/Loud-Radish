@@ -81,6 +81,12 @@ class SessionResponse(_Model):
     asr: dict[str, Any] = Field(default_factory=dict)
     stats: dict[str, Any] | None = None
     metrics: dict[str, Any] = Field(default_factory=dict)
+    #: The post-capture transcription pass, when one is running or has just finished (D-021).
+    #: Read on page load, so a reload during a half-hour pass resumes showing its progress rather
+    #: than an idle interface with no explanation for the missing transcript.
+    transcription: dict[str, Any] | None = None
+    #: How much audio the current recording has captured, when one is being written.
+    recording: dict[str, Any] | None = None
 
 
 class SessionStoppedResponse(_Model):

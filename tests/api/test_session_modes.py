@@ -52,7 +52,7 @@ def test_an_unknown_mode_is_a_validation_error(client: TestClient) -> None:
     assert response.status_code == 422
 
 
-@pytest.mark.parametrize("mode", [modes.RECORDED, modes.WINDOW])
+@pytest.mark.parametrize("mode", [modes.WINDOW])
 def test_an_unimplemented_mode_is_refused_by_name(client: TestClient, mode: str) -> None:
     """501, not 422 and not 409: the request is valid and the state is fine, the build lacks it."""
     response = client.post("/api/session/start", json={"mode": mode})
@@ -63,6 +63,15 @@ def test_an_unimplemented_mode_is_refused_by_name(client: TestClient, mode: str)
     # The message has to say what to do instead, because this is a button the user just pressed.
     assert "not built yet" in error["message"]
     assert "docs/plans/" in error["message"]
+
+
+def test_recorded_mode_is_no_longer_refused(client: TestClient) -> None:
+    """Plan 3 removed its own entry from the unimplemented set."""
+    response = client.post("/api/session/start", json={"mode": modes.RECORDED})
+    assert response.status_code != 501
+    if response.status_code == 200:
+        assert response.json()["session"]["mode"] == modes.RECORDED
+        client.post("/api/session/stop")
 
 
 def test_a_refused_mode_does_not_start_anything(client: TestClient) -> None:
@@ -103,8 +112,9 @@ def test_every_other_combination_gets_past_validation(client: TestClient, option
 
 
 def test_options_are_optional(client: TestClient) -> None:
-    response = client.post("/api/session/start", json={"mode": modes.RECORDED})
-    assert response.status_code == 501
+    """Absent means the defaults; it is not a required field for the modes that ignore it."""
+    response = client.post("/api/session/start", json={"mode": modes.WINDOW})
+    assert response.status_code == 501  # refused for the mode, not for a missing field
 
 
 # -- mode availability, which is what the interface disables a mode from -----------------
