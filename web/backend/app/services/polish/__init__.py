@@ -17,10 +17,12 @@ showing the raw segments it already shows today.
 
 from .chunker import CutDecision, decide_cut
 from .guard import ContentCheck, preserves_content, strip_decoration
+from .worker import PolishWorker
 
 __all__ = [
     "ContentCheck",
     "CutDecision",
+    "PolishWorker",
     "decide_cut",
     "preserves_content",
     "strip_decoration",

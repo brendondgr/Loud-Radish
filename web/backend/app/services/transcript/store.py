@@ -212,6 +212,16 @@ class TranscriptStore:
         row = self._query_one("SELECT MAX(id) AS max_id FROM segments")
         return int(row["max_id"]) if row and row["max_id"] is not None else 0
 
+    def last_segment_end(self) -> float:
+        """Where committed transcript currently ends, in session-relative seconds.
+
+        The polish worker polls this every second to decide whether a chunk is ready, so it is a
+        single aggregate rather than a scan — asking for the segments themselves on every tick
+        would read a minute of rows to answer a question about one number.
+        """
+        row = self._query_one("SELECT MAX(end) AS max_end FROM segments")
+        return float(row["max_end"]) if row and row["max_end"] is not None else 0.0
+
     # -- search --------------------------------------------------------------------
 
     def search(self, query: str, limit: int = 50) -> list[Segment]:
