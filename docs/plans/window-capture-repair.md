@@ -1,6 +1,7 @@
 # Window Capture Repair
 
-**Status:** Phase 1 complete (the resolution fault), Phases 2–8 not started.
+**Status:** Phases 1–3 complete (the resolution fault, output-verified tests, the repeated dialogs).
+Phases 4–8 not started.
 **Branch:** `claude/gpu-and-capture-fixes`
 
 ---
@@ -110,7 +111,16 @@ verify.
   commit stating: `Window Capture Repair (2 / 8) Complete: a capture test opens the file it produced,
   so a well-formed pipeline that writes a sixteen-pixel strip fails rather than passes.`
 
-### Phase 3 — One dialog per recording
+### Phase 3 — One dialog per recording ✅ COMPLETE
+
+**Found.** `start` guarded on `is_running`, which reads `self._metadata` — and that is not assigned
+until the audio source is open, several `await`s later, one of which loads a speech model. Every
+start request arriving inside that window passed the guard, and in `window` mode each one then
+opened its own portal negotiation. The session is now **claimed synchronously under the lock before
+the first `await`**, and released in `_teardown`, which every ending reaches. Verified by reverting
+the guard: five concurrent starts open five portals; with it, one.
+
+<details><summary>Original phase text</summary>
 
 - **Locations**: `web/backend/app/services/session/manager.py` (`_start_window_capture`, `start`,
   `toggle`); `web/backend/app/routes/session.py`; `web/frontend/static/js/components/preflight.js`
@@ -129,6 +139,8 @@ verify.
 - **Action**: Undergo the verification/tests/validation process for this phase. Once validated,
   commit stating: `Window Capture Repair (3 / 8) Complete: one recording negotiates exactly one
   portal session, and a second attempt while a dialog is open is refused rather than queued.`
+
+</details>
 
 ### Phase 4 — The monitor pane shows the capture
 

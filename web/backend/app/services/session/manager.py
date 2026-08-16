@@ -118,6 +118,11 @@ class SessionManager:
         self._session_dir = session_dir
 
         self._lock = threading.Lock()
+        #: Set the instant a start is accepted and cleared when the session ends. Distinct from
+        #: `is_running`, which cannot become true until the audio source is open — and the gap
+        #: between the two is long enough to hold a model load, which is where concurrent starts
+        #: used to slip through and open a portal dialog each.
+        self._claimed = False
         self._metadata: SessionMetadata | None = None
         self._store: TranscriptStore | None = None
         self._source: AudioSource | None = None
@@ -261,9 +266,33 @@ class SessionManager:
             SessionError: if a session is already running, or the device or model cannot be opened.
                 The message names the remedy; the caller surfaces it directly.
         """
-        if self.is_running:
-            raise SessionError("A session is already recording. Stop it before starting another.")
+        # **Claimed synchronously, before the first `await`.** `is_running` reads `self._metadata`,
+        # which is not set until the audio source is up — and getting there awaits a model load that
+        # can take seconds. Every start request arriving in that window passed this guard, and in
+        # `window` mode each one then opened its own portal negotiation: one keystroke, five
+        # consecutive "choose a window" dialogs, each cancelling the last. The claim closes the
+        # window between deciding to start and having started.
+        with self._lock:
+            if self._claimed or self.is_running:
+                raise SessionError(
+                    "A session is already recording. Stop it before starting another."
+                )
+            self._claimed = True
 
+        try:
+            return await self._start(metadata, options)
+        except BaseException:
+            # Released on every failure path, including cancellation: a claim that outlives its
+            # attempt makes the application permanently refuse to record.
+            self._claimed = False
+            raise
+
+    async def _start(
+        self,
+        metadata: SessionMetadata | None,
+        options: CaptureOptions | None,
+    ) -> SessionMetadata:
+        """The body of :meth:`start`, run with the session already claimed."""
         config = self._config.resolve()
         session = metadata or SessionMetadata(session_id=uuid.uuid4().hex[:12])
         self._options = options if session.mode == modes.WINDOW else None
@@ -888,6 +917,11 @@ class SessionManager:
         this was a parameter instead of instance state: `shutdown` reaches teardown by a path that
         had no way to know a pass was running.
         """
+        # Released here rather than in `stop`, because every way a session ends reaches teardown —
+        # a clean stop, a declined portal, an abrupt shutdown — and a claim that survives one of
+        # them makes the application refuse to record for the rest of its life.
+        self._claimed = False
+
         # Before the store closes, and before the ordinary stop path is assumed to have run: an
         # abrupt shutdown reaches here without passing through `stop`, and a polish task still
         # ticking against a closed database would raise once a second.
