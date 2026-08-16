@@ -29,8 +29,15 @@ acronyms, and technical terms are the least reliable parts of it. Read through o
 mistranscriptions rather than treating them as terminology, and do not quote a garbled phrase back \
 as if it were what the speaker said.
 
-When you refer to a specific moment, cite it as [MM:SS] using the timestamps in the transcript. \
-Cite the moment the point was made, not the moment it was mentioned again.
+When you refer to a specific moment, cite it as [MM:SS] — and **copy the timestamp exactly as it \
+appears at the start of a transcript line**. Do not calculate one, do not estimate one, and do not \
+give a timestamp that is not written below. If a passage you want to refer to has no timestamp of \
+its own, describe when it happened in words instead of inventing a number. Cite the moment the \
+point was made, not the moment it was mentioned again.
+
+The summary section carries ranges rather than moments, and its text is compressed rather than \
+spoken. Never cite a timestamp from it — find the verbatim line instead, or say when it happened \
+in words.
 
 Write in prose, not bullet points, unless the question asks for a list. Do not restate the \
 question. Do not open with a preamble about what you are about to do."""

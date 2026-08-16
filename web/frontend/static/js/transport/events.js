@@ -8,6 +8,9 @@
 
 export const SESSION_STARTED = "session.started";
 export const SESSION_STOPPED = "session.stopped";
+/** The microphone or monitor has been released. Emitted immediately on stop, ahead of finalising
+ *  the video, remuxing, and any post-capture pass — all of which can take tens of seconds. */
+export const SESSION_CAPTURE_ENDED = "session.capture_ended";
 export const SESSION_STATE = "session.state";
 
 export const TRANSCRIPT_COMMITTED = "transcript.committed";

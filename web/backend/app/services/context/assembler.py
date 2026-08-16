@@ -24,8 +24,11 @@ than the user assumes.
 
 from __future__ import annotations
 
+import logging
+import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, Final, Protocol
 
 from ...config.schema import AppConfig
 from ...models.segment import Segment
@@ -33,6 +36,8 @@ from ...models.session import ChatMessage, GlossaryTerm, Summary
 from ..llm.contract import LlmMessage, system, user
 from ..llm.tokens import estimate_tokens
 from . import prompts
+
+logger = logging.getLogger(__name__)
 
 #: Fraction of the model's window the context may occupy. The rest is the answer, plus slack for
 #: the tokeniser disagreeing with the estimate. Overrunning is not a soft failure: the provider
@@ -88,6 +93,9 @@ class AssembledContext:
     context_timestamp: float
     #: Segment ids the answer may cite, for the frontend to turn into transcript links.
     cites: list[int] = field(default_factory=list)
+    #: The session-relative start of every segment actually rendered into the prompt. These are the
+    #: only moments an answer may cite; anything else it names was invented rather than read.
+    offered_seconds: list[float] = field(default_factory=list)
     #: Human-readable descriptions of what was left out, in the order it was dropped.
     dropped: list[str] = field(default_factory=list)
     estimated_tokens: int = 0
@@ -121,6 +129,7 @@ def assemble(
     """Build the messages for one question."""
     budget = effective_budget(config)
     cites: list[int] = []
+    offered: list[float] = []
     dropped: list[str] = []
     blocks: list[str] = []
     spent = estimate_tokens(prompts.SYSTEM_PROMPT) + estimate_tokens(request.question)
@@ -148,6 +157,7 @@ def assemble(
     recent = store.segments_in_range(window_start, window_end)
     take("recent", _render_segments(recent), _dropped_window(window_start, window_end))
     cites.extend(segment.id for segment in recent)
+    offered.extend(segment.start for segment in recent)
 
     # 3. Earlier passages matching the question. Skipped when the window already covers the whole
     #    talk — retrieving from inside what has already been sent verbatim spends budget on
@@ -156,6 +166,7 @@ def assemble(
         retrieved = _retrieve(store, request.question, before=window_start)
         take("retrieved", _render_segments(retrieved), "earlier passages matching the question")
         cites.extend(segment.id for segment in retrieved)
+        offered.extend(segment.start for segment in retrieved)
 
     # 4. The outline. Deliberately after retrieval: a summary of an hour is cheap, but a passage
     #    that actually answers the question beats a compression of it.
@@ -182,6 +193,7 @@ def assemble(
         messages=messages,
         context_timestamp=request.now,
         cites=sorted(set(cites)),
+        offered_seconds=sorted(set(offered)),
         dropped=dropped,
         estimated_tokens=spent,
     )
@@ -265,3 +277,60 @@ def _quoted(request: ContextRequest) -> str:
 
 def _dropped_window(start: float, end: float) -> str:
     return f"the transcript from {timestamp(start)} to {timestamp(end)}"
+
+
+#: A cited moment in an answer: ``[12:34]`` or ``[1:02:03]``.
+CITATION = re.compile(r"\[(\d{1,2}):(\d{2})(?::(\d{2}))?\]")
+
+#: How far a cited timestamp may be from one that was actually offered and still count as that one.
+#: Zero would be defensible — the instruction is to copy — but a model that rounds 12:34.6 to 12:35
+#: has understood the transcript correctly and named the right line, and dropping that citation
+#: would punish the reader for a rounding.
+CITATION_TOLERANCE_S: Final = 2.0
+
+
+def offered_seconds(segments: Iterable[Segment]) -> set[float]:
+    """The timestamps a model was actually shown, which are the only ones it may cite."""
+    return {float(segment.start) for segment in segments}
+
+
+def resolve_citations(answer: str, offered: set[float]) -> tuple[str, list[str]]:
+    """Remove cited moments that were never in the transcript the model was given.
+
+    **A wrong timestamp shown confidently is worse than no timestamp.** The reader clicks it, lands
+    somewhere unrelated, and now distrusts every citation including the correct ones — which is the
+    reported complaint. Stored times were measured and found correct
+    (``tests/transcription/test_timestamp_alignment.py``), so a citation that matches nothing was
+    invented: the model was given ``[MM:SS]`` markers and produced a number of the same shape
+    rather than the same value, most often by interpolating between two lines or by reading one off
+    the compressed summary block, whose ranges are not moments at all.
+
+    Returns the answer with unresolvable citations removed, and the list of what was removed. The
+    surrounding sentence is deliberately kept — it is usually correct, and it was the *number* that
+    was invented, not the claim.
+    """
+    if not offered:
+        return answer, []
+
+    dropped: list[str] = []
+
+    def check(match: re.Match[str]) -> str:
+        hours, minutes, seconds = match.groups()
+        # `[1:02:03]` is hours:minutes:seconds; `[12:34]` is minutes:seconds.
+        total = (
+            int(hours) * 3600 + int(minutes) * 60 + int(seconds)
+            if seconds is not None
+            else int(hours) * 60 + int(minutes)
+        )
+        if any(abs(total - candidate) <= CITATION_TOLERANCE_S for candidate in offered):
+            return match.group(0)
+        dropped.append(match.group(0))
+        return ""
+
+    cleaned = CITATION.sub(check, answer)
+    if dropped:
+        logger.info(
+            "Dropped %d citation(s) that match no transcript line: %s", len(dropped), dropped
+        )
+    # Removing a bracketed citation can leave a doubled space or a space before punctuation.
+    return re.sub(r" +([,.;:])", r"\1", re.sub(r"  +", " ", cleaned)).strip(), dropped

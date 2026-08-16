@@ -138,14 +138,82 @@ def test_the_preview_branch_leaks_rather_than_stalling_the_recording() -> None:
 
 
 def test_the_frame_rate_and_height_are_configurable() -> None:
-    spec = build(frame_rate=30, max_height=1080)
+    spec = build(frame_rate=30, max_height=1080, source_width=3840, source_height=2160)
     assert "video/x-raw,framerate=30/1" in spec.args
-    assert any("height=[1,1080]" in arg for arg in spec.args)
+    assert "video/x-raw,width=1920,height=1080" in spec.args
 
 
 def test_scaling_is_only_ever_downward() -> None:
     """A small window recorded at its own size is sharper than one stretched to a ceiling."""
-    assert any("height=[1,720]" in arg for arg in build().args)
+    # Preview off, so the only scaler that could appear is the recording branch's own.
+    args = build(source_width=640, source_height=480, max_height=720, want_preview=False).args
+    assert "videoscale" not in args
+
+
+def test_the_preview_does_not_decide_the_recordings_size() -> None:
+    """The bug this file did not catch, and the reason every window capture was 480 wide.
+
+    GStreamer resolves caps *upstream*. With one shared `videoscale` ahead of the tee, the preview
+    branch's fixed `width=480` propagated back through the tee and became the recording's width
+    too — and with the height left as an open range for the scaler to satisfy however it liked, one
+    recording came out **480x16**: a sixteen-pixel-tall strip of a talk, written without a single
+    warning from GStreamer, because nothing about it was invalid. Only watching the file revealed
+    it. So each branch owns a scaler, and the recording's size is stated rather than negotiated.
+    """
+    spec = build(source_width=1920, source_height=1080)
+    args = spec.args
+
+    assert args.count("videoscale") == 2
+    assert "video/x-raw,width=1280,height=720" in args
+    # And the preview still gets its own, unrelated, size.
+    assert f"video/x-raw,width={pipeline.PREVIEW_WIDTH},height={pipeline.PREVIEW_HEIGHT}" in args
+
+
+def test_the_recording_branch_scales_after_the_tee() -> None:
+    """Position is the whole fix: a scaler before the tee is shared, and sharing is the fault."""
+    args = build(source_width=1920, source_height=1080).args
+
+    assert args.index("tee") < args.index("videoscale")
+
+
+def test_no_caps_range_is_ever_asked_of_the_scaler() -> None:
+    """A range asks `videoscale` to fixate a size, and fixation is what has failed every time.
+
+    Against an ordinary source it picked badly — a 480x16 recording. Against a source with an
+    extreme pixel-aspect-ratio it overflowed outright and the pipeline refused to preroll. There is
+    no size this pipeline asks GStreamer to work out any more: either both numbers are known and
+    stated, or there is no scaler on that branch.
+    """
+    for width, height in ((0, 0), (800, 600), (2560, 1440), (1920, 1080)):
+        args = build(source_width=width, source_height=height).args
+        assert not any("[" in arg for arg in args if arg.startswith("video/x-raw"))
+
+
+def test_a_tall_source_is_capped_at_the_ceiling_and_keeps_its_shape() -> None:
+    args = build(source_width=2560, source_height=1440, max_height=720).args
+
+    assert "video/x-raw,width=1280,height=720" in args
+
+
+def test_odd_dimensions_are_rounded_down_to_even() -> None:
+    """VP8, VP9 and H.264 all subsample chroma; an odd edge is rejected or silently rounded."""
+    args = build(source_width=1919, source_height=1081, max_height=1081).args
+
+    caps = next(arg for arg in args if arg.startswith("video/x-raw,width="))
+    width, height = (int(part.split("=")[1]) for part in caps.split(",")[1:3])
+    assert width % 2 == 0
+    assert height % 2 == 0
+
+
+def test_an_unknown_source_size_means_no_scaler_rather_than_a_guess() -> None:
+    """The portal on this desktop reports no size, so this is the ordinary case, not the edge one.
+
+    The ceiling is given up rather than approximated. A recording at the window's own size costs
+    encoder time; a recording produced by guessing cost the recording.
+    """
+    args = build(source_width=0, source_height=0, want_preview=False).args
+
+    assert "videoscale" not in args
 
 
 def test_frames_are_dropped_rather_than_queued() -> None:

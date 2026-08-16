@@ -17,6 +17,7 @@ for a human, which is verified by hand instead — see `docs/workflow.md`.
 
 from __future__ import annotations
 
+import asyncio
 import threading
 import time
 import wave
@@ -180,6 +181,54 @@ def window(**kwargs) -> SessionMetadata:
     import uuid
 
     return SessionMetadata(session_id=uuid.uuid4().hex[:12], mode=modes.WINDOW, **kwargs)
+
+
+# -- one recording, one dialog ------------------------------------------------------------------
+
+
+async def test_concurrent_starts_negotiate_exactly_one_portal(manager) -> None:
+    """The five-dialogs fault, as a property.
+
+    `start` guarded on `is_running`, which reads `self._metadata` — and that is not set until the
+    audio source is open, several awaits later, one of which loads a speech model. Every start
+    request arriving inside that window passed the guard, and in `window` mode each one then opened
+    its own portal negotiation. One keystroke produced five consecutive "choose a window" dialogs,
+    each cancelling the one before it, and the trace on the session bus showed seven negotiations
+    90 ms apart — machine speed, not a person clicking.
+    """
+    session, _store, _events = manager
+
+    results = await asyncio.gather(
+        *(session.start(window(), manager_module.CaptureOptions()) for _ in range(5)),
+        return_exceptions=True,
+    )
+    try:
+        started = [r for r in results if not isinstance(r, BaseException)]
+        refused = [r for r in results if isinstance(r, SessionError)]
+
+        assert len(started) == 1
+        assert len(refused) == 4
+        assert len(FakePortal.instances) == 1
+    finally:
+        if session.is_running:
+            await session.stop()
+
+
+async def test_a_refused_start_does_not_leave_the_session_unstartable(manager) -> None:
+    """A claim that outlives its attempt makes the application refuse to record for good."""
+    session, _store, _events = manager
+    FakePortal.behaviour = "decline"
+
+    with pytest.raises(SessionError):
+        await session.start(window(), manager_module.CaptureOptions())
+
+    # The decline tore everything down, so the next attempt must be accepted on its own merits.
+    FakePortal.behaviour = "grant"
+    await session.start(window(), manager_module.CaptureOptions())
+    try:
+        assert session.is_running
+    finally:
+        await session.stop()
 
 
 # -- the three switches are independent -------------------------------------------------------

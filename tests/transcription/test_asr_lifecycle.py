@@ -12,7 +12,7 @@ import types
 import numpy as np
 import pytest
 from app.config.schema import AsrConfig
-from app.services.asr import AsrLifecycle, LoadState, MockScript
+from app.services.asr import AsrLifecycle, LoadState, MockScript, acceleration
 from app.services.asr.contract import AsrLoadError
 from app.services.asr.faster_whisper import FasterWhisperBackend, is_available
 
@@ -226,14 +226,39 @@ class TestFasterWhisperGuards:
             (ValueError("something unexpected"), "Could not load"),
         ],
     )
-    def test_load_failures_name_the_likely_cause(self, error: Exception, expected: str) -> None:
+    def test_load_failures_name_the_likely_cause(
+        self, error: Exception, expected: str, monkeypatch
+    ) -> None:
         """ "Failed to load" alone leaves the user with nothing to act on (BE §15)."""
+        monkeypatch.setattr(acceleration, "_detect_hardware", lambda: ("cuda", "NVIDIA RTX 4090"))
 
         def failing_factory(*args: object, **kwargs: object):  # noqa: ANN202
             raise error
 
         with pytest.raises(AsrLoadError, match=expected):
             FasterWhisperBackend(model_factory=failing_factory).load()
+
+    def test_an_amd_machine_is_not_told_to_check_its_nvidia_driver(self, monkeypatch) -> None:
+        """CTranslate2 drives ROCm through the CUDA API, so the exception says CUDA either way.
+
+        Observed exactly once, and it cost an evening: a `uv sync` replaced the ROCm build with the
+        PyPI one, and the resulting load error sent the owner of a Radeon looking for an NVIDIA
+        driver. The hardware is known, so the message says what is really wrong.
+        """
+        monkeypatch.setattr(acceleration, "_detect_hardware", lambda: ("rocm", "AMD Radeon 8060S"))
+        monkeypatch.setattr(acceleration, "_ctranslate2_gpu_support", lambda: (False, []))
+        monkeypatch.setattr(acceleration, "_missing_rocm_libraries", list)
+
+        def failing_factory(*args: object, **kwargs: object):  # noqa: ANN202
+            raise RuntimeError("CUDA driver version is insufficient for CUDA runtime version")
+
+        with pytest.raises(AsrLoadError) as excinfo:
+            FasterWhisperBackend(model_factory=failing_factory).load()
+
+        message = str(excinfo.value)
+        assert "NVIDIA" not in message
+        assert "ROCm" in message
+        assert "uv pip install" in message
 
     def test_unload_releases_the_model(self) -> None:
         backend = FasterWhisperBackend(model_factory=_fake_whisper_factory)

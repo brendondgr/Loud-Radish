@@ -123,6 +123,25 @@ def _acceleration_lines() -> list[str]:
     return ["", f"    {lines[0]}"] + [f"    {line}" for line in lines[1:]]
 
 
+def _repair_gpu_build() -> str | None:
+    """Put the ROCm build of CTranslate2 back when the launch itself replaced it.
+
+    ``uv run app.py`` synchronises the environment against the lockfile before this file executes,
+    and the lockfile names PyPI — which ships a CPU-and-CUDA build. On an AMD machine that means the
+    act of starting the application is what breaks its GPU support, every time, and the resulting
+    error at record time says *CUDA* on a machine that has no NVIDIA hardware.
+
+    Called before anything imports CTranslate2, so the reinstalled build is the one that gets
+    loaded. Guarded like every other diagnostic here: a launcher must not fail because a repair did.
+    """
+    try:
+        from app.services.asr.acceleration import repair_kept_wheel
+
+        return repair_kept_wheel()
+    except Exception:  # noqa: BLE001 - a repair must not become a failure to start
+        return None
+
+
 def _port_is_free(host: str, port: int) -> bool:
     """Whether ``port`` can be bound, so a clash is reported clearly rather than as a traceback."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
@@ -284,13 +303,19 @@ def _take_over_port(host: str, port: int) -> bool:
     return False
 
 
-def _print_banner(host: str, port: int, reload: bool) -> None:
+def _print_banner(host: str, port: int, reload: bool, repaired: str | None = None) -> None:
     """Say what is running, where, and what it can and cannot do."""
     url = f"http://{host}:{port}"
     print()
     print("  Live Seminar Transcriber")
     print(f"  {url}")
     print()
+
+    # Ahead of the capability list, because the repair changes what that list and the acceleration
+    # report below it will say.
+    if repaired:
+        print(f"    {repaired}")
+        print()
 
     capabilities = _capabilities()
     missing = [description for _, description, present in capabilities if not present]
@@ -416,7 +441,9 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 1
 
-    _print_banner(args.host, args.port, args.reload)
+    # Before anything imports CTranslate2 — including the acceleration report in the banner — so
+    # the build this restores is the one the server actually loads.
+    _print_banner(args.host, args.port, args.reload, _repair_gpu_build())
 
     if args.open:
         webbrowser.open(f"http://{args.host}:{args.port}")

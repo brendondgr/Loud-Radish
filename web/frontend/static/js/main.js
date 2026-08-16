@@ -30,6 +30,7 @@ import {
   RECORDING_PROGRESS,
   SESSION_STARTED,
   SESSION_STATE,
+  SESSION_CAPTURE_ENDED,
   SESSION_STOPPED,
   STATUS,
   TRANSCRIPT_COMMITTED,
@@ -222,6 +223,13 @@ function wireSession(header) {
     // The server is authoritative about the mode: a reload mid-recording, or a session started
     // from somewhere other than this tab, must show what is actually being recorded.
     mode.adoptSession({ running: true, mode: session.mode });
+  });
+
+  // The device is released the instant stop is pressed; finalising a video container, remuxing,
+  // and a post-capture pass are not. Saying so here is what stops "Stopping…" sitting on screen
+  // for tens of seconds looking indistinguishable from a hang.
+  on(SESSION_CAPTURE_ENDED, () => {
+    capture.set(null);
   });
 
   on(SESSION_STOPPED, (payload) => {

@@ -27,9 +27,15 @@
       "critical": true,
       "coalescing": false
     },
+    "session.capture_ended": {
+      "action": "set",
+      "note": "The microphone or monitor has been released. Emitted immediately on stop, before the video is finalised, remuxed, or transcribed — all of which can take tens of seconds. `finalising` is true when work remains.",
+      "critical": true,
+      "coalescing": false
+    },
     "session.stopped": {
       "action": "set",
-      "note": "Capture ended. Carries final statistics.",
+      "note": "Capture ended and everything that follows it is done. Carries final statistics.",
       "critical": true,
       "coalescing": false
     },

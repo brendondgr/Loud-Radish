@@ -23,6 +23,7 @@ conventions in [../skills/planner/SKILL.md](../skills/planner/SKILL.md).
 | [minute-based-transcript-polish.md](minute-based-transcript-polish.md) | A background pass that rewrites each finished minute of transcript into clean block text, without changing what was said | Complete (7 / 7 steps) |
 | [transcript-polish-refinements.md](transcript-polish-refinements.md) | Dialogue accuracy: spoken code references written properly, timestamps retained for retrieval, and continuous prose instead of constant line breaks | Complete (5 / 5 steps) |
 | [asr-hallucination-suppression.md](asr-hallucination-suppression.md) | Stop the speech model inventing "thank you", "bye", and stray words on room noise and silence | Complete (4 / 4 steps) |
+| [window-capture-repair.md](window-capture-repair.md) | Window recording repaired against the machine rather than the test double: recorded resolution, repeated portal dialogs, the live preview, window audio instead of the microphone, immediate stop, and timestamps that correlate | **7 / 8 — Phase 5 (window audio) outstanding** |
 
 ## The multi-mode expansion
 

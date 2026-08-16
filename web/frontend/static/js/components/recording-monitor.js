@@ -38,6 +38,9 @@ export class RecordingMonitor {
 
     this.image = null;
     this.timer = null;
+    //: Whether a preview frame has ever decoded for *this* recording. An `<img>` with an
+    //: unresolved src is a blank rectangle, indistinguishable from a dead capture.
+    this.hasFrame = false;
 
     on(CAPTURE_CHANGED, () => this.render());
 
@@ -64,29 +67,44 @@ export class RecordingMonitor {
   }
 
   _renderPreview() {
+    const wanted = capture.recording && capture.preview;
+
+    if (!wanted) {
+      this.image?.remove();
+      this.image = null;
+      // Reset, so the next recording waits for its own first frame rather than inheriting the
+      // last one's answer.
+      this.hasFrame = false;
+    }
+
+    // **Three states, not two.** Recording-with-frames, recording-but-nothing-has-arrived-yet, and
+    // not-recording are genuinely different situations and the first two used to render
+    // identically: an `<img>` whose src had not resolved, which is a blank rectangle — the exact
+    // thing this pane exists not to show. The card stays up until a frame has actually decoded.
+    const showImage = wanted && this.hasFrame;
     const { title, body } = this._emptyCopy();
-    const showImage = capture.recording && capture.preview;
 
     this.empty?.setAttribute("data-variant", capture.failed ? "failed" : "idle");
     toggle(this.empty, !showImage);
     setText(this.emptyTitle, title);
     if (this.emptyBody) this.emptyBody.textContent = body;
 
-    if (!showImage) {
-      this.image?.remove();
-      this.image = null;
-      return;
-    }
-
-    if (!this.image) {
+    if (wanted && !this.image) {
       this.image = new Image();
       this.image.alt = "The window being recorded";
+      this.image.addEventListener("load", () => {
+        if (this.hasFrame) return;
+        this.hasFrame = true;
+        this._renderPreview();
+      });
       // A frame that fails to load leaves the previous one on screen rather than a broken-image
       // icon, which would read as the capture having failed when it has not.
       this.image.addEventListener("error", () => {});
       this.previewWrap?.append(this.image);
       this._refresh();
     }
+
+    toggle(this.image, showImage);
   }
 
   _emptyCopy() {
@@ -110,6 +128,15 @@ export class RecordingMonitor {
         body:
           "The capture is running. This machine has no JPEG encoder for GStreamer, so there is " +
           "nothing to show here; the recording itself is unaffected.",
+      };
+    }
+    if (capture.recording) {
+      // Preview is on and no frame has decoded yet. The branch writes one a second, so this is
+      // normally over in under two — but saying so is better than a blank rectangle that could
+      // equally mean the capture is dead.
+      return {
+        title: "Recording — waiting for the first frame",
+        body: "The capture has started. The preview updates once a second.",
       };
     }
     return {

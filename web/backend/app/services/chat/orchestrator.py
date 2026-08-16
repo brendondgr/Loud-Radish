@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ...config.schema import AppConfig, QuickAction
-from ..context.assembler import ContextRequest, assemble
+from ..context.assembler import ContextRequest, assemble, resolve_citations
 from ..context.prompts import quick_action_prompt, selection_prompt
 from ..llm.contract import GenerationOptions, LlmBackend
 from ..llm.errors import LlmError
@@ -216,6 +216,22 @@ class ChatService:
                 await stream.aclose()
 
         answer = "".join(parts).strip()
+
+        # **Checked against the transcript before it is kept.** Stored timestamps were measured and
+        # found correct at both revisions (`tests/transcription/test_timestamp_alignment.py`), so a
+        # cited moment matching no line the model was shown was invented — interpolated between two
+        # lines, or lifted from the summary block, whose ranges are not moments. The reader clicks
+        # it, lands somewhere unrelated, and stops trusting the citations that *are* right, which is
+        # the whole complaint. The sentence is kept; only the number goes.
+        answer, dropped = resolve_citations(answer, set(context.offered_seconds))
+        if dropped:
+            logger.info(
+                "Answer %s cited %d moment(s) that are in no transcript line: %s",
+                request_id,
+                len(dropped),
+                dropped,
+            )
+
         if not answer and finish_reason == "length":
             # A reasoning model can spend its whole budget thinking. Reporting that as an empty
             # answer sends the user looking for a bug; naming the setting fixes it in one step.
