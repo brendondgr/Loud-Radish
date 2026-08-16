@@ -64,30 +64,104 @@ class PipelineSpec:
         return " ".join(self.args)
 
 
-def encoder_args(encoder: str) -> list[str]:
+@dataclass(frozen=True)
+class Quality:
+    """One point on the quality/size trade, expressed in each encoder's own units."""
+
+    #: VP8 and VP9's constant-quality level. Lower is better; the range is 0–63.
+    cq_level: int
+    #: Bits per second the rate control may not exceed. A **ceiling**, not a target — constant
+    #: quality spends what the picture needs and no more, which is why a small window still
+    #: produces a small file.
+    ceiling: int
+    #: H.264's quantizer, on its own 0–51 scale.
+    quantizer: int
+
+
+#: Measured on fifteen seconds of a real 1080x1064 window capture, Y-PSNR against the source and
+#: the size an hour of it would take:
+#:
+#:     before this existed   487 kbps   35.44 dB    208 MB/h
+#:     efficient            1405 kbps   42.84 dB    603 MB/h
+#:     balanced             2161 kbps   44.80 dB    927 MB/h
+#:     high                 3031 kbps   45.89 dB   1194 MB/h
+#:
+#: The source had already been through the 487 kbps encoder once, so the real gap against a
+#: pristine portal stream is wider than these numbers show.
+QUALITIES: Final[dict[str, Quality]] = {
+    "efficient": Quality(cq_level=40, ceiling=4_000_000, quantizer=28),
+    "balanced": Quality(cq_level=30, ceiling=8_000_000, quantizer=23),
+    "high": Quality(cq_level=22, ceiling=16_000_000, quantizer=18),
+}
+
+DEFAULT_QUALITY: Final = "balanced"
+
+#: Motion-detection threshold. GStreamer's own property documentation says it in as many words:
+#: *"Recommendation is to set 100 for screen/window sharing"*. The default is 1.
+STATIC_THRESHOLD: Final = 100
+
+
+def encoder_args(encoder: str, quality: str = DEFAULT_QUALITY) -> list[str]:
     """Per-encoder tuning, chosen for *not falling behind* rather than for file size.
 
     A recording that drops frames because the encoder could not keep up is worse than a larger
-    file, and this is competing with speech inference for the same cores.
+    file, and this is competing with speech inference for the same cores. Measured on this machine
+    at the default quality: 2.78 s of CPU for fifteen seconds of 1080x1064 video, so a five-times
+    realtime budget on one core.
+
+    **Constant quality rather than a bitrate, and that is what fixes the compression.** `vp8enc`
+    was run with no rate control named at all, which left `target-bitrate` at its factory default
+    of **256 kbps** — the recordings on disk measure 345–357 kbps at 1080x1064, which is where the
+    blocking came from. A bitrate cannot simply be raised in its place because the portal reports
+    no stream size on this desktop (D-026), so the pipeline usually does not know the resolution to
+    compute one from; `bits-per-pixel`, the property that exists for exactly that, was measured to
+    have no effect in this build. Constant quality needs no resolution — measured at 4909 kbps for
+    1080x1064 and 1038 kbps for 640x360 from one setting.
     """
+    tuning = QUALITIES.get(quality, QUALITIES[DEFAULT_QUALITY])
+
     if encoder.startswith("va"):
         # VA-API encoders take their tuning through the driver rather than through element
         # properties, and the defaults are already tuned for realtime. Naming nothing is
         # deliberate: an unsupported property on a VA element is a pipeline that will not start,
         # and the software path is what a machine without the entrypoint falls back to anyway.
         return [encoder]
-    if encoder == "vp8enc":
-        # `deadline=1` is VP8's realtime mode; `cpu-used` trades quality for speed, and `threads`
-        # keeps it from taking every core away from the model.
-        return ["vp8enc", "deadline=1", "cpu-used=8", "threads=2", "keyframe-max-dist=30"]
-    if encoder == "vp9enc":
-        return ["vp9enc", "deadline=1", "cpu-used=8", "threads=2"]
+    if encoder in ("vp8enc", "vp9enc"):
+        # `deadline=1` is VPX's realtime mode; `cpu-used` trades quality for speed, and `threads`
+        # keeps it from taking every core away from the model. Quality is governed by `cq-level`
+        # now rather than by either of those, so both keep the values that leave the model alone.
+        return [
+            encoder,
+            "deadline=1",
+            "cpu-used=8",
+            "threads=2",
+            "keyframe-max-dist=30",
+            "end-usage=cq",
+            f"cq-level={tuning.cq_level}",
+            f"target-bitrate={tuning.ceiling}",
+            f"static-threshold={STATIC_THRESHOLD}",
+        ]
     if encoder == "x264enc":
         # `zerolatency` also disables B-frames, which is what makes the file playable while it is
-        # still being written.
-        return ["x264enc", "speed-preset=veryfast", "tune=zerolatency", "key-int-max=30"]
+        # still being written. `pass=qual` is x264's constant-quality mode, the same idea as VPX's.
+        return [
+            "x264enc",
+            "speed-preset=veryfast",
+            "tune=zerolatency",
+            "key-int-max=30",
+            "pass=qual",
+            f"quantizer={tuning.quantizer}",
+        ]
     if encoder == "openh264enc":
-        return ["openh264enc", "complexity=0"]
+        # Its default bitrate is **128 kbps**, which is lower again than VP8's and would produce
+        # the same fault on any machine that falls back to it.
+        return [
+            "openh264enc",
+            "complexity=0",
+            "gop-size=30",
+            f"bitrate={tuning.ceiling // 2}",
+            f"max-bitrate={tuning.ceiling}",
+        ]
     return [encoder]
 
 
@@ -103,6 +177,7 @@ def build(
     want_preview: bool = True,
     source_width: int = 0,
     source_height: int = 0,
+    quality: str = DEFAULT_QUALITY,
 ) -> PipelineSpec:
     """Assemble the launch line for one recording.
 
@@ -170,11 +245,15 @@ def build(
         args += ["tee", "name=t", "!", "queue", "!"]
 
     args += _record_scaler(max_height, source_width, source_height)
-    # Hardware encoders want NV12 and will not negotiate to it from every input format on their
-    # own; naming it costs nothing on the software path, which already accepts it.
-    if support.parser:
+    # **Hardware only, and the distinction is load-bearing.** VA-API encoders want NV12 and will
+    # not negotiate to it from every input format on their own. This used to be keyed off
+    # `support.parser` as a stand-in for "is hardware", which held only as long as no software
+    # encoder needed a parser — and `openh264enc` does. It also accepts **I420 and nothing else**,
+    # so naming NV12 for it would trade a pipeline that would not link for one that would not
+    # negotiate.
+    if support.encoder.startswith("va"):
         args += ["videoconvert", "!", "video/x-raw,format=NV12", "!"]
-    args += encoder_args(support.encoder)
+    args += encoder_args(support.encoder, quality)
     # An elementary stream needs parsing before a muxer will take it. Software encoders emit
     # something the muxer accepts directly, and for those this is empty.
     if support.parser:

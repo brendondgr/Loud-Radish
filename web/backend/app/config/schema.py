@@ -258,6 +258,21 @@ class CaptureConfig(_Base):
     #: and therefore the window being recorded, with it. A tool for recording talks that happen once
     #: does not trade that for CPU. `hardware` remains available for anyone whose driver is happier.
     encoder: Literal["software", "hardware"] = "software"
+    #: How much the encoder is allowed to spend on the picture. **`balanced` by default, and that
+    #: default is a repair.** `vp8enc` was run with no rate control named at all, leaving
+    #: `target-bitrate` at its factory value of 256 kbps; recordings measured 345–357 kbps at
+    #: 1080x1064 and looked it. Measured on fifteen seconds of a real capture, Y-PSNR against the
+    #: source and the size an hour would take:
+    #:
+    #:     before      487 kbps   35.44 dB    208 MB/h
+    #:     efficient  1405 kbps   42.84 dB    603 MB/h
+    #:     balanced   2161 kbps   44.80 dB    927 MB/h
+    #:     high       3031 kbps   45.89 dB   1194 MB/h
+    #:
+    #: These are constant-quality settings with a bitrate ceiling rather than targets, so a small
+    #: window still produces a small file — the same setting measured 4909 kbps at 1080x1064 and
+    #: 1038 kbps at 640x360.
+    quality: Literal["efficient", "balanced", "high"] = "balanced"
 
 
 class ShortcutsConfig(_Base):

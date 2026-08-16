@@ -98,6 +98,92 @@ def test_an_unknown_encoder_still_produces_a_bare_element() -> None:
     assert pipeline.encoder_args("someotherenc") == ["someotherenc"]
 
 
+# -- how much the encoder may spend on the picture -----------------------------------------------
+#
+# Reported as "extremely compressed", and it was. `vp8enc` was launched with no rate control named
+# at all, so `target-bitrate` sat at its factory default of 256 kbps; the recordings on disk measure
+# 345-357 kbps at 1080x1064. Fifteen seconds of a real capture, re-encoded, Y-PSNR against source:
+#
+#     before this existed   487 kbps   35.44 dB
+#     efficient            1405 kbps   42.84 dB
+#     balanced             2161 kbps   44.80 dB
+#     high                 3031 kbps   45.89 dB
+
+
+@pytest.mark.parametrize("encoder", ["vp8enc", "vp9enc"])
+def test_a_rate_control_mode_is_always_named(encoder: str) -> None:
+    """**The whole fault, in one assertion.** Naming none leaves it at 256 kbps."""
+    args = pipeline.encoder_args(encoder)
+
+    assert "end-usage=cq" in args
+    assert any(arg.startswith("cq-level=") for arg in args)
+    assert any(arg.startswith("target-bitrate=") for arg in args)
+
+
+def test_quality_is_constant_rather_than_a_bitrate_target() -> None:
+    """Because the pipeline usually does not know the resolution.
+
+    The portal reports no stream size on this desktop (D-026), so a bitrate cannot be computed from
+    the picture; `bits-per-pixel`, the property that exists for exactly that, was measured to have
+    no effect in this build. Constant quality needs no resolution — one setting measured 4909 kbps
+    at 1080x1064 and 1038 kbps at 640x360, so a small window still produces a small file.
+    """
+    for quality in ("efficient", "balanced", "high"):
+        assert "end-usage=cq" in pipeline.encoder_args("vp8enc", quality)
+
+
+def test_better_quality_means_a_lower_level_and_a_higher_ceiling() -> None:
+    """cq-level runs backwards — 0 is best — and the ceiling is a cap, not a target."""
+    levels = [pipeline.QUALITIES[name].cq_level for name in ("efficient", "balanced", "high")]
+    ceilings = [pipeline.QUALITIES[name].ceiling for name in ("efficient", "balanced", "high")]
+
+    assert levels == sorted(levels, reverse=True)
+    assert ceilings == sorted(ceilings)
+
+
+def test_screen_content_gets_the_motion_threshold_gstreamer_recommends() -> None:
+    """Its own property documentation: "Recommendation is to set 100 for screen/window sharing"."""
+    assert f"static-threshold={pipeline.STATIC_THRESHOLD}" in pipeline.encoder_args("vp8enc")
+
+
+def test_openh264_is_given_a_bitrate_rather_than_its_128_kbps_default() -> None:
+    """Lower again than VP8's, and the same fault on any machine that falls back to it."""
+    args = pipeline.encoder_args("openh264enc", "balanced")
+
+    assert "bitrate=128000" not in args
+    assert any(arg.startswith("bitrate=") for arg in args)
+
+
+def test_an_unknown_quality_falls_back_rather_than_failing() -> None:
+    """A hand-edited config file should not be able to stop a recording starting."""
+    assert pipeline.encoder_args("vp8enc", "nonsense") == pipeline.encoder_args("vp8enc")
+
+
+def test_the_quality_reaches_the_launch_line() -> None:
+    high = build(support=support(encoder="vp8enc", muxer="webmmux"), quality="high")
+    efficient = build(support=support(encoder="vp8enc", muxer="webmmux"), quality="efficient")
+
+    assert f"cq-level={pipeline.QUALITIES['high'].cq_level}" in high.args
+    assert f"cq-level={pipeline.QUALITIES['efficient'].cq_level}" in efficient.args
+
+
+def test_only_hardware_encoders_are_asked_for_nv12() -> None:
+    """**Keyed off the encoder, not off having a parser**, which is what it used to read.
+
+    That held only as long as no software encoder needed one, and `openh264enc` does — it accepts
+    **I420 and nothing else**, so naming NV12 for it would trade a pipeline that would not link for
+    one that would not negotiate.
+    """
+    software = build(
+        support=support(encoder="openh264enc", muxer="matroskamux", parser="h264parse")
+    )
+    hardware = build(support=support(encoder="vaav1enc", muxer="matroskamux", parser="av1parse"))
+
+    assert "video/x-raw,format=NV12" not in software.args
+    assert "h264parse" in software.args
+    assert "video/x-raw,format=NV12" in hardware.args
+
+
 # -- the preview branch ------------------------------------------------------------------------
 
 

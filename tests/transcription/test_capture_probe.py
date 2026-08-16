@@ -216,12 +216,28 @@ def test_a_hardware_encoder_without_its_parser_is_skipped() -> None:
 def test_an_encoder_without_its_muxer_is_not_chosen(monkeypatch) -> None:
     """Half a pipeline is not a pipeline. This machine has openh264enc and needed matroskamux."""
     assert probe.choose_encoder(frozenset({"vp8enc"})) is None
-    assert probe.choose_encoder(frozenset({"openh264enc", "matroskamux"})) == (
+    assert probe.choose_encoder(frozenset({"openh264enc", "matroskamux"})) is None
+    assert probe.choose_encoder(frozenset({"openh264enc", "matroskamux", "h264parse"})) == (
         "openh264enc",
         "matroskamux",
         "mkv",
-        "",
+        "h264parse",
     )
+
+
+def test_openh264_is_disqualified_without_a_parser() -> None:
+    """**A software encoder that needs one**, which the table did not allow for.
+
+    `openh264enc ! matroskamux` fails outright — `could not link openh264enc0 to matroskamux0` —
+    because openh264 emits a byte-stream elementary stream and Matroska wants AVC. Nothing caught
+    it because this machine chooses `vp8enc`; the entry only matters on a machine that falls back
+    to openh264, which is to say on somebody else's, where it was a pipeline that would not start.
+    """
+    without = frozenset({"openh264enc", "matroskamux"})
+    with_parser = without | {"h264parse"}
+
+    assert probe.choose_encoder(without) is None
+    assert probe.choose_encoder(with_parser)[3] == "h264parse"
 
 
 def test_no_encoder_at_all(monkeypatch) -> None:

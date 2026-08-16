@@ -809,6 +809,7 @@ class SessionManager:
             # the scaler a range to satisfy, and a range is how a recording ended up 480x16.
             source_width=stream.width,
             source_height=stream.height,
+            quality=config.capture.quality,
         )
         # The source size is worth a line of its own: when a capture records the wrong thing, this
         # is what says whether the compositor handed over the wrong node or the pipeline mangled a

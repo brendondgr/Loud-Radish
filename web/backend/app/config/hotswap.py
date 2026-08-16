@@ -57,6 +57,8 @@ RESTART_SESSION_PATHS: frozenset[str] = frozenset(
         "capture.frame_rate",
         "capture.max_height",
         "capture.preview",
+        "capture.encoder",
+        "capture.quality",
         # Read by the companion when it registers with the desktop's shortcut service; it re-reads
         # them on change, so this classification is about the *session*, which they never touch.
     }

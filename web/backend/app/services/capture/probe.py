@@ -58,7 +58,12 @@ ENCODERS: Final[tuple[tuple[str, str, str, str], ...]] = (
     ("vp8enc", "webmmux", "webm", ""),
     ("vp9enc", "webmmux", "webm", ""),
     ("x264enc", "mp4mux", "mp4", ""),
-    ("openh264enc", "matroskamux", "mkv", ""),
+    # **`h264parse` is not optional here**, and its absence was a pipeline that would not start.
+    # `openh264enc ! matroskamux` fails outright with `could not link openh264enc0 to
+    # matroskamux0`: openh264 emits a byte-stream elementary stream and Matroska wants AVC. Nobody
+    # saw it because this machine chooses `vp8enc`, and the entry only matters on a machine that
+    # falls back to it — which is to say, on somebody else's.
+    ("openh264enc", "matroskamux", "mkv", "h264parse"),
 )
 
 #: The preview branch. Optional: without it the monitor shows a static card instead of frames,
