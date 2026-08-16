@@ -1,6 +1,6 @@
 # Silent Recordings and Recording Quality
 
-**Status:** 🚧 In progress.
+**Status:** ✅ **Complete — all 4 phases.**
 **Branch:** `main`
 
 ---
@@ -144,3 +144,41 @@ a real encode at the new settings measuring the bitrate and PSNR this plan predi
 ### Phase 4 — The decisions, written down
 
 D-028 for both faults, `docs/checklist.md` for what is still owed, and the full suite.
+
+---
+
+## 4. What the phases actually found
+
+Two things were not in the plan when it was written, and both were larger than what was.
+
+**The leak was the test suite, not the crashes.** `_open_application_tap` was never stubbed, so any
+test opening a window session's audio ran `pactl load-module module-null-sink` against the live
+PipeWire daemon, linked whatever the developer happened to be playing into it, and never closed it
+— a tap is closed by the session's teardown, which those tests never reach. Measured: five tests in
+`test_window_audio.py`, **three leaked sinks per run**. Run the suite a few times and there are
+five, which is exactly the state that made every recording that afternoon silent. The suite that
+reported the feature green was manufacturing the state that broke it. That is the second time in
+two plans that a test reached the real desktop and cost a feature — the first put five screen-share
+dialogs on screen — and `tests/conftest.py` now guards both.
+
+**Two faults were sitting in the encoder table, unreached.** `openh264enc ! matroskamux` does not
+link at all: openh264 emits a byte-stream elementary stream and Matroska wants AVC, so the entry
+needed `h264parse` and did not declare one. And the NV12 capsfilter was keyed off `support.parser`
+as a stand-in for "is a hardware encoder", which held only until a software encoder needed a parser
+— `openh264enc` accepts I420 and nothing else, so fixing the first alone would have traded a
+pipeline that would not link for one that would not negotiate. Neither had ever run here, because
+this machine picks `vp8enc`; both would have met the first person whose machine did not.
+
+## 5. Verified
+
+| | before | after |
+|---|---|---|
+| tap with the fault planted | RMS 0.0, peak 0.0 | RMS 0.071, peak 0.808 |
+| sinks left by five window-audio tests | 3 per run | 0 |
+| recording bitrate, real 1080x1064 capture | 487 kbps | 2161 kbps |
+| Y-PSNR against the source | 35.44 dB | 44.80 dB |
+| encoder CPU per 15 s of video | 1.86 s | 2.78 s (5× realtime) |
+| suite | 1396 passed | 1419 passed, 4 skipped |
+
+Still owed, and recorded in `docs/checklist.md`: one full window session end to end, which is the
+only thing that can confirm a transcript of the window's own sound.

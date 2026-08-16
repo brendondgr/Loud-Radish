@@ -314,6 +314,20 @@ user's own machine, and none may be reported as passing until it has had one.
       rather than presented as microphones, but on a PipeWire desktop PortAudio does not expose the
       sink monitors at all, so what is offered is whatever the JACK bridge surfaces. Capturing a
       remote talk this way needs confirming on your own setup.
+- [ ] **A window recording that actually contains the window's sound (D-028).** The fault is
+      understood, reproduced, and fixed under measurement — five identically named leaked null
+      sinks meant `pw-link` and `pw-record` addressed different nodes, so the capture recorded
+      digital silence. Verified by planting the exact fault and clearing it: RMS 0.0 before, 0.071
+      after, no sink left behind. What has *not* been observed is a full session end to end: press
+      record on a window with a video playing and read the transcript back against what was said in
+      it. The tap now refuses to start rather than recording silence, so a failure here should be a
+      message rather than an empty transcript.
+- [ ] **The new encoder quality on a real portal stream.** Measured on a real capture that had
+      already been through the old 256 kbps encoder once: 35.44 dB → 44.80 dB at the default
+      setting, so the gap against a pristine stream is wider than that. Worth one recording to
+      confirm the picture is what you expect and that `balanced` is the right default for how you
+      use it — `capture.quality` also takes `efficient` (≈600 MB/hour) and `high` (≈1200 MB/hour)
+      against the default's ≈930 MB/hour.
 - [x] **Real-model transcription** — done. `faster-whisper` `small` at `int8` on a 32-core CPU:
       **RTF ≈ 1.5**, commit latency ≈ 1.4 s, transcript recognisably correct. Measured on this
       machine; measure on yours, which is what the status bar exists for.
