@@ -41,6 +41,14 @@ PREVIEW_WIDTH: Final = 480
 #: fixated from the source's aspect is what produced a 480x32767 JPEG and killed the pipeline.
 PREVIEW_HEIGHT: Final = 270
 
+#: Packed 8-bit formats `pipewiresrc` handles reliably. Anything else — 10-bit especially — is what
+#: the reported renegotiation failures have in common.
+SOURCE_FORMATS: Final[tuple[str, ...]] = ("BGRx", "RGBx", "BGRA", "RGBA", "xRGB", "xBGR")
+
+#: Milliseconds after which `pipewiresrc` resends its last buffer. 0 disables it, which is the
+#: default and is wrong here: a static window would starve the muxer.
+KEEPALIVE_MS: Final = 1000
+
 
 @dataclass(frozen=True)
 class PipelineSpec:
@@ -62,6 +70,12 @@ def encoder_args(encoder: str) -> list[str]:
     A recording that drops frames because the encoder could not keep up is worse than a larger
     file, and this is competing with speech inference for the same cores.
     """
+    if encoder.startswith("va"):
+        # VA-API encoders take their tuning through the driver rather than through element
+        # properties, and the defaults are already tuned for realtime. Naming nothing is
+        # deliberate: an unsupported property on a VA element is a pipeline that will not start,
+        # and the software path is what a machine without the entrypoint falls back to anyway.
+        return [encoder]
     if encoder == "vp8enc":
         # `deadline=1` is VP8's realtime mode; `cpu-used` trades quality for speed, and `threads`
         # keeps it from taking every core away from the model.
@@ -111,6 +125,28 @@ def build(
         # The portal's node is live: a late frame should be dropped rather than queued, or the
         # recording drifts behind the clock it is being muxed against.
         "do-timestamp=true",
+        # Resend the last buffer when nothing changes. A window that sits still — a slide left on
+        # screen for two minutes — otherwise starves the muxer of buffers, which produces timestamp
+        # gaps and a file whose duration does not match the talk. At 15 fps on a mostly-static
+        # window this is the ordinary case, not an edge one.
+        f"keepalive-time={KEEPALIVE_MS}",
+        "!",
+        # **Constrain the format before anything downstream sees it.** `pipewiresrc` is documented
+        # to mishandle 10-bit and exotic-modifier formats that a compositor may advertise, and the
+        # reported failures are not subtle — "no more input formats", then `not-negotiated`, and a
+        # pipeline that never reaches PLAYING. This machine is AMD plus KWin plus DMA-BUF, which is
+        # squarely inside the configuration space where that happens. Restricting to the packed
+        # 8-bit formats keeps negotiation on ground that is known to work.
+        f"video/x-raw,format={{{','.join(SOURCE_FORMATS)}}}",
+        "!",
+        # **Not leaky, and that distinction is the whole recording.** A leaky queue here was tried
+        # and measured: 150 frames in, **nine frames out**. It drops whenever the encoder is behind,
+        # which for a recording means silently writing a talk at one frame per second. Backpressure
+        # instead propagates to `pipewiresrc`, which drops at the source — the right place for a
+        # live stream, and where `videorate` below can account for it. The preview branch stays
+        # leaky, because a stale thumbnail costs nothing.
+        "queue",
+        "max-size-buffers=32",
         "!",
         "videorate",
         "drop-only=true",
@@ -134,7 +170,15 @@ def build(
         args += ["tee", "name=t", "!", "queue", "!"]
 
     args += _record_scaler(max_height, source_width, source_height)
+    # Hardware encoders want NV12 and will not negotiate to it from every input format on their
+    # own; naming it costs nothing on the software path, which already accepts it.
+    if support.parser:
+        args += ["videoconvert", "!", "video/x-raw,format=NV12", "!"]
     args += encoder_args(support.encoder)
+    # An elementary stream needs parsing before a muxer will take it. Software encoders emit
+    # something the muxer accepts directly, and for those this is empty.
+    if support.parser:
+        args += ["!", support.parser]
     args += ["!", support.muxer, "!", "filesink", f"location={video_path}"]
 
     if include_preview:

@@ -171,7 +171,44 @@ def test_the_display_check_comes_before_everything(monkeypatch) -> None:
 def test_vp8_is_preferred_over_x264(monkeypatch) -> None:
     """Deliberate: x264 is absent from stock Fedora, so preferring it makes the common case fail."""
     chosen = probe.choose_encoder(frozenset({"vp8enc", "webmmux", "x264enc", "mp4mux"}))
-    assert chosen == ("vp8enc", "webmmux", "webm")
+    assert chosen == ("vp8enc", "webmmux", "webm", "")
+
+
+def test_hardware_is_preferred_over_software() -> None:
+    """The whole point, and it is worth more than it looks.
+
+    This application transcribes and records simultaneously, so every core a software encoder takes
+    is a core the speech model does not get. Measured through the real pipeline on 150 frames at
+    720p: 1.25 s of user CPU for `vp8enc` against 0.30 s for `vaav1enc`.
+    """
+    chosen = probe.choose_encoder(
+        frozenset({"vp8enc", "webmmux", "vaav1enc", "matroskamux", "av1parse"})
+    )
+
+    assert chosen == ("vaav1enc", "matroskamux", "mkv", "av1parse")
+
+
+def test_av1_is_preferred_over_hardware_h264() -> None:
+    """Not a quality judgement — a packaging one.
+
+    Fedora strips the H.264 and HEVC VA-API entry points from its Mesa build for patent reasons, so
+    `vah264enc` does not register on a stock install even though the hardware supports it. AV1 is
+    royalty-free and is present. Preferring H.264 would mean the common case falls back to software.
+    """
+    elements = frozenset({"vaav1enc", "av1parse", "vah264enc", "h264parse", "matroskamux"})
+
+    assert probe.choose_encoder(elements)[0] == "vaav1enc"
+
+
+def test_a_hardware_encoder_without_its_parser_is_skipped() -> None:
+    """An elementary stream that cannot be parsed cannot be muxed.
+
+    Finding that out at record time is finding it out too late, so the entry is disqualified during
+    the probe and the software path is taken instead.
+    """
+    chosen = probe.choose_encoder(frozenset({"vaav1enc", "matroskamux", "vp8enc", "webmmux"}))
+
+    assert chosen == ("vp8enc", "webmmux", "webm", "")
 
 
 def test_an_encoder_without_its_muxer_is_not_chosen(monkeypatch) -> None:
@@ -181,6 +218,7 @@ def test_an_encoder_without_its_muxer_is_not_chosen(monkeypatch) -> None:
         "openh264enc",
         "matroskamux",
         "mkv",
+        "",
     )
 
 

@@ -79,6 +79,8 @@ def run_hostile(spec) -> subprocess.CompletedProcess:
         "pattern=smpte",
         "!",
         f"video/x-raw,width=1920,height=1080,framerate=15/1,pixel-aspect-ratio={HOSTILE_PAR}",
+        "!",
+        "videoconvert",
     ]
     return subprocess.run(args, capture_output=True, text=True, timeout=120, check=False)
 
@@ -99,6 +101,10 @@ def run_pipeline(spec, *, width: int, height: int) -> None:
         "pattern=smpte",
         "!",
         f"video/x-raw,width={width},height={height},framerate=15/1",
+        # The pipeline constrains `pipewiresrc`'s output format immediately; a test source has to
+        # be able to reach one of those formats, and two capsfilters cannot sit next to each other.
+        "!",
+        "videoconvert",
     ]
 
     result = subprocess.run(args, capture_output=True, text=True, timeout=120, check=False)
@@ -354,9 +360,11 @@ def test_frames_actually_reach_the_file(tmp_path) -> None:
     )
     run_pipeline(spec, width=640, height=480)
 
-    # Not all FRAMES: the encoder is in realtime mode and the run ends on end-of-stream, so a
-    # frame or two at the tail is a normal outcome rather than a fault.
-    assert frame_count(tmp_path / "out.webm") >= FRAMES // 2
+    # **Nearly all of them.** `>= FRAMES // 2` was the original assertion and it was far too loose:
+    # a leaky queue that dropped 150 frames down to nine passed a proportional version of this
+    # check, because 12 of 20 is over half. A recording that keeps half its frames is not a
+    # recording. Two frames of slack for the end-of-stream tail is the real tolerance.
+    assert frame_count(tmp_path / "out.webm") >= FRAMES - 2
 
 
 def test_the_recording_is_not_a_black_rectangle(tmp_path) -> None:
@@ -491,3 +499,65 @@ def test_an_extreme_aspect_ratio_is_recorded_rather_than_refused() -> None:
     geometry = resolve(480, 16, max_height=720)
 
     assert (geometry.width, geometry.height) == (480, 16)
+
+
+# -- the encoder this machine actually chose -----------------------------------------------------
+
+
+def test_the_chosen_encoder_produces_a_playable_file(tmp_path) -> None:
+    """Runs the pipeline the probe *actually* selected, not one a fixture pinned.
+
+    Every other test here hardcodes `vp8enc`, which is right for checking the pipeline's shape and
+    useless for checking that this machine's chosen encoder works. Hardware encoders are the case
+    that matters: they need an NV12 input and a parser between them and the muxer, and getting
+    either wrong is a pipeline that will not start — at record time, on a talk that will not happen
+    twice.
+    """
+    from app.services.capture.probe import detect
+
+    verdict = detect()
+    if not verdict.encoder:
+        pytest.skip("this machine has no video encoder at all")
+
+    spec = pipeline.build(
+        verdict,
+        node_id=0,
+        fd=0,
+        video_path=str(tmp_path / f"out.{verdict.extension}"),
+        preview_path=str(tmp_path / "preview.jpg"),
+        source_width=1280,
+        source_height=720,
+        want_preview=False,
+    )
+    run_pipeline(spec, width=1280, height=720)
+
+    written = tmp_path / f"out.{verdict.extension}"
+    assert written.stat().st_size > 0
+    assert dimensions(written) == (1280, 720)
+    assert mean_luminance(written) > 10.0, "the encoder produced a black file"
+
+
+def test_a_hardware_encoder_gets_a_parser_and_nv12(tmp_path) -> None:
+    """The two things a VA-API encoder needs that a software one does not.
+
+    An elementary stream reaches the muxer unparsed, or the encoder is handed a format it will not
+    negotiate to — either way the pipeline does not start.
+    """
+    from app.services.capture.probe import detect
+
+    verdict = detect()
+    if not verdict.parser:
+        pytest.skip("this machine selected a software encoder")
+
+    args = pipeline.build(
+        verdict,
+        node_id=0,
+        fd=0,
+        video_path=str(tmp_path / "out.mkv"),
+        preview_path="",
+        want_preview=False,
+    ).args
+
+    assert verdict.parser in args
+    assert "video/x-raw,format=NV12" in args
+    assert args.index(verdict.encoder) < args.index(verdict.parser)

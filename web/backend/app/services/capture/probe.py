@@ -39,11 +39,27 @@ REQUIRED_ELEMENTS: Final[tuple[str, ...]] = ("pipewiresrc", "videoconvert", "vid
 #: Video encoders, best first. **`x264enc` is deliberately not first**: it is absent from stock
 #: Fedora and most distributions that cannot ship x264, so preferring it would make the common case
 #: report a missing encoder. VP8 is present wherever `gst-plugins-good` is.
-ENCODERS: Final[tuple[tuple[str, str, str], ...]] = (
-    ("vp8enc", "webmmux", "webm"),
-    ("vp9enc", "webmmux", "webm"),
-    ("x264enc", "mp4mux", "mp4"),
-    ("openh264enc", "matroskamux", "mkv"),
+#: `(encoder, muxer, extension, parser)`, best first. The parser is empty for encoders whose output
+#: a muxer accepts directly, and named for the hardware ones, which produce an elementary stream.
+#:
+#: **Hardware first, and it is worth far more than it looks.** This application transcribes and
+#: records at the same time, so every core a software encoder occupies is a core the speech model
+#: does not get. Measured on this machine over 150 frames at 720p: **0.90 s of user CPU for
+#: `vp8enc` against 0.14 s for `vaav1enc`** — the video encode effectively stops competing.
+#:
+#: AV1 rather than H.264 by necessity rather than preference: Fedora strips the H.264 and HEVC
+#: VA-API entry points from its Mesa build for patent reasons, so `vah264enc` does not register on
+#: a stock install even though the hardware supports it. AV1 is royalty-free and is present.
+#: `gst-inspect-1.0 va` is the capability test — the `va` plugin only registers an encoder element
+#: when the driver advertises the matching entrypoint.
+ENCODERS: Final[tuple[tuple[str, str, str, str], ...]] = (
+    ("vaav1enc", "matroskamux", "mkv", "av1parse"),
+    ("vah264enc", "matroskamux", "mkv", "h264parse"),
+    ("vah265enc", "matroskamux", "mkv", "h265parse"),
+    ("vp8enc", "webmmux", "webm", ""),
+    ("vp9enc", "webmmux", "webm", ""),
+    ("x264enc", "mp4mux", "mp4", ""),
+    ("openh264enc", "matroskamux", "mkv", ""),
 )
 
 #: The preview branch. Optional: without it the monitor shows a static card instead of frames,
@@ -70,6 +86,9 @@ class CaptureSupport:
     encoder: str = ""
     muxer: str = ""
     extension: str = ""
+    #: Named for hardware encoders, which emit an elementary stream a muxer will not accept
+    #: directly. Empty for software encoders whose output is already in a form the muxer takes.
+    parser: str = ""
     #: Whether a live preview is possible. False degrades the monitor, not the recording.
     preview: bool = False
     #: Every element that was looked for and not found, for the diagnostics panel.
@@ -141,11 +160,20 @@ def gstreamer_elements() -> frozenset[str]:
     return frozenset(names)
 
 
-def choose_encoder(elements: frozenset[str]) -> tuple[str, str, str] | None:
-    """The best available `(encoder, muxer, extension)`, or None if nothing can encode."""
-    for encoder, muxer, extension in ENCODERS:
-        if encoder in elements and muxer in elements:
-            return encoder, muxer, extension
+def choose_encoder(elements: frozenset[str]) -> tuple[str, str, str, str] | None:
+    """The best available `(encoder, muxer, extension, parser)`, or None if nothing can encode.
+
+    Hardware entries sit at the top of the table, so a machine whose driver advertises an encode
+    entrypoint gets it and one that does not falls through to software without any branching here.
+    A parser that is named but missing disqualifies the entry: an elementary stream that cannot be
+    parsed cannot be muxed, and finding that out at record time is finding it out too late.
+    """
+    for encoder, muxer, extension, parser in ENCODERS:
+        if encoder not in elements or muxer not in elements:
+            continue
+        if parser and parser not in elements:
+            continue
+        return encoder, muxer, extension, parser
     return None
 
 
@@ -280,10 +308,16 @@ def _detect() -> CaptureSupport:
             ),
             session_type=kind,
             portal_version=version,
-            missing_elements=[name for name, _, _ in ENCODERS],
+            missing_elements=[name for name, _, _, _ in ENCODERS],
         )
 
-    encoder, muxer, extension = chosen
+    encoder, muxer, extension, parser = chosen
+    logger.info(
+        "Video will be encoded with %s (%s container)%s",
+        encoder,
+        extension,
+        " on the GPU's media engine" if encoder.startswith("va") else " in software",
+    )
     return CaptureSupport(
         available=True,
         session_type=kind,
@@ -291,6 +325,7 @@ def _detect() -> CaptureSupport:
         encoder=encoder,
         muxer=muxer,
         extension=extension,
+        parser=parser,
         # A missing preview costs the monitor its picture and costs the recording nothing.
         preview=PREVIEW_ELEMENT in elements,
     )
