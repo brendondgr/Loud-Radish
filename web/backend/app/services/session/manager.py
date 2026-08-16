@@ -72,6 +72,12 @@ LEVEL_INTERVAL_S = 0.25
 #: How often health telemetry is published.
 STATUS_INTERVAL_S = 1.0
 
+#: Absolute level a monitored frame must reach to count as worth transcribing, as linear RMS.
+#: −33 dBFS, chosen from measurement rather than taste: seminar speech has a 35 dB dynamic range
+#: and peaks well above this, while a video's background music measured a flat 5 dB band from
+#: −42.6 to −37.4 dBFS and stays below it. Speech has dynamics; ambience does not.
+LOOPBACK_SPEECH_RMS = 0.022
+
 #: Capture queue depth, in frames. At 32 ms a frame this is about six seconds of slack — enough to
 #: absorb a slow inference pass, short enough that a sustained problem surfaces quickly.
 QUEUE_CAPACITY = 200
@@ -531,22 +537,26 @@ class SessionManager:
         if sink is not None and sink.write(frame) and not sink.is_closed:
             self._emit_failure(degradation.recording_capped(sink.duration_s / 60.0))
 
-        # **The energy gate is not applied to a monitor source**, and this is the difference
-        # between a window recording that transcribes and one that does not.
+        # **A monitor source is gated on an absolute level, not an adaptive one**, and getting this
+        # wrong in either direction produces a different visible fault.
         #
-        # `EnergyVad` decides by comparing a frame against an *adaptive noise floor*, which is
-        # exactly right for a microphone in a room: speech spikes above a floor that settles into
-        # the gaps between phrases. System output has no gaps. The floor rises to meet continuous
-        # content and nothing ever clears it. Measured on this machine over the same detector:
-        # **61% of frames from microphone speech pass, against 8% from the system's own output** —
-        # and with three-consecutive-frame hysteresis, 8% scattered frames essentially never open
-        # the gate. Every window recording therefore consumed audio and committed nothing, which
-        # looks from the outside exactly like "it only listens to the microphone".
+        # `EnergyVad` compares each frame against an *adaptive noise floor*. That is right for a
+        # microphone in a room: speech spikes above a floor that settles into the gaps between
+        # phrases. System output has no gaps — the floor rises to meet continuous content and
+        # nothing ever clears it. Measured: **61% of frames from microphone speech pass, against 8%
+        # from the system's own output**, and with three-frame hysteresis 8% scattered frames never
+        # open the gate. Window recordings therefore consumed audio and committed nothing.
         #
-        # Whisper's own Silero filter still runs on every submitted buffer (`vad_filter=True`), so
-        # non-speech is still rejected — by a *content* detector, at the layer that can judge
-        # content, instead of by a level comparison that cannot.
-        speaking = result.speaking or self._source_is_loopback
+        # Bypassing the gate entirely was tried and is worse. Whisper *invents* text on non-speech,
+        # and submitting every buffer produced a transcript of disjointed fragments — "my other
+        # children", "yeah it happens father" — from a gaming video's background music. A wrong
+        # transcript is worse than an empty one, because it is read as real.
+        #
+        # An absolute threshold separates them, because a digital output has *true* silence where a
+        # room only has a noise floor. Measured over one-frame RMS: seminar speech runs from −57 to
+        # −21 dBFS, a 35 dB range; a video's background music sat between −42.6 and −37.4, a 5 dB
+        # range. Speech has dynamics and music at conversational volume does not.
+        speaking = result.speaking or self._loopback_has_content(frame)
 
         dropped = self._queue.put(
             CapturedFrame(audio=frame, speaking=speaking, pause=result.pause_event)
@@ -558,6 +568,17 @@ class SessionManager:
             )
 
         self._emit_level(frame, result.state_changed, result.speaking)
+
+    def _loopback_has_content(self, frame: np.ndarray) -> bool:
+        """Whether a monitor frame is loud enough to be worth transcribing.
+
+        Only ever true for a loopback source; a microphone keeps the adaptive gate, which earns its
+        place there by stopping inference running on an empty room.
+        """
+        if not self._source_is_loopback:
+            return False
+        rms = float(np.sqrt(np.mean(np.square(frame, dtype=np.float64))))
+        return rms >= LOOPBACK_SPEECH_RMS
 
     @property
     def _source_is_loopback(self) -> bool:
@@ -1004,8 +1025,15 @@ class SessionManager:
             return self._open_application_tap(config)
 
         if mode == modes.WINDOW and choice == "system":
+            # **Also through a tap.** Recording the default sink's monitor directly is the obvious
+            # implementation and it does not work here: `pw-record --target=<sink>.monitor` failed
+            # to resolve against this machine's Bluetooth sink and, because an unresolved target
+            # falls back to the *default source*, silently recorded the microphone instead —
+            # measured at 0.97 correlation with it. Tapping every playing stream reaches the same
+            # audio by the route that demonstrably works, and one mechanism is easier to keep
+            # correct than two.
             try:
-                return MonitorSource(frame_ms=config.audio.frame_ms)
+                return self._open_application_tap(config, match=False)
             except MonitorUnavailable as exc:
                 # The microphone is not a silent substitute here — it records the wrong thing, and
                 # the whole point of the mode is that it does not. Naming the remedy is better than
@@ -1014,31 +1042,41 @@ class SessionManager:
 
         return DeviceSource(device_id=config.audio.device_id, frame_ms=config.audio.frame_ms)
 
-    def _open_application_tap(self, config: AppConfig) -> AudioSource:
+    def _open_application_tap(self, config: AppConfig, *, match: bool = True) -> AudioSource:
         """Tap the chosen window's own audio, leaving it playing on the user's speakers.
 
-        Falls back to the machine's whole output when no playback stream can be matched — which is
-        the honest outcome rather than a failure, because "nothing is playing yet" is the ordinary
-        state at the moment a recording starts. The fallback is logged and reported, so a recording
-        that captured more than the window can be explained afterwards rather than discovered.
+        Used for both audio choices. `match=False` links every stream that is playing — the
+        "system output" case — and `match=True` narrows to the ones that look like the window's.
+        Both go through a tap because tapping is the route that works on this machine: targeting a
+        sink's monitor directly silently recorded the microphone instead.
+
+        Raises:
+            MonitorUnavailable: when there is nothing to tap or the tap cannot be built. **Not
+                downgraded to the microphone**, ever. Falling back to a device that records the
+                person watching, in a mode whose purpose is recording the window, is the fault this
+                whole path exists to fix — and it is the one that produced a transcript of the
+                user's own speech over a video they were trying to record.
         """
         streams = tap_streams()
         if not streams:
-            logger.info(
-                "No application is playing audio, so the whole system output is recorded instead."
+            raise MonitorUnavailable(
+                "Nothing is playing any audio, so there is no window sound to record. Start the "
+                "video first, or choose 'My microphone' if you meant to narrate."
             )
-            return MonitorSource(frame_ms=config.audio.frame_ms)
 
         tap = ApplicationTap()
         try:
             tap.open()
             # The *set*, not the best one: a browser owns a playback node per media element, and
             # linking only the top-ranked node records only whichever tab happened to be first.
-            tap.link_all(streams)
+            if tap.link_all(streams) == 0:
+                raise TapError("no audio ports could be linked into the capture sink")
         except TapError as exc:
             tap.close()
-            logger.warning("Could not tap the application's audio (%s); recording all output.", exc)
-            return MonitorSource(frame_ms=config.audio.frame_ms)
+            raise MonitorUnavailable(
+                f"The window's audio could not be captured ({exc}). Choose 'My microphone' if you "
+                "meant to record yourself."
+            ) from exc
 
         self._tap = tap
         return MonitorSource(frame_ms=config.audio.frame_ms, tap=tap)

@@ -22,7 +22,7 @@ import time
 import numpy as np
 import pytest
 from app.config.schema import AppConfig
-from app.services.audio.formats import SAMPLE_RATE
+from app.services.audio.formats import SAMPLE_RATE, frame_samples
 from app.services.audio.monitor import MonitorUnavailable, default_monitor, tools_present
 from app.services.audio.sources.monitor import MonitorSource
 from app.services.session import modes
@@ -342,6 +342,64 @@ def test_the_request_schema_carries_the_choice() -> None:
 
 
 # -- the gate that closed on everything ----------------------------------------------------------
+
+
+def test_speech_opens_the_loopback_gate_and_ambience_does_not() -> None:
+    """The threshold, held to the measurements it was chosen from.
+
+    Two faults sit either side of this number and both were shipped. Gating a monitor on the
+    *adaptive* energy floor closed it permanently — system output has no gaps for a floor to settle
+    into, so 8% of frames passed against 61% for microphone speech, and window recordings committed
+    nothing. Removing the gate entirely was worse: Whisper **invents** text on non-speech, and a
+    gaming video's background music produced a transcript of disjointed fragments — "my other
+    children", "yeah it happens father" — which is far worse than an empty one, because it reads as
+    real.
+
+    An absolute threshold works where an adaptive one cannot, because a digital output has *true*
+    silence where a room only has a noise floor. Measured per 32 ms frame: seminar speech runs
+    −57 to −21 dBFS, a 35 dB range; the video's ambience sat between −42.6 and −37.4, a 5 dB band.
+    Speech has dynamics and ambience at conversational volume does not.
+    """
+    from app.services.session.manager import LOOPBACK_SPEECH_RMS
+
+    size = frame_samples(32)
+    t = np.arange(size * 120) / SAMPLE_RATE
+
+    # Ambience: flat, quiet, no dynamics — around -40 dBFS, as measured.
+    ambience = (0.010 * np.sin(2 * np.pi * 200 * t)).astype(np.float32)
+    # Speech: loud syllables over near-silent gaps, which is what dynamics means.
+    envelope = (0.5 + 0.5 * np.sin(2 * np.pi * 3.5 * t)) ** 3
+    speech = (0.12 * np.sin(2 * np.pi * 300 * t) * envelope).astype(np.float32)
+
+    def passing(audio: np.ndarray) -> float:
+        frames = audio[: audio.size // size * size].reshape(-1, size)
+        return float((np.sqrt((frames**2).mean(axis=1)) >= LOOPBACK_SPEECH_RMS).mean())
+
+    assert passing(ambience) < 0.05, "ambience opens the gate; Whisper will invent text on it"
+    assert passing(speech) > 0.20, "speech cannot open the gate; the transcript will stay empty"
+
+
+def test_a_microphone_is_not_subject_to_the_absolute_gate(tmp_path) -> None:
+    """It keeps the adaptive detector, which is the right tool for a room."""
+    from app.services.audio.sources.base import SourceInfo
+
+    manager, _config = _manager(tmp_path)
+    manager._source_info = SourceInfo(id="mic", name="GoMic", kind="microphone")
+
+    loud = np.full(frame_samples(32), 0.5, dtype=np.float32)
+    assert manager._loopback_has_content(loud) is False
+
+
+def test_a_loud_loopback_frame_passes(tmp_path) -> None:
+    from app.services.audio.sources.base import SourceInfo
+
+    manager, _config = _manager(tmp_path)
+    manager._source_info = SourceInfo(id="tap", name="System output", kind="loopback")
+
+    assert manager._loopback_has_content(np.full(frame_samples(32), 0.2, dtype=np.float32)) is True
+    assert (
+        manager._loopback_has_content(np.full(frame_samples(32), 0.001, dtype=np.float32)) is False
+    )
 
 
 def test_the_energy_gate_rejects_system_audio_it_should_pass() -> None:

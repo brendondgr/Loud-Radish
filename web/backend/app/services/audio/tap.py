@@ -173,7 +173,13 @@ class ApplicationTap:
 
     @property
     def monitor(self) -> str:
-        """The node to record from once the tap is open."""
+        """The node to record from once the tap is open.
+
+        Named as a monitor because that is what it is, but a **null sink's monitor is reached
+        through the sink**: targeting ``<name>.monitor`` resolves to nothing here, and a target
+        that resolves to nothing is how a capture silently ends up on the default source — the
+        microphone. The caller strips the suffix and sets ``stream.capture.sink``.
+        """
         return f"{self.sink_name}.monitor"
 
     @property

@@ -80,12 +80,21 @@ class MonitorSource(AudioSource):
             self._node = self._tap.monitor
         else:
             self._node = self._requested or default_monitor()
+
+        # **Two target forms, because two kinds of sink resolve differently**, measured rather
+        # than assumed. A real device's sink exposes a `<name>.monitor` *source* that `pw-record`
+        # finds directly. A null sink created for the application tap does not — targeting
+        # `transcriber-tap.monitor` silently resolved to nothing — but targeting the sink itself
+        # with `stream.capture.sink` works. Getting this wrong is not a quiet failure to record:
+        # a stream whose target cannot be found connects to the **default source** instead, which
+        # is the microphone.
+        capture_sink = self._tap is not None and self._tap.is_open
         self._on_frame = on_frame
         self._on_error = on_error
 
         command = [
             "pw-record",
-            f"--target={self._node}",
+            f"--target={self._node.removesuffix('.monitor') if capture_sink else self._node}",
             f"--rate={SAMPLE_RATE}",
             "--channels=1",
             "--format=f32",
@@ -95,6 +104,25 @@ class MonitorSource(AudioSource):
             # level meter reads nothing and the speech gate never opens: a capture that runs
             # perfectly and transcribes silence. Observed exactly that before this flag was added.
             "--container=raw",
+        ]
+
+        if capture_sink:
+            # Only on the tap's path, and both properties are load-bearing there.
+            #
+            # `stream.capture.sink` is how a null sink's monitor is reached at all — targeting
+            # `<name>.monitor` resolved to nothing. And `node.dont-fallback` is what makes that
+            # visible: a stream whose named target cannot be found does **not** fail by default, it
+            # connects to the default target, which for a capture is the **microphone**. That is
+            # what happened. A window recording of a YouTube video transcribed the viewer's own
+            # speech while every layer reported success; measured after the fact, the "tap" audio
+            # correlated with the microphone at **0.92** and matched its RMS to five decimal
+            # places. With these set the correlation is 0.05, and a bad target fails loudly.
+            #
+            # A device sink's `<name>.monitor` is a real source that resolves on its own, and
+            # adding these to that path stops it connecting at all — so it does not get them.
+            command += ["-P", "{ stream.capture.sink = true node.dont-fallback = true }"]
+
+        command += [
             # A dash is the pipe. Everything downstream reads bytes and never touches a file.
             "-",
         ]
