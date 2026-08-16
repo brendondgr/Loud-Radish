@@ -713,10 +713,26 @@ class SessionManager:
         self._portal = PortalSession(cursor_mode=config.capture.cursor_mode, restore_token=token)
         stream = self._portal.open()
 
+        # **The token is single-use**, and persisting the new one is not optional. Passing
+        # `restore_token` to `SelectSources` invalidates it the moment it is used, and a fresh one
+        # comes back on `Start`. An implementation that saved a token once and replayed it would
+        # get a picker dialog on every recording after the first — which is precisely the symptom
+        # that was diagnosed and fixed as a concurrency fault, and would have looked identical.
         if stream.restore_token and credentials is not None:
             # Stored where credentials go, never in the config file: it is a granted capability
             # and D-017 governs those.
             credentials.set("capture-restore-token", stream.restore_token)
+
+        # Which path the portal took, so a re-prompt is diagnosable from the log rather than from
+        # a user noticing. KDE restores a *window* session by matching appId and then fuzzy-matching
+        # the saved title, so a browser whose tab changed will legitimately fail to match and
+        # re-prompt. That is correct behaviour, not a fault to hunt.
+        logger.info(
+            "Portal granted a window: %s",
+            "restored from a stored token"
+            if token
+            else "chosen fresh (no stored consent to restore)",
+        )
 
         directory = Path(config.recording.recording_dir)
         stamp = session.started_at.strftime("%Y%m%d-%H%M%S")

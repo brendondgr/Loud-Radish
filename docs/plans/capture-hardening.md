@@ -1,6 +1,6 @@
 # Capture Hardening
 
-**Status:** Phase 0 complete (measurements). Phases 1–7 not started.
+**Status:** ✅ **Complete — all 7 phases.**
 **Mode:** B — no worktree, feature branch `claude/capture-hardening`, merged to `main` at the end.
 **Source:** `docs/plans/capture-research-findings.md` (external research, 2026-08-16), answering
 `docs/plans/capture-research-brief.md`.
