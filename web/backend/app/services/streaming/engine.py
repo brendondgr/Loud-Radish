@@ -50,6 +50,16 @@ TranscribeFn = Callable[[np.ndarray, str | None], AsrResult]
 #: How much committed text is fed back as rolling context, in characters.
 ROLLING_CONTEXT_CHARS = 240
 
+#: Buffered audio shorter than this is not worth a pass of its own. No word fits in it, and a
+#: floor of zero would make every silent tick submit a few samples to the model.
+MIN_UNHEARD_S = 0.2
+
+#: Level a buffer must reach before it is worth one last pass, as linear RMS. −46 dBFS: two decades
+#: below the loopback speech threshold, so no real speech is anywhere near it, and far above digital
+#: silence or dither. It is a "is there anything here at all" floor, not a speech detector — the
+#: hallucination filters (D-019) are the second line if a noisy room clears it.
+UNHEARD_SILENCE_RMS = 0.005
+
 
 @dataclass
 class EngineMetrics:
@@ -151,6 +161,10 @@ class StreamingEngine:
         self._pause_pending = False
         self._last_hypothesis = ""
         self._committed_text: list[str] = []
+        #: How far inference has actually listened, in session-absolute seconds. The whole of
+        #: the losslessness fix rests on this one number: audio past it has never been
+        #: submitted to the model, and must not be discarded until it has.
+        self._inferred_to = 0.0
 
     # -- state ---------------------------------------------------------------------
 
@@ -214,7 +228,10 @@ class StreamingEngine:
         Called when the session stops or the model is swapped, so the last words spoken are not
         lost waiting for agreement or a full stop that will never arrive.
         """
-        events: list[EngineEvent] = []
+        # The last words spoken are usually still unheard: the session stops between steps, so
+        # whatever arrived since the final pass has never been submitted. Force-committing alone
+        # would end a talk one sentence short of where it ended.
+        events: list[EngineEvent] = self._drain_unheard()
         committed = self._agreement.force_commit()
         if committed:
             self._metrics.forced_commits += 1
@@ -239,6 +256,7 @@ class StreamingEngine:
         self._pause_pending = False
         self._last_hypothesis = ""
         self._committed_text = []
+        self._inferred_to = 0.0
 
     def update_config(self, config: StreamingConfig) -> None:
         """Adopt new streaming settings without disturbing the buffer or committed text."""
@@ -269,13 +287,18 @@ class StreamingEngine:
             self._metrics.skipped_short_buffer += 1
 
         if decision.guard == "silence-gate":
-            events = (
-                self._forced_commit(decision.guard, decision.reason)
-                if decision.should_commit
-                else []
-            )
-            # Silence is not worth keeping. Left in the buffer it costs inference time once speech
-            # resumes, and a long enough pause would trip the maximum-buffer guard for no reason.
+            # **Transcribe before discarding.** This used to commit whatever hypothesis the
+            # *previous* pass had left and then throw the whole buffer away — so every second of
+            # audio recorded since that pass went out unread. Measured by
+            # `tests/transcription/test_commit_losslessness.py`: 23 consecutive words lost across
+            # one ordinary pause. The user's report named `commit-timeout`, because that is the
+            # guard that logs; the words went missing here.
+            events = self._drain_unheard()
+            if decision.should_commit or self._agreement.hypothesis or self._segmenter.has_pending:
+                events.extend(self._forced_commit(decision.guard, decision.reason))
+            # Now that nothing in it is unheard, silence is not worth keeping. Left in the buffer it
+            # costs inference time once speech resumes, and a long enough pause would trip the
+            # maximum-buffer guard for no reason.
             self._buffer.trim_to(self._buffer.end_absolute)
             return events
 
@@ -290,6 +313,9 @@ class StreamingEngine:
         """Transcribe the buffer and apply the commit policy."""
         events: list[EngineEvent] = []
         audio = self._buffer.audio
+        # Recorded before the pass rather than after, so a backend that raises still counts the
+        # audio as heard and cannot make `_drain_unheard` retry it forever.
+        self._inferred_to = self._buffer.end_absolute
         started = time.monotonic()
         result = self._transcribe(audio, self._build_prompt())
         elapsed = time.monotonic() - started
@@ -325,6 +351,42 @@ class StreamingEngine:
 
         events.extend(self._hypothesis_events())
         return events
+
+    def _drain_unheard(self) -> list[EngineEvent]:
+        """Transcribe any buffered audio that has never been through a pass.
+
+        **The rule the losslessness requirement reduces to:** no audio may be discarded without
+        having been transcribed at least once. Audio that has been through inference and produced
+        no words was heard and found empty, which is a different thing from never being listened to.
+
+        Called wherever the engine is about to throw audio away — the silence gate, and the flush at
+        the end of a session. Cheap when there is nothing to do, which is the common case: between
+        ordinary steps the buffer has already been inferred right up to its end.
+
+        **The level is measured rather than the detector asked, and that is the whole difficulty.**
+        Draining unconditionally makes the engine transcribe pure silence, and Whisper answers
+        silence with invented speech — the failure D-019 exists to suppress and the one the silence
+        gate was built for. Caught here by `test_a_long_silence_produces_no_text`, which turned
+        "phantom text from silence" into a committed segment the moment this ran on everything.
+
+        Trusting the VAD instead cannot work either: half the requirement is that speech the
+        detector *misjudged* still gets transcribed, and a drain gated on `speaking` would skip
+        exactly that audio. So neither opinion decides it. The buffer's own level does, at a floor
+        far below speech and far above digital silence, which is the one signal that is right in
+        both cases.
+        """
+        if self._buffer.end_absolute - self._inferred_to < MIN_UNHEARD_S:
+            return []
+        if self._buffer.duration < MIN_UNHEARD_S:
+            return []
+
+        audio = self._buffer.audio
+        if audio.size == 0:
+            return []
+        level = float(np.sqrt(np.mean(np.square(audio, dtype=np.float64))))
+        if level < UNHEARD_SILENCE_RMS:
+            return []
+        return self._infer_and_commit()
 
     def _forced_commit(self, guard: str, reason: str) -> list[EngineEvent]:
         """Commit the pending hypothesis because a guard said to."""

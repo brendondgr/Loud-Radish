@@ -167,21 +167,49 @@ def test_the_maximum_buffer_guard_loses_nothing() -> None:
 
 
 def test_a_pause_in_the_middle_loses_nothing() -> None:
-    """The silence gate discards the whole buffer on the detector's word.
+    """The silence gate discards the whole buffer the moment the detector says the speaker stopped.
 
-    A gap in signal is the other half of the report. When the gate closes over speech the detector
-    misjudged, whatever was buffered goes with it — so the run below speaks, pauses, and speaks
-    again, and the words either side of the pause must all survive.
+    A gap in signal is the other half of the report. The run below speaks, pauses, and speaks again,
+    and every word either side of the pause must survive the gate closing between them.
+
+    **The pause carries position-encoded audio rather than zeros, and that is a limit of the mock
+    rather than a softening of the test.** `decode_position` rejects any buffer that is not a
+    monotonically non-decreasing ramp — one sample out of order is enough — so speech followed by
+    digital silence decodes to `None`, the mock falls back to the opening of its script, and the
+    pass returns words that were committed a minute ago. Measured directly: a pure speech buffer
+    decodes to 9.99999, the same buffer with 0.25 s of zeros appended decodes to `None`.
+
+    So a digitally silent tail cannot be modelled here at all. What *is* being modelled — the gate
+    closing over buffered speech and the buffer being discarded — is the mechanism that loses the
+    words, and it is exercised faithfully. The real-audio case is owed as a manual pass and is
+    recorded in `docs/checklist.md`.
     """
     engine, _ = build()
     events = speak(engine, frames=80)
-    events.extend(speak(engine, frames=12, speaking=False, silent=True))
+    events.extend(speak(engine, frames=12, speaking=False))
     events.extend(speak(engine, frames=80))
     events.extend(engine.flush())
 
     words = committed_words(events)
     assert words, "nothing was committed at all"
     assert missing_indices(words) == [], report(words)
+
+
+def test_the_last_words_of_a_session_are_not_left_unheard() -> None:
+    """`flush` force-committed the pending hypothesis and never listened to the rest.
+
+    A session stops between steps, so whatever arrived since the final pass has never been
+    submitted to the model. Committing only what was already pending ends a talk one sentence short
+    of where it actually ended — the same fault as the silence gate, at the other end of the run.
+    """
+    engine, backend = build(unstable_tail=0)
+    speak(engine, frames=97)  # deliberately not a whole number of steps
+    passes_before = backend.pass_count
+
+    flushed = engine.flush()
+
+    assert backend.pass_count > passes_before, "flush discarded the tail without transcribing it"
+    assert flushed
 
 
 def test_speech_the_detector_calls_silence_is_still_transcribed() -> None:
@@ -212,3 +240,39 @@ def test_losslessness_does_not_depend_on_how_unstable_the_model_is(tail: int) ->
 
     words = committed_words(events)
     assert missing_indices(words) == [], report(words)
+
+
+# -- the tension, held from both sides -----------------------------------------------------------
+#
+# The first version of the drain ran on everything the engine was about to discard, which made it
+# transcribe pure silence -- and Whisper answers silence with invented speech. That is the failure
+# D-019 exists to suppress, and it is a worse one than a dropped word: a reader can see that a
+# sentence is missing and cannot see that one was never said. Both properties have to hold at once,
+# so both are asserted here rather than left to two files that do not know about each other.
+
+
+def test_draining_never_runs_the_model_on_pure_silence() -> None:
+    """The regression that the losslessness fix introduced, and the reason for the level floor."""
+    engine, backend = build(unstable_tail=0)
+    speak(engine, frames=160, speaking=False, silent=True)
+    engine.flush()
+
+    assert backend.pass_count == 0, (
+        "the engine transcribed digital silence; a model asked to transcribe nothing invents speech"
+    )
+
+
+def test_a_pause_after_speech_still_gets_its_final_pass() -> None:
+    """And the floor must not be so cautious that it stops the fix working.
+
+    The buffer at the moment a real pause begins holds the speech that just ended, so it is loud —
+    the level test is asking "is there anything here at all", not "is anyone talking now".
+    """
+    engine, backend = build(unstable_tail=0)
+    speak(engine, frames=40)
+    passes_after_speech = backend.pass_count
+    speak(engine, frames=4, speaking=False)
+
+    assert backend.pass_count > passes_after_speech, (
+        "the gate closed over buffered speech without transcribing it"
+    )
