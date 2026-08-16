@@ -90,6 +90,36 @@ class WindowStream:
         return f"PipeWire node {self.node_id} ({size})"
 
 
+def _stream_size(properties: Any) -> tuple[int, int]:
+    """The stream's pixel dimensions, from whatever shape the portal put them in.
+
+    Three shapes have to be tolerated and only one of them was. The property is a D-Bus variant, so
+    a client may hand it back as the bare pair ``(1920, 1080)`` or as a signature-tagged
+    ``('(ii)', (1920, 1080))`` — and a compositor may leave it out entirely, which is what this
+    desktop does. The original read assumed the first shape and would have raised ``ValueError`` on
+    the second, inside a caller that reports any exception as "the portal failed".
+
+    Returns ``(0, 0)`` when the size is absent or unreadable. That is a real answer, not a failure:
+    it means the recording is not scaled down, which is the only safe thing to do with a size
+    nobody knows.
+    """
+    if not isinstance(properties, dict):
+        return 0, 0
+
+    value = properties.get("size")
+    # A tagged variant: ('(ii)', (width, height)).
+    if isinstance(value, tuple) and len(value) == 2 and isinstance(value[0], str):
+        value = value[1]
+
+    if not isinstance(value, (tuple, list)) or len(value) < 2:
+        return 0, 0
+    try:
+        width, height = int(value[0]), int(value[1])
+    except (TypeError, ValueError):
+        return 0, 0
+    return (width, height) if width > 0 and height > 0 else (0, 0)
+
+
 def _token() -> str:
     """A token for one request. Random, because two concurrent requests must not collide."""
     return f"transcriber_{secrets.token_hex(8)}"
@@ -136,12 +166,25 @@ class PortalSession:
             raise PortalError("The portal granted access but returned no stream to read.")
 
         node_id, properties = streams[0]
-        size = properties.get("size", (0, 0)) if isinstance(properties, dict) else (0, 0)
+        width, height = _stream_size(properties)
+        # Logged whole, because what a compositor puts here is not something to guess at: this
+        # desktop reports no `size`, the pipeline spent that as licence to let GStreamer work the
+        # dimensions out for itself, and the result was a 480x16 recording and then an integer
+        # overflow. If a future desktop reports something differently shaped, this line is what
+        # says so.
+        logger.debug("Portal stream properties: %r", properties)
+        if not (width and height):
+            logger.info(
+                "The portal reported no stream size, so the recording is not scaled down. "
+                "Properties offered: %s",
+                sorted(properties) if isinstance(properties, dict) else type(properties).__name__,
+            )
+
         return WindowStream(
             node_id=int(node_id),
             fd=fd,
-            width=int(size[0]) if size else 0,
-            height=int(size[1]) if size else 0,
+            width=width,
+            height=height,
             restore_token=restore_token,
             session_handle=self._session_handle,
         )

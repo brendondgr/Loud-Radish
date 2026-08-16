@@ -34,6 +34,9 @@ DEFAULT_FRAME_RATE: Final = 15
 #: which is the only question the monitor is asked.
 PREVIEW_FPS: Final = 1
 PREVIEW_WIDTH: Final = 480
+#: Fixed alongside the width, and letterboxed rather than stretched. Leaving the height to be
+#: fixated from the source's aspect is what produced a 480x32767 JPEG and killed the pipeline.
+PREVIEW_HEIGHT: Final = 270
 
 
 @dataclass(frozen=True)
@@ -127,7 +130,7 @@ def build(
     if include_preview:
         args += ["tee", "name=t", "!", "queue", "!"]
 
-    args += ["videoscale", "!", _record_caps(max_height, source_width, source_height), "!"]
+    args += _record_scaler(max_height, source_width, source_height)
     args += encoder_args(support.encoder)
     args += ["!", support.muxer, "!", "filesink", f"location={video_path}"]
 
@@ -143,11 +146,16 @@ def build(
             "!",
             f"video/x-raw,framerate={PREVIEW_FPS}/1",
             "!",
+            # `add-borders` letterboxes rather than stretching, which is what makes it safe to fix
+            # *both* dimensions — and fixing both is the point. Width alone leaves the height to be
+            # fixated from the source's aspect and pixel-aspect-ratio, and when the source caps are
+            # not fixed that arithmetic overflows: this branch produced a **480x32767** JPEG, 32767
+            # being SHRT_MAX, while GStreamer logged `assertion 'denom > 0' failed` and the whole
+            # pipeline refused to preroll. Two fixed numbers require no arithmetic at all.
             "videoscale",
+            "add-borders=true",
             "!",
-            # Width only. Pinning the height as well would letterbox or stretch a window whose
-            # shape is not the preview's, and the monitor pane is sized from the image it gets.
-            f"video/x-raw,width={PREVIEW_WIDTH},pixel-aspect-ratio=1/1",
+            f"video/x-raw,width={PREVIEW_WIDTH},height={PREVIEW_HEIGHT}",
             "!",
             "jpegenc",
             "quality=60",
@@ -167,23 +175,38 @@ def build(
     )
 
 
-def _record_caps(max_height: int, source_width: int, source_height: int) -> str:
-    """The recording branch's output size.
+def _record_scaler(max_height: int, source_width: int, source_height: int) -> list[str]:
+    """The recording branch's scaler, or nothing at all.
 
-    **Concrete numbers whenever the portal told us the source size**, because a caps *range* asks
-    the scaler to pick, and a scaler with a range and any other constraint in play will pick
-    something no one wanted — which is exactly how a talk got recorded sixteen pixels tall. When
-    the size is unknown the range is still the right answer, but it is now the only constraint on
-    the branch, so `videoscale` passes a small window through untouched instead of resolving it
-    against a preview's width.
+    **Never asks GStreamer to work a size out.** Every fault this pipeline has had came from doing
+    exactly that. A caps *range* — ``height=[1,720]`` — asks `videoscale` to pick a height, and it
+    picks by fixating against the source's dimensions and pixel-aspect-ratio. When the source caps
+    are fixed that arithmetic is fine. When they are not, it produces nonsense: a talk recorded at
+    **480x16**, and then, once each branch had its own scaler to fixate independently, an outright
+    **integer overflow** — ``assertion 'denom > 0' failed``, a 480x32767 preview, and a pipeline
+    that would not preroll at all.
 
-    Only ever scales *down*: a window smaller than the ceiling is sharper at its own size than
-    stretched up to one it never reached.
+    ``pipewiresrc`` does not always present fixed caps, and the portal on this desktop reports no
+    stream size, so negotiating blind is the normal case rather than the edge one. So there are only
+    two outcomes here and neither involves fixation:
+
+    * the source size is **known and above the ceiling** — scale to two concrete even numbers;
+    * anything else — **no scaler at all**, and the window is recorded at whatever size it is.
+
+    Recording at native size costs encoder time on a machine with no hardware encoder, which is a
+    real cost and the right one to pay: a larger file that plays beats a smaller one that does not
+    exist. The ceiling still applies whenever the size is actually known.
     """
-    if source_width > 0 and source_height > 0:
-        height = min(source_height, max_height)
-        width = max(2, round(source_width * height / source_height))
-        # Even dimensions: VP8, VP9 and H.264 all subsample chroma, and an odd edge is either
-        # rejected outright or silently rounded by the encoder.
-        return f"video/x-raw,width={width - width % 2},height={height - height % 2}"
-    return f"video/x-raw,height=[1,{max_height}],pixel-aspect-ratio=1/1"
+    if source_width <= 0 or source_height <= 0 or source_height <= max_height:
+        return []
+
+    height = max_height
+    width = max(2, round(source_width * height / source_height))
+    # Even dimensions: VP8, VP9 and H.264 all subsample chroma, and an odd edge is either rejected
+    # outright or silently rounded by the encoder.
+    return [
+        "videoscale",
+        "!",
+        f"video/x-raw,width={width - width % 2},height={height - height % 2}",
+        "!",
+    ]

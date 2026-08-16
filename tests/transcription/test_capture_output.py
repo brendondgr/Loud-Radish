@@ -55,6 +55,34 @@ def support(**overrides) -> CaptureSupport:
     return CaptureSupport(**{**defaults, **overrides})
 
 
+#: A pixel-aspect-ratio extreme enough to overflow the scaler's fixation arithmetic. This is the
+#: reproduction of the fault that took window capture from "wrong size" to "does not run at all":
+#: asked to hit a target while preserving display aspect, `videoscale` computes
+#: ``width * par_num * ...`` and, with a denominator this large, the result does not fit. GStreamer
+#: reports ``Error calculating the output scaled size - integer overflow`` and refuses to preroll,
+#: which is verbatim what the recorder's log showed.
+HOSTILE_PAR = "1/2147483647"
+
+
+def run_hostile(spec) -> subprocess.CompletedProcess:
+    """Run a spec against a source whose aspect ratio breaks the scaler's arithmetic.
+
+    Returns the completed process rather than failing on a non-zero exit, because whether it
+    survived is the assertion.
+    """
+    args = list(spec.args)
+    source = args.index("pipewiresrc")
+    end = args.index("!", source)
+    args[source:end] = [
+        "videotestsrc",
+        f"num-buffers={FRAMES}",
+        "pattern=smpte",
+        "!",
+        f"video/x-raw,width=1920,height=1080,framerate=15/1,pixel-aspect-ratio={HOSTILE_PAR}",
+    ]
+    return subprocess.run(args, capture_output=True, text=True, timeout=120, check=False)
+
+
 def run_pipeline(spec, *, width: int, height: int) -> None:
     """Run a built spec with the portal source swapped for a test pattern.
 
@@ -216,6 +244,101 @@ def test_a_window_smaller_than_the_ceiling_keeps_its_own_size(tmp_path) -> None:
     run_pipeline(spec, width=640, height=480)
 
     assert dimensions(tmp_path / "out.webm") == (640, 480)
+
+
+def test_a_hostile_aspect_ratio_does_not_kill_the_pipeline(tmp_path) -> None:
+    """The fault that took window capture from "wrong size" to "does not run at all".
+
+    Reported from the recorder's own log: `Error calculating the output scaled size - integer
+    overflow`, `assertion 'denom > 0' failed`, `pipeline doesn't want to preroll` — and on disk, a
+    **16x16** recording beside a **480x32767** preview, 32767 being SHRT_MAX. Every one of those is
+    the same arithmetic failing: `videoscale` asked to hit a target while preserving display aspect,
+    against a source whose pixel-aspect-ratio makes the product overflow.
+
+    Nothing is asked to fixate any more — the preview names two concrete numbers and letterboxes,
+    and the recording branch has no scaler at all unless both source dimensions are known — so this
+    must simply run. Verified to fail before the change and pass after, against this same source.
+    """
+    spec = pipeline.build(
+        support(),
+        node_id=0,
+        fd=0,
+        video_path=str(tmp_path / "out.webm"),
+        preview_path=str(tmp_path / "preview.jpg"),
+        # Exactly what the portal gives us on this desktop: no size at all.
+        source_width=0,
+        source_height=0,
+    )
+    result = run_hostile(spec)
+
+    assert result.returncode == 0, result.stderr
+    assert "overflow" not in result.stderr.lower()
+    assert "negotiation" not in result.stderr.lower()
+
+    width, height = dimensions(tmp_path / "out.webm")
+    assert (width, height) == (1920, 1080), "the source size, unscaled, because it was not known"
+    assert dimensions(tmp_path / "preview.jpg") == (
+        pipeline.PREVIEW_WIDTH,
+        pipeline.PREVIEW_HEIGHT,
+    )
+
+
+def test_the_preview_is_always_the_same_two_numbers(tmp_path) -> None:
+    """Fixing both dimensions is what makes the preview branch incapable of the overflow.
+
+    Width alone leaves the height to be fixated from the source's aspect, which is the arithmetic
+    that failed. Letterboxing is the price and it is worth paying for a thumbnail.
+    """
+    spec = pipeline.build(
+        support(),
+        node_id=0,
+        fd=0,
+        video_path=str(tmp_path / "out.webm"),
+        preview_path=str(tmp_path / "preview.jpg"),
+        source_width=0,
+        source_height=0,
+    )
+    assert "add-borders=true" in spec.args
+    run_pipeline(spec, width=640, height=480)
+
+    # A 4:3 source into a 16:9 preview: the shape is preserved by bars, not by stretching.
+    assert dimensions(tmp_path / "preview.jpg") == (
+        pipeline.PREVIEW_WIDTH,
+        pipeline.PREVIEW_HEIGHT,
+    )
+
+
+def test_an_unknown_size_is_recorded_rather_than_guessed_at(tmp_path) -> None:
+    """No scaler at all when the size is unknown, because every guess so far has been wrong."""
+    args = pipeline.build(
+        support(),
+        node_id=0,
+        fd=0,
+        video_path=str(tmp_path / "out.webm"),
+        preview_path=str(tmp_path / "preview.jpg"),
+        want_preview=False,
+        source_width=0,
+        source_height=0,
+    ).args
+
+    assert "videoscale" not in args
+
+
+def test_a_source_under_the_ceiling_is_not_scaled_either(tmp_path) -> None:
+    """Scaling down a window that is already small is work with a cost and no benefit."""
+    args = pipeline.build(
+        support(),
+        node_id=0,
+        fd=0,
+        video_path=str(tmp_path / "out.webm"),
+        preview_path=str(tmp_path / "preview.jpg"),
+        want_preview=False,
+        source_width=640,
+        source_height=480,
+        max_height=720,
+    ).args
+
+    assert "videoscale" not in args
 
 
 def test_frames_actually_reach_the_file(tmp_path) -> None:

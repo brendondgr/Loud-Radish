@@ -138,14 +138,16 @@ def test_the_preview_branch_leaks_rather_than_stalling_the_recording() -> None:
 
 
 def test_the_frame_rate_and_height_are_configurable() -> None:
-    spec = build(frame_rate=30, max_height=1080)
+    spec = build(frame_rate=30, max_height=1080, source_width=3840, source_height=2160)
     assert "video/x-raw,framerate=30/1" in spec.args
-    assert any("height=[1,1080]" in arg for arg in spec.args)
+    assert "video/x-raw,width=1920,height=1080" in spec.args
 
 
 def test_scaling_is_only_ever_downward() -> None:
     """A small window recorded at its own size is sharper than one stretched to a ceiling."""
-    assert any("height=[1,720]" in arg for arg in build().args)
+    # Preview off, so the only scaler that could appear is the recording branch's own.
+    args = build(source_width=640, source_height=480, max_height=720, want_preview=False).args
+    assert "videoscale" not in args
 
 
 def test_the_preview_does_not_decide_the_recordings_size() -> None:
@@ -163,8 +165,8 @@ def test_the_preview_does_not_decide_the_recordings_size() -> None:
 
     assert args.count("videoscale") == 2
     assert "video/x-raw,width=1280,height=720" in args
-    # And the preview still gets its own, unrelated, width.
-    assert any(f"width={pipeline.PREVIEW_WIDTH}" in arg for arg in args)
+    # And the preview still gets its own, unrelated, size.
+    assert f"video/x-raw,width={pipeline.PREVIEW_WIDTH},height={pipeline.PREVIEW_HEIGHT}" in args
 
 
 def test_the_recording_branch_scales_after_the_tee() -> None:
@@ -174,13 +176,17 @@ def test_the_recording_branch_scales_after_the_tee() -> None:
     assert args.index("tee") < args.index("videoscale")
 
 
-def test_a_known_source_size_is_stated_rather_than_left_to_the_scaler() -> None:
-    """A range asks the scaler to choose. Given anything else to satisfy, it chooses badly."""
-    args = build(source_width=800, source_height=600).args
+def test_no_caps_range_is_ever_asked_of_the_scaler() -> None:
+    """A range asks `videoscale` to fixate a size, and fixation is what has failed every time.
 
-    # Under the ceiling, so it records at its own size rather than being stretched up to it.
-    assert "video/x-raw,width=800,height=600" in args
-    assert not any("height=[" in arg for arg in args)
+    Against an ordinary source it picked badly — a 480x16 recording. Against a source with an
+    extreme pixel-aspect-ratio it overflowed outright and the pipeline refused to preroll. There is
+    no size this pipeline asks GStreamer to work out any more: either both numbers are known and
+    stated, or there is no scaler on that branch.
+    """
+    for width, height in ((0, 0), (800, 600), (2560, 1440), (1920, 1080)):
+        args = build(source_width=width, source_height=height).args
+        assert not any("[" in arg for arg in args if arg.startswith("video/x-raw"))
 
 
 def test_a_tall_source_is_capped_at_the_ceiling_and_keeps_its_shape() -> None:
@@ -199,11 +205,15 @@ def test_odd_dimensions_are_rounded_down_to_even() -> None:
     assert height % 2 == 0
 
 
-def test_an_unknown_source_size_still_gets_a_ceiling() -> None:
-    """The portal does not always report a size, and a capture must not depend on it doing so."""
-    args = build(source_width=0, source_height=0).args
+def test_an_unknown_source_size_means_no_scaler_rather_than_a_guess() -> None:
+    """The portal on this desktop reports no size, so this is the ordinary case, not the edge one.
 
-    assert any("height=[1,720]" in arg for arg in args)
+    The ceiling is given up rather than approximated. A recording at the window's own size costs
+    encoder time; a recording produced by guessing cost the recording.
+    """
+    args = build(source_width=0, source_height=0, want_preview=False).args
+
+    assert "videoscale" not in args
 
 
 def test_frames_are_dropped_rather_than_queued() -> None:
