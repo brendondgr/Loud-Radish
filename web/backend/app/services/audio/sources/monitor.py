@@ -46,6 +46,87 @@ GUARD_SAMPLES = 16_000
 #: capture is considered mis-specified rather than merely jittery.
 RATE_TOLERANCE = 0.02
 
+#: How long :func:`carries_audio` listens before deciding. Long enough to cross a buffer boundary
+#: and short enough that nobody notices it in front of a record button.
+PROBE_S = 0.6
+
+
+def record_command(node: str, *, capture_sink: bool, destination: str = "-") -> list[str]:
+    """The ``pw-record`` invocation for one node, shared by the capture and the probe.
+
+    **Two target forms, because two kinds of sink resolve differently**, measured rather than
+    assumed. A real device's sink exposes a ``<name>.monitor`` *source* that ``pw-record`` finds
+    directly. A null sink created for the application tap does not: targeting ``<name>.monitor``
+    fails outright with ``defined target not found``, while targeting the sink itself with
+    ``stream.capture.sink`` returns the audio linked into it — verified against a uniquely named
+    sink with a 440 Hz tone, which came back as 440.0 Hz.
+    """
+    command = [
+        "pw-record",
+        f"--target={node.removesuffix('.monitor') if capture_sink else node}",
+        f"--rate={SAMPLE_RATE}",
+        "--channels=1",
+        "--format=f32",
+        # **Not optional.** Writing to stdout without it, `pw-record` emits an AU container — a
+        # 24-byte `.snd` header ahead of the samples. Read as float32 those bytes decode to NaN, and
+        # a single NaN propagates through every downstream mean, peak and RMS, so the level meter
+        # reads nothing and the speech gate never opens: a capture that runs perfectly and
+        # transcribes silence. Observed exactly that before this flag was added.
+        "--container=raw",
+    ]
+
+    if capture_sink:
+        # Only on the tap's path, and both properties are load-bearing there.
+        #
+        # `stream.capture.sink` is how a null sink's monitor is reached at all. And
+        # `node.dont-fallback` is what makes a bad target visible: a stream whose named target
+        # cannot be found does **not** fail by default, it connects to the default target, which
+        # for a capture is the **microphone**. That is what happened. A window recording of a
+        # YouTube video transcribed the viewer's own speech while every layer reported success;
+        # measured after the fact, the "tap" audio correlated with the microphone at **0.92** and
+        # matched its RMS to five decimal places. With these set the correlation is 0.05, and a
+        # bad target fails loudly — verified: a nonexistent target now exits 1 with
+        # `defined target not found` rather than quietly recording a room.
+        #
+        # A device sink's `<name>.monitor` is a real source that resolves on its own, and adding
+        # these to that path stops it connecting at all — so it does not get them.
+        command += ["-P", "{ stream.capture.sink = true node.dont-fallback = true }"]
+
+    # A dash is the pipe. Everything downstream reads bytes and never touches a file.
+    return [*command, destination]
+
+
+def carries_audio(node: str, *, capture_sink: bool = True, seconds: float = PROBE_S) -> bool:
+    """Whether anything at all is arriving from ``node``, checked before a session commits to it.
+
+    **Bit-exact zeros, not "quiet".** Real audio — even a silent room, even a muted line with a
+    noise floor — does not produce a run of samples whose every byte is zero. A tap that does is a
+    tap the graph is not delivering into, which is what an ambiguous sink name produced and what
+    made recording after recording come back silent. Asking here costs six hundred milliseconds at
+    the start of a session; not asking cost the length of a talk.
+
+    Returns True when the probe cannot be run at all, because a probe that fails to start knows
+    nothing about the capture and must not be the thing that stops it.
+    """
+    try:
+        result = subprocess.run(  # noqa: S603 - fixed binary, no shell
+            record_command(node, capture_sink=capture_sink),
+            capture_output=True,
+            timeout=seconds,
+        )
+    except subprocess.TimeoutExpired as expired:
+        # The expected path: `pw-record` runs until it is stopped, so a healthy probe always times
+        # out. Whatever it wrote by then is the answer.
+        return bool((expired.stdout or b"").strip(b"\x00"))
+    except OSError:
+        return True
+
+    if result.returncode != 0:
+        # A target that could not be resolved. The capture itself will fail with the reason, which
+        # is a better message than anything this function could invent.
+        return True
+    return bool(result.stdout.strip(b"\x00"))
+
 
 class MonitorSource(AudioSource):
     """The machine's audio output, as canonical-format frames."""
@@ -81,51 +162,11 @@ class MonitorSource(AudioSource):
         else:
             self._node = self._requested or default_monitor()
 
-        # **Two target forms, because two kinds of sink resolve differently**, measured rather
-        # than assumed. A real device's sink exposes a `<name>.monitor` *source* that `pw-record`
-        # finds directly. A null sink created for the application tap does not — targeting
-        # `transcriber-tap.monitor` silently resolved to nothing — but targeting the sink itself
-        # with `stream.capture.sink` works. Getting this wrong is not a quiet failure to record:
-        # a stream whose target cannot be found connects to the **default source** instead, which
-        # is the microphone.
         capture_sink = self._tap is not None and self._tap.is_open
         self._on_frame = on_frame
         self._on_error = on_error
 
-        command = [
-            "pw-record",
-            f"--target={self._node.removesuffix('.monitor') if capture_sink else self._node}",
-            f"--rate={SAMPLE_RATE}",
-            "--channels=1",
-            "--format=f32",
-            # **Not optional.** Writing to stdout without it, `pw-record` emits an AU container —
-            # a 24-byte `.snd` header ahead of the samples. Read as float32 those bytes decode to
-            # NaN, and a single NaN propagates through every downstream mean, peak and RMS, so the
-            # level meter reads nothing and the speech gate never opens: a capture that runs
-            # perfectly and transcribes silence. Observed exactly that before this flag was added.
-            "--container=raw",
-        ]
-
-        if capture_sink:
-            # Only on the tap's path, and both properties are load-bearing there.
-            #
-            # `stream.capture.sink` is how a null sink's monitor is reached at all — targeting
-            # `<name>.monitor` resolved to nothing. And `node.dont-fallback` is what makes that
-            # visible: a stream whose named target cannot be found does **not** fail by default, it
-            # connects to the default target, which for a capture is the **microphone**. That is
-            # what happened. A window recording of a YouTube video transcribed the viewer's own
-            # speech while every layer reported success; measured after the fact, the "tap" audio
-            # correlated with the microphone at **0.92** and matched its RMS to five decimal
-            # places. With these set the correlation is 0.05, and a bad target fails loudly.
-            #
-            # A device sink's `<name>.monitor` is a real source that resolves on its own, and
-            # adding these to that path stops it connecting at all — so it does not get them.
-            command += ["-P", "{ stream.capture.sink = true node.dont-fallback = true }"]
-
-        command += [
-            # A dash is the pipe. Everything downstream reads bytes and never touches a file.
-            "-",
-        ]
+        command = record_command(self._node, capture_sink=capture_sink)
         try:
             self._process = subprocess.Popen(  # noqa: S603 - fixed binary, no shell
                 command,

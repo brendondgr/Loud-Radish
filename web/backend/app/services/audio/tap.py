@@ -71,6 +71,15 @@ class PlaybackStream:
     application: str
     binary: str
     media_name: str
+    #: PipeWire's own word for the node: ``running``, ``idle``, ``suspended``. The difference
+    #: between "this application is playing" and "this application exists" — which is what tells a
+    #: silent tap apart from a paused video.
+    state: str = ""
+
+    @property
+    def running(self) -> bool:
+        """Whether this stream is actually producing audio right now."""
+        return self.state == "running"
 
     @property
     def label(self) -> str:
@@ -86,6 +95,7 @@ class PlaybackStream:
             "application": self.application,
             "binary": self.binary,
             "media_name": self.media_name,
+            "state": self.state,
             "label": self.label,
         }
 
@@ -110,7 +120,8 @@ def playback_streams() -> list[PlaybackStream]:
     for entry in objects:
         if entry.get("type") != "PipeWire:Interface:Node":
             continue
-        props = entry.get("info", {}).get("props", {})
+        info = entry.get("info", {})
+        props = info.get("props", {})
         if props.get("media.class") != PLAYBACK_CLASS:
             continue
         streams.append(
@@ -121,6 +132,7 @@ def playback_streams() -> list[PlaybackStream]:
                 application=str(props.get("application.name", "")),
                 binary=str(props.get("application.process.binary", "")),
                 media_name=str(props.get("media.name", "")),
+                state=str(info.get("state", "")),
             )
         )
     return streams

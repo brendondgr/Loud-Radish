@@ -469,3 +469,115 @@ def test_no_source_yet_is_not_treated_as_loopback(tmp_path) -> None:
     manager._source_info = None
 
     assert manager._source_is_loopback is False
+
+
+# -- the tap proves it carries audio before the session commits ----------------------------------
+#
+# Every layer reported success while recording nothing. The sink was created, the links were made,
+# `pw-record` ran at the right rate for the right duration, and the samples were bit-exact zeros for
+# the length of a talk. Unique sink names remove the cause; this removes the *class* of failure,
+# whatever causes it next — a capture that is delivering nothing says so in the first second.
+
+
+def _tap_double(carries: bool, monkeypatch, streams):
+    """A manager whose tap opens cleanly and whose probe returns `carries`."""
+    from tests.conftest import NoTapInTests
+
+    monkeypatch.setattr("app.services.session.manager.ApplicationTap", NoTapInTests)
+    monkeypatch.setattr("app.services.session.manager.tap_streams", lambda: streams)
+    monkeypatch.setattr("app.services.session.manager.carries_audio", lambda *_a, **_k: carries)
+
+
+def _playing(state: str):
+    from app.services.audio.tap import PlaybackStream
+
+    return [
+        PlaybackStream(
+            node_id=1,
+            serial=1,
+            node_name="LibreWolf",
+            application="LibreWolf",
+            binary="librewolf",
+            media_name="A Lecture",
+            state=state,
+        )
+    ]
+
+
+def test_a_tap_that_delivers_nothing_refuses_to_start(tmp_path, monkeypatch) -> None:
+    """The alternative is a silent recording of a talk that happened once."""
+    from app.services.session.manager import SessionError
+
+    _tap_double(carries=False, monkeypatch=monkeypatch, streams=_playing("running"))
+    manager, config = _manager(tmp_path)
+    manager._options = _options("system")
+
+    with pytest.raises(SessionError, match="nothing is arriving"):
+        manager._open_source(config, modes.WINDOW)
+
+
+def test_a_tap_that_delivers_audio_is_used(tmp_path, monkeypatch) -> None:
+    _tap_double(carries=True, monkeypatch=monkeypatch, streams=_playing("running"))
+    manager, config = _manager(tmp_path)
+    manager._options = _options("system")
+
+    source = manager._open_source(config, modes.WINDOW)
+
+    assert source.info.kind == "loopback"
+
+
+def test_a_paused_application_is_not_treated_as_a_fault(tmp_path, monkeypatch) -> None:
+    """**The check only fires when something is actually playing.**
+
+    A stream that exists but is idle is a paused video, and a paused video is the user's business.
+    Refusing to start over one would be this guard inventing a fault of its own — someone who
+    presses record and *then* presses play is doing something entirely reasonable.
+    """
+    _tap_double(carries=False, monkeypatch=monkeypatch, streams=_playing("idle"))
+    manager, config = _manager(tmp_path)
+    manager._options = _options("system")
+
+    source = manager._open_source(config, modes.WINDOW)
+
+    assert source.info.kind == "loopback"
+
+
+def test_the_probe_reads_the_node_state_pipewire_reports() -> None:
+    """`running` is PipeWire's own word for a node that is producing audio."""
+    assert _playing("running")[0].running is True
+    assert _playing("idle")[0].running is False
+    assert _playing("suspended")[0].running is False
+
+
+def _options(choice: str):
+    from app.services.session.manager import CaptureOptions
+
+    return CaptureOptions(audio_source=choice)
+
+
+# -- the probe itself ----------------------------------------------------------------------------
+
+
+def test_an_unresolvable_target_is_not_the_probes_call_to_make() -> None:
+    """A probe that cannot run knows nothing, and must not be what stops a recording.
+
+    The capture itself fails on an unresolvable target with `defined target not found`, which is a
+    better message than anything this function could invent.
+    """
+    from app.services.audio.sources.monitor import carries_audio
+
+    assert carries_audio("no-such-node-anywhere-xyz", seconds=0.2) is True
+
+
+@pipewire
+def test_a_sink_with_nothing_linked_into_it_reads_as_silent() -> None:
+    """Bit-exact zeros, which is what an ambiguous sink name produced for a whole afternoon."""
+    from app.services.audio.sources.monitor import carries_audio
+    from app.services.audio.tap import ApplicationTap
+
+    tap = ApplicationTap()
+    tap.open()
+    try:
+        assert carries_audio(tap.sink_name, seconds=0.4) is False
+    finally:
+        tap.close()

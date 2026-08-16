@@ -30,7 +30,7 @@ from ..asr import AsrLifecycle, LoadProgress, PromptBuilder
 from ..asr.contract import AsrLoadError
 from ..audio import LevelMeter, WavFileSource
 from ..audio.monitor import MonitorUnavailable
-from ..audio.sources import AudioSource, DeviceSource, MonitorSource, SourceInfo
+from ..audio.sources import AudioSource, DeviceSource, MonitorSource, SourceInfo, carries_audio
 from ..audio.tap import ApplicationTap, TapError
 from ..audio.tap import playback_streams as tap_streams
 from ..capture import (
@@ -1078,8 +1078,35 @@ class SessionManager:
                 "meant to record yourself."
             ) from exc
 
+        self._verify_tap(tap, streams)
         self._tap = tap
         return MonitorSource(frame_ms=config.audio.frame_ms, tap=tap)
+
+    def _verify_tap(self, tap: ApplicationTap, streams: list) -> None:
+        """Listen to the tap for a moment before the session commits to it.
+
+        **Every layer reported success while recording nothing.** The sink was created, the links
+        were made, `pw-record` ran at the right rate for the right duration, and the samples were
+        bit-exact zeros for the length of a talk — five identically named leaked sinks meant the
+        linker and the recorder were addressing different nodes. Unique names make that particular
+        cause impossible; this makes the *symptom* impossible to miss, whatever causes it next.
+
+        Only when something is actually playing. A stream that exists but is idle is a paused
+        video, and a paused video is the user's business — refusing to start a session over one
+        would be this check inventing a fault of its own.
+        """
+        if not any(getattr(stream, "running", False) for stream in streams):
+            logger.info("Nothing is playing yet, so the tap is not checked for content.")
+            return
+        if carries_audio(tap.sink_name):
+            return
+
+        tap.close()
+        raise MonitorUnavailable(
+            "The window's audio was routed but nothing is arriving from it — the capture would be "
+            "silent for the whole recording. Try starting the recording again, or choose "
+            "'My microphone' if you meant to record yourself."
+        )
 
     async def _load_model(self, config: AppConfig) -> None:
         """Load the ASR model, translating a failure into a remedy the user can act on."""
