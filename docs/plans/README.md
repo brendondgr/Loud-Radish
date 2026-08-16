@@ -27,7 +27,7 @@ conventions in [../skills/planner/SKILL.md](../skills/planner/SKILL.md).
 | [capture-research-findings.md](capture-research-findings.md) | External research answering the brief: what is spec, what is proven, what to stop tracking | Reference |
 | [capture-research-brief.md](capture-research-brief.md) | What has been measured on this machine, what that rules out, and the questions genuinely open for external research | Reference |
 | [window-capture-repair.md](window-capture-repair.md) | Window recording repaired against the machine rather than the test double: recorded resolution, repeated portal dialogs, the live preview, window audio instead of the microphone, immediate stop, and timestamps that correlate | **Complete (8 / 8)** |
-| [four-reported-faults.md](four-reported-faults.md) | Four faults reported together: the assistant's rejected system message, copied timestamps of zero, window audio refused by its own guard, and forced commits that drop speech | **In progress (0 / 5)** |
+| [four-reported-faults.md](four-reported-faults.md) | Four faults reported together: the assistant's rejected system message, copied timestamps of zero, window audio refused by its own guard, and forced commits that drop speech | **Complete (5 / 5)** |
 
 ## The multi-mode expansion
 

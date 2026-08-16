@@ -1,6 +1,6 @@
 # Four Reported Faults
 
-**Status:** 🚧 In progress — Phase 0 of 5.
+**Status:** ✅ **Complete — all 5 phases.**
 **Branch:** `main` (Mode B — no worktree).
 
 ---
