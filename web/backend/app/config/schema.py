@@ -242,6 +242,12 @@ class CaptureConfig(_Base):
     reuse_consent: bool = True
     #: Combine the video and the session's audio into one file once both are closed.
     mux_audio: bool = True
+    #: Which audio a `window` session records. **Defaults to the machine's output**, because the
+    #: point of the mode is the window's sound and not the person watching it — a microphone
+    #: recorded when it was not wanted is the fault this setting exists to fix. The portal carries
+    #: video only (D-022), so this is a separate capture either way; `system` reads the default
+    #: sink's monitor, which contains no microphone at all.
+    audio_source: Literal["system", "microphone"] = "system"
 
 
 class ShortcutsConfig(_Base):

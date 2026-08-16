@@ -1,7 +1,6 @@
 # Window Capture Repair
 
-**Status:** Phases 1–4 and 6–8 complete. **Phase 5 (window audio) is the one outstanding item**
-— see the note under that phase for what was established and why it is not a small change.
+**Status:** ✅ **Complete — all 8 phases.**
 **Branch:** `claude/gpu-and-capture-fixes`
 
 ---
@@ -174,7 +173,7 @@ has actually decoded and says which situation it is.
 
 </details>
 
-### Phase 5 — Window audio, not the user's microphone ⚠️ NOT DONE
+### Phase 5 — Window audio, not the user's microphone ✅ COMPLETE
 
 **Established, and it is the reason this is not a small change:** PortAudio does **not** expose
 PipeWire's monitor sources. Enumerating this machine returns fifteen inputs and not one of them is
@@ -190,6 +189,16 @@ present (`/usr/bin/pw-record`, `/usr/bin/pw-cli`) and `pactl get-default-sink` n
 The default sink must be resolved **at start time**, not stored: it changes when a dock or a
 Bluetooth headset appears, and on this machine it is currently a Bluetooth output. A recording that
 silently captured a disconnected device would be the same class of fault as the rest of this plan.
+
+**Built and verified against the real daemon.** `audio/monitor.py` resolves the node,
+`audio/sources/monitor.py` runs `pw-record` and frames its stdout, and window mode opens it instead
+of a capture device unless `capture.audio_source` says otherwise. One flag turned out to be
+load-bearing: **`--container=raw`**. Without it `pw-record` writes an *AU* container to stdout — a
+24-byte `.snd` header ahead of the samples — and those bytes read as float32 decode to **NaN**. A
+single NaN propagates through every downstream mean, peak and RMS, so the level meter reads nothing
+and the speech gate never opens: a capture that runs perfectly, at the right rate, for the right
+duration, and transcribes silence. It was found by measuring the peak amplitude of a three-second
+capture and getting `nan`, and it is exactly the class of fault the rest of this plan is about.
 
 <details><summary>Original phase text</summary>
 

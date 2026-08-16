@@ -74,14 +74,16 @@
       </fieldset>
 
       {# The single most important sentence in this dialog. The screen-cast portal carries video
-         only, so the audio recorded is the machine's, not that window's. A user who assumes
-         otherwise and records the wrong source has lost the recording. #}
+         only, so a window's sound has to be captured separately — and until this was fixed the
+         separate capture was the *microphone*, so recording a talk also recorded the person
+         watching it. It now reads the machine's audio output, which contains no microphone at
+         all. A user who assumes otherwise and records the wrong source has lost the recording. #}
       <p class="preflight__note">
-        <strong>Audio comes from your current input, not from the window.</strong>
-        The desktop's screen sharing does not include a window's own sound. To capture a talk
-        playing on this machine, choose a loopback or monitor input in
-        <button type="button" class="preflight__link" data-preflight-settings>audio settings</button>
-        first.
+        <strong>Audio is recorded from this machine's sound output, not your microphone.</strong>
+        The desktop's screen sharing carries video only, so a window's sound is captured
+        separately — from everything this machine is playing. Your microphone is not recorded.
+        To record it instead, change the window audio source in
+        <button type="button" class="preflight__link" data-preflight-settings>audio settings</button>.
       </p>
     </div>
 

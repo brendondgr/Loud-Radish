@@ -29,7 +29,8 @@ from ...models.session import SessionMetadata, SessionStats
 from ..asr import AsrLifecycle, LoadProgress, PromptBuilder
 from ..asr.contract import AsrLoadError
 from ..audio import LevelMeter, WavFileSource
-from ..audio.sources import AudioSource, DeviceSource, SourceInfo
+from ..audio.monitor import MonitorUnavailable
+from ..audio.sources import AudioSource, DeviceSource, MonitorSource, SourceInfo
 from ..capture import (
     MuxResult,
     PortalDeclined,
@@ -334,7 +335,7 @@ class SessionManager:
         self._start_status_thread()
 
         try:
-            self._source = self._open_source(config)
+            self._source = self._open_source(config, session.mode)
             self._source.start(self._on_frame, self._on_source_error)
             # Read *after* starting. A device source does not know which device it holds until it
             # has opened one, so asking first returned "No device" — and that string then went into
@@ -893,8 +894,19 @@ class SessionManager:
         path = directory / f"{session.started_at.strftime('%Y%m%d-%H%M%S')}-{session.session_id}.db"
         return TranscriptStore(path, metadata=session)
 
-    def _open_source(self, config: AppConfig) -> AudioSource:
-        """Build the configured audio source."""
+    def _open_source(self, config: AppConfig, mode: str = modes.LIVE) -> AudioSource:
+        """Build the audio source this session should capture from.
+
+        **`window` mode reads the machine's output, not the microphone.** The point of the mode is
+        the window's sound; recording the person watching it was the reported fault. The portal
+        carries video only (D-022) so this was always a separate capture — it was simply capturing
+        the wrong thing. `capture.audio_source` moves it back to the microphone for anyone who
+        wants both a window and their own commentary.
+
+        The file source still wins outright in every mode: it is the reproducible input the whole
+        pipeline is developed against, and a window session that silently ignored it would make the
+        mode untestable.
+        """
         if config.audio.source_type == "file":
             if not config.audio.file_path:
                 raise SessionError(
@@ -906,6 +918,15 @@ class SessionManager:
                 frame_ms=config.audio.frame_ms,
                 speed=config.audio.file_speed,
             )
+        if mode == modes.WINDOW and config.capture.audio_source == "system":
+            try:
+                return MonitorSource(frame_ms=config.audio.frame_ms)
+            except MonitorUnavailable as exc:
+                # The microphone is not a silent substitute here — it records the wrong thing, and
+                # the whole point of the mode is that it does not. Naming the remedy is better than
+                # quietly capturing a voice the user did not want recorded.
+                raise SessionError(str(exc)) from exc
+
         return DeviceSource(device_id=config.audio.device_id, frame_ms=config.audio.frame_ms)
 
     async def _load_model(self, config: AppConfig) -> None:
