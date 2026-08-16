@@ -17,10 +17,24 @@ from app.services.capture import probe
 
 @pytest.fixture(autouse=True)
 def clear_element_cache():
-    """The element list is cached across calls; each test needs its own."""
-    probe.gstreamer_elements.cache_clear()
+    """The element list is cached across calls; each test needs its own.
+
+    Tolerant of the name having been replaced, because most tests here patch
+    ``probe.gstreamer_elements`` with a plain function that has no cache to clear. Whether
+    ``monkeypatch`` has already undone that by teardown time depends on fixture ordering, which is
+    not this fixture's business to know — and when a suite-wide autouse fixture was added in
+    ``tests/conftest.py``, the ordering changed and eleven tests started erroring in teardown while
+    still passing. A cache that is not there needs no clearing.
+    """
+
+    def clear() -> None:
+        cache_clear = getattr(probe.gstreamer_elements, "cache_clear", None)
+        if cache_clear is not None:
+            cache_clear()
+
+    clear()
     yield
-    probe.gstreamer_elements.cache_clear()
+    clear()
 
 
 def working_machine(monkeypatch, **overrides) -> None:
