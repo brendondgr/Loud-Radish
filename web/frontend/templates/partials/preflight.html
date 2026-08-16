@@ -73,6 +73,48 @@
         </label>
       </fieldset>
 
+      {# **Chosen here, at record time, not in a settings tab.** Which audio a window recording
+         captures is a per-recording decision — the same person records a talk playing in a window
+         one minute and their own commentary over it the next — and a setting buried two screens
+         away is one nobody changes and everybody is surprised by. #}
+      <fieldset class="preflight__options" data-preflight-audio-group>
+        <legend class="preflight__legend">Which audio to record</legend>
+
+        <label class="preflight__option">
+          <input type="radio" name="preflight-audio" value="system" data-preflight-audio checked />
+          <span class="preflight__option-text">
+            <span class="preflight__option-name">The window's sound</span>
+            <span class="preflight__option-hint">
+              Everything this machine is playing, which is the window's own audio whenever it is the
+              thing making sound. Your microphone is not recorded.
+            </span>
+          </span>
+        </label>
+
+        <label class="preflight__option">
+          <input type="radio" name="preflight-audio" value="application" data-preflight-audio />
+          <span class="preflight__option-text">
+            <span class="preflight__option-name">Only this application's sound</span>
+            <span class="preflight__option-hint">
+              Taps the chosen application directly, so other programs playing at the same time are
+              left out. It keeps playing through your speakers as usual. Matching an application to
+              a window is a guess, so this falls back to the window's sound when nothing matches.
+            </span>
+          </span>
+        </label>
+
+        <label class="preflight__option">
+          <input type="radio" name="preflight-audio" value="microphone" data-preflight-audio />
+          <span class="preflight__option-text">
+            <span class="preflight__option-name">My microphone</span>
+            <span class="preflight__option-hint">
+              Record yourself instead — for narrating over a window rather than capturing what it
+              plays. The window's own sound is not recorded.
+            </span>
+          </span>
+        </label>
+      </fieldset>
+
       {# The single most important sentence in this dialog. The screen-cast portal carries video
          only, so a window's sound has to be captured separately — and until this was fixed the
          separate capture was the *microphone*, so recording a talk also recorded the person

@@ -142,7 +142,7 @@ def stub_capture(monkeypatch):
     monkeypatch.setattr(
         manager_module,
         "detect_capture",
-        lambda: CaptureSupport(
+        lambda **_kwargs: CaptureSupport(
             available=True,
             session_type="wayland",
             portal_version=5,
@@ -344,7 +344,7 @@ async def test_an_unavailable_machine_keeps_the_session(manager, monkeypatch) ->
     monkeypatch.setattr(
         manager_module,
         "detect_capture",
-        lambda: CaptureSupport(
+        lambda **_kwargs: CaptureSupport(
             available=False, missing="portal", reason="Install xdg-desktop-portal-kde."
         ),
     )

@@ -248,3 +248,93 @@ def test_an_unavailable_monitor_is_named_rather_than_swapped_for_a_microphone(
 def test_the_default_is_the_machines_output() -> None:
     """A microphone recorded when it was not wanted is the fault this default exists to fix."""
     assert AppConfig().capture.audio_source == "system"
+
+
+# -- the choice made at record time --------------------------------------------------------------
+#
+# Reported: a window recording transcribed the person watching rather than the window. The default
+# was already the machine's output, so the fault was that the decision lived in a settings tab —
+# two screens away, changed once, and surprising thereafter. It belongs in the sheet that appears
+# when you press record, because it genuinely changes from recording to recording: a talk playing
+# in a window one minute, narration over it the next.
+
+
+def _with_options(tmp_path, choice, monkeypatch):
+    from app.services.session.manager import CaptureOptions
+
+    opened: list[str] = []
+    monkeypatch.setattr(
+        "app.services.session.manager.MonitorSource",
+        lambda **_kwargs: opened.append("monitor") or object(),
+    )
+    monkeypatch.setattr(
+        "app.services.session.manager.DeviceSource",
+        lambda **_kwargs: opened.append("device") or object(),
+    )
+    manager, config = _manager(tmp_path)
+    manager._options = CaptureOptions(audio_source=choice)
+    manager._open_source(config, modes.WINDOW)
+    return opened
+
+
+def test_the_per_run_choice_selects_the_microphone(tmp_path, monkeypatch) -> None:
+    """Narrating over a window is a legitimate thing to want, and it is chosen here."""
+    assert _with_options(tmp_path, "microphone", monkeypatch) == ["device"]
+
+
+def test_the_per_run_choice_selects_the_windows_sound(tmp_path, monkeypatch) -> None:
+    assert _with_options(tmp_path, "system", monkeypatch) == ["monitor"]
+
+
+def test_the_per_run_choice_overrides_the_configured_one(tmp_path, monkeypatch) -> None:
+    """**The sheet wins.** It is what the user is looking at when they press record.
+
+    A configured default they set once and forgot is not more authoritative than the choice in
+    front of them, and treating it as such is how a window recording ends up capturing a
+    microphone nobody asked for.
+    """
+    from app.services.session.manager import CaptureOptions
+
+    opened: list[str] = []
+    monkeypatch.setattr(
+        "app.services.session.manager.MonitorSource",
+        lambda **_kwargs: opened.append("monitor") or object(),
+    )
+    monkeypatch.setattr(
+        "app.services.session.manager.DeviceSource",
+        lambda **_kwargs: opened.append("device") or object(),
+    )
+    # Configuration says microphone; the run says the window's sound.
+    manager, config = _manager(tmp_path, **{"capture.audio_source": "microphone"})
+    manager._options = CaptureOptions(audio_source="system")
+
+    manager._open_source(config, modes.WINDOW)
+
+    assert opened == ["monitor"]
+
+
+def test_without_a_per_run_choice_the_configured_one_applies(tmp_path, monkeypatch) -> None:
+    """`live` and `recorded` sessions carry no options at all, and must not break on that."""
+    opened: list[str] = []
+    monkeypatch.setattr(
+        "app.services.session.manager.MonitorSource",
+        lambda **_kwargs: opened.append("monitor") or object(),
+    )
+    monkeypatch.setattr(
+        "app.services.session.manager.DeviceSource",
+        lambda **_kwargs: opened.append("device") or object(),
+    )
+    manager, config = _manager(tmp_path, **{"capture.audio_source": "microphone"})
+    manager._options = None
+
+    manager._open_source(config, modes.WINDOW)
+
+    assert opened == ["device"]
+
+
+def test_the_request_schema_carries_the_choice() -> None:
+    """It has to survive the trip from the sheet to the manager."""
+    from app.schemas.api import CaptureOptions as CaptureOptionsRequest
+
+    assert CaptureOptionsRequest().audio_source == "system"
+    assert CaptureOptionsRequest(audio_source="microphone").audio_source == "microphone"

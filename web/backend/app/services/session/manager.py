@@ -88,6 +88,11 @@ class CaptureOptions:
     live_transcription: bool = True
     post_transcription: bool = True
     video: bool = True
+    #: Which audio this run records: `system` (everything the machine plays), `application` (only
+    #: the matched application, tapped additively), or `microphone`. Per-run, and it **overrides**
+    #: `capture.audio_source` — the sheet in front of the user at the moment they press record is
+    #: more authoritative than a setting they configured once and forgot.
+    audio_source: str = "system"
 
     @property
     def records_nothing(self) -> bool:
@@ -342,6 +347,12 @@ class SessionManager:
         try:
             self._source = self._open_source(config, session.mode)
             self._source.start(self._on_frame, self._on_source_error)
+            logger.info(
+                "Session %s (%s) is recording audio from: %s",
+                session.session_id,
+                session.mode,
+                self._source.info.name,
+            )
             # Read *after* starting. A device source does not know which device it holds until it
             # has opened one, so asking first returned "No device" — and that string then went into
             # the status bar and the session's stored metadata for every live recording, while
@@ -700,7 +711,7 @@ class SessionManager:
         whole run — they said no, and starting an audio recording they did not ask for would be
         taking the refusal as a yes.
         """
-        support = detect_capture()
+        support = detect_capture(prefer_hardware=config.capture.encoder == "hardware")
         if not support.available:
             self._emit_failure(degradation.capture_unavailable(support.reason))
             return
@@ -925,6 +936,18 @@ class SessionManager:
         path = directory / f"{session.started_at.strftime('%Y%m%d-%H%M%S')}-{session.session_id}.db"
         return TranscriptStore(path, metadata=session)
 
+    def _audio_choice(self, config: AppConfig) -> str:
+        """Which audio this run should capture.
+
+        The per-run choice wins. It is the one in front of the user at the moment they press
+        record, and the whole reason the pre-flight sheet exists is that this decision changes from
+        recording to recording — a talk playing in a window one minute, narration over it the next.
+        """
+        options = self._options
+        if options is not None and options.audio_source:
+            return options.audio_source
+        return config.capture.audio_source
+
     def _open_source(self, config: AppConfig, mode: str = modes.LIVE) -> AudioSource:
         """Build the audio source this session should capture from.
 
@@ -949,10 +972,11 @@ class SessionManager:
                 frame_ms=config.audio.frame_ms,
                 speed=config.audio.file_speed,
             )
-        if mode == modes.WINDOW and config.capture.audio_source == "application":
+        choice = self._audio_choice(config)
+        if mode == modes.WINDOW and choice == "application":
             return self._open_application_tap(config)
 
-        if mode == modes.WINDOW and config.capture.audio_source == "system":
+        if mode == modes.WINDOW and choice == "system":
             try:
                 return MonitorSource(frame_ms=config.audio.frame_ms)
             except MonitorUnavailable as exc:

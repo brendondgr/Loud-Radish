@@ -42,20 +42,19 @@ REQUIRED_ELEMENTS: Final[tuple[str, ...]] = ("pipewiresrc", "videoconvert", "vid
 #: `(encoder, muxer, extension, parser)`, best first. The parser is empty for encoders whose output
 #: a muxer accepts directly, and named for the hardware ones, which produce an elementary stream.
 #:
-#: **Hardware first, and it is worth far more than it looks.** This application transcribes and
-#: records at the same time, so every core a software encoder occupies is a core the speech model
-#: does not get. Measured on this machine over 150 frames at 720p: **0.90 s of user CPU for
-#: `vp8enc` against 0.14 s for `vaav1enc`** — the video encode effectively stops competing.
+#: **Software first, and that is a reversal.** Hardware AV1 was measured at 0.30 s of user CPU
+#: against 1.25 s for `vp8enc` over 150 frames at 720p — a real and large win, and it was made the
+#: default on the strength of it. Then a real window capture produced:
 #:
-#: AV1 rather than H.264 by necessity rather than preference: Fedora strips the H.264 and HEVC
-#: VA-API entry points from its Mesa build for patent reasons, so `vah264enc` does not register on
-#: a stock install even though the hardware supports it. AV1 is royalty-free and is present.
-#: `gst-inspect-1.0 va` is the capability test — the `va` plugin only registers an encoder element
-#: when the driver advertises the matching entrypoint.
+#:     amdgpu: The CS has cancelled because the context is lost.
+#:     This context is guilty of a hard recovery.
+#:
+#: A GPU context loss is not an encoder that ran slowly. It kills the recording, and a hard recovery
+#: can take the desktop session with it — including the window being recorded. This application
+#: exists to record talks that happen once, so a four-fold CPU saving does not justify a failure
+#: mode that loses the thing being saved. Hardware is opt-in via `capture.encoder`, kept because it
+#: works on a test pattern and may well work on a portal stream on other hardware or a later Mesa.
 ENCODERS: Final[tuple[tuple[str, str, str, str], ...]] = (
-    ("vaav1enc", "matroskamux", "mkv", "av1parse"),
-    ("vah264enc", "matroskamux", "mkv", "h264parse"),
-    ("vah265enc", "matroskamux", "mkv", "h265parse"),
     ("vp8enc", "webmmux", "webm", ""),
     ("vp9enc", "webmmux", "webm", ""),
     ("x264enc", "mp4mux", "mp4", ""),
@@ -160,15 +159,26 @@ def gstreamer_elements() -> frozenset[str]:
     return frozenset(names)
 
 
-def choose_encoder(elements: frozenset[str]) -> tuple[str, str, str, str] | None:
+#: Hardware entries, offered only when `capture.encoder` asks for one. Same shape as `ENCODERS`.
+HARDWARE_ENCODERS: Final[tuple[tuple[str, str, str, str], ...]] = (
+    ("vaav1enc", "matroskamux", "mkv", "av1parse"),
+    ("vah264enc", "matroskamux", "mkv", "h264parse"),
+    ("vah265enc", "matroskamux", "mkv", "h265parse"),
+)
+
+
+def choose_encoder(
+    elements: frozenset[str], *, prefer_hardware: bool = False
+) -> tuple[str, str, str, str] | None:
     """The best available `(encoder, muxer, extension, parser)`, or None if nothing can encode.
 
-    Hardware entries sit at the top of the table, so a machine whose driver advertises an encode
-    entrypoint gets it and one that does not falls through to software without any branching here.
-    A parser that is named but missing disqualifies the entry: an elementary stream that cannot be
-    parsed cannot be muxed, and finding that out at record time is finding it out too late.
+    Hardware encoders are offered only when asked for, because one caused an amdgpu context loss on
+    a real capture — see the note on `ENCODERS`. A parser that is named but missing disqualifies an
+    entry: an elementary stream that cannot be parsed cannot be muxed, and finding that out at
+    record time is finding it out too late.
     """
-    for encoder, muxer, extension, parser in ENCODERS:
+    table = (*HARDWARE_ENCODERS, *ENCODERS) if prefer_hardware else ENCODERS
+    for encoder, muxer, extension, parser in table:
         if encoder not in elements or muxer not in elements:
             continue
         if parser and parser not in elements:
@@ -212,10 +222,10 @@ def portal_capabilities() -> tuple[int, int] | None:
         return None
 
 
-def detect() -> CaptureSupport:
+def detect(prefer_hardware: bool = False) -> CaptureSupport:
     """The full verdict. Never raises."""
     try:
-        return _detect()
+        return _detect(prefer_hardware)
     except Exception:  # noqa: BLE001 - a diagnostic must never break the endpoint that reports it
         logger.exception("Capture probe failed")
         return CaptureSupport(
@@ -225,7 +235,7 @@ def detect() -> CaptureSupport:
         )
 
 
-def _detect() -> CaptureSupport:
+def _detect(prefer_hardware: bool = False) -> CaptureSupport:
     kind = session_type()
     if not kind:
         return CaptureSupport(
@@ -297,7 +307,7 @@ def _detect() -> CaptureSupport:
             missing_elements=absent,
         )
 
-    chosen = choose_encoder(elements)
+    chosen = choose_encoder(elements, prefer_hardware=prefer_hardware)
     if chosen is None:
         return CaptureSupport(
             available=False,

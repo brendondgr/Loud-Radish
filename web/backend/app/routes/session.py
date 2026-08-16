@@ -69,6 +69,7 @@ def _capture_options(body: StartSessionRequest) -> CaptureOptions | None:
         live_transcription=body.options.live_transcription,
         post_transcription=body.options.post_transcription,
         video=body.options.video,
+        audio_source=body.options.audio_source,
     )
 
 

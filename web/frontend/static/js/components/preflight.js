@@ -17,6 +17,9 @@ const DEFAULTS = {
   live_transcription: true,
   post_transcription: true,
   video: true,
+  // The window's own sound, not the person watching it. A window recording that captures the
+  // viewer's microphone is the fault this default exists to prevent.
+  audio_source: "system",
 };
 
 export class Preflight {
@@ -32,6 +35,11 @@ export class Preflight {
       this.inputs.set(input.dataset.preflightOption, input);
       input.addEventListener("change", () => this._validate());
     }
+
+    // The audio choice is a radio group rather than a checkbox, because the three are exclusive
+    // and one of them is always true — there is no "record no audio at all" option, and there
+    // should not be: a recording with no sound has no transcript, which is the point of the tool.
+    this.audioInputs = [...root.querySelectorAll("[data-preflight-audio]")];
 
     this.trap = new FocusTrap(this.dialog ?? root);
     this._resolve = null;
@@ -61,6 +69,8 @@ export class Preflight {
   get options() {
     const chosen = { ...DEFAULTS };
     for (const [name, input] of this.inputs) chosen[name] = input.checked;
+    const audio = this.audioInputs.find((input) => input.checked);
+    if (audio) chosen.audio_source = audio.value;
     return chosen;
   }
 

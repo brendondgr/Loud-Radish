@@ -174,18 +174,20 @@ def test_vp8_is_preferred_over_x264(monkeypatch) -> None:
     assert chosen == ("vp8enc", "webmmux", "webm", "")
 
 
-def test_hardware_is_preferred_over_software() -> None:
-    """The whole point, and it is worth more than it looks.
+def test_hardware_is_used_only_when_it_is_asked_for() -> None:
+    """**Opt-in, and that is a reversal made on evidence.**
 
-    This application transcribes and records simultaneously, so every core a software encoder takes
-    is a core the speech model does not get. Measured through the real pipeline on 150 frames at
-    720p: 1.25 s of user CPU for `vp8enc` against 0.30 s for `vaav1enc`.
+    Hardware AV1 is four times cheaper on CPU — 0.30 s against 1.25 s over 150 frames at 720p — and
+    was the default on the strength of that. Then a real window capture produced `amdgpu: The CS
+    has cancelled because the context is lost. This context is guilty of a hard recovery.` A GPU
+    context loss kills the recording and can take the desktop session, and therefore the window
+    being recorded, with it. A tool for recording talks that happen once does not trade that for
+    CPU time.
     """
-    chosen = probe.choose_encoder(
-        frozenset({"vp8enc", "webmmux", "vaav1enc", "matroskamux", "av1parse"})
-    )
+    elements = frozenset({"vp8enc", "webmmux", "vaav1enc", "matroskamux", "av1parse"})
 
-    assert chosen == ("vaav1enc", "matroskamux", "mkv", "av1parse")
+    assert probe.choose_encoder(elements)[0] == "vp8enc"
+    assert probe.choose_encoder(elements, prefer_hardware=True)[0] == "vaav1enc"
 
 
 def test_av1_is_preferred_over_hardware_h264() -> None:
@@ -197,7 +199,7 @@ def test_av1_is_preferred_over_hardware_h264() -> None:
     """
     elements = frozenset({"vaav1enc", "av1parse", "vah264enc", "h264parse", "matroskamux"})
 
-    assert probe.choose_encoder(elements)[0] == "vaav1enc"
+    assert probe.choose_encoder(elements, prefer_hardware=True)[0] == "vaav1enc"
 
 
 def test_a_hardware_encoder_without_its_parser_is_skipped() -> None:

@@ -251,6 +251,13 @@ class CaptureConfig(_Base):
     #: playing to the user's speakers. It needs a match between the window and a PipeWire playback
     #: stream, which is a heuristic, so `system` remains the default and the fallback.
     audio_source: Literal["system", "microphone", "application"] = "system"
+    #: Which video encoder to use. **`software` by default, deliberately.** Hardware AV1 was
+    #: measured four times cheaper on CPU and was the default until a real capture produced
+    #: `amdgpu: The CS has cancelled because the context is lost. This context is guilty of a hard
+    #: recovery.` — a GPU context loss that kills the recording and can take the desktop session,
+    #: and therefore the window being recorded, with it. A tool for recording talks that happen once
+    #: does not trade that for CPU. `hardware` remains available for anyone whose driver is happier.
+    encoder: Literal["software", "hardware"] = "software"
 
 
 class ShortcutsConfig(_Base):

@@ -54,6 +54,10 @@ class CaptureOptions(_Model):
     live_transcription: bool = True
     post_transcription: bool = True
     video: bool = True
+    #: Which audio this run records. Per-run for the same reason the others are: the same person
+    #: records a talk playing in a window one minute and their own commentary over it the next, and
+    #: a setting two screens away is one nobody changes and everybody is surprised by.
+    audio_source: Literal["system", "microphone", "application"] = "system"
 
     @property
     def records_nothing(self) -> bool:
