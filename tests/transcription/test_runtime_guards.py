@@ -6,9 +6,9 @@ broken in every user-visible respect, because every test asserted the shape of a
 none opened a file. The specific faults it missed:
 
 * a pipeline that wrote **480x16** — valid command, exit code 0, no warning;
-* `pw-record` emitting an **AU container header** whose bytes decode to `NaN` — a capture that ran at
-  the right rate, for the right duration, and transcribed silence, because one NaN poisons every
-  downstream mean, peak and RMS.
+* `pw-record` emitting an **AU container header** whose bytes decode to `NaN` — a capture that ran
+  at the right rate, for the right duration, and transcribed silence, because one NaN poisons
+  every downstream mean, peak and RMS.
 
 Neither is detectable by a test double. Both are detectable in three lines by the running capture,
 which is where those checks now are. **The tests in this file exercise the guards** — they are the

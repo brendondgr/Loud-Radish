@@ -45,6 +45,9 @@ class RecordingStore {
     this.totalSeconds = payload.total_seconds ?? 0;
     this.segments = payload.segments ?? 0;
     this.error = payload.error ?? "";
+    // The measured character of the audio, carried on the same payload so an empty transcript can
+    // explain itself without the interface making a second request to find out why.
+    this.audio = payload.audio ?? null;
     emit(RECORDING_CHANGED, this);
   }
 
@@ -71,11 +74,36 @@ class RecordingStore {
     this.totalSeconds = 0;
     this.segments = 0;
     this.error = "";
+    this.audio = null;
     emit(RECORDING_CHANGED, this);
   }
 
   get isTranscribing() {
     return this.state === "running";
+  }
+
+  /**
+   * The pass finished and found nothing to transcribe.
+   *
+   * Distinct from a failure and from an ordinary finish. An empty transcript with no explanation
+   * reads as a crash — a five-minute recording that produced two segments looks identical whether
+   * the transcriber broke or whether the recording was music. The server measures the audio and
+   * says which, and this is how the interface knows to say so.
+   */
+  get foundNoSpeech() {
+    return this.state === "done_no_speech";
+  }
+
+  /** One line explaining an empty transcript, drawn from the measured audio. */
+  get noSpeechReason() {
+    const audio = this.audio ?? {};
+    if (audio.likely_content === "likely_music_or_game") {
+      return "The audio was captured correctly but does not sound like speech.";
+    }
+    if (audio.audible_pct !== undefined && audio.audible_pct < 5) {
+      return "The recording is silent — check that the right audio source was captured.";
+    }
+    return "No speech was detected in this recording.";
   }
 
   /** Progress as a whole percentage, for a label. */

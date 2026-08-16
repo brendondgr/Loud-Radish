@@ -193,19 +193,20 @@ Python/GI sketch:
 ```python
 from gi.repository import Gst
 
+
 def _on_caps(pad, info, user_data):
     ev = info.get_event()
     if ev.type != Gst.EventType.CAPS:
         return Gst.PadProbeReturn.OK
     caps = ev.parse_caps()
     s = caps.get_structure(0)
-    ok_w, width  = s.get_int("width")
+    ok_w, width = s.get_int("width")
     ok_h, height = s.get_int("height")
     ok_f, fr_n, fr_d = s.get_fraction("framerate")
     if ok_w and ok_h:
-        user_data.on_source_geometry(width, height,
-                                     (fr_n / fr_d) if ok_f and fr_d else None)
+        user_data.on_source_geometry(width, height, (fr_n / fr_d) if ok_f and fr_d else None)
     return Gst.PadProbeReturn.OK
+
 
 src_pad = pipewiresrc.get_static_pad("src")
 src_pad.add_probe(Gst.PadProbeType.EVENT_DOWNSTREAM, _on_caps, state)
@@ -659,6 +660,7 @@ and `vapostproc` are stricter still about dimensions and formats than software e
 ```python
 def _even(n: int) -> int:
     return n - (n & 1)
+
 
 target_w = _even(max(16, min(source_w, ceiling_w)))
 target_h = _even(max(16, min(source_h, ceiling_h)))

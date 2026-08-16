@@ -186,6 +186,17 @@ function wireRecording(banners) {
   on(TRANSCRIPTION_DONE, (payload) => {
     recording.setTranscription(payload);
     mode.setState(IDLE);
+    // A pass that finished and found nothing is not a failure, and must not be shown as one — but
+    // an empty transcript with no explanation reads as a crash, so it says which it was.
+    if (recording.foundNoSpeech) {
+      banners.show({
+        code: "no-speech",
+        // A warning rather than info: `info` is routed to the status bar by design, and this has
+        // to be read. An empty transcript the user cannot explain is the thing being prevented.
+        severity: "warning",
+        message: recording.noSpeechReason,
+      });
+    }
     // A second pass over a session that also transcribed live has just created a revision to
     // switch to, which is the one moment the switch becomes worth offering.
     void refreshRevisions(window.transcriptPane);

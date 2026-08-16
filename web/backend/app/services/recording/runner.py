@@ -13,6 +13,7 @@ this arrangement exists to make impossible.
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import time
@@ -23,6 +24,7 @@ from typing import Any
 from ...models.segment import Segment
 from ..transcript import TranscriptStore
 from .batch import BatchError, transcribe_file
+from .characterise import characterise
 from .job import JobRegistry, TranscriptionJob
 
 logger = logging.getLogger(__name__)
@@ -143,7 +145,14 @@ class TranscriptionRunner:
             self._fail(job, store, f"The transcription pass failed: {exc}")
             return
 
-        job.finish()
+        # **Measured before the outcome is named.** "322 seconds processed, 2 segments" is
+        # unfalsifiable from outside — it is what a broken transcriber looks like *and* what an
+        # accurate one looks like on music. The sidecar and the terminal state together make it
+        # answerable by reading a file instead of by an afternoon with ffmpeg and numpy.
+        job.audio = self._characterise(job)
+        found_speech = job.segments_written > 0
+        job.finish(found_speech=found_speech)
+        self._write_sidecar(job)
         store.mark_ended()
         self._release(store)
 
@@ -156,6 +165,40 @@ class TranscriptionRunner:
         logger.info(
             "Transcription of %s finished: %d segments.", job.source_path, job.segments_written
         )
+
+    def _characterise(self, job: TranscriptionJob) -> dict[str, Any]:
+        """Measure the recording's audio. Never fatal — a failed measurement loses a diagnostic."""
+        try:
+            return characterise(job.source_path).as_dict()
+        except Exception:  # noqa: BLE001 - a diagnostic must never fail the pass it describes
+            logger.exception("Could not characterise %s", job.source_path)
+            return {}
+
+    def _write_sidecar(self, job: TranscriptionJob) -> None:
+        """Write the measurements beside the recording, as its own artefact.
+
+        Research §9.2: once every recording carries its own measured dimensions, levels, spectrum
+        and speech ratio, a whole class of "it seemed to work" becomes a diff between two JSON
+        documents. Written next to the audio rather than into the database because it describes the
+        *file*, and it should survive the session being deleted.
+        """
+        source = Path(job.source_path)
+        payload = {
+            "session_id": job.session_id,
+            "source": source.name,
+            "audio": job.audio,
+            "transcription": {
+                "state": str(job.state),
+                "segments": job.segments_written,
+                "total_seconds": round(job.total_seconds, 2),
+                "transcribed_seconds": round(job.transcribed_seconds, 2),
+                "error": job.error,
+            },
+        }
+        try:
+            source.with_suffix(".json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        except OSError:
+            logger.warning("Could not write the measurement sidecar for %s", source)
 
     def _on_window(
         self,
