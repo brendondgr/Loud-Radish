@@ -177,9 +177,19 @@ def assemble(
     if config.context.glossary_enabled:
         take("glossary", _render_glossary(store.glossary()), "the glossary")
 
-    messages: list[LlmMessage] = [system(prompts.SYSTEM_PROMPT)]
-    if blocks:
-        messages.append(system("\n\n".join(blocks)))
+    # **One system message, not two.** The standing instructions and the context blocks used to be
+    # sent as separate `system` messages, which is legal in the OpenAI schema and rejected by real
+    # servers: the user's own endpoint answers `400 System message must be at the beginning` for the
+    # second one, so the assistant could not answer a single question whenever any context block
+    # survived the budget — which is to say, almost always. Reproduced directly against it: two
+    # system messages 400, the identical content merged into one 200.
+    #
+    # Instructions first, then the material they refer to, so the merged prompt reads in the order
+    # it was written. The Anthropic backend already concatenates system parts exactly this way
+    # (`llm/anthropic.py`), so this makes the two backends agree rather than making one a special
+    # case.
+    preamble = [prompts.SYSTEM_PROMPT, *blocks]
+    messages: list[LlmMessage] = [system("\n\n".join(preamble))]
 
     # 6. Conversation history, so a follow-up question makes sense. Added last and charged against
     #    whatever is left, because context about the talk beats context about the conversation.

@@ -120,3 +120,33 @@ async def test_cancelling_mid_stream_stops_the_request(backend) -> None:
 
     await stream.aclose()
     assert received >= 2
+
+
+async def test_an_assembled_question_is_accepted_by_a_real_server() -> None:
+    """**The reported fault, end to end against the thing that rejected it.**
+
+    Every question returned `400 System message must be at the beginning`, because the assembler
+    sent the standing instructions and the context blocks as two separate `system` messages. That is
+    legal in the OpenAI schema and refused by real servers, so no unit test on the message list
+    could have caught it — only sending the real shape to a real server can, which is what this
+    does. A stub asserts the client handles the shapes this repository imagines.
+    """
+    from app.config.defaults import default_config
+    from app.models.session import Summary
+    from app.services.context.assembler import ContextRequest, assemble
+
+    from tests.assistant.test_context_assembly import FakeStore, talk
+
+    store = FakeStore(
+        segments=talk(),
+        summaries=[Summary(id=1, start=0.0, end=120.0, text="The speaker set up the problem.")],
+    )
+    built = assemble(store, default_config(), ContextRequest(question="What was said?", now=400.0))
+
+    backend = OpenAiCompatibleBackend(endpoint=ENDPOINT, model=MODEL)
+    chunks = [
+        chunk
+        async for chunk in backend.stream(built.messages, GenerationOptions(max_output_tokens=32))
+    ]
+
+    assert chunks, "the server accepted the request but returned nothing"

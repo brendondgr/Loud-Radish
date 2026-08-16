@@ -13,6 +13,7 @@ import pytest
 from app.config.defaults import default_config
 from app.models.segment import Segment
 from app.models.session import ChatMessage, Summary
+from app.services.context import prompts
 from app.services.context.assembler import (
     ContextRequest,
     assemble,
@@ -279,3 +280,58 @@ def test_the_context_timestamp_is_when_the_question_was_asked() -> None:
 def test_timestamps_match_what_the_transcript_shows(seconds: float, expected: str) -> None:
     """Hours appear only once there are any — a citation must be findable by eye."""
     assert timestamp(seconds) == expected
+
+
+# -- the shape the endpoint will actually accept -------------------------------------------
+#
+# Reported: every question returned HTTP 400 from the user's own server —
+# `System message must be at the beginning`. The standing instructions and the context blocks were
+# sent as two separate `system` messages. That is legal in the OpenAI schema and rejected in
+# practice: a strict server requires the system message to be *the* first one, and there to be one.
+# Reproduced against the endpoint at localhost:9090 before the fix and after it — two system
+# messages 400, the identical content merged into one 200 — which is why this is asserted on the
+# message list rather than on a mocked client.
+
+
+def test_exactly_one_system_message_is_sent() -> None:
+    """**The whole fault.** A second one is what the endpoint refuses."""
+    store = FakeStore(
+        segments=talk(),
+        summaries=[Summary(id=1, start=0.0, end=120.0, text="The speaker set up the problem.")],
+    )
+
+    result = assemble(store, config_with(), ContextRequest(question="why?", now=400.0))
+    systems = [i for i, m in enumerate(result.messages) if m.role == "system"]
+
+    assert systems == [0], f"expected one system message at index 0, got indices {systems}"
+
+
+def test_one_system_message_even_with_no_context_to_send() -> None:
+    """An empty store took the other branch, so it must be checked separately."""
+    result = assemble(FakeStore(), config_with(), ContextRequest(question="why?", now=0.0))
+    systems = [i for i, m in enumerate(result.messages) if m.role == "system"]
+
+    assert systems == [0]
+
+
+def test_the_instructions_come_before_the_material_they_govern() -> None:
+    """Merging must not reverse the prompt: the rules are stated, then the talk is quoted."""
+    store = FakeStore(segments=talk())
+    result = assemble(store, config_with(), ContextRequest(question="why?", now=400.0))
+    preamble = result.messages[0].content
+
+    assert preamble.index(prompts.SYSTEM_PROMPT) == 0
+    assert "verbatim" in preamble
+
+
+def test_merging_loses_none_of_the_context() -> None:
+    """The blocks still have to arrive — one message, not one message's worth of content."""
+    store = FakeStore(
+        segments=talk(),
+        summaries=[Summary(id=1, start=0.0, end=120.0, text="The speaker set up the problem.")],
+    )
+
+    result = assemble(store, config_with(), ContextRequest(question="why?", now=400.0))
+
+    assert "segment 39" in result.messages[0].content
+    assert "The speaker set up the problem." in result.messages[0].content
