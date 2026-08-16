@@ -18,9 +18,11 @@ parsing, the scoring, and the tap's lifecycle. The one that needs a real stream 
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 
 import pytest
+from app.services.audio import tap as tap_module
 from app.services.audio.tap import (
     ApplicationTap,
     PlaybackStream,
@@ -177,6 +179,7 @@ def test_the_same_node_is_not_linked_twice(monkeypatch) -> None:
         return "42" if command[:2] == ["pactl", "load-module"] else ""
 
     monkeypatch.setattr("app.services.audio.tap._run", fake_run)
+    monkeypatch.setattr("app.services.audio.tap._succeeded", lambda _command: True)
 
     tap = ApplicationTap()
     tap.open()
@@ -187,12 +190,118 @@ def test_the_same_node_is_not_linked_twice(monkeypatch) -> None:
     assert second == 0
 
 
+# -- a name no other tap can be holding ----------------------------------------------------------
+
+
+def test_every_tap_gets_a_name_of_its_own() -> None:
+    """**The fault that made every recent recording silent**, in one assertion.
+
+    The name used to be the constant `transcriber-tap`. `pactl load-module` outlives the process
+    that called it, so each session that died without teardown left one loaded — five were present
+    when this was diagnosed — and PipeWire does not uniquify node names. `pw-link` and `pw-record`
+    then resolve that one name independently and can land on **different nodes**, so the recorder
+    captures a sink nothing is linked to. Measured: RMS 0.0 with the leaks present, 0.0058 without.
+    """
+    names = {ApplicationTap().sink_name for _ in range(50)}
+
+    assert len(names) == 50
+    assert all(name.startswith(tap_module.TAP_SINK_PREFIX) for name in names)
+    assert all(tap_module._SINK_NAME.match(name) for name in names)
+
+
+def test_a_sink_left_by_a_dead_process_is_swept(monkeypatch) -> None:
+    unloaded: list[str] = []
+    listing = (
+        f"7\tmodule-null-sink\tsink_name={tap_module.TAP_SINK_PREFIX}-999999-abc123 x\t\n"
+        "9\tmodule-native-protocol-unix\t\t\n"
+    )
+    monkeypatch.setattr("app.services.audio.tap._process_alive", lambda _pid: False)
+    monkeypatch.setattr("app.services.audio.tap._run", lambda command, **_k: listing)
+    monkeypatch.setattr(
+        "app.services.audio.tap._succeeded", lambda command: unloaded.append(command[-1]) is None
+    )
+
+    assert tap_module.sweep_stale_sinks() == 1
+    assert unloaded == ["7"]
+
+
+def test_a_sink_belonging_to_a_live_process_is_left_alone(monkeypatch) -> None:
+    """A second instance of the application is a reasonable thing to be running.
+
+    Stealing its capture sink mid-recording would turn one person's tidy-up into another's silent
+    talk, which is the exact fault this sweep exists to prevent.
+    """
+    unloaded: list[str] = []
+    listing = (
+        f"7\tmodule-null-sink\tsink_name={tap_module.TAP_SINK_PREFIX}-{os.getpid()}-abc123\t\n"
+    )
+    monkeypatch.setattr("app.services.audio.tap._run", lambda command, **_k: listing)
+    monkeypatch.setattr(
+        "app.services.audio.tap._succeeded", lambda command: unloaded.append(command[-1]) is None
+    )
+
+    assert tap_module.sweep_stale_sinks() == 0
+    assert unloaded == []
+
+
+def test_a_sink_under_the_old_constant_name_is_always_stale(monkeypatch) -> None:
+    """Nothing creates that name any more, so whatever holds it is left over by definition."""
+    unloaded: list[str] = []
+    listing = f"3\tmodule-null-sink\tsink_name={tap_module.LEGACY_SINK_NAME}\t\n"
+    monkeypatch.setattr("app.services.audio.tap._run", lambda command, **_k: listing)
+    monkeypatch.setattr(
+        "app.services.audio.tap._succeeded", lambda command: unloaded.append(command[-1]) is None
+    )
+
+    assert tap_module.sweep_stale_sinks() == 1
+    assert unloaded == ["3"]
+
+
+def test_somebody_elses_null_sink_is_never_touched(monkeypatch) -> None:
+    unloaded: list[str] = []
+    listing = "5\tmodule-null-sink\tsink_name=my-loopback channel_map=stereo\t\n"
+    monkeypatch.setattr("app.services.audio.tap._run", lambda command, **_k: listing)
+    monkeypatch.setattr(
+        "app.services.audio.tap._succeeded", lambda command: unloaded.append(command[-1]) is None
+    )
+
+    assert tap_module.sweep_stale_sinks() == 0
+    assert unloaded == []
+
+
+def test_a_link_that_fails_is_not_counted(monkeypatch) -> None:
+    """**This guard could not fire.**
+
+    It read `if _run(...) is not None`, and `_run` returns `""` on failure and never returns
+    `None` — so every attempt counted as a success and `link_all(...) == 0`, the check that a tap
+    has something in it, was unreachable. It did not cause the silent recordings, and it is why
+    nothing upstream noticed them.
+    """
+    monkeypatch.setattr("app.services.audio.tap.tools_present", lambda: True)
+    monkeypatch.setattr(
+        "app.services.audio.tap._run",
+        lambda command, **_k: "42" if command[:2] == ["pactl", "load-module"] else "",
+    )
+    monkeypatch.setattr("app.services.audio.tap._succeeded", lambda _command: False)
+
+    tap = ApplicationTap()
+    tap.open()
+
+    assert tap.link_all([stream()]) == 0
+
+
 # -- against the real graph ----------------------------------------------------------------------
 
 
 @pipewire
 def test_a_tap_opens_and_closes_without_leaving_a_sink_behind() -> None:
-    """A leaked null sink appears in the user's output picker and outlives the application."""
+    """A leaked null sink appears in the user's output picker and outlives the application.
+
+    The count is read *after* an opening sweep rather than before, because opening now removes
+    sinks left by processes that are gone — which would otherwise make a correct teardown look like
+    it had removed more than it created.
+    """
+    tap_module.sweep_stale_sinks()
     before = _null_sinks()
 
     tap = ApplicationTap(sink_name="transcriber-tap-test")
@@ -205,6 +314,38 @@ def test_a_tap_opens_and_closes_without_leaving_a_sink_behind() -> None:
 
     assert not tap.is_open
     assert _null_sinks() == before
+
+
+@pipewire
+def test_two_taps_open_at_once_are_two_different_sinks() -> None:
+    """The regression test for the silent recordings, against the real graph.
+
+    Two sinks sharing a name is not a tidiness problem — it is a capture that records nothing,
+    because `pw-link` and `pw-record` resolve the name to whichever node they each find first.
+    """
+    first, second = ApplicationTap(), ApplicationTap()
+    first.open()
+    try:
+        second.open()
+        try:
+            assert first.sink_name != second.sink_name
+            names = _sink_names()
+            assert names.count(first.sink_name) == 1
+            assert names.count(second.sink_name) == 1
+        finally:
+            second.close()
+    finally:
+        first.close()
+
+    assert first.sink_name not in _sink_names()
+    assert second.sink_name not in _sink_names()
+
+
+def _sink_names() -> list[str]:
+    result = subprocess.run(
+        ["pactl", "list", "short", "sinks"], capture_output=True, text=True, timeout=10, check=False
+    )
+    return [line.split("\t")[1] for line in result.stdout.splitlines() if "\t" in line]
 
 
 @pipewire

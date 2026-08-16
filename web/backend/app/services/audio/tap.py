@@ -29,8 +29,11 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import re
 import shutil
 import subprocess
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, Final
 
@@ -39,9 +42,14 @@ logger = logging.getLogger(__name__)
 #: The class a playback stream carries. Anything else in the graph is a device or a capture.
 PLAYBACK_CLASS: Final = "Stream/Output/Audio"
 
-#: Name of the sink this creates. One at a time, and destroyed explicitly on stop — leaked null
-#: sinks accumulate across crashes and are visible to the user in their output picker.
-TAP_SINK_NAME: Final = "transcriber-tap"
+#: Shared start of every tap sink's name. Only used to *recognise* this application's sinks — the
+#: name a sink is actually created with always carries the owning process and a random suffix, for
+#: the reason set out on :func:`tap_sink_name`.
+TAP_SINK_PREFIX: Final = "transcriber-tap"
+
+#: The name taps used to be created with, before it carried a process id. Left here so the sweep
+#: can still recognise and remove sinks leaked by a build that predates this.
+LEGACY_SINK_NAME: Final = "transcriber-tap"
 
 #: How long to wait on the PipeWire tools. They answer in milliseconds when the daemon is healthy.
 TIMEOUT_S: Final = 5.0
@@ -159,6 +167,87 @@ def rank(
     return sorted(streams, key=lambda s: score(s, app_id=app_id, title=title), reverse=True)
 
 
+def tap_sink_name() -> str:
+    """A sink name no other tap on this machine can be holding.
+
+    **The single most important line in this module, and it used to be a constant.** PipeWire does
+    not uniquify node names, and `pactl load-module` outlives the process that called it — so every
+    session that ended without reaching teardown left a sink called `transcriber-tap` loaded, and
+    they accumulated. Five of them were present when this was diagnosed.
+
+    With more than one candidate, `pw-link <app>:output_FL transcriber-tap:playback_FL` and
+    `pw-record --target=transcriber-tap` resolve the name **independently, and can resolve it to
+    different nodes**. The recorder then captures a sink nothing is linked to, which is a perfectly
+    healthy capture of nothing: the same code, one minute apart, measured RMS 0.0 with the leaked
+    sinks present and 0.0058 once they were unloaded. Every recent recording's sidecar read
+    `rms: 0.0, peak: 0.0, likely_content: "silent"`.
+
+    The process id makes the sweep possible and the random suffix makes a collision impossible even
+    within one process, so neither depends on the other being right.
+    """
+    return f"{TAP_SINK_PREFIX}-{os.getpid()}-{uuid.uuid4().hex[:6]}"
+
+
+#: Matches a name from :func:`tap_sink_name`, capturing the process that created it.
+_SINK_NAME = re.compile(rf"^{re.escape(TAP_SINK_PREFIX)}-(\d+)-[0-9a-f]+$")
+
+#: Finds `sink_name=...` in the argument string `pactl list short modules` prints.
+_SINK_ARG = re.compile(r"sink_name=(\S+)")
+
+
+def _process_alive(pid: int) -> bool:
+    """Whether a process id is still running. A recycled id costs a leaked sink, nothing worse."""
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # Alive, and owned by somebody else — which is reason enough not to touch its sink.
+        return True
+    except OSError:
+        return True
+    return True
+
+
+def sweep_stale_sinks() -> int:
+    """Unload tap sinks left behind by processes that are gone. Returns how many were removed.
+
+    Leaked sinks are not merely untidy: identically named ones are what made a capture record
+    silence, and they are visible to the user in their output picker until something removes them.
+    Nothing else will — a `pactl` module belongs to the PipeWire daemon and survives until it is
+    unloaded or the daemon restarts.
+
+    **Sinks belonging to a live process are left alone**, including this one's own earlier taps
+    while a session still holds them, because a second instance of the application is a thing a
+    person may reasonably be running and stealing its capture sink would break it.
+    """
+    listing = _run(["pactl", "list", "short", "modules"], allow_failure=True)
+    if not listing:
+        return 0
+
+    removed = 0
+    for line in listing.splitlines():
+        fields = line.split("\t")
+        if len(fields) < 2 or fields[1] != "module-null-sink":
+            continue
+        found = _SINK_ARG.search(fields[2] if len(fields) > 2 else "")
+        if not found:
+            continue
+        name = found.group(1)
+
+        if name == LEGACY_SINK_NAME:
+            # Nothing creates this name any more, so whatever holds it is by definition stale.
+            stale = True
+        else:
+            match = _SINK_NAME.match(name)
+            stale = bool(match) and not _process_alive(int(match.group(1)))
+
+        if stale and _succeeded(["pactl", "unload-module", fields[0]]):
+            logger.info("Removed a leaked capture sink (%s)", name)
+            removed += 1
+    return removed
+
+
 class ApplicationTap:
     """A private sink carrying one application's audio, without diverting it.
 
@@ -166,8 +255,10 @@ class ApplicationTap:
     the user's output picker and survives until they notice it.
     """
 
-    def __init__(self, sink_name: str = TAP_SINK_NAME) -> None:
-        self.sink_name = sink_name
+    def __init__(self, sink_name: str = "") -> None:
+        #: Empty means "pick a unique one at open". Resolving it here would be just as correct, but
+        #: the name is worth generating next to the sweep that depends on its shape.
+        self.sink_name = sink_name or tap_sink_name()
         self._module = ""
         self._linked: set[str] = set()
 
@@ -201,6 +292,11 @@ class ApplicationTap:
                 "cannot be captured. Install pipewire-utils, or record the system's whole output."
             )
 
+        # Before creating one, remove the ones nobody owns. Unique names mean a leak can no longer
+        # break a capture, but a leak is still a sink in the user's output picker, and the daemon
+        # will hold it until something says otherwise.
+        sweep_stale_sinks()
+
         module = _run(
             [
                 "pactl",
@@ -231,16 +327,18 @@ class ApplicationTap:
             key = f"{stream.node_name}:{channel}"
             if key in self._linked:
                 continue
-            result = _run(
+            # **The exit status, not the output.** This read `if _run(...) is not None`, and `_run`
+            # returns `""` on failure and never returns `None` — so every attempt counted as a
+            # success and `link_all(...) == 0`, the guard against a tap with nothing in it, could
+            # not fire. A mono application really does have no FR port, and that really is not a
+            # failure, but it has to be distinguished from a link that did not happen.
+            if _succeeded(
                 [
                     "pw-link",
                     f"{stream.node_name}:output_{channel}",
                     f"{self.sink_name}:playback_{channel}",
-                ],
-                allow_failure=True,
-            )
-            # A mono application has no FR port; that is not a failure.
-            if result is not None:
+                ]
+            ):
                 self._linked.add(key)
                 linked += 1
         if linked:
@@ -277,6 +375,21 @@ def _tokens(text: str) -> set[str]:
     """Words worth comparing between a window title and a stream's media name."""
     cleaned = "".join(char.lower() if char.isalnum() else " " for char in text)
     return {word for word in cleaned.split() if len(word) > 3}
+
+
+def _succeeded(command: list[str]) -> bool:
+    """Whether a PipeWire tool exited zero. For calls whose *outcome* matters, not their output."""
+    try:
+        result = subprocess.run(  # noqa: S603 - fixed binaries, no shell
+            command, capture_output=True, text=True, timeout=TIMEOUT_S, check=False
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        logger.debug("%s failed: %s", command[0], exc)
+        return False
+    if result.returncode != 0:
+        logger.debug("%s exited %d: %s", command[0], result.returncode, result.stderr.strip())
+        return False
+    return True
 
 
 def _run(command: list[str], *, allow_failure: bool = False) -> str:
