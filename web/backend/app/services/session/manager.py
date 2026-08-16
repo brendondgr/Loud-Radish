@@ -31,6 +31,8 @@ from ..asr.contract import AsrLoadError
 from ..audio import LevelMeter, WavFileSource
 from ..audio.monitor import MonitorUnavailable
 from ..audio.sources import AudioSource, DeviceSource, MonitorSource, SourceInfo
+from ..audio.tap import ApplicationTap, TapError
+from ..audio.tap import playback_streams as tap_streams
 from ..capture import (
     MuxResult,
     PortalDeclined,
@@ -155,6 +157,9 @@ class SessionManager:
         #: `None` in every other mode, and either may be `None` in this one — video is optional.
         self._recorder: WindowRecorder | None = None
         self._portal: PortalSession | None = None
+        #: The application audio tap, when window mode was asked for one. Closed in teardown —
+        #: a leaked null sink shows up in the user's output picker and survives until they notice.
+        self._tap: ApplicationTap | None = None
         #: Where the video landed, kept past teardown so the audio can be muxed into it.
         self._video_path = ""
         #: The per-run options a window session was armed with.
@@ -928,6 +933,9 @@ class SessionManager:
                 frame_ms=config.audio.frame_ms,
                 speed=config.audio.file_speed,
             )
+        if mode == modes.WINDOW and config.capture.audio_source == "application":
+            return self._open_application_tap(config)
+
         if mode == modes.WINDOW and config.capture.audio_source == "system":
             try:
                 return MonitorSource(frame_ms=config.audio.frame_ms)
@@ -938,6 +946,35 @@ class SessionManager:
                 raise SessionError(str(exc)) from exc
 
         return DeviceSource(device_id=config.audio.device_id, frame_ms=config.audio.frame_ms)
+
+    def _open_application_tap(self, config: AppConfig) -> AudioSource:
+        """Tap the chosen window's own audio, leaving it playing on the user's speakers.
+
+        Falls back to the machine's whole output when no playback stream can be matched — which is
+        the honest outcome rather than a failure, because "nothing is playing yet" is the ordinary
+        state at the moment a recording starts. The fallback is logged and reported, so a recording
+        that captured more than the window can be explained afterwards rather than discovered.
+        """
+        streams = tap_streams()
+        if not streams:
+            logger.info(
+                "No application is playing audio, so the whole system output is recorded instead."
+            )
+            return MonitorSource(frame_ms=config.audio.frame_ms)
+
+        tap = ApplicationTap()
+        try:
+            tap.open()
+            # The *set*, not the best one: a browser owns a playback node per media element, and
+            # linking only the top-ranked node records only whichever tab happened to be first.
+            tap.link_all(streams)
+        except TapError as exc:
+            tap.close()
+            logger.warning("Could not tap the application's audio (%s); recording all output.", exc)
+            return MonitorSource(frame_ms=config.audio.frame_ms)
+
+        self._tap = tap
+        return MonitorSource(frame_ms=config.audio.frame_ms, tap=tap)
 
     async def _load_model(self, config: AppConfig) -> None:
         """Load the ASR model, translating a failure into a remedy the user can act on."""
@@ -965,6 +1002,10 @@ class SessionManager:
         # a clean stop, a declined portal, an abrupt shutdown — and a claim that survives one of
         # them makes the application refuse to record for the rest of its life.
         self._claimed = False
+
+        tap, self._tap = self._tap, None
+        if tap is not None:
+            tap.close()
 
         # Before the store closes, and before the ordinary stop path is assumed to have run: an
         # abrupt shutdown reaches here without passing through `stop`, and a polish task still

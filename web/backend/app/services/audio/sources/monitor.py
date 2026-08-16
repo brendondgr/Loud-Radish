@@ -22,6 +22,7 @@ import logging
 import subprocess
 import threading
 import time
+from typing import Any
 
 import numpy as np
 
@@ -49,8 +50,12 @@ RATE_TOLERANCE = 0.02
 class MonitorSource(AudioSource):
     """The machine's audio output, as canonical-format frames."""
 
-    def __init__(self, node: str = "", frame_ms: int = 32) -> None:
+    def __init__(self, node: str = "", frame_ms: int = 32, tap: Any = None) -> None:
         super().__init__(frame_ms=frame_ms)
+        #: An open :class:`~app.services.audio.tap.ApplicationTap` whose monitor to record instead
+        #: of the default sink's. Owned by the caller, which also closes it — this source records
+        #: what it is pointed at and does not manage the graph.
+        self._tap = tap
         #: Empty means "resolve at start". Resolving here would fix the node at construction time,
         #: and the default sink changes when a dock or a headset appears — see ``audio/monitor.py``.
         self._requested = node
@@ -71,7 +76,10 @@ class MonitorSource(AudioSource):
         if self._process is not None:
             return
 
-        self._node = self._requested or default_monitor()
+        if self._tap is not None and self._tap.is_open:
+            self._node = self._tap.monitor
+        else:
+            self._node = self._requested or default_monitor()
         self._on_frame = on_frame
         self._on_error = on_error
 
