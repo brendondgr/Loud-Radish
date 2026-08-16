@@ -25,6 +25,7 @@ import { ApiError, api } from "./transport/api.js";
 import {
   ASR_PROGRESS,
   AUDIO_LEVEL,
+  CONNECTED,
   CONNECTION_CHANGED,
   CAPTURE_STATE,
   RECORDING_PROGRESS,
@@ -178,6 +179,14 @@ function wireRecording(banners) {
   on(RECORDING_PROGRESS, (payload) => recording.setRecording(payload));
   on(CAPTURE_STATE, (payload) => capture.set(payload));
 
+  // **Reconcile on every connect, not just the first.** The socket is a latency optimisation; the
+  // authoritative answer is a GET. A client that only ever learned about capture from an event it
+  // may not have been present for is a client that shows an empty monitor pane through an entire
+  // recording — which is exactly what happened.
+  on(CONNECTION_CHANGED, ({ state }) => {
+    if (state === CONNECTED) void reconcileCapture();
+  });
+
   on(TRANSCRIPTION_PROGRESS, (payload) => {
     recording.setTranscription(payload);
     mode.setState(PROCESSING);
@@ -258,6 +267,16 @@ function wireSession(header) {
     if (recording.isTranscribing) mode.setState(PROCESSING);
   });
   void header;
+}
+
+/** Ask the server what the capture is actually doing, and adopt the answer. */
+async function reconcileCapture() {
+  try {
+    capture.set(await api.captureState());
+  } catch {
+    // A failed reconciliation leaves whatever the events said, which is the better fallback:
+    // the pane keeps showing a live capture rather than blanking on a transient network error.
+  }
 }
 
 /** Controls that belong to the page frame rather than to any one component. */

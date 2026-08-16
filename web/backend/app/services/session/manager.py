@@ -605,6 +605,16 @@ class SessionManager:
                     {"duration_s": round(sink.duration_s, 2), "bytes": sink.bytes_written},
                 )
 
+            # **A heartbeat, not just an announcement.** `capture.state` used to be emitted exactly
+            # once, when capture started — a fact broadcast into a lossy channel with no
+            # reconciliation. Four ordinary events lost it permanently: a page loaded after the
+            # emit, a socket reconnect, a second tab, or the emit racing the recorder into
+            # existence. In every one of those the monitor pane never learned there was anything to
+            # show, and nothing ever corrected it. Re-sent every second, a missed emit costs a
+            # second instead of the whole recording.
+            if self._recorder is not None:
+                self._emit("capture.state", self.capture_state())
+
             # Only warn once the model has actually run: a factor of zero before the speaker starts
             # is not the system falling behind.
             if metrics.engine.inference_passes > 3 and 0.0 < metrics.real_time_factor < 1.0:

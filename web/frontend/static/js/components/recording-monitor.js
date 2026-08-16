@@ -46,7 +46,14 @@ export class RecordingMonitor {
 
     // A backgrounded tab still runs timers, just slowly — and encoding a frame nobody can see is
     // pure waste on a CPU already sharing itself with a speech model.
-    document.addEventListener("visibilitychange", () => this._syncTimer());
+    // **Refresh immediately on becoming visible, then resume the timer.** Background tabs throttle
+    // `setInterval` to a second at best and can freeze it entirely, so a tab returning from the
+    // background would otherwise show a frame from whenever it was last awake — a frozen picture,
+    // which is the symptom this pane exists to distinguish from a dead capture.
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) this._refresh();
+      this._syncTimer();
+    });
 
     this.render();
   }
@@ -97,9 +104,14 @@ export class RecordingMonitor {
         this.hasFrame = true;
         this._renderPreview();
       });
-      // A frame that fails to load leaves the previous one on screen rather than a broken-image
-      // icon, which would read as the capture having failed when it has not.
-      this.image.addEventListener("error", () => {});
+      // **Retry rather than give up.** A frame that fails to load leaves the previous one on
+      // screen rather than a broken-image icon — but the important part is that it tries again.
+      // The route legitimately 404s before the first frame is written and while one is being
+      // rewritten in place, and a pane that treated the first 404 as permanent stayed empty for
+      // the rest of the recording. A pane that retries forever is strictly better.
+      this.image.addEventListener("error", () => {
+        if (!this.hasFrame) setTimeout(() => this._refresh(), REFRESH_MS);
+      });
       this.previewWrap?.append(this.image);
       this._refresh();
     }

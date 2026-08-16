@@ -12,9 +12,12 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 
 router = APIRouter(prefix="/api/capture", tags=["capture"])
+
+#: A complete JPEG ends with this. Its absence means the file was caught mid-write.
+JPEG_END = b"\xff\xd9"
 
 
 def _manager(request: Request):  # noqa: ANN201 - returns SessionManager
@@ -32,7 +35,7 @@ async def capture_state(request: Request) -> dict[str, Any]:
 
 
 @router.get("/preview.jpg")
-async def preview(request: Request) -> FileResponse:
+async def preview(request: Request) -> Response:
     """The most recent preview frame.
 
     404 whenever there is not one — no capture, no `jpegenc`, or the first frame not yet written.
@@ -53,10 +56,38 @@ async def preview(request: Request) -> FileResponse:
                     "severity": "info",
                 }
             },
+            # **On the 404 too.** A cached 404 is sticky: a browser that caches "there is no
+            # preview" will not ask again for a while, and the pane stays empty for the rest of the
+            # recording even though frames started arriving a second later. This is the header that
+            # makes "not yet" recoverable rather than permanent.
+            headers={"Cache-Control": "no-store, max-age=0"},
         )
 
-    return FileResponse(
-        path,
+    # **Read and validate rather than stream.** `multifilesink` rewrites this file in place roughly
+    # once a second, so a request can arrive mid-write and serve a truncated JPEG — which renders as
+    # a torn or blank frame and looks exactly like a broken capture. A complete JPEG ends with the
+    # end-of-image marker; one that does not is a frame caught in the middle of being written, and
+    # the honest response is to say "not yet" rather than to draw half a picture.
+    try:
+        frame = path.read_bytes()
+    except OSError:
+        frame = b""
+
+    if not frame.endswith(JPEG_END):
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": {
+                    "code": "preview-incomplete",
+                    "message": "The preview frame is still being written.",
+                    "severity": "info",
+                }
+            },
+            headers={"Cache-Control": "no-store, max-age=0"},
+        )
+
+    return Response(
+        content=frame,
         media_type="image/jpeg",
         # The file is rewritten in place roughly once a second, so any caching at all serves a
         # stale frame — which reads as a capture that has frozen.
