@@ -314,6 +314,11 @@ user's own machine, and none may be reported as passing until it has had one.
       rather than presented as microphones, but on a PipeWire desktop PortAudio does not expose the
       sink monitors at all, so what is offered is whatever the JACK bridge surfaces. Capturing a
       remote talk this way needs confirming on your own setup.
+- [ ] **Copy a quote from polished prose and check the timestamp.** Verified in the browser
+      against the real `selection.js` on a reconstruction of a real block — prose 95 s into a block
+      starting at 0.0 now stamps `00:01:35` where it stamped `00:00:00`. What is owed is the same
+      check on a live session, selecting with the mouse rather than a scripted Range, since the
+      anchor node a hand-drawn selection produces is the one variable a script cannot reproduce.
 - [ ] **A window recording where the audio starts *after* you press record.** The session now
       re-links playing streams on every status tick, because an application creates a playback node
       when media starts and the old code linked once at open — so pressing record and then pressing

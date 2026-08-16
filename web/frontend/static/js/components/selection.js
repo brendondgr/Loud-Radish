@@ -57,19 +57,52 @@ export class TranscriptSelection {
   /**
    * The session time the selection begins at.
    *
-   * Read from the enclosing segment's `data-start` rather than interpolated within it: the segment
-   * is the unit the transcript stores times for, and a guess at a word's offset inside it would be
-   * a citation that lands in the wrong place.
+   * Read from the enclosing element's `data-start` rather than interpolated within it: a guess at a
+   * word's offset would be a citation that lands in the wrong place.
+   *
+   * **The enclosing element is not always a segment, and that is what made every copied timestamp
+   * read `00:00:00`.** A raw segment is a sentence or two, so its start is the right answer for
+   * anything inside it. A *polished* block is not — the pass rewrites a stretch of talk into
+   * continuous prose, and the blocks it produces are minutes long. Measured on two real sessions:
+   * six blocks across 784 seconds, two across 300, the first of each starting at **0.0** and running
+   * to 61 and 127 seconds respectively. So every quote taken from the opening two minutes of a talk
+   * was stamped with the start of the recording, which is both wrong and the case a user is most
+   * likely to hit.
+   *
+   * The block already carries the answer. Polish writes inline `[mm:ss]` markers through the prose
+   * and `transcript-pane.withTimes` renders each as a span with its own `data-start`, so the last
+   * marker *before* the selection is the moment that passage was said. Falling back to the
+   * container's own start when there is no preceding marker keeps the first sentence of a block
+   * answerable.
    */
   _startOf(selection) {
     let node = selection.anchorNode;
     while (node && node !== this.scroller) {
       if (node.nodeType === Node.ELEMENT_NODE && node.dataset?.start !== undefined) {
-        return Number(node.dataset.start);
+        return this._markedTimeBefore(node, selection.anchorNode) ?? Number(node.dataset.start);
       }
       node = node.parentNode;
     }
     return null;
+  }
+
+  /**
+   * The last inline time marker inside `container` that precedes `anchor`, in seconds.
+   *
+   * Returns null when the container has no markers — a raw segment never does — or when the
+   * selection starts before the first of them, which is the case the container's own start answers.
+   */
+  _markedTimeBefore(container, anchor) {
+    if (!anchor || typeof container.querySelectorAll !== "function") return null;
+
+    let best = null;
+    for (const marker of container.querySelectorAll("[data-start]")) {
+      if (marker.contains(anchor)) return Number(marker.dataset.start);
+      // DOCUMENT_POSITION_FOLLOWING means the anchor comes after this marker in the document.
+      const after = marker.compareDocumentPosition(anchor) & Node.DOCUMENT_POSITION_FOLLOWING;
+      if (after) best = Number(marker.dataset.start);
+    }
+    return Number.isFinite(best) ? best : null;
   }
 
   _show(selection) {
