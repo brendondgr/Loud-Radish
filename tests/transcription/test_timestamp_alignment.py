@@ -242,7 +242,7 @@ def test_rounding_to_the_nearest_second_is_not_an_invention() -> None:
 
 
 def test_hours_are_read_as_hours() -> None:
-    """`[1:02:03]` is an hour in, `[1:02]` a minute in. Confusing them moves a citation by an hour."""
+    """`[1:02:03]` is an hour in, `[1:02]` a minute in. Confusing them moves a citation."""
     from app.services.context.assembler import resolve_citations
 
     _kept, dropped = resolve_citations("At [1:02:03].", {3723.0})
