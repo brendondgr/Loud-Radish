@@ -46,13 +46,9 @@ GUARD_SAMPLES = 16_000
 #: capture is considered mis-specified rather than merely jittery.
 RATE_TOLERANCE = 0.02
 
-#: How long :func:`carries_audio` listens before deciding. Long enough to cross a buffer boundary
-#: and short enough that nobody notices it in front of a record button.
-PROBE_S = 0.6
-
 
 def record_command(node: str, *, capture_sink: bool, destination: str = "-") -> list[str]:
-    """The ``pw-record`` invocation for one node, shared by the capture and the probe.
+    """The ``pw-record`` invocation for one node.
 
     **Two target forms, because two kinds of sink resolve differently**, measured rather than
     assumed. A real device's sink exposes a ``<name>.monitor`` *source* that ``pw-record`` finds
@@ -94,38 +90,6 @@ def record_command(node: str, *, capture_sink: bool, destination: str = "-") -> 
 
     # A dash is the pipe. Everything downstream reads bytes and never touches a file.
     return [*command, destination]
-
-
-def carries_audio(node: str, *, capture_sink: bool = True, seconds: float = PROBE_S) -> bool:
-    """Whether anything at all is arriving from ``node``, checked before a session commits to it.
-
-    **Bit-exact zeros, not "quiet".** Real audio — even a silent room, even a muted line with a
-    noise floor — does not produce a run of samples whose every byte is zero. A tap that does is a
-    tap the graph is not delivering into, which is what an ambiguous sink name produced and what
-    made recording after recording come back silent. Asking here costs six hundred milliseconds at
-    the start of a session; not asking cost the length of a talk.
-
-    Returns True when the probe cannot be run at all, because a probe that fails to start knows
-    nothing about the capture and must not be the thing that stops it.
-    """
-    try:
-        result = subprocess.run(  # noqa: S603 - fixed binary, no shell
-            record_command(node, capture_sink=capture_sink),
-            capture_output=True,
-            timeout=seconds,
-        )
-    except subprocess.TimeoutExpired as expired:
-        # The expected path: `pw-record` runs until it is stopped, so a healthy probe always times
-        # out. Whatever it wrote by then is the answer.
-        return bool((expired.stdout or b"").strip(b"\x00"))
-    except OSError:
-        return True
-
-    if result.returncode != 0:
-        # A target that could not be resolved. The capture itself will fail with the reason, which
-        # is a better message than anything this function could invent.
-        return True
-    return bool(result.stdout.strip(b"\x00"))
 
 
 class MonitorSource(AudioSource):

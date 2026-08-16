@@ -88,6 +88,11 @@ class NoTapInTests:
     def is_open(self) -> bool:
         return self._open
 
+    @property
+    def live_links(self) -> int:
+        """As many as were asked for. The real one counts links in the PipeWire graph."""
+        return 2 if self._open else 0
+
     def open(self) -> None:
         self._open = True
 
@@ -119,10 +124,9 @@ def no_real_audio_tap(monkeypatch):
 
     Patched on the *manager* rather than in `app.services.audio.tap`, so the tests in
     `test_audio_tap.py` that deliberately exercise the real graph — and clean up after themselves —
-    still do. Also stubs the probe: with no real sink there is nothing to listen to, and a probe
-    that heard nothing would refuse every window session in the suite.
+    still do. The double reports its own `live_links`, so the session's verification runs for real
+    against it rather than being stubbed out separately.
     """
     from app.services.session import manager as manager_module
 
     monkeypatch.setattr(manager_module, "ApplicationTap", NoTapInTests)
-    monkeypatch.setattr(manager_module, "carries_audio", lambda *_a, **_k: True)

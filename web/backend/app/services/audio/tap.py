@@ -260,6 +260,47 @@ def sweep_stale_sinks() -> int:
     return removed
 
 
+def linked_sources(sink_name: str) -> int:
+    """How many application ports are currently feeding this sink.
+
+    **A fact about the graph, and that is the point.** The first attempt at verifying a tap listened
+    to it and treated a run of bit-exact zeros as proof the graph was not delivering. That premise
+    holds for a microphone, which always carries a noise floor, and is false for an application:
+    a media player between sounds, a paused video whose stream is still open, or a clip with a
+    silent lead-in all write literal zeros. So a working capture was refused for being quiet, which
+    is a fault the user hit within a day.
+
+    Whether anything is *linked* cannot be confused with whether anything is *audible*. It is read
+    from `pw-dump`'s `Link` objects by node id rather than by parsing `pw-link -l`, because the ids
+    are structured JSON and the listing is a drawing.
+    """
+    raw = _run(["pw-dump"], allow_failure=True)
+    if not raw:
+        return 0
+    try:
+        objects = json.loads(raw)
+    except ValueError:
+        return 0
+
+    node_id = None
+    for entry in objects:
+        if entry.get("type") != "PipeWire:Interface:Node":
+            continue
+        props = entry.get("info", {}).get("props", {})
+        if props.get("node.name") == sink_name and props.get("media.class") == "Audio/Sink":
+            node_id = entry.get("id")
+            break
+    if node_id is None:
+        return 0
+
+    return sum(
+        1
+        for entry in objects
+        if entry.get("type") == "PipeWire:Interface:Link"
+        and entry.get("info", {}).get("props", {}).get("link.input.node") == node_id
+    )
+
+
 class ApplicationTap:
     """A private sink carrying one application's audio, without diverting it.
 
@@ -288,6 +329,16 @@ class ApplicationTap:
     @property
     def is_open(self) -> bool:
         return bool(self._module)
+
+    @property
+    def live_links(self) -> int:
+        """How many application ports are feeding this tap right now.
+
+        Zero on an open tap means the recording would be silent for a reason worth reporting: the
+        graph is not routing anything into it. Non-zero says nothing about whether the application
+        is currently making a sound, which is exactly the distinction that matters.
+        """
+        return linked_sources(self.sink_name) if self._module else 0
 
     def open(self) -> None:
         """Create the private sink.

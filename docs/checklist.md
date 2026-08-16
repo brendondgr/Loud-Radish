@@ -314,6 +314,11 @@ user's own machine, and none may be reported as passing until it has had one.
       rather than presented as microphones, but on a PipeWire desktop PortAudio does not expose the
       sink monitors at all, so what is offered is whatever the JACK bridge surfaces. Capturing a
       remote talk this way needs confirming on your own setup.
+- [ ] **A window recording where the audio starts *after* you press record.** The session now
+      re-links playing streams on every status tick, because an application creates a playback node
+      when media starts and the old code linked once at open — so pressing record and then pressing
+      play captured nothing. Verified against the real graph in isolation; not yet through a whole
+      session.
 - [ ] **A window recording that actually contains the window's sound (D-028).** The fault is
       understood, reproduced, and fixed under measurement — five identically named leaked null
       sinks meant `pw-link` and `pw-record` addressed different nodes, so the capture recorded

@@ -471,113 +471,186 @@ def test_no_source_yet_is_not_treated_as_loopback(tmp_path) -> None:
     assert manager._source_is_loopback is False
 
 
-# -- the tap proves it carries audio before the session commits ----------------------------------
+# -- the tap is verified against the graph, not against silence ----------------------------------
 #
-# Every layer reported success while recording nothing. The sink was created, the links were made,
-# `pw-record` ran at the right rate for the right duration, and the samples were bit-exact zeros for
-# the length of a talk. Unique sink names remove the cause; this removes the *class* of failure,
-# whatever causes it next — a capture that is delivering nothing says so in the first second.
+# The first version of this check listened to the tap and treated a run of bit-exact zeros as proof
+# the graph was not delivering. That premise holds for a microphone, which always carries a noise
+# floor, and is **false for an application** — a media player between sounds, a paused video whose
+# stream is still open, or a clip with a silent lead-in all write literal zeros. Working recordings
+# were refused for being quiet, within a day of the check shipping.
+#
+# Whether anything is *linked* cannot be confused with whether anything is *audible*, so that is
+# what is asked now. It still catches the fault the check exists for.
 
 
-def _tap_double(carries: bool, monkeypatch, streams):
-    """A manager whose tap opens cleanly and whose probe returns `carries`."""
-    from tests.conftest import NoTapInTests
+class _Tap:
+    """A tap double whose link count is whatever the test says it is."""
 
-    monkeypatch.setattr("app.services.session.manager.ApplicationTap", NoTapInTests)
-    monkeypatch.setattr("app.services.session.manager.tap_streams", lambda: streams)
-    monkeypatch.setattr("app.services.session.manager.carries_audio", lambda *_a, **_k: carries)
+    def __init__(self, links: int) -> None:
+        self.sink_name = "transcriber-tap-double"
+        self.live_links = links
+        self.closed = False
+        self.is_open = True
+
+    @property
+    def monitor(self) -> str:
+        return f"{self.sink_name}.monitor"
+
+    def open(self) -> None:
+        self.is_open = True
+
+    def link_all(self, streams) -> int:
+        return 2 * len(list(streams))
+
+    def close(self) -> None:
+        self.closed = True
+        self.is_open = False
 
 
-def _playing(state: str):
+def _stream(state: str = "running"):
     from app.services.audio.tap import PlaybackStream
 
-    return [
-        PlaybackStream(
-            node_id=1,
-            serial=1,
-            node_name="LibreWolf",
-            application="LibreWolf",
-            binary="librewolf",
-            media_name="A Lecture",
-            state=state,
-        )
-    ]
+    return PlaybackStream(
+        node_id=1,
+        serial=1,
+        node_name="LibreWolf",
+        application="LibreWolf",
+        binary="librewolf",
+        media_name="A Lecture",
+        state=state,
+    )
 
 
-def test_a_tap_that_delivers_nothing_refuses_to_start(tmp_path, monkeypatch) -> None:
-    """The alternative is a silent recording of a talk that happened once."""
+def _manager_with_tap(tmp_path, monkeypatch, links: int):
+    tap = _Tap(links)
+    monkeypatch.setattr("app.services.session.manager.ApplicationTap", lambda *_a, **_k: tap)
+    monkeypatch.setattr("app.services.session.manager.tap_streams", lambda: [_stream()])
+    manager, config = _manager(tmp_path)
+    return manager, config, tap
+
+
+def test_a_tap_nothing_is_routed_into_refuses_to_start(tmp_path, monkeypatch) -> None:
+    """The fault the check exists for: a sink no audio reaches records silence for a whole talk."""
     from app.services.session.manager import SessionError
 
-    _tap_double(carries=False, monkeypatch=monkeypatch, streams=_playing("running"))
-    manager, config = _manager(tmp_path)
-    manager._options = _options("system")
+    manager, config, tap = _manager_with_tap(tmp_path, monkeypatch, links=0)
 
-    with pytest.raises(SessionError, match="nothing is arriving"):
+    with pytest.raises(SessionError, match="nothing is connected"):
         manager._open_source(config, modes.WINDOW)
+    assert tap.closed, "a refused tap must not be left loaded in the graph"
 
 
-def test_a_tap_that_delivers_audio_is_used(tmp_path, monkeypatch) -> None:
-    _tap_double(carries=True, monkeypatch=monkeypatch, streams=_playing("running"))
-    manager, config = _manager(tmp_path)
-    manager._options = _options("system")
+def test_a_linked_tap_that_happens_to_be_silent_is_accepted(tmp_path, monkeypatch) -> None:
+    """**The regression this replaces.**
+
+    An application writes bit-exact zeros whenever it is between sounds. Refusing on that refused
+    recordings that would have worked, which is what the user reported the day the old check
+    shipped. Linked is linked, whether or not anyone is talking into it.
+    """
+    manager, config, _tap = _manager_with_tap(tmp_path, monkeypatch, links=2)
 
     source = manager._open_source(config, modes.WINDOW)
 
     assert source.info.kind == "loopback"
-
-
-def test_a_paused_application_is_not_treated_as_a_fault(tmp_path, monkeypatch) -> None:
-    """**The check only fires when something is actually playing.**
-
-    A stream that exists but is idle is a paused video, and a paused video is the user's business.
-    Refusing to start over one would be this guard inventing a fault of its own — someone who
-    presses record and *then* presses play is doing something entirely reasonable.
-    """
-    _tap_double(carries=False, monkeypatch=monkeypatch, streams=_playing("idle"))
-    manager, config = _manager(tmp_path)
-    manager._options = _options("system")
-
-    source = manager._open_source(config, modes.WINDOW)
-
-    assert source.info.kind == "loopback"
-
-
-def test_the_probe_reads_the_node_state_pipewire_reports() -> None:
-    """`running` is PipeWire's own word for a node that is producing audio."""
-    assert _playing("running")[0].running is True
-    assert _playing("idle")[0].running is False
-    assert _playing("suspended")[0].running is False
-
-
-def _options(choice: str):
-    from app.services.session.manager import CaptureOptions
-
-    return CaptureOptions(audio_source=choice)
-
-
-# -- the probe itself ----------------------------------------------------------------------------
-
-
-def test_an_unresolvable_target_is_not_the_probes_call_to_make() -> None:
-    """A probe that cannot run knows nothing, and must not be what stops a recording.
-
-    The capture itself fails on an unresolvable target with `defined target not found`, which is a
-    better message than anything this function could invent.
-    """
-    from app.services.audio.sources.monitor import carries_audio
-
-    assert carries_audio("no-such-node-anywhere-xyz", seconds=0.2) is True
 
 
 @pipewire
-def test_a_sink_with_nothing_linked_into_it_reads_as_silent() -> None:
-    """Bit-exact zeros, which is what an ambiguous sink name produced for a whole afternoon."""
-    from app.services.audio.sources.monitor import carries_audio
-    from app.services.audio.tap import ApplicationTap
+def test_a_real_tap_reports_its_links_without_listening_to_them() -> None:
+    """Against the real graph, and deliberately with nothing playing.
 
-    tap = ApplicationTap()
-    tap.open()
+    That is the state the old check could not tell apart from a broken one, so it is the state this
+    one has to be measured in.
+    """
+    from app.services.audio.tap import ApplicationTap, playback_streams
+
+    bare = ApplicationTap()
+    bare.open()
     try:
-        assert carries_audio(tap.sink_name, seconds=0.4) is False
+        assert bare.live_links == 0, "an unlinked tap must report no links"
+        streams = playback_streams()
+        if not streams:
+            pytest.skip("no application is playing audio to link")
+        bare.link_all(streams)
+        assert bare.live_links > 0, "a linked tap must report its links"
     finally:
-        tap.close()
+        bare.close()
+
+
+# -- the tap keeps linking while the recording runs ----------------------------------------------
+#
+# `tap.py`'s own module docstring says the set has to be watched, because "an application creates
+# and destroys playback nodes as the user opens tabs and starts media". The session linked once, at
+# open, and never again — so pressing record and *then* pressing play recorded nothing at all.
+
+
+def test_new_playback_nodes_are_linked_after_recording_starts(tmp_path, monkeypatch) -> None:
+    calls: list[int] = []
+
+    class Growing(_Tap):
+        def link_all(self, streams):
+            calls.append(len(list(streams)))
+            return 2
+
+    tap = Growing(links=2)
+    monkeypatch.setattr("app.services.session.manager.tap_streams", lambda: [_stream()])
+    manager, _config = _manager(tmp_path)
+    manager._tap = tap
+    manager._tap_match = False
+
+    manager._relink_tap()
+
+    assert calls == [1], "the status tick must re-link the streams playing now"
+
+
+def test_relinking_a_closed_tap_is_harmless(tmp_path, monkeypatch) -> None:
+    """The tick runs once a second in every mode, including after teardown has released the tap."""
+    manager, _config = _manager(tmp_path)
+    manager._tap = None
+
+    manager._relink_tap()  # must not raise
+
+
+# -- 'application' narrows to the window; 'system' does not --------------------------------------
+
+
+def test_the_application_choice_narrows_to_the_matching_streams(tmp_path, monkeypatch) -> None:
+    """`match` was documented and ignored: both choices linked everything that was playing."""
+    from app.services.audio.tap import PlaybackStream
+
+    wanted = _stream()
+    other = PlaybackStream(
+        node_id=2,
+        serial=2,
+        node_name="Music",
+        application="Music",
+        binary="music",
+        media_name="Some Song",
+        state="running",
+    )
+    monkeypatch.setattr("app.services.session.manager.tap_streams", lambda: [other, wanted])
+    manager, _config = _manager(tmp_path)
+    manager._options = _window_options("application", app_id="librewolf")
+
+    assert [s.node_name for s in manager._tap_candidates(match=True)] == ["LibreWolf"]
+    assert len(manager._tap_candidates(match=False)) == 2
+
+
+def test_a_window_that_matches_nothing_taps_everything(tmp_path, monkeypatch) -> None:
+    """The match is a heuristic over properties PipeWire warns are not authoritative (D-027).
+
+    It must not be the thing that decides a recording captures no audio at all.
+    """
+    monkeypatch.setattr("app.services.session.manager.tap_streams", lambda: [_stream()])
+    manager, _config = _manager(tmp_path)
+    manager._options = _window_options("application", app_id="nothing-like-this")
+
+    assert len(manager._tap_candidates(match=True)) == 1
+
+
+def _window_options(choice: str, *, app_id: str = "", title: str = ""):
+    from app.services.session.manager import CaptureOptions
+
+    options = CaptureOptions(audio_source=choice)
+    object.__setattr__(options, "window_app_id", app_id)
+    object.__setattr__(options, "window_title", title)
+    return options

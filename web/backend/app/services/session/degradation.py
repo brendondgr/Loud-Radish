@@ -285,3 +285,21 @@ def capture_failed(detail: str) -> Failure:
         severity=Severity.WARNING,
         transcription_continues=True,
     )
+
+
+def window_audio_stopped() -> Failure:
+    """Everything the tap was carrying went away while the recording was still running.
+
+    A warning rather than a failure: the video keeps recording, and the person may have closed one
+    tab of several deliberately. But from here the transcript will be empty, and finding that out
+    afterwards is finding it out too late — which is the complaint this whole path exists to answer.
+    """
+    return Failure(
+        code="window-audio-stopped",
+        message=(
+            "The window stopped sending audio — whatever was playing has closed or ended, so "
+            "nothing more will be transcribed. Start it playing again, or stop and record with "
+            "your microphone."
+        ),
+        severity=Severity.WARNING,
+    )

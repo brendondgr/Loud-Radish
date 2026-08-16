@@ -30,9 +30,10 @@ from ..asr import AsrLifecycle, LoadProgress, PromptBuilder
 from ..asr.contract import AsrLoadError
 from ..audio import LevelMeter, WavFileSource
 from ..audio.monitor import MonitorUnavailable
-from ..audio.sources import AudioSource, DeviceSource, MonitorSource, SourceInfo, carries_audio
+from ..audio.sources import AudioSource, DeviceSource, MonitorSource, SourceInfo
 from ..audio.tap import ApplicationTap, TapError
 from ..audio.tap import playback_streams as tap_streams
+from ..audio.tap import score as tap_score
 from ..capture import (
     MuxResult,
     PortalDeclined,
@@ -153,6 +154,8 @@ class SessionManager:
         self._last_level_emit = 0.0
         self._source_info: SourceInfo | None = None
         self._warned_backpressure = False
+        #: Said once per session. Repeating it every second would bury the notices that matter.
+        self._warned_tap_silent = False
         #: Produces rolling summaries and glossary terms while a session runs. Attached by the app
         #: factory rather than constructed here: it needs a language model, and the pipeline must
         #: keep working on a machine that has none.
@@ -171,6 +174,9 @@ class SessionManager:
         #: The application audio tap, when window mode was asked for one. Closed in teardown —
         #: a leaked null sink shows up in the user's output picker and survives until they notice.
         self._tap: ApplicationTap | None = None
+        #: Whether this run's tap narrows to the chosen window. Held so the periodic re-link
+        #: applies the same rule the tap was opened with.
+        self._tap_match = False
         #: Where the video landed, kept past teardown so the audio can be muxed into it.
         self._video_path = ""
         #: The per-run options a window session was armed with.
@@ -679,6 +685,10 @@ class SessionManager:
             if self._recorder is not None:
                 self._emit("capture.state", self.capture_state())
 
+            # An application creates playback nodes as media starts, so the set the tap was
+            # built from goes stale within seconds of pressing record.
+            self._relink_tap()
+
             # Only warn once the model has actually run: a factor of zero before the speaker starts
             # is not the system falling behind.
             if metrics.engine.inference_passes > 3 and 0.0 < metrics.real_time_factor < 1.0:
@@ -1058,7 +1068,7 @@ class SessionManager:
                 whole path exists to fix — and it is the one that produced a transcript of the
                 user's own speech over a video they were trying to record.
         """
-        streams = tap_streams()
+        streams = self._tap_candidates(match)
         if not streams:
             raise MonitorUnavailable(
                 "Nothing is playing any audio, so there is no window sound to record. Start the "
@@ -1079,35 +1089,97 @@ class SessionManager:
                 "meant to record yourself."
             ) from exc
 
-        self._verify_tap(tap, streams)
+        self._verify_tap(tap)
         self._tap = tap
+        self._tap_match = match
         return MonitorSource(frame_ms=config.audio.frame_ms, tap=tap)
 
-    def _verify_tap(self, tap: ApplicationTap, streams: list) -> None:
-        """Listen to the tap for a moment before the session commits to it.
+    def _tap_candidates(self, match: bool) -> list:
+        """The playback streams this run should tap.
 
-        **Every layer reported success while recording nothing.** The sink was created, the links
-        were made, `pw-record` ran at the right rate for the right duration, and the samples were
-        bit-exact zeros for the length of a talk — five identically named leaked sinks meant the
-        linker and the recorder were addressing different nodes. Unique names make that particular
-        cause impossible; this makes the *symptom* impossible to miss, whatever causes it next.
+        **`match` used to be documented and ignored.** Both audio choices linked every stream that
+        was playing, so "record this window's audio" quietly recorded the machine's, and a second
+        application making noise landed in the transcript of the first. It now narrows using the
+        same `rank`/`score` heuristic the interface already presents — keeping *every* stream that
+        scores rather than the single best one, because a browser owns a playback node per media
+        element and picking one records whichever tab happened to be first.
 
-        Only when something is actually playing. A stream that exists but is idle is a paused
-        video, and a paused video is the user's business — refusing to start a session over one
-        would be this check inventing a fault of its own.
+        A window that matches nothing falls back to everything rather than to nothing. The match is
+        a heuristic over properties PipeWire's own documentation warns are not authoritative
+        (D-027), so it must not be the thing that decides a recording captures no audio at all.
         """
-        if not any(getattr(stream, "running", False) for stream in streams):
-            logger.info("Nothing is playing yet, so the tap is not checked for content.")
-            return
-        if carries_audio(tap.sink_name):
+        streams = tap_streams()
+        if not match or not streams:
+            return streams
+
+        options = self._options
+        app_id = getattr(options, "window_app_id", "") or ""
+        title = getattr(options, "window_title", "") or ""
+        if not app_id and not title:
+            return streams
+
+        scored = [s for s in streams if tap_score(s, app_id=app_id, title=title) > 0]
+        if not scored:
+            logger.info("No playing stream matched the chosen window; tapping everything instead.")
+            return streams
+        logger.info(
+            "Tapping %d of %d playing streams matched to the window", len(scored), len(streams)
+        )
+        return scored
+
+    def _verify_tap(self, tap: ApplicationTap) -> None:
+        """Confirm the graph is routing something into the tap, before the session commits.
+
+        **This asked the wrong question for a day, and refused working recordings for it.** The
+        first version listened to the tap and treated a run of bit-exact zeros as proof the graph
+        was not delivering. That premise holds for a microphone, which always carries a noise floor,
+        and is false for an application — a media player between sounds, a paused video whose stream
+        is still open, or a clip with a silent lead-in all write literal zeros. Someone who pressed
+        record a moment before the audio started was told the capture would be silent, and it would
+        not have been.
+
+        Whether anything is *linked* cannot be confused with whether anything is *audible*, so that
+        is what is asked. It still catches the fault the check exists for — a tap nothing is routed
+        into records silence for the length of a talk — and it cannot fire on a quiet moment.
+        """
+        if tap.live_links > 0:
             return
 
         tap.close()
         raise MonitorUnavailable(
-            "The window's audio was routed but nothing is arriving from it — the capture would be "
-            "silent for the whole recording. Try starting the recording again, or choose "
-            "'My microphone' if you meant to record yourself."
+            "The window's audio could not be routed into the capture — nothing is connected to it, "
+            "so the recording would be silent throughout. Try starting the recording again, or "
+            "choose 'My microphone' if you meant to record yourself."
         )
+
+    def _relink_tap(self) -> None:
+        """Join playback nodes that appeared after the recording started.
+
+        **Linking once is linking too early.** `tap.py`'s own module docstring says the set has to
+        be watched, because "an application creates and destroys playback nodes as the user opens
+        tabs and starts media" — and the session linked once, at open, and never again. So pressing
+        record and *then* pressing play produced a recording of nothing: the node carrying the video
+        did not exist at the moment the tap was built. Runs from the status tick, which already
+        fires once a second for the monitor pane.
+        """
+        tap = self._tap
+        if tap is None or not tap.is_open:
+            return
+        try:
+            added = tap.link_all(self._tap_candidates(self._tap_match))
+        except TapError as exc:
+            logger.debug("Could not refresh the audio tap: %s", exc)
+            return
+        if added:
+            logger.info("Linked %d newly playing port(s) into the audio tap", added)
+
+        # **Reported, never fatal.** If everything the tap was carrying goes away mid-recording —
+        # the browser tab closed, the player quit — the rest of the session records silence, and the
+        # user should hear that from the application rather than from an empty transcript
+        # afterwards. Said once: repeating it every second would bury the notices that matter.
+        if tap.live_links == 0 and not self._warned_tap_silent:
+            self._warned_tap_silent = True
+            self._emit_failure(degradation.window_audio_stopped())
 
     async def _load_model(self, config: AppConfig) -> None:
         """Load the ASR model, translating a failure into a remedy the user can act on."""
