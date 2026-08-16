@@ -397,6 +397,19 @@ class SessionManager:
         if self._source is not None:
             self._source.stop()
 
+        # **Said as soon as it is true.** Releasing the device is instant; everything after it —
+        # finalising a video container, remuxing, a transcription pass — can take tens of seconds,
+        # and until this event existed the interface sat on "Stopping…" for all of it with no way
+        # to tell a slow finalise from a hang. The microphone or monitor is already closed by the
+        # time this is emitted, which is the fact the user actually wants confirmed.
+        self._emit(
+            "session.capture_ended",
+            {
+                "session_id": session_id,
+                "finalising": bool(self._recorder is not None or self._sink is not None),
+            },
+        )
+
         # Before the audio sink closes: finalising the container takes a few seconds, and the
         # timestamps line up better if the audio is still being written while it happens.
         self._stop_window_capture()

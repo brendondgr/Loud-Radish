@@ -19,6 +19,10 @@ from typing import Any, Final
 # -- session --------------------------------------------------------------------------
 SESSION_STARTED: Final = "session.started"
 SESSION_STOPPED: Final = "session.stopped"
+#: The microphone or monitor has been released, which is instant — while finalising a video
+#: container, remuxing and a post-capture pass are not. Without this the interface sat on
+#: "Stopping…" for all of it, and a slow finalise was indistinguishable from a hang.
+SESSION_CAPTURE_ENDED: Final = "session.capture_ended"
 
 # -- transcript -----------------------------------------------------------------------
 TRANSCRIPT_COMMITTED: Final = "transcript.committed"
@@ -107,6 +111,9 @@ CRITICAL_EVENTS: Final[frozenset[str]] = frozenset(
         TRANSCRIPT_POLISHED,
         SESSION_STARTED,
         SESSION_STOPPED,
+        # Dropping it leaves the interface claiming capture is still running after the device has
+        # been released, which is the one thing this event exists to deny.
+        SESSION_CAPTURE_ENDED,
         # A transcription that ended and never said so leaves a progress bar running forever.
         TRANSCRIPTION_DONE,
         TRANSCRIPTION_FAILED,
