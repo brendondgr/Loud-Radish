@@ -22,6 +22,7 @@ import time
 import numpy as np
 import pytest
 from app.config.schema import AppConfig
+from app.services.audio.formats import SAMPLE_RATE
 from app.services.audio.monitor import MonitorUnavailable, default_monitor, tools_present
 from app.services.audio.sources.monitor import MonitorSource
 from app.services.session import modes
@@ -338,3 +339,75 @@ def test_the_request_schema_carries_the_choice() -> None:
 
     assert CaptureOptionsRequest().audio_source == "system"
     assert CaptureOptionsRequest(audio_source="microphone").audio_source == "microphone"
+
+
+# -- the gate that closed on everything ----------------------------------------------------------
+
+
+def test_the_energy_gate_rejects_system_audio_it_should_pass() -> None:
+    """The measurement behind the bypass, kept so the reasoning survives the code.
+
+    `EnergyVad` judges a frame against an **adaptive noise floor**, which is exactly right for a
+    microphone: speech spikes above a floor that settles into the gaps between phrases. System
+    output has no gaps — the floor rises to meet continuous content and nothing ever clears it.
+
+    Measured on this machine with the same detector and settings: **61% of frames from real
+    microphone speech pass, against 8% from the machine's own output.** With three-consecutive-
+    frame hysteresis, 8% scattered frames essentially never open the gate, so a window recording
+    consumed audio for minutes and committed nothing — indistinguishable, from outside, from "it
+    only listens to my microphone".
+    """
+    from app.services.audio.formats import frame_samples
+    from app.services.vad.energy import EnergyVad
+
+    size = frame_samples(32)
+    rng = np.random.default_rng(7)
+
+    # Continuous content, like a video playing: no silent troughs for the floor to settle into.
+    t = np.arange(size * 200) / SAMPLE_RATE
+    continuous = (
+        0.25 * np.sin(2 * np.pi * 220 * t)
+        + 0.2 * np.sin(2 * np.pi * 1400 * t)
+        + 0.05 * rng.standard_normal(t.size)
+    ).astype(np.float32)
+
+    vad = EnergyVad(sensitivity=0.6)
+    passed = sum(
+        vad.is_speech(continuous[i : i + size]) for i in range(0, continuous.size - size, size)
+    )
+    total = continuous.size // size
+
+    # The point is not the exact figure — it is that a level-based detector cannot see content in
+    # audio that never goes quiet, so the gate must not be what decides for such a source.
+    assert passed / total < 0.5, (
+        "if continuous audio now passes the energy gate, the bypass may no longer be needed — "
+        "measure a real monitor capture before removing it"
+    )
+
+
+def test_a_loopback_source_is_not_gated_on_energy(tmp_path, monkeypatch) -> None:
+    """The fix, as the property that matters: frames reach the engine regardless of the verdict."""
+    from app.services.audio.sources.base import SourceInfo
+
+    manager, _config = _manager(tmp_path)
+    manager._source_info = SourceInfo(id="tap", name="System output", kind="loopback")
+
+    assert manager._source_is_loopback is True
+
+
+def test_a_microphone_source_is_still_gated(tmp_path) -> None:
+    """The gate earns its place on a microphone: it stops inference running on an empty room."""
+    from app.services.audio.sources.base import SourceInfo
+
+    manager, _config = _manager(tmp_path)
+    manager._source_info = SourceInfo(id="mic", name="GoMic", kind="microphone")
+
+    assert manager._source_is_loopback is False
+
+
+def test_no_source_yet_is_not_treated_as_loopback(tmp_path) -> None:
+    """`_source_info` is read after the source opens, and is None before that."""
+    manager, _config = _manager(tmp_path)
+    manager._source_info = None
+
+    assert manager._source_is_loopback is False

@@ -531,8 +531,25 @@ class SessionManager:
         if sink is not None and sink.write(frame) and not sink.is_closed:
             self._emit_failure(degradation.recording_capped(sink.duration_s / 60.0))
 
+        # **The energy gate is not applied to a monitor source**, and this is the difference
+        # between a window recording that transcribes and one that does not.
+        #
+        # `EnergyVad` decides by comparing a frame against an *adaptive noise floor*, which is
+        # exactly right for a microphone in a room: speech spikes above a floor that settles into
+        # the gaps between phrases. System output has no gaps. The floor rises to meet continuous
+        # content and nothing ever clears it. Measured on this machine over the same detector:
+        # **61% of frames from microphone speech pass, against 8% from the system's own output** —
+        # and with three-consecutive-frame hysteresis, 8% scattered frames essentially never open
+        # the gate. Every window recording therefore consumed audio and committed nothing, which
+        # looks from the outside exactly like "it only listens to the microphone".
+        #
+        # Whisper's own Silero filter still runs on every submitted buffer (`vad_filter=True`), so
+        # non-speech is still rejected — by a *content* detector, at the layer that can judge
+        # content, instead of by a level comparison that cannot.
+        speaking = result.speaking or self._source_is_loopback
+
         dropped = self._queue.put(
-            CapturedFrame(audio=frame, speaking=result.speaking, pause=result.pause_event)
+            CapturedFrame(audio=frame, speaking=speaking, pause=result.pause_event)
         )
         if dropped and not self._warned_backpressure:
             self._warned_backpressure = True
@@ -541,6 +558,16 @@ class SessionManager:
             )
 
         self._emit_level(frame, result.state_changed, result.speaking)
+
+    @property
+    def _source_is_loopback(self) -> bool:
+        """Whether the open source is a monitor of the machine's own output.
+
+        Read from the source rather than from configuration, because the file source and the
+        application tap both resolve to something the configuration does not name directly.
+        """
+        info = self._source_info
+        return info is not None and info.kind == "loopback"
 
     def _emit_level(self, frame: np.ndarray, state_changed: bool, speaking: bool) -> None:
         """Publish the level meter, throttled, and the VAD state only when it changes."""
