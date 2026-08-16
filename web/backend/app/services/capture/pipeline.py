@@ -16,14 +16,17 @@ interface to the identical pipeline.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Final
 
+from .geometry import GeometryError, describe, resolve
 from .probe import CaptureSupport
 
-#: Ceiling on the encoded height. 720p by default because there is **no hardware encoder on this
-#: class of machine** — encoding is software VP8 on the same CPU that runs the speech model, which
-#: was measured at a real-time factor around 1.5. Halving the pixel count is the cheapest lever.
+logger = logging.getLogger(__name__)
+
+#: Ceiling on the encoded height. Applied only when the negotiated source size is known — the
+#: portal reports none on this desktop, so an unscaled native-size recording is the normal case.
 DEFAULT_MAX_HEIGHT: Final = 720
 
 #: Frames per second. Fifteen is ample for a talk: slides change every thirty seconds and a cursor
@@ -37,6 +40,14 @@ PREVIEW_WIDTH: Final = 480
 #: Fixed alongside the width, and letterboxed rather than stretched. Leaving the height to be
 #: fixated from the source's aspect is what produced a 480x32767 JPEG and killed the pipeline.
 PREVIEW_HEIGHT: Final = 270
+
+#: Packed 8-bit formats `pipewiresrc` handles reliably. Anything else — 10-bit especially — is what
+#: the reported renegotiation failures have in common.
+SOURCE_FORMATS: Final[tuple[str, ...]] = ("BGRx", "RGBx", "BGRA", "RGBA", "xRGB", "xBGR")
+
+#: Milliseconds after which `pipewiresrc` resends its last buffer. 0 disables it, which is the
+#: default and is wrong here: a static window would starve the muxer.
+KEEPALIVE_MS: Final = 1000
 
 
 @dataclass(frozen=True)
@@ -59,6 +70,12 @@ def encoder_args(encoder: str) -> list[str]:
     A recording that drops frames because the encoder could not keep up is worse than a larger
     file, and this is competing with speech inference for the same cores.
     """
+    if encoder.startswith("va"):
+        # VA-API encoders take their tuning through the driver rather than through element
+        # properties, and the defaults are already tuned for realtime. Naming nothing is
+        # deliberate: an unsupported property on a VA element is a pipeline that will not start,
+        # and the software path is what a machine without the entrypoint falls back to anyway.
+        return [encoder]
     if encoder == "vp8enc":
         # `deadline=1` is VP8's realtime mode; `cpu-used` trades quality for speed, and `threads`
         # keeps it from taking every core away from the model.
@@ -108,6 +125,28 @@ def build(
         # The portal's node is live: a late frame should be dropped rather than queued, or the
         # recording drifts behind the clock it is being muxed against.
         "do-timestamp=true",
+        # Resend the last buffer when nothing changes. A window that sits still — a slide left on
+        # screen for two minutes — otherwise starves the muxer of buffers, which produces timestamp
+        # gaps and a file whose duration does not match the talk. At 15 fps on a mostly-static
+        # window this is the ordinary case, not an edge one.
+        f"keepalive-time={KEEPALIVE_MS}",
+        "!",
+        # **Constrain the format before anything downstream sees it.** `pipewiresrc` is documented
+        # to mishandle 10-bit and exotic-modifier formats that a compositor may advertise, and the
+        # reported failures are not subtle — "no more input formats", then `not-negotiated`, and a
+        # pipeline that never reaches PLAYING. This machine is AMD plus KWin plus DMA-BUF, which is
+        # squarely inside the configuration space where that happens. Restricting to the packed
+        # 8-bit formats keeps negotiation on ground that is known to work.
+        f"video/x-raw,format={{{','.join(SOURCE_FORMATS)}}}",
+        "!",
+        # **Not leaky, and that distinction is the whole recording.** A leaky queue here was tried
+        # and measured: 150 frames in, **nine frames out**. It drops whenever the encoder is behind,
+        # which for a recording means silently writing a talk at one frame per second. Backpressure
+        # instead propagates to `pipewiresrc`, which drops at the source — the right place for a
+        # live stream, and where `videorate` below can account for it. The preview branch stays
+        # leaky, because a stale thumbnail costs nothing.
+        "queue",
+        "max-size-buffers=32",
         "!",
         "videorate",
         "drop-only=true",
@@ -131,7 +170,15 @@ def build(
         args += ["tee", "name=t", "!", "queue", "!"]
 
     args += _record_scaler(max_height, source_width, source_height)
+    # Hardware encoders want NV12 and will not negotiate to it from every input format on their
+    # own; naming it costs nothing on the software path, which already accepts it.
+    if support.parser:
+        args += ["videoconvert", "!", "video/x-raw,format=NV12", "!"]
     args += encoder_args(support.encoder)
+    # An elementary stream needs parsing before a muxer will take it. Software encoders emit
+    # something the muxer accepts directly, and for those this is empty.
+    if support.parser:
+        args += ["!", support.parser]
     args += ["!", support.muxer, "!", "filesink", f"location={video_path}"]
 
     if include_preview:
@@ -179,34 +226,25 @@ def _record_scaler(max_height: int, source_width: int, source_height: int) -> li
     """The recording branch's scaler, or nothing at all.
 
     **Never asks GStreamer to work a size out.** Every fault this pipeline has had came from doing
-    exactly that. A caps *range* — ``height=[1,720]`` — asks `videoscale` to pick a height, and it
-    picks by fixating against the source's dimensions and pixel-aspect-ratio. When the source caps
-    are fixed that arithmetic is fine. When they are not, it produces nonsense: a talk recorded at
-    **480x16**, and then, once each branch had its own scaler to fixate independently, an outright
-    **integer overflow** — ``assertion 'denom > 0' failed``, a 480x32767 preview, and a pipeline
-    that would not preroll at all.
+    exactly that. A caps *range* asks `videoscale` to pick, and it picks by fixating against the
+    source's dimensions and pixel-aspect-ratio — which produced a **480x16** recording, and then an
+    outright integer overflow against a source whose aspect ratio made the product too large.
 
-    ``pipewiresrc`` does not always present fixed caps, and the portal on this desktop reports no
-    stream size, so negotiating blind is the normal case rather than the edge one. So there are only
-    two outcomes here and neither involves fixation:
-
-    * the source size is **known and above the ceiling** — scale to two concrete even numbers;
-    * anything else — **no scaler at all**, and the window is recorded at whatever size it is.
-
-    Recording at native size costs encoder time on a machine with no hardware encoder, which is a
-    real cost and the right one to pay: a larger file that plays beats a smaller one that does not
-    exist. The ceiling still applies whenever the size is actually known.
+    So the size is decided here, in `geometry.resolve`, from concrete numbers, or not at all. When
+    the negotiated size is unknown or refused there is **no scaler on this branch** and the window
+    is recorded at whatever size it is: a larger file that plays beats a smaller one that does not
+    exist.
     """
-    if source_width <= 0 or source_height <= 0 or source_height <= max_height:
+    try:
+        geometry = resolve(source_width, source_height, max_height=max_height)
+    except GeometryError as exc:
+        # Expected whenever the portal reports nothing, which is the normal case on this desktop.
+        logger.debug("Not scaling the recording: %s", exc)
         return []
 
-    height = max_height
-    width = max(2, round(source_width * height / source_height))
-    # Even dimensions: VP8, VP9 and H.264 all subsample chroma, and an odd edge is either rejected
-    # outright or silently rounded by the encoder.
-    return [
-        "videoscale",
-        "!",
-        f"video/x-raw,width={width - width % 2},height={height - height % 2}",
-        "!",
-    ]
+    if not geometry.scaled:
+        logger.info("Capture geometry: %s", describe(source_width, source_height, geometry))
+        return []
+
+    logger.info("Capture geometry: %s", describe(source_width, source_height, geometry))
+    return ["videoscale", "!", geometry.caps, "!"]

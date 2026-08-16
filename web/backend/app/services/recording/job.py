@@ -24,6 +24,12 @@ class JobState(StrEnum):
 
     RUNNING = "running"
     DONE = "done"
+    #: Finished, correctly, and found nothing to transcribe. **Distinct from `done` on purpose.**
+    #: "322 seconds processed, 2 segments" is what a broken transcriber looks like and what an
+    #: accurate one looks like on music — and an interface that cannot tell them apart shows an
+    #: empty transcript that reads as a crash. This state lets it say "no speech detected" instead,
+    #: which is the difference between a bug report and an understanding.
+    DONE_NO_SPEECH = "done_no_speech"
     FAILED = "failed"
 
 
@@ -43,6 +49,9 @@ class TranscriptionJob:
     transcribed_seconds: float = 0.0
     segments_written: int = 0
     error: str = ""
+    #: What the audio actually is, measured before the pass runs (`characterise.py`). Carried on
+    #: the event so the interface can explain an empty transcript without a second request.
+    audio: dict[str, Any] = field(default_factory=dict)
     started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     finished_at: datetime | None = None
 
@@ -57,14 +66,20 @@ class TranscriptionJob:
     def is_running(self) -> bool:
         return self.state is JobState.RUNNING
 
+    @property
+    def succeeded(self) -> bool:
+        """Whether the pass completed, with or without finding speech."""
+        return self.state in (JobState.DONE, JobState.DONE_NO_SPEECH)
+
     def advance(self, transcribed_seconds: float, segments: int) -> None:
         # Monotonic by construction: a window that overlaps the previous one must not walk the
         # figure backwards, which reads as the pass losing ground.
         self.transcribed_seconds = max(self.transcribed_seconds, transcribed_seconds)
         self.segments_written += segments
 
-    def finish(self) -> None:
-        self.state = JobState.DONE
+    def finish(self, *, found_speech: bool = True) -> None:
+        """End the pass. ``found_speech`` decides which of the two success states applies."""
+        self.state = JobState.DONE if found_speech else JobState.DONE_NO_SPEECH
         self.transcribed_seconds = self.total_seconds
         self.finished_at = datetime.now(UTC)
 
@@ -83,6 +98,7 @@ class TranscriptionJob:
             "total_seconds": round(self.total_seconds, 2),
             "segments": self.segments_written,
             "error": self.error,
+            "audio": dict(self.audio),
         }
 
 

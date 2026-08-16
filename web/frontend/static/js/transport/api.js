@@ -87,6 +87,7 @@ export const api = {
   health: () => get("/api/health"),
 
   session: () => get("/api/session"),
+  captureState: () => get("/api/capture/state"),
   startSession: (metadata = {}) => post("/api/session/start", metadata),
   stopSession: () => post("/api/session/stop"),
 

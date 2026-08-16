@@ -22,7 +22,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Final
 
 import numpy as np
 
@@ -34,6 +34,18 @@ logger = logging.getLogger(__name__)
 #: Whisper's hard window. Submitting more is silently truncated by the model, which produces a
 #: transcript missing its tail rather than an error — so the engine must respect this.
 MAX_AUDIO_SECONDS = 30.0
+
+#: Above this ratio of raw to compressed text, the output has degenerated into repetition — the
+#: failure mode where a model loops a phrase for a minute.
+COMPRESSION_RATIO_THRESHOLD: Final = 2.4
+
+#: Below this average log-probability a segment is too uncertain to keep. Low confidence correlates
+#: with invented text, which is what makes this worth applying at all.
+LOG_PROB_THRESHOLD: Final = -1.0
+
+#: The model's own estimate that a window contains no speech. A weak filter — see the note at the
+#: call site — kept because it costs nothing and occasionally catches what the others miss.
+NO_SPEECH_THRESHOLD: Final = 0.6
 
 #: Languages Whisper handles well enough to offer. ``*`` because coverage is genuinely broad and
 #: enumerating ninety-nine codes in the UI helps nobody.
@@ -163,6 +175,20 @@ class FasterWhisperBackend(AsrBackend):
             word_timestamps=True,
             initial_prompt=prompt or None,
             condition_on_previous_text=False,
+            # **Pinned rather than left to the library's defaults.** Measured first: nothing here
+            # uses `BatchedInferencePipeline`, and that matters — batched inference *ignores* every
+            # threshold below, so tuning them there would be tuning dead configuration. On the
+            # sequential path they are live, and these are the documented values rather than
+            # invented ones.
+            #
+            # `no_speech_threshold` is the weakest of the three and is not relied on alone: the
+            # token it reads is a known-unreliable indicator, and published analysis finds
+            # hallucinated output on non-speech audio frequently carries a *low* no-speech
+            # probability and a *high* average log-probability — the exact combination that slips
+            # past it. The denylist in `hallucination.py` is what actually catches those.
+            compression_ratio_threshold=COMPRESSION_RATIO_THRESHOLD,
+            log_prob_threshold=LOG_PROB_THRESHOLD,
+            no_speech_threshold=NO_SPEECH_THRESHOLD,
             # Strips non-speech from the buffer before decoding. The cheapest fix for invented
             # text there is, because text that is never decoded cannot be invented — and the
             # filter is a small Silero model, which is far cheaper than the Whisper pass it saves.

@@ -247,7 +247,10 @@ class CaptureConfig(_Base):
     #: recorded when it was not wanted is the fault this setting exists to fix. The portal carries
     #: video only (D-022), so this is a separate capture either way; `system` reads the default
     #: sink's monitor, which contains no microphone at all.
-    audio_source: Literal["system", "microphone"] = "system"
+    #: `application` taps only the chosen window's own audio, additively — the application keeps
+    #: playing to the user's speakers. It needs a match between the window and a PipeWire playback
+    #: stream, which is a heuristic, so `system` remains the default and the fallback.
+    audio_source: Literal["system", "microphone", "application"] = "system"
 
 
 class ShortcutsConfig(_Base):

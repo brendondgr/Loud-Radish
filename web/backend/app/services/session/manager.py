@@ -31,6 +31,8 @@ from ..asr.contract import AsrLoadError
 from ..audio import LevelMeter, WavFileSource
 from ..audio.monitor import MonitorUnavailable
 from ..audio.sources import AudioSource, DeviceSource, MonitorSource, SourceInfo
+from ..audio.tap import ApplicationTap, TapError
+from ..audio.tap import playback_streams as tap_streams
 from ..capture import (
     MuxResult,
     PortalDeclined,
@@ -155,6 +157,9 @@ class SessionManager:
         #: `None` in every other mode, and either may be `None` in this one — video is optional.
         self._recorder: WindowRecorder | None = None
         self._portal: PortalSession | None = None
+        #: The application audio tap, when window mode was asked for one. Closed in teardown —
+        #: a leaked null sink shows up in the user's output picker and survives until they notice.
+        self._tap: ApplicationTap | None = None
         #: Where the video landed, kept past teardown so the audio can be muxed into it.
         self._video_path = ""
         #: The per-run options a window session was armed with.
@@ -605,6 +610,16 @@ class SessionManager:
                     {"duration_s": round(sink.duration_s, 2), "bytes": sink.bytes_written},
                 )
 
+            # **A heartbeat, not just an announcement.** `capture.state` used to be emitted exactly
+            # once, when capture started — a fact broadcast into a lossy channel with no
+            # reconciliation. Four ordinary events lost it permanently: a page loaded after the
+            # emit, a socket reconnect, a second tab, or the emit racing the recorder into
+            # existence. In every one of those the monitor pane never learned there was anything to
+            # show, and nothing ever corrected it. Re-sent every second, a missed emit costs a
+            # second instead of the whole recording.
+            if self._recorder is not None:
+                self._emit("capture.state", self.capture_state())
+
             # Only warn once the model has actually run: a factor of zero before the speaker starts
             # is not the system falling behind.
             if metrics.engine.inference_passes > 3 and 0.0 < metrics.real_time_factor < 1.0:
@@ -698,10 +713,26 @@ class SessionManager:
         self._portal = PortalSession(cursor_mode=config.capture.cursor_mode, restore_token=token)
         stream = self._portal.open()
 
+        # **The token is single-use**, and persisting the new one is not optional. Passing
+        # `restore_token` to `SelectSources` invalidates it the moment it is used, and a fresh one
+        # comes back on `Start`. An implementation that saved a token once and replayed it would
+        # get a picker dialog on every recording after the first — which is precisely the symptom
+        # that was diagnosed and fixed as a concurrency fault, and would have looked identical.
         if stream.restore_token and credentials is not None:
             # Stored where credentials go, never in the config file: it is a granted capability
             # and D-017 governs those.
             credentials.set("capture-restore-token", stream.restore_token)
+
+        # Which path the portal took, so a re-prompt is diagnosable from the log rather than from
+        # a user noticing. KDE restores a *window* session by matching appId and then fuzzy-matching
+        # the saved title, so a browser whose tab changed will legitimately fail to match and
+        # re-prompt. That is correct behaviour, not a fault to hunt.
+        logger.info(
+            "Portal granted a window: %s",
+            "restored from a stored token"
+            if token
+            else "chosen fresh (no stored consent to restore)",
+        )
 
         directory = Path(config.recording.recording_dir)
         stamp = session.started_at.strftime("%Y%m%d-%H%M%S")
@@ -918,6 +949,9 @@ class SessionManager:
                 frame_ms=config.audio.frame_ms,
                 speed=config.audio.file_speed,
             )
+        if mode == modes.WINDOW and config.capture.audio_source == "application":
+            return self._open_application_tap(config)
+
         if mode == modes.WINDOW and config.capture.audio_source == "system":
             try:
                 return MonitorSource(frame_ms=config.audio.frame_ms)
@@ -928,6 +962,35 @@ class SessionManager:
                 raise SessionError(str(exc)) from exc
 
         return DeviceSource(device_id=config.audio.device_id, frame_ms=config.audio.frame_ms)
+
+    def _open_application_tap(self, config: AppConfig) -> AudioSource:
+        """Tap the chosen window's own audio, leaving it playing on the user's speakers.
+
+        Falls back to the machine's whole output when no playback stream can be matched — which is
+        the honest outcome rather than a failure, because "nothing is playing yet" is the ordinary
+        state at the moment a recording starts. The fallback is logged and reported, so a recording
+        that captured more than the window can be explained afterwards rather than discovered.
+        """
+        streams = tap_streams()
+        if not streams:
+            logger.info(
+                "No application is playing audio, so the whole system output is recorded instead."
+            )
+            return MonitorSource(frame_ms=config.audio.frame_ms)
+
+        tap = ApplicationTap()
+        try:
+            tap.open()
+            # The *set*, not the best one: a browser owns a playback node per media element, and
+            # linking only the top-ranked node records only whichever tab happened to be first.
+            tap.link_all(streams)
+        except TapError as exc:
+            tap.close()
+            logger.warning("Could not tap the application's audio (%s); recording all output.", exc)
+            return MonitorSource(frame_ms=config.audio.frame_ms)
+
+        self._tap = tap
+        return MonitorSource(frame_ms=config.audio.frame_ms, tap=tap)
 
     async def _load_model(self, config: AppConfig) -> None:
         """Load the ASR model, translating a failure into a remedy the user can act on."""
@@ -955,6 +1018,10 @@ class SessionManager:
         # a clean stop, a declined portal, an abrupt shutdown — and a claim that survives one of
         # them makes the application refuse to record for the rest of its life.
         self._claimed = False
+
+        tap, self._tap = self._tap, None
+        if tap is not None:
+            tap.close()
 
         # Before the store closes, and before the ordinary stop path is assumed to have run: an
         # abrupt shutdown reaches here without passing through `stop`, and a polish task still

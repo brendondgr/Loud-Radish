@@ -76,6 +76,9 @@ class WindowStream:
     node_id: int
     #: An open file descriptor for the PipeWire remote. The recorder owns closing it.
     fd: int
+    #: The node's ``object.serial`` when the portal reported one (ScreenCast v6+), else 0. Never
+    #: reused, unlike the node id, which PipeWire recycles once a node is destroyed.
+    serial: int = 0
     #: Width and height the portal reported, when it reported any.
     width: int = 0
     height: int = 0
@@ -88,6 +91,32 @@ class WindowStream:
     def describe(self) -> str:
         size = f"{self.width}×{self.height}" if self.width and self.height else "unknown size"
         return f"PipeWire node {self.node_id} ({size})"
+
+
+def _stream_serial(properties: Any) -> int:
+    """The stream's ``object.serial``, when the portal is new enough to report it.
+
+    **Node ids are reused.** PipeWire recycles them once a node is destroyed, so a long-lived
+    session can end up bound to an entirely different node across a monitor hotplug, a resolution
+    change, or a suspend. `object.serial` is monotonic and never reused, and ScreenCast v6 added
+    `pipewire-serial` for exactly that reason — deprecating the node id for stream targeting.
+
+    This desktop reports portal version 5, so this returns 0 today. Reading it now and preferring
+    it when present costs a few lines and removes the whole class of "my recording followed the
+    wrong window after I docked my laptop" once the backend catches up.
+    """
+    if not isinstance(properties, dict):
+        return 0
+
+    value = properties.get("pipewire-serial")
+    # A tagged variant: ('t', 12345).
+    if isinstance(value, tuple) and len(value) == 2 and isinstance(value[0], str):
+        value = value[1]
+    try:
+        serial = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0
+    return serial if serial > 0 else 0
 
 
 def _stream_size(properties: Any) -> tuple[int, int]:
@@ -166,6 +195,7 @@ class PortalSession:
             raise PortalError("The portal granted access but returned no stream to read.")
 
         node_id, properties = streams[0]
+        serial = _stream_serial(properties)
         width, height = _stream_size(properties)
         # Logged whole, because what a compositor puts here is not something to guess at: this
         # desktop reports no `size`, the pipeline spent that as licence to let GStreamer work the
@@ -180,8 +210,12 @@ class PortalSession:
                 sorted(properties) if isinstance(properties, dict) else type(properties).__name__,
             )
 
+        if serial:
+            logger.debug("Portal reported pipewire-serial %s for node %s", serial, node_id)
+
         return WindowStream(
             node_id=int(node_id),
+            serial=serial,
             fd=fd,
             width=width,
             height=height,

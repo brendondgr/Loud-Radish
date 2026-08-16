@@ -21,6 +21,8 @@ from __future__ import annotations
 import logging
 import subprocess
 import threading
+import time
+from typing import Any
 
 import numpy as np
 
@@ -36,12 +38,24 @@ BYTES_PER_SAMPLE = 4
 #: How long to wait for the process to end on its own after being asked to.
 STOP_TIMEOUT_S = 2.0
 
+#: How much audio to check before trusting the stream. One second is enough to catch a container
+#: header being read as samples, which is the fault this exists for.
+GUARD_SAMPLES = 16_000
+
+#: How far the delivered byte count may drift from `rate x channels x 4 x seconds` before the
+#: capture is considered mis-specified rather than merely jittery.
+RATE_TOLERANCE = 0.02
+
 
 class MonitorSource(AudioSource):
     """The machine's audio output, as canonical-format frames."""
 
-    def __init__(self, node: str = "", frame_ms: int = 32) -> None:
+    def __init__(self, node: str = "", frame_ms: int = 32, tap: Any = None) -> None:
         super().__init__(frame_ms=frame_ms)
+        #: An open :class:`~app.services.audio.tap.ApplicationTap` whose monitor to record instead
+        #: of the default sink's. Owned by the caller, which also closes it — this source records
+        #: what it is pointed at and does not manage the graph.
+        self._tap = tap
         #: Empty means "resolve at start". Resolving here would fix the node at construction time,
         #: and the default sink changes when a dock or a headset appears — see ``audio/monitor.py``.
         self._requested = node
@@ -62,7 +76,10 @@ class MonitorSource(AudioSource):
         if self._process is not None:
             return
 
-        self._node = self._requested or default_monitor()
+        if self._tap is not None and self._tap.is_open:
+            self._node = self._tap.monitor
+        else:
+            self._node = self._requested or default_monitor()
         self._on_frame = on_frame
         self._on_error = on_error
 
@@ -138,6 +155,9 @@ class MonitorSource(AudioSource):
 
         chunk_bytes = self._frame_samples * BYTES_PER_SAMPLE
         failure: Exception | None = None
+        checked = 0
+        started = time.monotonic()
+        delivered = 0
 
         try:
             while self._running.is_set():
@@ -146,12 +166,32 @@ class MonitorSource(AudioSource):
                 raw = process.stdout.read(chunk_bytes)
                 if not raw or len(raw) < chunk_bytes:
                     break
-                self._emit(np.frombuffer(raw, dtype=np.float32).copy())
+                frame = np.frombuffer(raw, dtype=np.float32).copy()
+                delivered += frame.size
+
+                # **Checked here, in the recorder, not in a test.** A test sees what this code does;
+                # only the running capture sees what the machine actually sent. `pw-record` without
+                # `--container=raw` writes an AU header whose bytes decode to NaN, and that capture
+                # ran at the right rate for the right duration and transcribed silence — every
+                # downstream mean, peak and RMS was poisoned by one NaN. Three lines catch it.
+                if checked < GUARD_SAMPLES:
+                    checked += frame.size
+                    if not np.isfinite(frame).all():
+                        raise MonitorUnavailable(
+                            "The system audio capture returned values that are not finite, which "
+                            "means the byte stream is not the format it was asked for. A container "
+                            "header being read as samples is the usual cause."
+                        )
+
+                self._emit(frame)
         except Exception as exc:  # noqa: BLE001 - the reason reaches the session either way
             failure = exc
         finally:
             ended_early = self._running.is_set()
             self._running.clear()
+
+        elapsed = time.monotonic() - started
+        self._check_rate(delivered, elapsed)
 
         if not ended_early:
             # An ordinary stop. Nothing to report.
@@ -166,6 +206,28 @@ class MonitorSource(AudioSource):
         callback = self._on_error
         if callback is not None:
             callback(failure)
+
+    def _check_rate(self, delivered: int, elapsed: float) -> None:
+        """Log when the delivered sample count does not match the wall clock.
+
+        A capture asked for the wrong sample format still produces bytes at a plausible rate, so
+        duration alone cannot tell them apart — but the *count* can. Logged rather than raised: by
+        the time this is known the recording exists, and discarding a talk over a rate mismatch
+        would be a worse outcome than a warning naming it.
+        """
+        if elapsed < 1.0 or delivered == 0:
+            return
+        expected = SAMPLE_RATE * elapsed
+        drift = abs(delivered - expected) / expected
+        if drift > RATE_TOLERANCE:
+            logger.warning(
+                "System audio delivered %d samples in %.1f s, %.0f%% off the %d Hz it was asked "
+                "for. The capture format may not be what was requested.",
+                delivered,
+                elapsed,
+                drift * 100,
+                SAMPLE_RATE,
+            )
 
     def _stderr(self) -> str:
         """Whatever ``pw-record`` said on its way out, for the failure message."""
