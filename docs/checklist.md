@@ -285,6 +285,21 @@ Known blockers and open questions carried by these plans:
 
 ---
 
+
+- [ ] **`tests/api/test_session_toggle.py::test_stopping_ignores_the_mode` fails roughly
+      one full-suite run in three, with a SQLite error.** It passes in isolation every time,
+      and passed in the two full runs either side of the one that failed, so it is timing and
+      not ordering. The test stops a `recorded` session, which is what *starts* a post-capture
+      pass and hands that pass the transcript store (D-021) — so the suspicion is the runner's
+      thread and the store's close racing under load. `TranscriptionRunner.stop` joins with a
+      five-second timeout and then returns regardless, by deliberate design: a server that
+      takes half an hour to exit is one nobody will let start automatically. That trade is
+      probably right and the abandoned thread is probably the race.
+
+      **Deliberately not fixed by guessing.** A concurrency change made on a hunch is how the
+      original "Cannot operate on a closed database" fault was introduced. Reproduce it under
+      `pytest -p no:randomly --count` or with the store instrumented to log its close, get the
+      full traceback rather than the truncated summary line, and fix what it actually names.
 ## Part 5 — Verification Debt
 
 Things the plan's phases cannot verify in a headless environment. Each needs a manual pass on the
