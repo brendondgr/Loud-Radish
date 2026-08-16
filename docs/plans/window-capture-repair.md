@@ -1,7 +1,7 @@
 # Window Capture Repair
 
-**Status:** Phases 1–3 complete (the resolution fault, output-verified tests, the repeated dialogs).
-Phases 4–8 not started.
+**Status:** Phases 1–4 and 6–8 complete. **Phase 5 (window audio) is the one outstanding item**
+— see the note under that phase for what was established and why it is not a small change.
 **Branch:** `claude/gpu-and-capture-fixes`
 
 ---
@@ -142,7 +142,16 @@ the guard: five concurrent starts open five portals; with it, one.
 
 </details>
 
-### Phase 4 — The monitor pane shows the capture
+### Phase 4 — The monitor pane shows the capture ✅ COMPLETE
+
+**The pane was never broken.** It was faithfully drawing a 480x16 image inside a 16:9 box with
+`object-fit: contain` — a hairline across the middle, indistinguishable from nothing. Phase 1 makes
+it 480x270. What *was* missing is a third state: recording-with-frames and
+recording-but-nothing-has-arrived-yet both rendered as an `<img>` with an unresolved src, which is a
+blank rectangle — the exact thing this pane exists not to show. The card now stays up until a frame
+has actually decoded and says which situation it is.
+
+<details><summary>Original phase text</summary>
 
 - **Locations**: `web/frontend/static/js/components/recording-monitor.js` (`_renderPreview`,
   `_refresh`, `_syncTimer`); `web/frontend/static/js/stores/capture.js`;
@@ -163,7 +172,26 @@ the guard: five concurrent starts open five portals; with it, one.
   commit stating: `Window Capture Repair (4 / 8) Complete: the monitor pane shows the live capture
   and distinguishes "no frame yet" from "not recording".`
 
-### Phase 5 — Window audio, not the user's microphone
+</details>
+
+### Phase 5 — Window audio, not the user's microphone ⚠️ NOT DONE
+
+**Established, and it is the reason this is not a small change:** PortAudio does **not** expose
+PipeWire's monitor sources. Enumerating this machine returns fifteen inputs and not one of them is
+the `.monitor` of a sink — `pactl list short sources` shows them, `sounddevice.query_devices()` does
+not. The `loopback` kind the device list already reports is a name heuristic and is wrong here: it
+labels an HDMI *output* as a loopback.
+
+So "record the machine's output" cannot be done by selecting a device. It needs a second audio
+source class that spawns `pw-record --target <default-sink>.monitor` and reads PCM from its stdout —
+the same subprocess pattern the video recorder already uses, and for the same reason. Both tools are
+present (`/usr/bin/pw-record`, `/usr/bin/pw-cli`) and `pactl get-default-sink` names the target.
+
+The default sink must be resolved **at start time**, not stored: it changes when a dock or a
+Bluetooth headset appears, and on this machine it is currently a Bluetooth output. A recording that
+silently captured a disconnected device would be the same class of fault as the rest of this plan.
+
+<details><summary>Original phase text</summary>
 
 - **Locations**: `web/backend/app/config/schema.py` (`AudioConfig`, `SourceType`, `CaptureConfig`);
   `web/backend/app/services/audio/sources/device.py`; new `web/backend/app/services/audio/monitor.py`
@@ -187,7 +215,16 @@ the guard: five concurrent starts open five portals; with it, one.
   commit stating: `Window Capture Repair (5 / 8) Complete: window mode records the machine's output
   by default, the microphone is an explicit opt-in, and the pre-flight sheet says which.`
 
-### Phase 6 — Stop stops
+</details>
+
+### Phase 6 — Stop stops ✅ COMPLETE
+
+The audio source was already released first; what was missing was *saying so*.
+`session.capture_ended` is emitted the moment the device is closed, ahead of finalising the video,
+remuxing, and the post-capture pass — all of which can take tens of seconds, during which the
+interface sat on "Stopping…" looking identical to a hang.
+
+<details><summary>Original phase text</summary>
 
 - **Locations**: `web/backend/app/services/session/manager.py` (`stop`, `_teardown`,
   `_stop_window_capture`, `_mux_if_wanted`); `web/backend/app/services/capture/recorder.py`
@@ -205,7 +242,18 @@ the guard: five concurrent starts open five portals; with it, one.
   commit stating: `Window Capture Repair (6 / 8) Complete: stopping releases the audio immediately
   and finalises the video behind it.`
 
-### Phase 7 — Timestamps that point at the moment a thing was said
+</details>
+
+### Phase 7 — Timestamps that point at the moment a thing was said ✅ COMPLETE
+
+**Measured first, and the measurement changed the fix.** A recording that says what time it is — one
+distinct tone per second — lets a transcriber read the absolute second off the audio it was handed
+without reproducing any of the arithmetic under test. Both storage causes are ruled out: every word
+lands within 50 ms of when it was spoken, the two passes agree exactly, and an overlapped word is
+emitted once. So the model was inventing them, and the repair is in the prompt and in checking the
+answer against the transcript before it is shown.
+
+<details><summary>Original phase text</summary>
 
 - **Locations**: `web/backend/app/services/recording/batch.py` (window offsets);
   `web/backend/app/services/transcript/` (segment `start` at write time);
@@ -227,6 +275,8 @@ the guard: five concurrent starts open five portals; with it, one.
 - **Action**: Undergo the verification/tests/validation process for this phase. Once validated,
   commit stating: `Window Capture Repair (7 / 8) Complete: stored timestamps are session-relative at
   every revision and a citation that cannot be resolved is dropped rather than shown.`
+
+</details>
 
 ### Phase 8 — Documentation, decision record, and merge
 
