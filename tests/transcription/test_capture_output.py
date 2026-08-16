@@ -410,3 +410,84 @@ def test_a_capture_without_a_preview_still_records(tmp_path) -> None:
 
     assert dimensions(tmp_path / "out.webm") == (1280, 720)
     assert not (tmp_path / "preview.jpg").exists()
+
+
+# -- geometry ------------------------------------------------------------------------------------
+#
+# The size is now decided in `capture/geometry.py` from negotiated caps rather than negotiated by
+# the scaler. These check the decision; the tests above check the file it produces.
+
+
+def test_a_source_under_the_ceiling_keeps_its_own_size() -> None:
+    from app.services.capture.geometry import resolve
+
+    geometry = resolve(1080, 1064, max_height=1080)
+
+    assert (geometry.width, geometry.height) == (1080, 1064)
+    assert geometry.scaled is False
+
+
+def test_an_odd_source_is_rounded_down_to_even() -> None:
+    """Mandatory for 4:2:0 chroma, and VA-API encoders are stricter about it than software ones.
+
+    The current recordings are even by luck — a window happened to be 1080x1064. Window sizes are
+    arbitrary, and this is the trap that bites the moment the encoder changes.
+    """
+    from app.services.capture.geometry import resolve
+
+    geometry = resolve(1081, 1063, max_height=2160)
+
+    assert (geometry.width, geometry.height) == (1080, 1062)
+    assert geometry.scaled is True
+
+
+def test_a_tall_source_is_capped_and_keeps_its_shape() -> None:
+    from app.services.capture.geometry import resolve
+
+    geometry = resolve(2560, 1440, max_height=720)
+
+    assert (geometry.width, geometry.height) == (1280, 720)
+    assert geometry.width % 2 == 0 and geometry.height % 2 == 0
+
+
+@pytest.mark.parametrize(
+    ("width", "height"),
+    [(0, 0), (1920, 0), (-1, 100), (100_000, 100), (1920, 32767), (8, 8)],
+)
+def test_a_degenerate_size_is_refused_rather_than_recorded(width: int, height: int) -> None:
+    """Values this application has produced, or would produce from a failed negotiation.
+
+    A zero is what the portal reports for a window. 32767 is SHRT_MAX and is what the scaler's
+    overflow resolved to. Each would give a plausible file from an implausible number, so the
+    number is refused before it can reach an encoder.
+    """
+    from app.services.capture.geometry import GeometryError, resolve
+
+    with pytest.raises(GeometryError):
+        resolve(width, height, max_height=720)
+
+
+def test_resolving_is_idempotent() -> None:
+    """It is called again on every renegotiation, and must not creep by a pixel each time."""
+    from app.services.capture.geometry import resolve
+
+    first = resolve(2560, 1440, max_height=720)
+    second = resolve(first.width, first.height, max_height=720)
+
+    assert (second.width, second.height) == (first.width, first.height)
+
+
+def test_an_extreme_aspect_ratio_is_recorded_rather_than_refused() -> None:
+    """480x16 was the shape of the original fault, and it is *not* what this guard is for.
+
+    That file was a bad *output* — a scaler resolving a caps range against a preview's width. The
+    size now comes from negotiated caps, so a 480x16 source means the compositor really handed over
+    something 480x16, and a desktop panel is exactly that: a legitimate window with an extreme
+    aspect ratio. Refusing it would decline to record a real window in order to guard against a bug
+    that this design has already made impossible.
+    """
+    from app.services.capture.geometry import resolve
+
+    geometry = resolve(480, 16, max_height=720)
+
+    assert (geometry.width, geometry.height) == (480, 16)
