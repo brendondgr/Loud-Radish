@@ -51,7 +51,18 @@ rather than a unit test.
   recording begins is never captured. Either is independently sufficient to produce "window audio
   records nothing", and both are in scope for Phase 2.
 
-- **Where forced commits lose words.** *Not established, and deliberately not guessed at.* Three
+- **Where forced commits lose words.** ✅ **Answered by Phase 1, and the answer contradicts the
+  guess below.** The harness clears `commit-timeout` and `maximum-buffer` — both are already
+  lossless — and fails on the **silence gate**, which drops 23 consecutive words (`w038`–`w060`) at
+  a pause. The mechanism is one line in `engine._iterate`: after the gate's commit,
+  `self._buffer.trim_to(self._buffer.end_absolute)` discards the **whole** buffer, and
+  `_forced_commit` only commits the hypothesis from the *previous* inference — so every second of
+  audio buffered since that pass is thrown away without ever being transcribed. The user's log named
+  `commit-timeout` because that is what logs; the words go missing somewhere else entirely. Phase 3
+  is re-aimed accordingly. *The paragraph below is left as written, because it is the reasoning the
+  harness was built to check, and it was wrong.*
+
+  ~~*Not established, and deliberately not guessed at.*~~ Three
   paths in `engine._forced_commit` discard audio or words: `maximum-buffer` calls
   `_buffer.hard_trim` twice and its own comment says "Discard it rather than resubmitting audio that
   already failed"; `silence-gate` discards the whole buffer on the VAD's word; and `commit-timeout`
