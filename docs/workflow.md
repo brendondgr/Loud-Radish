@@ -284,6 +284,32 @@ Shortcuts are registered with **your desktop's own service** and are revocable f
 This application never reads input devices. Settings → Shortcuts shows whether they are actually
 registered, and names the command to bind by hand if your desktop has no such service.
 
+## Troubleshooting: everything went quiet but the mixer says full volume
+
+PipeWire applies **two** gains to a playback stream and multiplies them. `channelVolumes` is the one
+every mixer shows and lets you drag. `volume` is a single scalar that **nothing in the KDE interface
+displays or changes**. Measured on this machine:
+
+    channelVolumes = 0.2847   -> the mixer shows this, as 66%
+    volume         = 0.0200   -> invisible in the interface
+    what you hear  = 0.00569   (-44.9 dB below full)
+
+So a stream can read 100% everywhere you can look and still be inaudible.
+
+It spreads because WirePlumber falls back to an application's **media role** when it has no entry of
+its own. Anything playing music declares `media.role=Music`, so one tool set quiet under that role
+silences a video player and a music client's audio-only playback at once — while a browser, which
+has an entry under its own name, keeps working. That asymmetry is the giveaway.
+
+```bash
+uv run python scripts/repair_stream_volumes.py          # report
+uv run python scripts/repair_stream_volumes.py --fix    # repair, restarting WirePlumber
+```
+
+**Do not pass `--volume` to `pw-play` or `pw-cat` when testing capture.** The value is saved to the
+role permanently and reaches every application that shares it — this fault has been self-inflicted
+twice that way. Bake the amplitude into the WAV file instead; `scripts/make_fixture_wav.py` does.
+
 ## Documentation Maintenance
 
 Documentation updates ship with the code, not after it. The full trigger table is in
