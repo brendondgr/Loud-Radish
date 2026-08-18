@@ -306,9 +306,18 @@ uv run python scripts/repair_stream_volumes.py          # report
 uv run python scripts/repair_stream_volumes.py --fix    # repair, restarting WirePlumber
 ```
 
-**Do not pass `--volume` to `pw-play` or `pw-cat` when testing capture.** The value is saved to the
-role permanently and reaches every application that shares it — this fault has been self-inflicted
-twice that way. Bake the amplitude into the WAV file instead; `scripts/make_fixture_wav.py` does.
+**This is prevented at the source rather than by remembering a rule.** Install
+`scripts/wireplumber/50-no-tool-volume-memory.conf` once per machine — see
+[../scripts/wireplumber/README.md](../scripts/wireplumber/README.md) — and `pw-play`, `pw-cat`,
+`pw-record`, `speaker-test`, `paplay` and `parec` stop persisting their volume anywhere. Verified by
+running `pw-play --volume=0.02` twice with the drop-in installed: the role stayed at 1.0, where the
+first such run previously wrote 0.020000.
+
+The cause is a shared bucket and a default, not carelessness. `formKey` in WirePlumber's
+`state-stream.lua` picks where a volume is remembered and its priority list *begins* with
+`media.role`, ahead of the application's own name — and `pw-cat --help` says of the role:
+"(default Music)". Baking the amplitude into the WAV file rather than passing `--volume` is still
+the better habit, and `scripts/make_fixture_wav.py` does.
 
 ## Documentation Maintenance
 
