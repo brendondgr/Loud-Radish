@@ -71,8 +71,19 @@ async def list_sessions(request: Request) -> dict[str, Any]:
 
 
 def _running_key(manager: Any) -> str:
-    store = getattr(manager, "store", None) if manager else None
-    return getattr(store, "path", None).stem if store is not None else ""
+    """The key of the session being recorded *right now*, or empty when nothing is.
+
+    **Gated on `is_running`, not on the store existing.** `SessionManager.store` deliberately keeps
+    returning the last finished session's store so the assistant can still be asked about it
+    (D-031) — so reading it alone marked every completed recording as still recording, gave it the
+    "recording now" badge, and disabled its Delete button. The store answers "what can be read";
+    only `is_running` answers "what is being written".
+    """
+    if manager is None or not getattr(manager, "is_running", False):
+        return ""
+    store = getattr(manager, "store", None)
+    path = getattr(store, "path", None)
+    return path.stem if path is not None else ""
 
 
 @router.get("/{key}")

@@ -198,16 +198,39 @@ def test_a_legitimate_key_still_resolves(sessions_dir, tmp_path) -> None:
 def test_delete_refuses_the_session_that_is_still_recording(
     client: TestClient, sessions_dir
 ) -> None:
-    """Deleting the file out from under an open connection loses the talk in progress."""
+    """Deleting the file out from under an open connection loses the talk in progress.
+
+    A running session is **a store plus live metadata**, not a store alone. It used to be faked
+    here with the store by itself, which is the very conflation that made every *finished* session
+    report itself as recording once the store began outliving its session (D-031).
+    """
     write_session(sessions_dir, "live-one")
     manager = client.app.state.session_manager
     manager._store = TranscriptStore(sessions_dir / "live-one.db")
+    manager._metadata = SessionMetadata(session_id="live-one")
 
     try:
         response = client.delete("/api/sessions/live-one")
         assert response.status_code == 409
         assert "still recording" in response.json()["detail"]["error"]["message"]
         assert (sessions_dir / "live-one.db").is_file()
+    finally:
+        manager._store.close()
+        manager._store = None
+        manager._metadata = None
+
+
+def test_a_retained_store_alone_does_not_make_a_session_undeletable(
+    client: TestClient, sessions_dir
+) -> None:
+    """The finished half of the pair above: readable is not the same as being written."""
+    write_session(sessions_dir, "finished-but-retained")
+    manager = client.app.state.session_manager
+    manager._store = TranscriptStore(sessions_dir / "finished-but-retained.db")
+
+    try:
+        assert client.get("/api/sessions").json()["running_key"] == ""
+        assert client.delete("/api/sessions/finished-but-retained").json() == {"deleted": True}
     finally:
         manager._store.close()
         manager._store = None
@@ -321,3 +344,42 @@ def test_the_media_block_reaches_the_api(client, sessions_dir) -> None:
         "recording_bytes": 0,
         "exportable": False,
     }
+
+
+# -- which row is being written right now ------------------------------------------------------
+
+
+def test_a_stopped_session_does_not_report_itself_as_recording(client, sessions_dir) -> None:
+    """The badge, and the disabled Delete button, both follow this one field.
+
+    `SessionManager.store` keeps returning the last finished session's store on purpose (D-031), so
+    a `running_key` derived from it marked every completed recording as still recording — which is
+    what a user sees as "it still says recording now even though I finished".
+    """
+    write_session(sessions_dir, KEY, segments=3)
+
+    started = client.post("/api/session/start", json={})
+    if started.status_code != 200:
+        pytest.skip("no capture source available in this environment")
+
+    while_running = client.get("/api/sessions").json()["running_key"]
+    client.post("/api/session/stop")
+    after_stop = client.get("/api/sessions").json()["running_key"]
+
+    assert while_running, "a running session must be marked, or the badge means nothing"
+    assert after_stop == ""
+
+
+def test_a_finished_session_can_be_deleted(client, sessions_dir) -> None:
+    """The same fault seen from the other side: the row's Delete button was refused."""
+    write_session(sessions_dir, KEY, segments=1)
+
+    started = client.post("/api/session/start", json={})
+    if started.status_code != 200:
+        pytest.skip("no capture source available in this environment")
+    client.post("/api/session/stop")
+
+    running = client.get("/api/sessions").json()["running_key"]
+    key = next(s["key"] for s in client.get("/api/sessions").json()["sessions"] if s["key"] != running)
+
+    assert client.delete(f"/api/sessions/{key}").status_code == 200
