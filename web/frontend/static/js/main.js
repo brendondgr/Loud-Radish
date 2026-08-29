@@ -125,7 +125,7 @@ function boot() {
   wireChat(chatPane);
 
   socket.connect();
-  hydrate(chatPane, glossary).then(() => armFromUrl(preflight, banners, settings));
+  hydrate(pane, chatPane, glossary).then(() => armFromUrl(preflight, banners, settings));
 }
 
 /** Keep the narrow-layout tab badge in step with unread answers. */
@@ -375,7 +375,7 @@ function showPane(name, { persist = true } = {}) {
 }
 
 /** Fetch state over HTTP on load, so the page is correct before the socket says anything. */
-async function hydrate(chatPane, glossary) {
+async function hydrate(pane, chatPane, glossary) {
   // Before anything else: which capture modes this machine can run. Until it answers, every mode
   // is offered — the server refuses what it cannot do, so the worst case is one clear error rather
   // than a selector that is inexplicably dead on load.
@@ -395,15 +395,7 @@ async function hydrate(chatPane, glossary) {
     if (recording.isTranscribing) mode.setState(PROCESSING);
     if (state.metrics) health.setStatus(state.metrics);
 
-    if (state.running) {
-      // Blocks first: the pane skips any segment a block already covers, so loading them in this
-      // order renders one minute once rather than rendering it raw and then replacing it.
-      const { blocks } = await api.polished();
-      polish.addMany(blocks);
-
-      const { segments } = await api.since(0);
-      transcript.commitMany(segments);
-    }
+    await loadTranscript(pane);
   } catch (error) {
     if (error instanceof ApiError) console.warn("Could not load session state:", error.message);
   }
@@ -476,6 +468,52 @@ async function showRevision(pane, revision) {
   } catch (error) {
     if (error instanceof ApiError) console.warn("Could not switch transcript:", error.message);
   }
+}
+
+/**
+ * Load the transcript the server currently holds, and show the right pass of it.
+ *
+ * **Not gated on a session running**, which is what it used to be and which was the whole of "the
+ * transcription was never saved". The moment a transcript is most worth loading is a reload just
+ * after a post-capture pass — the pass has finished, its text is better than the live one, and
+ * `running` is false. The server keeps the finished session's store open for reading until the
+ * next one starts (D-031), so the question is answerable; the page simply was not asking it.
+ *
+ * Blocks are filtered to the pass on screen. A polished block is derived from the segment *ids* of
+ * the pass it was built from, and the post-capture pass writes different ids for the same audio —
+ * so loading both unfiltered renders the whole talk twice, once as prose and once raw. This is the
+ * same rule `showRevision` applies when the switch is used; it was missing on the load path.
+ */
+async function loadTranscript(pane) {
+  let latest = 0;
+  let revisions = [];
+  try {
+    ({ revisions, latest } = await api.transcriptRevisions());
+  } catch {
+    // No session has ever run, or the store has gone. An empty pane is the correct page.
+    return;
+  }
+
+  let segments = [];
+  let blocks = [];
+  try {
+    // Both before either store is written, so the pane paints once rather than rendering the raw
+    // text and then replacing it a frame later.
+    [{ segments }, { blocks }] = await Promise.all([api.transcriptAt(latest), api.polished()]);
+  } catch (error) {
+    if (error instanceof ApiError) console.warn("Could not load the transcript:", error.message);
+    return;
+  }
+  if (!segments.length && !blocks.length) return;
+
+  const shown = new Set(segments.map((segment) => segment.id));
+  transcript.reset(latest);
+  polish.reset();
+  polish.addMany(
+    (blocks ?? []).filter((block) => (block.source_ids ?? []).some((id) => shown.has(id)))
+  );
+  transcript.commitMany(segments);
+  pane?.setRevisions(revisions, latest);
 }
 
 /**
