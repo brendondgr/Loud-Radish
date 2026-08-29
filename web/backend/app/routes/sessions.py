@@ -83,7 +83,9 @@ async def read_session(
             "key": key,
             "session": metadata.as_dict() if metadata else None,
             "stats": store.stats().as_dict(),
-            "segments": [segment.as_event() for segment in store.segments_since(0, limit=limit)],
+            # One transcription pass, not every row: a session holding both a live and a
+            # post-capture pass would otherwise render the same talk twice on the page (D-022).
+            "segments": [segment.as_event() for segment in store.latest_segments()[:limit]],
             "summaries": [summary.as_event() for summary in store.summaries()],
             "glossary": [term.as_event() for term in store.glossary()],
             "chat": [message.as_dict() for message in store.chat_history()],
@@ -100,7 +102,7 @@ async def export_session(request: Request, key: str, fmt: str = Query("markdown"
         metadata = store.metadata()
         body, mime, extension = render_export(
             fmt,
-            segments=store.all_segments(),
+            segments=store.latest_segments(),
             metadata=metadata,
             summaries=store.summaries(),
             glossary=store.glossary(),

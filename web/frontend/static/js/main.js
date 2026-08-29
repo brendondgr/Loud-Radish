@@ -207,8 +207,10 @@ function wireRecording(banners) {
       });
     }
     // A second pass over a session that also transcribed live has just created a revision to
-    // switch to, which is the one moment the switch becomes worth offering.
-    void refreshRevisions(window.transcriptPane);
+    // switch to, which is the one moment the switch becomes worth offering — and the moment to
+    // show it. Shown by *replacing* the transcript, never by appending: the two passes cover the
+    // same audio with different ids, so merging them says the whole talk twice (D-022).
+    void showLatestRevision(window.transcriptPane);
   });
 
   on(TRANSCRIPTION_FAILED, (payload) => {
@@ -455,13 +457,32 @@ async function armFromUrl(preflight, banners, settings) {
 async function showRevision(pane, revision) {
   try {
     const { segments } = await api.transcriptAt(revision);
-    transcript.reset();
+    // Reset *into* the new revision, so the store both drops what the other pass left on screen
+    // and starts accepting the arriving one. The polished blocks go too: they were derived from
+    // the segment ids of the pass being left, and cover nothing in the one arriving.
+    transcript.reset(revision);
     polish.reset();
     transcript.commitMany(segments);
     const { revisions } = await api.transcriptRevisions();
     pane.setRevisions(revisions, revision);
   } catch (error) {
     if (error instanceof ApiError) console.warn("Could not switch transcript:", error.message);
+  }
+}
+
+/**
+ * Show whichever pass the session ended up with, and offer the switch if there are two.
+ *
+ * Called when a post-capture pass finishes. Its segments were dropped as they streamed in — the
+ * pane was showing the live pass — so this is where the better transcript actually appears.
+ */
+async function showLatestRevision(pane) {
+  try {
+    const { latest } = await api.transcriptRevisions();
+    if (latest === transcript.revision) return void refreshRevisions(pane);
+    await showRevision(pane, latest);
+  } catch {
+    /* No session, or none yet. The transcript on screen stays as it is. */
   }
 }
 

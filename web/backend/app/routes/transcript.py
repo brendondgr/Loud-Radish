@@ -153,7 +153,10 @@ async def export(request: Request, fmt: str = Query("markdown")) -> Response:
     try:
         body, mime, extension = render_export(
             fmt,
-            segments=store.all_segments(),
+            # The newest pass only. A window session that transcribed live and again afterwards
+            # holds both over the same audio (D-022), and exporting their union writes the talk out
+            # twice under one "Transcript" heading.
+            segments=store.latest_segments(),
             metadata=metadata,
             summaries=store.summaries(),
             glossary=store.glossary(),

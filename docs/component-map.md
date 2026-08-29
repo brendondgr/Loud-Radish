@@ -114,7 +114,7 @@ session can hold two transcription passes it also grows a Live/Final revision sw
 
 | Store | Holds | Published on |
 |---|---|---|
-| `transcript` | Committed segments and the single hypothesis | `store.transcript.changed` |
+| `transcript` | Committed segments from **one** transcription pass, and the single hypothesis. A segment from another pass is dropped rather than appended — merging the post-capture pass into the live one shows the talk twice (D-022) | `store.transcript.changed` |
 | `polish` | Finished minutes rewritten for reading, and which segments they cover | `store.polish.changed` |
 | `session` | Whether recording, for how long, resolved config | `store.session.changed` |
 | `health` | Level, speech, RTF, latency, connection | `store.health.changed`, throttled to ~4 Hz |
