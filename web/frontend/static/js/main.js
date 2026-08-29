@@ -266,7 +266,15 @@ function wireSession(header) {
     mode.adoptSession({ running: session.running, mode: session.mode });
     // After adoptSession, which would otherwise reset a reconnecting client to idle while a pass
     // it cannot see is still running.
-    if (recording.isTranscribing) mode.setState(PROCESSING);
+    if (recording.isTranscribing) {
+      mode.setState(PROCESSING);
+    } else if (!session.running && mode.state === PROCESSING) {
+      // The server is authoritative and it says nothing is transcribing. `adoptSession` protects
+      // `processing` from being reset — the pass outlives the session, so a stop must not clear it
+      // — which means this is the only place a client that arrived *after* the pass ended can find
+      // its way back to idle. Without it the interface stayed on "Transcribing…" indefinitely.
+      mode.setState(IDLE);
+    }
   });
   void header;
 }

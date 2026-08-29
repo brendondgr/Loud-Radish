@@ -10,6 +10,10 @@ Three properties the hub guarantees:
 * **Health events coalesce.** A stale level-meter frame is worse than none — it draws a wrong bar.
 * **A slow client cannot stall the pipeline.** Each connection has its own bounded queue, and the
   emitting thread never waits on a socket.
+* **A retained event is dropped once it stops being true.** The newest instance of each coalescing
+  event is replayed to every client that connects. A finished transcription pass whose last progress
+  frame said *running* would otherwise keep telling new clients it was running for the life of the
+  process, which is exactly how the interface ended up stuck on "Transcribing… 100%".
 """
 
 from __future__ import annotations
@@ -19,7 +23,7 @@ import logging
 from collections import deque
 from typing import Any
 
-from .events import CRITICAL_EVENTS, envelope, is_coalescing
+from .events import CRITICAL_EVENTS, envelope, invalidated_by, is_coalescing
 
 logger = logging.getLogger(__name__)
 
@@ -147,8 +151,17 @@ class EventHub:
         return len(self._clients)
 
     def latest_state(self) -> list[dict[str, Any]]:
-        """The most recent health events, so a new client paints a correct screen at once."""
+        """The most recent health events, so a new client paints a correct screen at once.
+
+        Only events still true: a terminal event removes the coalescing one it ended, so nothing
+        here describes something that has already finished.
+        """
         return list(self._latest.values())
+
+    def forget(self, *events: str) -> None:
+        """Drop retained coalescing events by name. Used when a new session starts."""
+        for event in events:
+            self._latest.pop(event, None)
 
     # -- publishing ----------------------------------------------------------------
 
@@ -161,6 +174,10 @@ class EventHub:
         frame = envelope(event, data)
         if is_coalescing(event):
             self._latest[event] = frame
+        # A terminal event retracts the progress it terminates, so the replay set never carries a
+        # state that has already ended.
+        for stale in invalidated_by(event):
+            self._latest.pop(stale, None)
 
         loop = self._loop
         if loop is None or loop.is_closed():

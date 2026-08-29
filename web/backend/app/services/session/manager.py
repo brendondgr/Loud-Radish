@@ -322,6 +322,12 @@ class SessionManager:
         options: CaptureOptions | None,
     ) -> SessionMetadata:
         """The body of :meth:`start`, run with the session already claimed."""
+        # The previous session's finished pass is forgotten here rather than when it ended: while
+        # nothing else is running it is still the answer to "what happened to my last recording",
+        # which a reload has every right to ask. Once a *new* recording starts it is only a stale
+        # figure that `GET /api/session` would keep reporting alongside the live one.
+        self.jobs.clear()
+
         config = self._config.resolve()
         session = metadata or SessionMetadata(session_id=uuid.uuid4().hex[:12])
         self._options = options if session.mode == modes.WINDOW else None

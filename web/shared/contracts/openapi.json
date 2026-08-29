@@ -1563,7 +1563,7 @@
           "recordings"
         ],
         "summary": "List Recordings",
-        "description": "Every recording still on disk, newest first.\n\nA recording present here has *not* been transcribed, or was kept deliberately: the pass deletes\nits audio on success unless audio retention is on. So this list is mostly a list of things that\nwent wrong, which is exactly what it is for.",
+        "description": "Every recording still on disk, newest first.\n\nA recording present here has *not* been transcribed, or was kept deliberately: the pass deletes\nits audio on success unless audio retention is on. So this list is mostly a list of things that\nwent wrong, which is exactly what it is for.\n\nAddressed by folder key \u2014 ``20260829-174113-d60b37a9e3c4`` \u2014 rather than by file name, since a\nrecording is now a directory holding audio, video, a preview frame, and a sidecar.",
         "operationId": "list_recordings_api_recordings_get",
         "responses": {
           "200": {
@@ -1817,6 +1817,16 @@
             "type": "boolean",
             "title": "Video",
             "default": true
+          },
+          "audio_source": {
+            "type": "string",
+            "enum": [
+              "system",
+              "microphone",
+              "application"
+            ],
+            "title": "Audio Source",
+            "default": "system"
           }
         },
         "additionalProperties": false,
