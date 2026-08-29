@@ -659,18 +659,37 @@ def _window_options(choice: str, *, app_id: str = "", title: str = ""):
 # -- a tap that is built correctly and still carries nothing -------------------------------------
 
 
+#: What :func:`~app.services.audio.monitor.default_sink` is made to return in these tests. A sink
+#: name, deliberately without a ``.monitor`` suffix: that suffix does not resolve on this machine
+#: and falls back to the microphone, which is the bug these doubles must not paper over.
+THE_SPEAKERS = "the-speakers"
+
+
 def _probes(monkeypatch, *, tap: float, whole_output: float = 0.0) -> list[str]:
-    """Answer both probes by hand, and record which one was asked."""
+    """Answer both probes by hand, and record which one was asked.
+
+    **Keyed by node, not by ``capture_sink``.** Both probes pass ``capture_sink=True`` now — the
+    only form that reads a sink here — so the flag no longer distinguishes them, and a double that
+    switched on it would answer the wrong question while still passing.
+    """
     asked: list[str] = []
 
-    def fake_probe(node: str, *, capture_sink: bool, seconds: float = 1.0) -> float:
+    def fake_probe(
+        node: str, *, capture_sink: bool, device_sink: bool = False, seconds: float = 1.0
+    ) -> float:
         asked.append(node)
-        return tap if capture_sink else whole_output
+        assert capture_sink, "every probe must address a sink, never a `.monitor` that falls back"
+        if node == THE_SPEAKERS:
+            # The machine's own output is a **device** sink, and must be probed with the form that
+            # a device sink accepts. Carrying `node.dont-fallback` there means no stream starts at
+            # all, so the widening would silently decide the machine was silent and never fire.
+            assert device_sink, "a device sink must not be probed with the tap's property set"
+            return whole_output
+        assert not device_sink, "the tap is a null sink and keeps the stricter property set"
+        return tap
 
     monkeypatch.setattr("app.services.session.manager.probe_peak", fake_probe)
-    monkeypatch.setattr(
-        "app.services.session.manager.default_monitor", lambda: "the-speakers.monitor"
-    )
+    monkeypatch.setattr("app.services.session.manager.default_sink", lambda: THE_SPEAKERS)
     return asked
 
 
@@ -688,7 +707,7 @@ def test_a_tap_that_delivers_nothing_widens_to_the_whole_output(tmp_path, monkey
 
     source = manager._open_source(config, modes.WINDOW)
 
-    assert source.info.id == "the-speakers.monitor", "the capture should have widened"
+    assert source.info.id == THE_SPEAKERS, "the capture should have widened"
     assert tap.closed, "the tap that could not deliver must not be left loaded in the graph"
     assert manager._tap is None
 

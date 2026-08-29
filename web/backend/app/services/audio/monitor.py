@@ -77,6 +77,39 @@ def default_monitor() -> str:
     return chosen
 
 
+def default_sink() -> str:
+    """The sink this machine is currently playing to, named as a **sink** rather than a monitor.
+
+    **The `.monitor` suffix is a trap on this machine, on every sink type tested.** `pw-record`
+    does not resolve `<name>.monitor` as a target, and an unresolved target does not fail — it
+    falls back to the *default source*, which is the microphone. Measured against a simultaneous
+    microphone capture: the USB dock's `.monitor` and the Bluetooth headset's both correlate with
+    the microphone at **+1.000**, identical to five decimal places, while the same sink addressed
+    with `stream.capture.sink` correlates at **-0.000**. The Bluetooth sink has no monitor *node*
+    in `pw-dump` at all, which is why there is nothing for the suffix to resolve to.
+
+    So callers take this name and pass ``capture_sink=True``. Recording a room and calling it a
+    window's audio is the fault this whole path exists to prevent (D-028), and it is silent: the
+    microphone hears the speakers, so the level looks entirely plausible.
+
+    Raises:
+        MonitorUnavailable: when the tools are missing or no default sink can be read — a real
+            answer on a machine with no sound card, not a failure to be papered over.
+    """
+    if shutil.which("pactl") is None:
+        raise MonitorUnavailable(
+            "pactl is not installed, so the system's audio output cannot be found. "
+            "Install pipewire-utils (or your distribution's equivalent), or record the microphone."
+        )
+    sink = _run(["pactl", "get-default-sink"])
+    if not sink:
+        raise MonitorUnavailable(
+            "This machine reports no default audio output, so what it plays cannot be recorded. "
+            "Record the microphone instead."
+        )
+    return sink.removesuffix(MONITOR_SUFFIX)
+
+
 def _monitor_nodes() -> list[str]:
     """Every monitor source PipeWire is currently exposing, in the order it lists them."""
     listing = _run(["pactl", "list", "short", "sources"])

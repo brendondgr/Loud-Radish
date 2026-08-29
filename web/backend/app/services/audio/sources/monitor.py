@@ -50,7 +50,9 @@ GUARD_SAMPLES = 16_000
 RATE_TOLERANCE = 0.02
 
 
-def record_command(node: str, *, capture_sink: bool, destination: str = "-") -> list[str]:
+def record_command(
+    node: str, *, capture_sink: bool, device_sink: bool = False, destination: str = "-"
+) -> list[str]:
     """The ``pw-record`` invocation for one node.
 
     **Two target forms, because two kinds of sink resolve differently**, measured rather than
@@ -89,7 +91,22 @@ def record_command(node: str, *, capture_sink: bool, destination: str = "-") -> 
         #
         # A device sink's `<name>.monitor` is a real source that resolves on its own, and adding
         # these to that path stops it connecting at all — so it does not get them.
-        command += ["-P", "{ stream.capture.sink = true node.dont-fallback = true }"]
+        if device_sink:
+            # **A real sink gets `stream.capture.sink` and *not* `node.dont-fallback`.** The flag
+            # is what makes a bad target fail loudly rather than silently recording the
+            # microphone, and it is exactly right on the tap's null sink — but on this PipeWire
+            # (1.6.8) a device sink rejects it outright with `defined target not found`, by name
+            # and by node id alike, so a capture carrying it never starts at all. Measured on the
+            # Bluetooth output: with the flag, no stream; without it, RMS 0.10 correlating with
+            # the microphone at **-0.009**, which is the machine's real output.
+            #
+            # What replaces the flag is the *provenance of the name*: this path is only ever given
+            # a sink that `pactl get-default-sink` just named, so it resolves by construction. A
+            # target that does not resolve still falls back to the microphone here — measured —
+            # so nothing else may be passed in.
+            command += ["-P", "{ stream.capture.sink = true }"]
+        else:
+            command += ["-P", "{ stream.capture.sink = true node.dont-fallback = true }"]
 
     # A dash is the pipe. Everything downstream reads bytes and never touches a file.
     return [*command, destination]
@@ -98,8 +115,15 @@ def record_command(node: str, *, capture_sink: bool, destination: str = "-") -> 
 class MonitorSource(AudioSource):
     """The machine's audio output, as canonical-format frames."""
 
-    def __init__(self, node: str = "", frame_ms: int = 32, tap: Any = None) -> None:
+    def __init__(
+        self, node: str = "", frame_ms: int = 32, tap: Any = None, capture_sink: bool = False
+    ) -> None:
         super().__init__(frame_ms=frame_ms)
+        #: Address ``node`` as a **sink** even with no tap, through ``stream.capture.sink``. The
+        #: only form that reads a device sink here: `<name>.monitor` does not resolve and falls
+        #: back to the microphone, measured at +1.000 correlation with it on both the USB dock and
+        #: the Bluetooth headset. See :func:`~app.services.audio.monitor.default_sink`.
+        self._capture_sink = capture_sink
         #: An open :class:`~app.services.audio.tap.ApplicationTap` whose monitor to record instead
         #: of the default sink's. Owned by the caller, which also closes it — this source records
         #: what it is pointed at and does not manage the graph.
@@ -129,11 +153,13 @@ class MonitorSource(AudioSource):
         else:
             self._node = self._requested or default_monitor()
 
-        capture_sink = self._tap is not None and self._tap.is_open
+        capture_sink = (self._tap is not None and self._tap.is_open) or self._capture_sink
         self._on_frame = on_frame
         self._on_error = on_error
 
-        command = record_command(self._node, capture_sink=capture_sink)
+        command = record_command(
+            self._node, capture_sink=capture_sink, device_sink=self._capture_sink
+        )
         try:
             self._process = subprocess.Popen(  # noqa: S603 - fixed binary, no shell
                 command,
@@ -283,7 +309,9 @@ def _short(node: str) -> str:
     return node.removesuffix(".monitor").split(".")[0]
 
 
-def probe_peak(node: str, *, capture_sink: bool, seconds: float = 1.0) -> float:
+def probe_peak(
+    node: str, *, capture_sink: bool, device_sink: bool = False, seconds: float = 1.0
+) -> float:
     """The largest absolute sample ``node`` delivers in ``seconds``, or ``-1.0`` if unknown.
 
     **Built from :func:`record_command`, deliberately.** A probe that constructs its own invocation
@@ -297,7 +325,7 @@ def probe_peak(node: str, *, capture_sink: bool, seconds: float = 1.0) -> float:
     wanted = int(SAMPLE_RATE * seconds) * BYTES_PER_SAMPLE
     try:
         process = subprocess.Popen(  # noqa: S603 - fixed binary, no shell
-            record_command(node, capture_sink=capture_sink),
+            record_command(node, capture_sink=capture_sink, device_sink=device_sink),
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
         )
