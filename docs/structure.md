@@ -108,7 +108,7 @@ TranscriberPrototype/
 │   │   │       ├── recorder.py    # The subprocess, its lifetime, and its finalisation
 │   │   │       └── mux.py         # Combines the video with the session's audio afterwards
 │   │   │   └── recording/         # Capture to disk, and transcribe it whole (D-021)
-│   │   │       ├── layout.py      # One directory per recording, named for when it started (D-031)
+│   │   │       ├── layout.py      # One directory per recording, named for when it started (D-032)
 │   │   │       ├── sink.py        # Incremental WAV writer; crash-safe header, duration cap
 │   │   │       ├── batch.py       # Whole-file pass in overlapping windows; bypasses agreement
 │   │   │       ├── job.py         # One pass's state, progress, and the one-at-a-time rule
@@ -142,7 +142,7 @@ TranscriberPrototype/
 │   │   │       └── worker.py      # Rolling summaries and glossary extraction
 │   │   │   └── chat/              # Question → context → provider → streamed answer
 │   │   │       └── orchestrator.py
-│   │   │   └── export/            # A recording as a folder that opens on its own (D-033)
+│   │   │   └── export/            # A recording as a folder that opens on its own (D-034)
 │   │   │       ├── webapp.py      # Builds the ZIP; streams the video rather than reading it in
 │   │   │       ├── payload.py     # transcript.json and settings.json; never a credential
 │   │   │       └── template/      # The exported page, copied verbatim: index.html, two
@@ -191,7 +191,7 @@ TranscriberPrototype/
 │   ├── sessions/<stamp>-<id>.db   # One transcript per session
 │   └── recordings/<stamp>-<id>/   # One folder per recording — audio.wav, video.<ext>,
 │                                  #   video-with-audio.<ext>, preview.jpg, audio.json.
-│                                  #   The folder name is the session database's stem (D-031)
+│                                  #   The folder name is the session database's stem (D-032)
 ├── logs/                          # Runtime logs (gitignored)
 │
 ├── .claude/skills/ · .agents/skills/ · .cursor/rules/   # Pointers → docs/skills/

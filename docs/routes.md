@@ -1,6 +1,6 @@
 # Route Map
 
-*Last updated: 2026-08-29 (per-recording folders and the web-app export — D-031, D-033)*
+*Last updated: 2026-08-29 (per-recording folders and the web-app export — D-032, D-034)*
 
 > **Status column is authoritative.** Every API group is implemented and tested, as is the
 > WebSocket and both pages. Update this file in the same change that adds, removes, or changes a
@@ -76,7 +76,7 @@ is on — a successful pass deletes its own audio (D-021).
 | `POST` | `/api/recordings/{key}/transcribe` | Run or re-run a pass, into a **new** session | **Implemented** |
 | `DELETE` | `/api/recordings/{key}` | Delete one recording's audio. The video beside it is kept. | **Implemented** |
 
-`{key}` is a **recording folder key** — `20260829-174113-d60b37a9e3c4` — not a file name (D-031).
+`{key}` is a **recording folder key** — `20260829-174113-d60b37a9e3c4` — not a file name (D-032).
 It is checked against that shape *before* it is joined onto a path, and the result is required to
 be inside the recordings directory: a loopback-bound server is still reachable from any page in any
 other tab, so a traversal here would be a real file read. A re-run writes into a new session rather
@@ -97,7 +97,7 @@ minutes ago.
 | `GET` | `/api/sessions/{key}/webapp` | The recording as a self-contained web application, as a ZIP | **Implemented** |
 | `DELETE` | `/api/sessions/{key}` | Delete a session file. Refuses the one still recording. | **Implemented** |
 
-`{key}` is the database file's stem, which is also the name of the recording's folder (D-031) — that
+`{key}` is the database file's stem, which is also the name of the recording's folder (D-032) — that
 equality is how a session reaches its own video without a second identifier.
 
 **The web-app export refuses rather than degrades.** It needs video, audio, and a transcript, and

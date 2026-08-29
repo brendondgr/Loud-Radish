@@ -1,6 +1,6 @@
 # API Contract
 
-*Last updated: 2026-08-29 (past-session media, and the web-app export — D-031, D-033)*
+*Last updated: 2026-08-29 (past-session media, and the web-app export — D-032, D-034)*
 
 > **Status: the WebSocket event contract below is frozen.** The machine-readable contract lives in
 > `web/shared/contracts/` and is generated from the backend; this document is its human-readable
@@ -168,7 +168,7 @@ Response `200 OK`:
 }
 ```
 
-`media` says what the session's **recording folder** holds (D-031). The folder is named with the
+`media` says what the session's **recording folder** holds (D-032). The folder is named with the
 same key as the database, so this is a directory listing rather than a filename search.
 
 Two subtleties in it. `transcript` means the database holds segments, not merely that the file
@@ -183,7 +183,7 @@ and cannot open is more useful than one that has silently vanished.
 ### `GET /api/sessions/{key}/webapp`
 
 Response `200 OK`: `application/zip`, `Content-Disposition: attachment`. The archive holds one
-folder named for the key (D-033):
+folder named for the key (D-034):
 
 ```text
 <key>/index.html                 The application. Opens with no server.

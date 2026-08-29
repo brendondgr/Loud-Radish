@@ -320,3 +320,31 @@ async def test_the_transcript_is_readable_while_the_pass_runs(manager) -> None:
     if session.jobs.is_busy:
         assert session.store is not None, "the transcript became unreadable mid-pass"
     recorder.wait_for("transcription.done")
+
+
+async def test_the_transcript_is_askable_once_the_batch_pass_finishes(manager) -> None:
+    """**The reported fault, on the path this mode actually takes.**
+
+    `recorded` and `window` hand the store to `TranscriptionRunner`, which closes it itself when the
+    pass ends — so retaining it in `_teardown` cannot reach this case. Without reopening it, the
+    assistant answers "there is no transcript to ask about yet" at exactly the moment the transcript
+    becomes complete, which is the moment it is most worth asking about.
+    """
+    session, _config, recorder, tmp_path = manager
+    assert await drive(session, recorder, tmp_path), "the transcription pass never finished"
+
+    store = session.store
+    assert store is not None, "the finished transcript must still be readable"
+    assert store.stats().segment_count > 0, "the reopened store reports no segments"
+    assert session.session_seconds > 0.0, '"the last ten minutes" needs a clock'
+
+
+async def test_the_reopened_transcript_is_released_on_shutdown(manager) -> None:
+    """Reopening must not leak the descriptor the runner was careful to close."""
+    session, _config, recorder, tmp_path = manager
+    assert await drive(session, recorder, tmp_path)
+    assert session.store is not None
+
+    await session.shutdown()
+
+    assert session.store is None

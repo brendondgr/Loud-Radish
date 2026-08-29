@@ -195,6 +195,9 @@ class SessionManager:
         #: to `_teardown`, because `shutdown` reaches teardown by a second path that has no way to
         #: know — and did exactly that, closing a database a running pass was still writing to.
         self._store_handed_over = False
+        #: The store of the session that has just finished, kept **open for reading** until the
+        #: next one starts. See the :attr:`store` property for why.
+        self._last_store: TranscriptStore | None = None
 
     # -- state ---------------------------------------------------------------------
 
@@ -205,8 +208,29 @@ class SessionManager:
 
     @property
     def store(self) -> TranscriptStore | None:
-        """The current session's store, if any."""
-        return self._store
+        """The session's store — the running one, or the last finished one.
+
+        **The finished session's store stays open, and three faults came from it not doing so.**
+        Everything that reads a transcript reads it through here: the assistant's
+        ``store_provider``, both readers in ``routes/transcript.py``, and the stats in
+        :meth:`state`. Closing it the instant a session ended left all of them with ``None``.
+
+        What that looked like, in the order a user meets it:
+
+        * Asking the assistant to summarise anything answered *"There is no transcript to ask
+          about yet"* — while the finished transcript sat on screen. The pane's copy arrived over
+          the socket during the session and outlives the store, so the interface and the server
+          disagreed about whether a transcript existed.
+        * Reloading the page showed an empty transcript, because the segments could not be
+          re-fetched.
+        * :attr:`session_seconds` fell to ``0.0``, so *"the last ten minutes"* resolved to the
+          range ``[0, 0]`` and would have found nothing even had the store been present. Its own
+          docstring promises the opposite; the promise was defeated here rather than unwritten.
+
+        Held until the next session starts, which bounds the cost at exactly one SQLite connection
+        and matches the point at which the previous answer stops being the one anyone wants.
+        """
+        return self._store or self._last_store
 
     @property
     def emit(self) -> EmitFn:
@@ -228,10 +252,16 @@ class SessionManager:
 
         Falls back to the stored transcript's duration once the engine is gone, so a question asked
         after a session ends is still positioned correctly.
+
+        **That fallback read ``_store`` rather than :attr:`store`, so it never fired.** Teardown
+        clears ``_store``, which is exactly the moment the fallback exists for — leaving `0.0`, and
+        with it a *"last ten minutes"* that resolves to the range ``[0, 0]`` and selects nothing.
+        The promise above was written and then defeated one line below it.
         """
         if self._engine is not None:
             return float(self._engine.session_seconds)
-        return self._store.stats().duration_seconds if self._store is not None else 0.0
+        store = self.store
+        return store.stats().duration_seconds if store is not None else 0.0
 
     @property
     def silence_seconds(self) -> float:
@@ -244,8 +274,14 @@ class SessionManager:
         return self._gate.silence_seconds if self._gate is not None else 0.0
 
     def state(self) -> dict[str, Any]:
-        """A JSON-safe description of the session, for ``GET /api/session``."""
-        stats = self._store.stats() if self._store else None
+        """A JSON-safe description of the session, for ``GET /api/session``.
+
+        Reads through :attr:`store`, so a finished session still reports its totals. Reading
+        ``_store`` directly is why a reload after a stop showed an empty transcript: the page asks
+        here first, was told there were no stats, and had nothing to re-fetch.
+        """
+        store = self.store
+        stats = store.stats() if store else None
         return {
             "running": self.is_running,
             "session": self._metadata.as_dict() if self._metadata else None,
@@ -337,6 +373,9 @@ class SessionManager:
         if not self._asr.is_ready:
             await self._load_model(config)
 
+        # The previous session's transcript stops being the one anyone is asking about the moment a
+        # new one begins, and holding two open would leak a descriptor per recording.
+        self._release_retained()
         self._store = self._open_store(config, session)
         self._prompts = PromptBuilder(config.asr)
         # The gate runs in every mode. In `recorded` it gates nothing — it feeds the level meter
@@ -534,6 +573,10 @@ class SessionManager:
         if self._runner is not None:
             self._runner.stop()
             self._runner = None
+
+        # The retained transcript is held for the *next* question, and after this there will not be
+        # one. Released here rather than in `_teardown`, which is precisely where it must survive.
+        self._release_retained()
         await self._asr.unload()
 
     # -- capture path --------------------------------------------------------------
@@ -999,9 +1042,44 @@ class SessionManager:
         return started
 
     def _on_transcription_released(self) -> None:
-        """The pass has closed the store. Stop reading from it, and reclaim ownership."""
-        self._store = None
+        """The pass has closed the store. Reopen it for reading, and reclaim ownership.
+
+        **This is the path `recorded` and `window` sessions take, and the fault was reported
+        against one of them.** Those modes hand the store to `TranscriptionRunner`, which closes it
+        itself when the batch pass finishes — so retaining it in `_teardown` cannot help here, and
+        without this the assistant would go back to answering "there is no transcript to ask about
+        yet" at precisely the moment the transcript becomes *complete* and most worth asking about.
+
+        Reopened from the path rather than kept, because the object the runner closed is spent.
+        `TranscriptStore(path)` opens an existing database — the same call `routes/sessions.py`
+        makes for any past session — so this costs one connection and no special case.
+        """
+        store, self._store = self._store, None
         self._store_handed_over = False
+        if store is None:
+            return
+        try:
+            self._retain(TranscriptStore(store.path))
+        except Exception:  # noqa: BLE001 - a session that has already ended must still end cleanly
+            logger.debug("Could not reopen %s for reading", store.path.name, exc_info=True)
+
+    def _retain(self, store: TranscriptStore) -> None:
+        """Hold a finished session's store open for reading, replacing any already held."""
+        if store is self._last_store:
+            return
+        self._release_retained()
+        self._last_store = store
+        logger.debug("Holding %s open for reading", store.path.name)
+
+    def _release_retained(self) -> None:
+        """Close the retained store, if there is one. Safe to call more than once."""
+        store, self._last_store = self._last_store, None
+        if store is None:
+            return
+        try:
+            store.close()
+        except Exception:  # noqa: BLE001 - a store we are done with must not break a new session
+            logger.debug("The retained transcript store did not close cleanly", exc_info=True)
 
     def _open_store(self, config: AppConfig, session: SessionMetadata) -> TranscriptStore:
         directory = self._session_dir or Path(config.storage.session_dir)
@@ -1319,7 +1397,12 @@ class SessionManager:
         self._worker = Worker("asr-worker", self._queue, self._handle_frame)  # type: ignore[arg-type]
 
         if self._store is not None and not self._store_handed_over:
-            self._store.close()
+            # **Retained, not closed.** This is the line the assistant's "there is no transcript to
+            # ask about yet" came out of: the session ends, the handle closes, and every reader —
+            # the chat orchestrator, the transcript routes, the session stats — is handed `None`
+            # while the finished transcript is still on the user's screen. It stays open for
+            # reading until the next session starts. See the `store` property.
+            self._retain(self._store)
             self._store = None
 
         # An abrupt teardown that never reached `stop` still has a file open. Discarded rather than

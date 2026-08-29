@@ -107,9 +107,14 @@ Three differences from the live flow, each deliberate:
   copy of the talk.
 - **The pass outlives the session.** The transcript store is handed to the runner, which alone
   closes it; the manager keeps a read-only reference so `/api/transcript/...` still serves during
-  the pass, and drops it when the runner says the store is gone.
+  the pass, and reopens it for reading when the runner says the store is gone.
+- **The transcript outlives the session too.** The store stays open for reading until the next
+  session starts, so a question asked *after* a talk — a summary, a definition, what was missed —
+  reaches the same store the live ones did, and a reload still finds segments to re-fetch. Asking
+  after the fact is the ordinary case rather than the edge one, and closing the store on stop broke
+  it three separate ways (**D-031**).
 
-## Where a recording's pieces end up (D-031)
+## Where a recording's pieces end up (D-032)
 
 ```text
 data/sessions/<stamp>-<id>.db        the transcript, summaries, glossary, conversation
@@ -126,7 +131,7 @@ whole of a session and is not moved into the folder to tidy a listing; sharing t
 without moving anything. Every consumer that has to answer "what does this session hold" — the
 past-sessions list, the media indicators, the web-app export — does it by listing one directory.
 
-## Export flow — a recording as a web application (D-033)
+## Export flow — a recording as a web application (D-034)
 
 ```text
 GET /api/sessions/{key}/webapp
