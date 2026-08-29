@@ -28,6 +28,7 @@ from .services.chat import ChatService
 from .services.context import ContextWorker
 from .services.llm import build_llm
 from .services.polish import PolishWorker
+from .services.recording import migrate_flat_recordings
 from .services.session import SessionManager
 from .transport import EventHub, ws_router
 
@@ -55,6 +56,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     config: ConfigStore = app.state.config
     config.load()
     logger.info("Configuration resolved from %s", config.path)
+
+    # Recordings made before the per-recording folder layout existed are grouped into it now, once.
+    # Done at start-up rather than lazily because every reader — the listing, the past-sessions
+    # page, the export — would otherwise need to understand both layouts forever.
+    migrate_flat_recordings(config.resolve().recording.recording_dir)
 
     # The hub needs the running loop so the pipeline's worker threads can hand it events. This is
     # the only place asyncio and the audio path meet.

@@ -1,5 +1,6 @@
 """Capturing audio to disk, and transcribing it once it is whole (D-021).
 
+* ``layout`` — one directory per recording, named for the moment it started
 * ``sink``  — writes the canonical stream to a WAV file while a session records
 * ``batch`` — transcribes a finished file in one pass
 * ``job``    — the state of one such pass, and the one-at-a-time rule
@@ -13,6 +14,14 @@ available rather than to decide what is safe to show before the talk has finishe
 
 from .batch import BatchError, plan_windows, read_wav, transcribe_file
 from .job import JobRegistry, JobState, TranscriptionJob
+from .layout import (
+    RecordingLayout,
+    iter_recordings,
+    key_for,
+    layout_for,
+    migrate_flat_recordings,
+    resolve_recording,
+)
 from .runner import TranscriptionRunner
 from .sink import RecordingLimitReached, SinkError, WavSink
 
@@ -20,12 +29,18 @@ __all__ = [
     "BatchError",
     "JobRegistry",
     "JobState",
+    "RecordingLayout",
     "RecordingLimitReached",
     "SinkError",
     "TranscriptionJob",
     "TranscriptionRunner",
     "WavSink",
+    "iter_recordings",
+    "key_for",
+    "layout_for",
+    "migrate_flat_recordings",
     "plan_windows",
     "read_wav",
+    "resolve_recording",
     "transcribe_file",
 ]

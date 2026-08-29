@@ -156,7 +156,7 @@ async def test_a_recording_file_is_written(manager) -> None:
     await session.start(recorded_session())
     try:
         time.sleep(0.4)
-        recordings = list((tmp_path / "recordings").glob("*.wav"))
+        recordings = list((tmp_path / "recordings").glob("*/audio.wav"))
         assert recordings, "no recording file was created"
         assert recordings[0].stat().st_size > 44, "only a header was written"
     finally:
@@ -184,7 +184,7 @@ async def test_live_mode_writes_no_recording(manager) -> None:
         assert session.state()["recording"] is None
     finally:
         await session.stop()
-    assert not list((tmp_path / "recordings").glob("*.wav"))
+    assert not list((tmp_path / "recordings").glob("*/audio.wav"))
 
 
 # -- the pass, after the toggle ---------------------------------------------------------------
@@ -220,14 +220,14 @@ async def test_the_audio_is_deleted_once_transcribed(manager) -> None:
     """Retention is off by default, and that promise predates this mode."""
     session, _store, recorder, tmp_path = manager
     assert await drive(session, recorder, tmp_path)
-    assert not list((tmp_path / "recordings").glob("*.wav"))
+    assert not list((tmp_path / "recordings").glob("*/audio.wav"))
 
 
 async def test_the_audio_is_kept_when_retention_is_on(manager) -> None:
     session, store, recorder, tmp_path = manager
     store.update({"storage.retain_audio": True})
     assert await drive(session, recorder, tmp_path)
-    assert list((tmp_path / "recordings").glob("*.wav"))
+    assert list((tmp_path / "recordings").glob("*/audio.wav"))
 
 
 async def test_the_transcript_survives_on_disk(manager) -> None:
@@ -271,7 +271,9 @@ async def test_a_session_that_captured_nothing_starts_no_pass(tmp_path: Path) ->
     await session.stop()
 
     assert recorder.of("transcription.progress") == []
-    assert not list((tmp_path / "recordings").glob("*.wav")), "an empty recording was left behind"
+    assert not list((tmp_path / "recordings").glob("*/audio.wav")), (
+        "an empty recording was left behind"
+    )
 
 
 async def test_shutdown_does_not_wait_out_a_running_pass(manager) -> None:

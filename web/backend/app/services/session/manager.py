@@ -52,6 +52,7 @@ from ..recording import (
     TranscriptionJob,
     TranscriptionRunner,
     WavSink,
+    layout_for,
 )
 from ..streaming.events import CommittedSegment, EngineNotice, HypothesisUpdate
 from ..streaming.guards import Severity
@@ -808,15 +809,17 @@ class SessionManager:
             else "chosen fresh (no stored consent to restore)",
         )
 
-        directory = Path(config.recording.recording_dir)
-        stamp = session.started_at.strftime("%Y%m%d-%H%M%S")
-        base = f"{stamp}-{session.session_id}"
+        # One directory per recording, shared with the audio sink and named for the moment the
+        # session started — which is also the transcript database's stem, and how the two are
+        # joined without moving an open SQLite file.
+        layout = layout_for(config.recording.recording_dir, session.started_at, session.session_id)
+        layout.ensure()
         spec = build_pipeline(
             support,
             node_id=stream.node_id,
             fd=stream.fd,
-            video_path=str(directory / f"{base}.{support.extension}"),
-            preview_path=str(directory / f"{base}-preview.jpg"),
+            video_path=str(layout.video(support.extension)),
+            preview_path=str(layout.preview),
             frame_rate=config.capture.frame_rate,
             max_height=config.capture.max_height,
             want_preview=config.capture.preview,
@@ -925,11 +928,10 @@ class SessionManager:
         class: `recorded` mode with no file is a mode that records nothing and then reports
         success, which is the worst possible outcome for a talk that will not happen twice.
         """
-        directory = Path(config.recording.recording_dir)
-        stamp = session.started_at.strftime("%Y%m%d-%H%M%S")
+        layout = layout_for(config.recording.recording_dir, session.started_at, session.session_id)
         try:
             return WavSink(
-                directory / f"{stamp}-{session.session_id}.wav",
+                layout.audio,
                 max_minutes=config.recording.max_minutes,
             )
         except SinkError as exc:
