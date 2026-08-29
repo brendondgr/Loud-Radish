@@ -36,6 +36,19 @@ came back as bit-exact digital silence, and the cause was the test suite that re
 
 A unique name per tap now makes the silence impossible; this makes the leak impossible, which is
 the fault underneath it. The double below records what was asked of it and touches nothing.
+
+## No test may write into the developer's data directory
+
+The same lesson a third time, and this one had been running for months. A test that constructs
+``ConfigStore()`` with no path resolves ``./data/transcriber-config.json`` and therefore the real
+``./data/sessions`` — so every route test that started a session left a transcript database behind.
+Measured on the machine this was found on: **949 session files, 690 of them empty**, all of them
+written by the suite.
+
+That was not merely untidy either. The past-sessions page lists what is in that directory, newest
+first, and the newest were hundreds of empty test sessions — which is why the page opened on a wall
+of "0 words, 0 segments" and the genuine recordings could not be found. A test suite that fills the
+product's own storage with garbage is a test suite reporting a bug it caused.
 """
 
 from __future__ import annotations
@@ -130,3 +143,45 @@ def no_real_audio_tap(monkeypatch):
     from app.services.session import manager as manager_module
 
     monkeypatch.setattr(manager_module, "ApplicationTap", NoTapInTests)
+
+
+@pytest.fixture(autouse=True)
+def isolated_data_dirs(tmp_path, monkeypatch):
+    """Point every default-constructed ``ConfigStore`` at a per-test data directory.
+
+    Autouse and suite-wide, for the same reason as the two above: "remember to pass a config path"
+    is a habit, and a test that forgets writes into the directory the user's own recordings live in.
+
+    Two overrides rather than one, because they close different holes. The environment variable
+    moves a default-constructed store's *config file* out of the way. Patching the bottom
+    configuration layer moves the session and recording directories for **every** store, including
+    the many tests that pass their own ``config_path`` and then override only the one directory
+    their subject writes to — those were leaking the other one, which is how a suite with careful
+    per-test fixtures still filled `data/sessions`.
+    """
+    import json
+
+    from app.config import defaults
+    from app.config import store as store_module
+
+    data = tmp_path / "data"
+    sessions = data / "sessions"
+    recordings = data / "recordings"
+    sessions.mkdir(parents=True)
+    recordings.mkdir(parents=True)
+
+    config_path = data / "transcriber-config.json"
+    config_path.write_text(json.dumps({}), encoding="utf-8")
+    monkeypatch.setenv("TRANSCRIBER_CONFIG_PATH", str(config_path))
+
+    real_default_layer = defaults.default_layer
+
+    def isolated_default_layer():
+        layer = real_default_layer()
+        layer["storage"]["session_dir"] = str(sessions)
+        layer["recording"]["recording_dir"] = str(recordings)
+        return layer
+
+    monkeypatch.setattr(defaults, "default_layer", isolated_default_layer)
+    # `store.py` imported the name directly, so patching the module it came from is not enough.
+    monkeypatch.setattr(store_module, "default_layer", isolated_default_layer)
