@@ -46,6 +46,11 @@ never uploaded; it is captured locally and consumed in flight.
 6. PUBLISH                                    transport/
    `transcript.committed` (append) and `transcript.hypothesis` (replace) go to every
    connected client, alongside audio level, VAD state, and health telemetry.
+   `transcript.committed` appends *within one transcription pass*. A post-capture pass
+   publishes over the same channel while the browser is still showing the live one
+   (D-022), so the segment store keeps the revision it is displaying and drops the
+   rest; on `transcription.done` the pane switches to the newest pass by replacing
+   its contents. Appending across passes writes the whole talk out twice.
 
 7. POLISH                                     services/polish/
    Once about a minute of committed transcript has accumulated, the worker waits for

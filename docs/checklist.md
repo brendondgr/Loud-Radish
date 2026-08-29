@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-08-15 (the multi-mode expansion)*
+*Last updated: 2026-08-28 (one transcription pass in the finished result)*
 
 The active work list for TranscriberPrototype. Update it whenever a task is finished or new work is
 discovered.
@@ -234,6 +234,114 @@ Known blockers and open questions carried by these plans:
 - [ ] **Per-window audio is not available.** The KDE ScreenCast portal carries video only, so window
       capture records the machine's audio, not that window's. Plan 4 says so at the moment of arming
       rather than letting a user discover it in the recording.
+
+---
+
+## Part 3g — The Final Result Said Everything Twice
+
+Reported: stop a window session, wait for the pass that runs at the end, and the finished result
+showed the rewritten prose followed immediately by the entire raw transcript again. Planned in
+[plans/duplicate-final-transcript.md](plans/duplicate-final-transcript.md) and closed (4 / 4).
+
+- [x] **Nothing was duplicating text — the rule in the contract was never applied.** Both passes are
+      supposed to exist (**D-022**), and `docs/api-contract.md` already said a client showing
+      revision 1 must *replace* the transcript rather than merge. Four call sites merged.
+- [x] **The browser holds one pass at a time.** `stores/transcript.js` drops a committed segment
+      whose revision is not the one on screen, so a post-capture pass streaming in over the live
+      socket can no longer append the whole talk under the transcript already there. Enforced in the
+      store, for the same reason the hypothesis is its own field: the shape is the safeguard.
+- [x] **The second pass appears by replacing, not by joining.** `transcription.done` now switches
+      the pane to the newest revision, which resets and refetches. `recorded` mode, whose only pass
+      is revision 0, is unaffected — the switch is a no-op when the revision has not changed.
+- [x] **Three read paths served the union.** `GET /api/transcript/export`,
+      `GET /api/sessions/{key}` and `GET /api/sessions/{key}/export` used `all_segments()`. They use
+      `latest_segments()` now, so the file a reader keeps holds the talk once in all five formats.
+- [x] **A regression test that fails on the old code.** `tests/data/test_two_pass_output.py` builds
+      a two-pass session and asserts each sentence appears exactly once in every export format and
+      on the sessions page — verified failing before the fix, seven of thirteen.
+
+- [ ] **Export cannot name a revision.** `/export` serves the latest pass and there is no way to ask
+      for the live one. The sessions page has no revision control to drive such a parameter, so
+      adding it would have widened a bug fix into a feature. Worth doing alongside a revision
+      control on that page.
+- [ ] **`segments_in_range` still spans passes.** The context, polish, and chat paths read through
+      it. Not reachable today — the post-capture pass runs after those workers have stopped and
+      closes the store when it finishes — but it is the same union, and it would surface the moment
+      a session with two passes is reopened for reading.
+
+---
+
+## Part 3f — A Tap That Is Linked, Active, and Silent
+
+Reported: window recording "not working again" — the video recorded perfectly and the transcript
+stayed empty. Recorded as **D-030**. Reproduced against the real graph and fixed under measurement.
+
+- [x] **The fault, located.** The tap is built exactly as designed and delivers bit-exact digital
+      silence: sink created, browser ports linked, every link `active`, both nodes `running`, every
+      gain 1.0, 43 seconds of capture at the right sample rate with not one non-zero sample.
+- [x] **Why neither guard saw it.** `live_links` counts links and there were two; the silence probe
+      it replaced was removed for the sound reason that zeros are also what a paused video looks
+      like. Each question was right and neither was sufficient alone.
+- [x] **The mechanism is not broken.** `pw-play` linked into the *identical* tap in the same second
+      came back at 440.4 Hz / RMS 0.35 while the browser stayed at 0.000000 — measured four times
+      alternating, and again against a sink created with the browser's own rate and layout.
+- [x] **The dead-tap test, and the widening.** Tap silence and the machine's own output are probed
+      together; only *tap silent **and** speakers audible* means a dead tap. The capture then widens
+      to the whole output and says so, rather than refusing.
+- [x] **`-1.0` is unknown, not silent.** A probe that could not run changes nothing.
+- [x] **One name is not one node.** `link` keyed by `node.name`, and a browser gives every tab's
+      node the same one, so the second tab was marked already-linked and skipped — exactly one tab
+      was ever captured. It links by port object id and keys by node id now.
+
+Two things measured along the way, recorded so they are not re-litigated:
+
+- **The `<name>.monitor` target must not be used for a null sink.** It silently records the
+  *microphone*, at RMS 0.065 whether or not anything is linked — and because the microphone hears
+  the speakers, level alone cannot tell it from a real capture. The discriminator is an unlinked
+  tap: a true tap read is 0.0, a microphone fallback is not.
+- **`node.dont-fallback` is unusable on PipeWire 1.6.8.** It rejects valid targets by name and by
+  id alike with `defined target not found`, so it cannot be the thing that makes a bad target
+  visible. Verifying the achieved capture replaces it.
+
+- [ ] **`services/session/manager.py` is 1334 lines, against a cap of 800.** It was already 1265
+      before this repair and this added 73. The new logic went into the audio modules wherever it
+      could, but the decision about which source a session opens belongs to the manager and had
+      nowhere else to go. It wants splitting — the source-selection and capture-wiring halves are
+      the obvious seam — and that is a refactor, not a repair, so it was not smuggled into one.
+
+Still open, and deliberately not guessed at:
+
+- [ ] **Why a `pipewire-pulse` client's output does not reach an additive second sink.** Every
+      observable says it should: the tap joins the browser's driver domain (`node.driver-id` goes
+      from `None` to 63 on linking), all four links read `active`, all gains read 1.0. A native
+      client through the same tap works. Ruled out by measurement: sink volume and the hidden
+      `volume` scalar, mute and `softMute`, monitor volumes, the null sink's rate and channel
+      layout, and driver-domain separation. This is the reason per-application audio is unavailable
+      for browsers, and the widening is a workaround rather than a fix.
+- [ ] **`module-combine-sink` as the real fix for per-application audio.** The standard PulseAudio
+      approach for this: a combined sink over the real sink plus the tap, with the application moved
+      onto it, keeps the audio audible *and* captures it. It is a larger change and it moves a
+      stream the user is listening to, which is the risk D-027 refused for `move-sink-input` — worth
+      trying deliberately rather than smuggling into a repair.
+- [x] **End-to-end confirmation that words appear — done, on a real window recording with consent
+      given at the picker.** 55 s of a narrated video: 22 segments, 240 words, coherent and matching
+      the video's own on-screen captions; video 1080x910 VP8 muxed with an Opus track; the sidecar
+      reads `likely_speech`, speech-band ratio **0.73**, dominant **164.5 Hz**. That last figure is
+      what closes the earlier ambiguity — the audio used during the repair characterised as
+      `likely_music_or_game` at ratio 0.29 and dominant 29.7 Hz, so the empty transcripts then were
+      the audio, not the pipeline.
+
+- [ ] **The tap delivered on that run, so D-030's fault did not reproduce and the widening never
+      fired.** Stated plainly because it matters for what is actually known: the repair is verified
+      to *detect and widen* (its own tests, plus a live run earlier the same day where it fired in
+      2.1 s), but this successful recording did not exercise it. Nor can the change be attributed
+      with confidence. The browser's stream state differed — two playback nodes during the repair,
+      one here — and with a single node the link-by-port-id fix and the old name-keyed code behave
+      identically. Against that: linking *only* the video's node by explicit port id during the
+      repair still measured bit-exact zeros, which the browser-state explanation does not cover.
+      **So the silent-tap condition is intermittent and its trigger is not known.** Both guards
+      stay. If it recurs, capture `pw-dump` and the playback-node set at the moment it happens —
+      that is the observation the repair never got.
 
 ---
 

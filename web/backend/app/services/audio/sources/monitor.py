@@ -38,6 +38,9 @@ BYTES_PER_SAMPLE = 4
 #: How long to wait for the process to end on its own after being asked to.
 STOP_TIMEOUT_S = 2.0
 
+#: Slack on top of a probe's own window, covering the daemon's start-up before samples flow.
+PROBE_GRACE_S = 2.0
+
 #: How much audio to check before trusting the stream. One second is enough to catch a container
 #: header being read as samples, which is the fault this exists for.
 GUARD_SAMPLES = 16_000
@@ -278,3 +281,61 @@ def _short(node: str) -> str:
     if not node:
         return "system output"
     return node.removesuffix(".monitor").split(".")[0]
+
+
+def probe_peak(node: str, *, capture_sink: bool, seconds: float = 1.0) -> float:
+    """The largest absolute sample ``node`` delivers in ``seconds``, or ``-1.0`` if unknown.
+
+    **Built from :func:`record_command`, deliberately.** A probe that constructs its own invocation
+    is a probe that eventually measures something the capture does not do — the target form here
+    took three attempts to get right, and the two must not be able to drift apart.
+
+    ``-1.0`` rather than ``0.0`` when the capture could not run at all. The distinction is the whole
+    point: *silent* is a measurement, *unknown* is the absence of one, and a probe that cannot run
+    knows nothing and must never be what stops a recording.
+    """
+    wanted = int(SAMPLE_RATE * seconds) * BYTES_PER_SAMPLE
+    try:
+        process = subprocess.Popen(  # noqa: S603 - fixed binary, no shell
+            record_command(node, capture_sink=capture_sink),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
+        return -1.0
+
+    # **Read on a thread with a deadline.** `pw-record` writes until it is stopped and the pipe
+    # holds 64 KB — a blocking read of a target that turns out to deliver nothing would hang here
+    # for the length of the session, and a capture that fills the buffer would stall the daemon.
+    collected = bytearray()
+
+    def drain() -> None:
+        stream = process.stdout
+        if stream is None:
+            return
+        while len(collected) < wanted:
+            chunk = stream.read(min(8192, wanted - len(collected)))
+            if not chunk:
+                break
+            collected.extend(chunk)
+
+    reader = threading.Thread(target=drain, name="monitor-probe", daemon=True)
+    reader.start()
+    reader.join(timeout=seconds + PROBE_GRACE_S)
+
+    process.terminate()
+    try:
+        process.wait(timeout=STOP_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        process.kill()
+    reader.join(timeout=STOP_TIMEOUT_S)
+
+    usable = len(collected) - len(collected) % BYTES_PER_SAMPLE
+    if usable < BYTES_PER_SAMPLE:
+        return -1.0
+
+    samples = np.frombuffer(bytes(collected[:usable]), dtype=np.float32)
+    if not np.isfinite(samples).all():
+        # The container-header fault (see `record_command`). Not a level, so not a level to report.
+        return -1.0
+    return float(np.abs(samples).max())

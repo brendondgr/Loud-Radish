@@ -75,6 +75,17 @@ Three consequences worth stating separately, because each is a constraint on eve
   that can be declined in the middle of the mode, and it means the application never learns what
   windows exist. See **D-022**.
 
+- **`window` audio is a separate capture, and it may be wider than the window.** The portal carries
+  video only, so the window's sound is captured from PipeWire alongside it — ideally as an additive
+  tap on the application's own playback nodes, which leaves the audio playing on the user's speakers
+  (D-027). That tap cannot always deliver: a `pipewire-pulse` client's output does not reach an
+  additive second sink on PipeWire 1.6.8, and the failure is silent — every link reads `active`,
+  every node `running`, every gain 1.0, and the capture is bit-exact zeros. The session detects this
+  by asking the tap and the machine's own output *together*, because only the combination "tap
+  silent, speakers audible" distinguishes a dead tap from a paused video. On that verdict the
+  capture widens to the machine's whole output and says so over the `error` channel: a wider
+  recording still contains what was asked for, and an empty one contains nothing. See **D-030**.
+
 ## The pipeline
 
 ```text

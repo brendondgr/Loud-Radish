@@ -29,8 +29,8 @@ from ...models.session import SessionMetadata, SessionStats
 from ..asr import AsrLifecycle, LoadProgress, PromptBuilder
 from ..asr.contract import AsrLoadError
 from ..audio import LevelMeter, WavFileSource
-from ..audio.monitor import MonitorUnavailable
-from ..audio.sources import AudioSource, DeviceSource, MonitorSource, SourceInfo
+from ..audio.monitor import MonitorUnavailable, default_monitor
+from ..audio.sources import AudioSource, DeviceSource, MonitorSource, SourceInfo, probe_peak
 from ..audio.tap import ApplicationTap, TapError
 from ..audio.tap import playback_streams as tap_streams
 from ..audio.tap import score as tap_score
@@ -78,6 +78,11 @@ STATUS_INTERVAL_S = 1.0
 #: and peaks well above this, while a video's background music measured a flat 5 dB band from
 #: −42.6 to −37.4 dBFS and stays below it. Speech has dynamics; ambience does not.
 LOOPBACK_SPEECH_RMS = 0.022
+
+#: How long each side of the dead-tap comparison listens. One second is ample: the question is
+#: whether anything at all arrives, not what it sounds like, and both probes run before the
+#: session starts — so this is time the user waits at the moment they press record.
+TAP_PROBE_S = 1.0
 
 #: Capture queue depth, in frames. At 32 ms a frame this is about six seconds of slack — enough to
 #: absorb a slow inference pass, short enough that a sustained problem surfaces quickly.
@@ -1090,9 +1095,73 @@ class SessionManager:
             ) from exc
 
         self._verify_tap(tap)
+
+        wider = self._whole_output_if_the_tap_is_dead(tap, config)
+        if wider is not None:
+            return wider
+
         self._tap = tap
         self._tap_match = match
         return MonitorSource(frame_ms=config.audio.frame_ms, tap=tap)
+
+    def _whole_output_if_the_tap_is_dead(
+        self, tap: ApplicationTap, config: AppConfig
+    ) -> AudioSource | None:
+        """Record the machine's whole output when the tap is built correctly and carries nothing.
+
+        **The third question, after two that could not answer this on their own.** Listening to the
+        tap alone cannot tell a dead graph from a paused video — both are bit-exact zeros, and
+        refusing on that basis rejected working recordings within a day. Counting links cannot tell
+        a link that carries audio from one that merely exists — which is this fault exactly: the
+        sink created, the browser's ports linked, every link ``active``, every node ``running``,
+        every gain 1.0, and zeros for the length of a talk.
+
+        Asking both at once separates them, because the machine's own output is the ground truth
+        neither question had:
+
+        =============  =============  ==================================  ==================
+        tap            whole output   what that means                     what happens
+        =============  =============  ==================================  ==================
+        silent         silent         nothing is playing yet              keep the tap
+        anything       —              the tap is delivering               keep the tap
+        silent         audible        the tap cannot carry this stream    record the output
+        unknown        anything       the probe did not run               keep the tap
+        =============  =============  ==================================  ==================
+
+        The last row is not a formality. A probe that cannot run knows nothing, and must never be
+        the thing that changes what a recording captures.
+
+        Widening rather than refusing is the deliberate trade. What the user asked for is a
+        transcript of the thing they are watching; a wider recording still contains it, and an empty
+        one contains nothing. The cost — every other sound on the machine lands in the transcript —
+        is real, so it is said out loud rather than absorbed silently.
+        """
+        sink = tap.monitor.removesuffix(".monitor")
+        if probe_peak(sink, capture_sink=True, seconds=TAP_PROBE_S) != 0.0:
+            # Delivering, or unmeasurable. Either way, not the fault this exists for.
+            return None
+
+        try:
+            whole_output = default_monitor()
+        except MonitorUnavailable:
+            # No monitor to widen to. The tap is the only route there is, so it stays.
+            return None
+
+        if probe_peak(whole_output, capture_sink=False, seconds=TAP_PROBE_S) <= 0.0:
+            # The machine is not playing anything, so the tap's silence is the ordinary kind —
+            # someone who pressed record before pressing play. Leave it alone; it will fill.
+            return None
+
+        logger.warning(
+            "The tap on %s is linked (%d ports) and delivering digital silence while the machine "
+            "is playing audio. Recording the whole output instead.",
+            sink,
+            tap.live_links,
+        )
+        tap.close()
+        self._tap = None
+        self._emit_failure(degradation.window_audio_not_delivering())
+        return MonitorSource(node=whole_output, frame_ms=config.audio.frame_ms)
 
     def _tap_candidates(self, match: bool) -> list:
         """The playback streams this run should tap.

@@ -303,3 +303,27 @@ def window_audio_stopped() -> Failure:
         ),
         severity=Severity.WARNING,
     )
+
+
+def window_audio_not_delivering() -> Failure:
+    """The tap was built correctly and carries nothing, so the whole output is recorded instead.
+
+    Measured on a real fault: the sink was created, the browser's ports were linked, every link
+    read ``active``, both nodes read ``running``, every gain read 1.0 — and the tap's monitor
+    delivered bit-exact zeros while the same audio played through the speakers at peak 1.04. A
+    native client linked into the identical tap in the same second came back at 440 Hz, so the
+    mechanism works and the browser's ``pipewire-pulse`` stream is what does not feed it.
+
+    A warning rather than a failure, because the recording is fine — it is simply wider than was
+    asked for. Saying so matters: the transcript will now contain anything else the machine plays,
+    and discovering that afterwards is discovering it too late.
+    """
+    return Failure(
+        code="window-audio-not-delivering",
+        message=(
+            "This window's audio could not be captured on its own, so the machine's whole output "
+            "is being recorded instead. The transcript will include any other sound that plays. "
+            "Mute anything you do not want in it, or stop and record with your microphone."
+        ),
+        severity=Severity.WARNING,
+    )

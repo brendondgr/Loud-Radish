@@ -301,6 +301,38 @@ def linked_sources(sink_name: str) -> int:
     )
 
 
+def _output_ports(node_id: int) -> dict[str, int]:
+    """This node's audio output ports, as ``{channel: port id}``.
+
+    **By id, because names are ambiguous exactly where it matters.** Several nodes can share a
+    ``node.name`` — a browser names every tab's playback node after itself — so `pw-link`'s
+    ``<name>:output_FL`` form cannot address one of them in particular. Port object ids can.
+
+    An empty mapping is a real answer: the daemon may be unreachable, or the node may have gone
+    away between being listed and being linked. The caller falls back to the name form, which is
+    what a single-node application has always used successfully.
+    """
+    raw = _run(["pw-dump"], allow_failure=True)
+    if not raw:
+        return {}
+    try:
+        objects = json.loads(raw)
+    except ValueError:
+        return {}
+
+    ports: dict[str, int] = {}
+    for entry in objects:
+        if entry.get("type") != "PipeWire:Interface:Port":
+            continue
+        props = entry.get("info", {}).get("props", {})
+        if props.get("node.id") != node_id or props.get("port.direction") != "out":
+            continue
+        channel = props.get("audio.channel")
+        if isinstance(channel, str) and channel not in ports:
+            ports[channel] = entry.get("id")
+    return ports
+
+
 class ApplicationTap:
     """A private sink carrying one application's audio, without diverting it.
 
@@ -385,23 +417,28 @@ class ApplicationTap:
         if not self._module:
             raise TapError("The tap is not open.")
 
+        # **Keyed and addressed by node id, because a name is not one node.** A browser owns a
+        # playback node per media element and gives them all the *same* `node.name`: two tabs both
+        # appear as `LibreWolf`. Keyed by name, the first tab's `LibreWolf:FL` marked the second
+        # tab's port already linked and it was skipped — and `pw-link LibreWolf:output_FL` would
+        # have resolved to whichever node it matched first anyway. Measured on a browser with two
+        # tabs playing: `link_all` reported 2 ports for 2 nodes, so exactly one tab was ever
+        # captured, which is the fault this module's own docstring warns about.
+        ports = _output_ports(stream.node_id)
         linked = 0
         for channel in ("FL", "FR"):
-            key = f"{stream.node_name}:{channel}"
+            key = f"{stream.node_id}:{channel}"
             if key in self._linked:
                 continue
+            source = (
+                str(ports[channel]) if channel in ports else f"{stream.node_name}:output_{channel}"
+            )
             # **The exit status, not the output.** This read `if _run(...) is not None`, and `_run`
             # returns `""` on failure and never returns `None` — so every attempt counted as a
             # success and `link_all(...) == 0`, the guard against a tap with nothing in it, could
             # not fire. A mono application really does have no FR port, and that really is not a
             # failure, but it has to be distinguished from a link that did not happen.
-            if _succeeded(
-                [
-                    "pw-link",
-                    f"{stream.node_name}:output_{channel}",
-                    f"{self.sink_name}:playback_{channel}",
-                ]
-            ):
+            if _succeeded(["pw-link", source, f"{self.sink_name}:playback_{channel}"]):
                 self._linked.add(key)
                 linked += 1
         if linked:

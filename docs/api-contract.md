@@ -148,6 +148,15 @@ are kept rather than one replacing the other, so a client showing revision 1 mus
 transcript rather than merge — the two cover the same audio with different ids, and interleaving
 them says everything twice.
 
+**That rule binds the reader as well as the writer, and it was where the fault was.** A post-capture
+pass publishes `transcript.committed` for every revision-1 segment as it writes it, so a client
+displaying revision 0 receives a second whole transcript over the same socket it is already using.
+The browser now holds one revision at a time and drops anything from another, switching wholesale
+when the pass finishes. On the server, `GET /api/transcript/export`, `GET /api/sessions/{key}` and
+`GET /api/sessions/{key}/export` serve the **latest** revision — never the union — so the file a
+reader keeps holds the talk once. The Live/Final switch is the only way to see the other pass, and
+full-text search is the deliberate exception: it spans both, because a hit in either is a real hit.
+
 The unit the transcript store holds, the frontend renders as a paragraph, and the context pipeline
 chunks on.
 

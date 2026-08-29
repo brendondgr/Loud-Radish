@@ -226,8 +226,22 @@ class TranscriptStore:
         return int(row["newest"]) if row and row["newest"] is not None else 0
 
     def all_segments(self) -> list[Segment]:
-        """Every segment, in id order."""
+        """Every segment, in id order — *including* every transcription pass.
+
+        Rarely what a reader wants. Use :meth:`latest_segments` for anything shown or exported; this
+        is for the archive, the migration, and anything that genuinely means "every row".
+        """
         return [_row_to_segment(row) for row in self._query("SELECT * FROM segments ORDER BY id")]
+
+    def latest_segments(self) -> list[Segment]:
+        """The transcript a reader should be shown: the newest pass, and only that one (D-022).
+
+        Not :meth:`all_segments`. A session that transcribed live and again afterwards holds both
+        passes over the *same* audio under different ids, so their union is the talk said twice —
+        which is what an export and a past-session read were serving. Keeping both on disk is the
+        point of revisions; concatenating them was never part of it.
+        """
+        return self.segments_at(self.latest_revision())
 
     def segments_at(self, revision: int) -> list[Segment]:
         """Every segment from one transcription pass, in order."""
