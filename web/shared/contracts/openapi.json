@@ -1557,6 +1557,47 @@
         }
       }
     },
+    "/api/sessions/{key}/webapp": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Export Webapp",
+        "description": "Download this recording as a self-contained HTML web application, in a ZIP.\n\nRefused rather than degraded when the recording has no video or no transcript. A \"web\napplication\" with an empty player and nothing to read is not the thing that was asked for, and\nshipping one under the same name disappoints quietly instead of explaining \u2014 so the refusal\nnames which piece is missing and what to do about it.\n\nBuilt on a worker thread. A talk is hundreds of megabytes, and copying that much into an archive\non the event loop stalls every other request including the transcript the user is watching.",
+        "operationId": "export_webapp_api_sessions__key__webapp_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/recordings": {
       "get": {
         "tags": [

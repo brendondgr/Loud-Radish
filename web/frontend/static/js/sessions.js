@@ -166,7 +166,27 @@ class SessionsPage {
     });
     remove.addEventListener("click", () => this.remove(session));
 
-    return el("div", { className: "session__actions", children: [format, download, remove] });
+    // Offered only when the session holds video, audio, and a transcript. The export *is* those
+    // three — a player, a transcript that follows it, and questions asked against both — so a
+    // button that produced two of them under the same name would disappoint quietly.
+    const webapp = session.media?.exportable
+      ? el("a", {
+          className: "button button--primary",
+          text: "Web app (.zip)",
+          attrs: {
+            href: api.sessionWebappUrl(session.key),
+            download: "",
+            title:
+              "A self-contained page with the video, the transcript, and a question panel. " +
+              "Opens in any browser, with no server.",
+          },
+        })
+      : null;
+
+    return el("div", {
+      className: "session__actions",
+      children: [format, download, webapp, remove].filter(Boolean),
+    });
   }
 
   async remove(session) {

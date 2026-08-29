@@ -159,4 +159,6 @@ export const api = {
   deleteSession: (key) => del(`/api/sessions/${encodeURIComponent(key)}`),
   sessionExportUrl: (key, fmt) =>
     `/api/sessions/${encodeURIComponent(key)}/export?fmt=${encodeURIComponent(fmt)}`,
+  /** The self-contained web application, as a ZIP. Only offered when a session holds all three. */
+  sessionWebappUrl: (key) => `/api/sessions/${encodeURIComponent(key)}/webapp`,
 };

@@ -6,7 +6,8 @@ because those read the *running* session's store. That is correct for the live v
 a talk that finished ten minutes ago, which is what these routes are for.
 
 A session is addressed by its **key** — the file's stem — never by a path. A path from a request is
-a path traversal waiting to be written, and there is no reason for the caller to supply one.
+a path traversal waiting to be written, and there is no reason for the caller to supply one. That
+same key names the recording's folder, which is what lets the web-app export here reach the video.
 """
 
 from __future__ import annotations
@@ -15,7 +16,10 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import Response
+from starlette.concurrency import run_in_threadpool
 
+from ..services.export import ExportError, build_webapp
+from ..services.recording import resolve_recording
 from ..services.transcript import archive
 from ..services.transcript import export as render_export
 from ..services.transcript.store import TranscriptStore
@@ -120,6 +124,63 @@ async def export_session(request: Request, key: str, fmt: str = Query("markdown"
         content=body,
         media_type=mime,
         headers={"Content-Disposition": f'attachment; filename="{stem}-transcript.{extension}"'},
+    )
+
+
+@router.get("/{key}/webapp")
+async def export_webapp(request: Request, key: str) -> Response:
+    """Download this recording as a self-contained HTML web application, in a ZIP.
+
+    Refused rather than degraded when the recording has no video or no transcript. A "web
+    application" with an empty player and nothing to read is not the thing that was asked for, and
+    shipping one under the same name disappoints quietly instead of explaining — so the refusal
+    names which piece is missing and what to do about it.
+
+    Built on a worker thread. A talk is hundreds of megabytes, and copying that much into an archive
+    on the event loop stalls every other request including the transcript the user is watching.
+    """
+    config = _config(request)
+    layout = resolve_recording(archive.recording_dir(config), key)
+    if layout is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": {
+                    "code": "no-recording",
+                    "message": "There is no recording folder for that session.",
+                    "severity": "warning",
+                }
+            },
+        )
+
+    store = _open(request, key)
+    try:
+        body = await run_in_threadpool(
+            build_webapp,
+            key=key,
+            store=store,
+            metadata=store.metadata(),
+            layout=layout,
+            config=config,
+        )
+    except ExportError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": {
+                    "code": "not-exportable",
+                    "message": str(exc),
+                    "severity": "warning",
+                }
+            },
+        ) from exc
+    finally:
+        store.close()
+
+    return Response(
+        content=body,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{key}-webapp.zip"'},
     )
 
 

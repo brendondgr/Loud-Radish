@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Recorded talk</title>
+    <link rel="stylesheet" href="theme.css" />
+    <link rel="stylesheet" href="app.css" />
+  </head>
+  <body>
+    <!-- The exported application.
+         Three panels in two columns. Every panel can be collapsed, moved between columns, or
+         closed; closing the assistant is what produces the video-first arrangement, where the
+         video takes the whole left column and the transcript moves across to the right.
+
+         The markup is deliberately plain and the panels are addressed by `data-panel`, so the
+         layout is a matter of which column a panel is appended to and nothing else. -->
+    <header class="topbar">
+      <div class="topbar__identity">
+        <h1 class="topbar__title" data-title>Recorded talk</h1>
+        <p class="topbar__meta" data-meta></p>
+      </div>
+
+      <!-- Reopening a closed panel. Buttons appear here only for panels that are closed, so the
+           bar is empty in the ordinary case rather than carrying three permanently lit toggles. -->
+      <div class="topbar__reopen" data-reopen aria-label="Reopen a closed panel"></div>
+
+      <button type="button" class="button button--quiet" data-reset-layout title="Put every panel back where it started">
+        Reset layout
+      </button>
+    </header>
+
+    <main class="workspace" data-workspace>
+      <section class="column" data-column="left" aria-label="Video and transcript"></section>
+      <div class="splitter" data-splitter role="separator" aria-orientation="vertical" tabindex="0"
+           aria-label="Resize the columns"></div>
+      <section class="column" data-column="right" aria-label="Assistant"></section>
+    </main>
+
+    <!-- Panels live in a template and are moved into a column at boot. Keeping them out of the
+         columns in the markup means the saved layout is the only thing that decides where they
+         start, rather than the markup and the saved layout disagreeing on first paint. -->
+    <template data-panels>
+      <article class="panel" data-panel="video" data-grow="2">
+        <header class="panel__head">
+          <h2 class="panel__title">Video</h2>
+          <div class="panel__tools">
+            <button type="button" class="icon-button" data-panel-move title="Move to the other column">⇄</button>
+            <button type="button" class="icon-button" data-panel-collapse title="Collapse">▾</button>
+            <button type="button" class="icon-button" data-panel-close title="Close">✕</button>
+          </div>
+        </header>
+        <div class="panel__body panel__body--video">
+          <div class="player" data-player>
+            <video class="player__video" data-video playsinline preload="metadata"></video>
+            <div class="player__controls">
+              <button type="button" class="icon-button" data-back title="Back 10 seconds">↺10</button>
+              <button type="button" class="icon-button icon-button--primary" data-play title="Play or pause">▶</button>
+              <button type="button" class="icon-button" data-forward title="Forward 10 seconds">10↻</button>
+              <input class="player__scrub" type="range" data-scrub min="0" max="1000" value="0"
+                     aria-label="Seek" />
+              <span class="player__time numeric" data-time>0:00 / 0:00</span>
+              <label class="player__rate">
+                <span class="visually-hidden">Playback speed</span>
+                <select data-rate aria-label="Playback speed">
+                  <option value="0.75">0.75×</option>
+                  <option value="1" selected>1×</option>
+                  <option value="1.25">1.25×</option>
+                  <option value="1.5">1.5×</option>
+                  <option value="2">2×</option>
+                </select>
+              </label>
+              <button type="button" class="icon-button" data-mute title="Mute">🔊</button>
+              <button type="button" class="icon-button" data-fullscreen title="Fullscreen">⛶</button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel" data-panel="transcript" data-grow="3">
+        <header class="panel__head">
+          <h2 class="panel__title">Transcript</h2>
+          <div class="panel__tools">
+            <label class="follow">
+              <input type="checkbox" data-follow checked />
+              <span>Follow</span>
+            </label>
+            <input class="panel__search" type="search" data-transcript-search placeholder="Find…"
+                   aria-label="Search the transcript" />
+            <button type="button" class="icon-button" data-panel-move title="Move to the other column">⇄</button>
+            <button type="button" class="icon-button" data-panel-collapse title="Collapse">▾</button>
+            <button type="button" class="icon-button" data-panel-close title="Close">✕</button>
+          </div>
+        </header>
+        <div class="panel__body panel__body--scroll" data-transcript></div>
+      </article>
+
+      <article class="panel" data-panel="qa" data-grow="3">
+        <header class="panel__head">
+          <h2 class="panel__title">Ask about this talk</h2>
+          <div class="panel__tools">
+            <button type="button" class="icon-button" data-open-model title="Model settings">⚙</button>
+            <button type="button" class="icon-button" data-clear-chat title="Clear the conversation">⌫</button>
+            <button type="button" class="icon-button" data-panel-move title="Move to the other column">⇄</button>
+            <button type="button" class="icon-button" data-panel-collapse title="Collapse">▾</button>
+            <button type="button" class="icon-button" data-panel-close title="Close">✕</button>
+          </div>
+        </header>
+
+        <!-- The model settings live in the panel rather than behind a separate application-level
+             dialog: the exported page has no application around it, and a setting that has to be
+             found somewhere else is a setting nobody changes. -->
+        <div class="model-settings" data-model-settings hidden>
+          <label class="field">
+            <span>Endpoint</span>
+            <input type="url" data-llm-endpoint placeholder="http://localhost:11434/v1" />
+          </label>
+          <label class="field">
+            <span>Model</span>
+            <input type="text" data-llm-model placeholder="llama3.1:8b" />
+          </label>
+          <label class="field">
+            <span>API key <em>(only if your endpoint needs one)</em></span>
+            <input type="password" data-llm-key placeholder="left empty for a local model" />
+          </label>
+          <div class="field-row">
+            <label class="field">
+              <span>Temperature</span>
+              <input type="number" data-llm-temperature min="0" max="2" step="0.1" />
+            </label>
+            <label class="field">
+              <span>Max reply tokens</span>
+              <input type="number" data-llm-max-tokens min="16" max="32000" step="16" />
+            </label>
+            <label class="field">
+              <span>Transcript characters sent</span>
+              <input type="number" data-llm-context min="2000" max="400000" step="1000" />
+            </label>
+          </div>
+          <p class="model-settings__note">
+            Kept in this browser only. Nothing was exported with the archive, and nothing leaves
+            your machine except the request to the endpoint above.
+          </p>
+        </div>
+
+        <div class="panel__body panel__body--scroll" data-chat></div>
+
+        <div class="composer">
+          <div class="composer__quick" data-quick-actions></div>
+          <form class="composer__form" data-ask-form>
+            <textarea data-question rows="2" placeholder="Ask about the talk…"
+                      aria-label="Ask about the talk"></textarea>
+            <button type="submit" class="button button--primary" data-ask>Ask</button>
+          </form>
+          <p class="composer__status" data-chat-status role="status"></p>
+        </div>
+      </article>
+    </template>
+
+    <p class="boot-error" data-boot-error hidden role="alert"></p>
+
+    <!-- Classic scripts, in order, sharing one global scope. Not modules: every browser refuses
+         `import` across `file://` URLs, and this page has to open by double-clicking it. -->
+    <script src="data/bundle.js"></script>
+    <script src="util.js"></script>
+    <script src="layout.js"></script>
+    <script src="player.js"></script>
+    <script src="transcript.js"></script>
+    <script src="assistant.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
