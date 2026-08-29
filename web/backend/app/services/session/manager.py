@@ -1034,9 +1034,26 @@ class SessionManager:
         return started
 
     def _on_transcription_released(self) -> None:
-        """The pass has closed the store. Stop reading from it, and reclaim ownership."""
-        self._store = None
+        """The pass has closed the store. Reopen it for reading, and reclaim ownership.
+
+        **This is the path `recorded` and `window` sessions take, and the fault was reported
+        against one of them.** Those modes hand the store to `TranscriptionRunner`, which closes it
+        itself when the batch pass finishes — so retaining it in `_teardown` cannot help here, and
+        without this the assistant would go back to answering "there is no transcript to ask about
+        yet" at precisely the moment the transcript becomes *complete* and most worth asking about.
+
+        Reopened from the path rather than kept, because the object the runner closed is spent.
+        `TranscriptStore(path)` opens an existing database — the same call `routes/sessions.py`
+        makes for any past session — so this costs one connection and no special case.
+        """
+        store, self._store = self._store, None
         self._store_handed_over = False
+        if store is None:
+            return
+        try:
+            self._retain(TranscriptStore(store.path))
+        except Exception:  # noqa: BLE001 - a session that has already ended must still end cleanly
+            logger.debug("Could not reopen %s for reading", store.path.name, exc_info=True)
 
     def _retain(self, store: TranscriptStore) -> None:
         """Hold a finished session's store open for reading, replacing any already held."""
