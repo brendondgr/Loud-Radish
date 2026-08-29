@@ -654,3 +654,169 @@ def _window_options(choice: str, *, app_id: str = "", title: str = ""):
     object.__setattr__(options, "window_app_id", app_id)
     object.__setattr__(options, "window_title", title)
     return options
+
+
+# -- a tap that is built correctly and still carries nothing -------------------------------------
+
+
+def _probes(monkeypatch, *, tap: float, whole_output: float = 0.0) -> list[str]:
+    """Answer both probes by hand, and record which one was asked."""
+    asked: list[str] = []
+
+    def fake_probe(node: str, *, capture_sink: bool, seconds: float = 1.0) -> float:
+        asked.append(node)
+        return tap if capture_sink else whole_output
+
+    monkeypatch.setattr("app.services.session.manager.probe_peak", fake_probe)
+    monkeypatch.setattr(
+        "app.services.session.manager.default_monitor", lambda: "the-speakers.monitor"
+    )
+    return asked
+
+
+def test_a_tap_that_delivers_nothing_widens_to_the_whole_output(tmp_path, monkeypatch) -> None:
+    """The reported fault, stated as the property that catches it.
+
+    Measured on the real graph: the sink created, the browser's ports linked, every link ``active``,
+    every node ``running``, every gain 1.0 — and bit-exact zeros out of the tap while the same audio
+    played through the speakers. Neither of the two questions asked before this could see it: the
+    tap *is* linked, and its silence is indistinguishable from a paused video until the machine's
+    own output is asked as well.
+    """
+    _probes(monkeypatch, tap=0.0, whole_output=0.4)
+    manager, config, tap = _manager_with_tap(tmp_path, monkeypatch, links=2)
+
+    source = manager._open_source(config, modes.WINDOW)
+
+    assert source.info.id == "the-speakers.monitor", "the capture should have widened"
+    assert tap.closed, "the tap that could not deliver must not be left loaded in the graph"
+    assert manager._tap is None
+
+
+def test_a_silent_tap_on_a_silent_machine_keeps_the_tap(tmp_path, monkeypatch) -> None:
+    """**The regression that must not come back.**
+
+    Nothing playing yet is the ordinary case — someone presses record and then presses play. Both
+    sides are zero, which is exactly what a dead tap looks like, and the difference is the whole
+    reason the machine's output is consulted at all. Widening here would silently record the wrong
+    thing for everyone who arms a recording early.
+    """
+    _probes(monkeypatch, tap=0.0, whole_output=0.0)
+    manager, config, tap = _manager_with_tap(tmp_path, monkeypatch, links=2)
+
+    manager._open_source(config, modes.WINDOW)
+
+    assert not tap.closed
+    assert manager._tap is tap
+
+
+def test_a_probe_that_cannot_run_never_changes_the_capture(tmp_path, monkeypatch) -> None:
+    """``-1.0`` is *unknown*, and a measurement that did not happen must decide nothing."""
+    _probes(monkeypatch, tap=-1.0, whole_output=0.4)
+    manager, config, tap = _manager_with_tap(tmp_path, monkeypatch, links=2)
+
+    manager._open_source(config, modes.WINDOW)
+
+    assert not tap.closed
+    assert manager._tap is tap
+
+
+def test_a_delivering_tap_is_left_alone(tmp_path, monkeypatch) -> None:
+    """The ordinary success, and it must not cost a second probe."""
+    asked = _probes(monkeypatch, tap=0.3, whole_output=0.4)
+    manager, config, tap = _manager_with_tap(tmp_path, monkeypatch, links=2)
+
+    manager._open_source(config, modes.WINDOW)
+
+    assert manager._tap is tap
+    assert len(asked) == 1, "the machine's output is irrelevant once the tap is known to deliver"
+
+
+def test_widening_says_so_rather_than_absorbing_it(tmp_path, monkeypatch) -> None:
+    """A wider recording is a different recording, and the transcript will show it."""
+    from app.config import ConfigStore
+
+    _probes(monkeypatch, tap=0.0, whole_output=0.4)
+    events: list[tuple[str, dict]] = []
+    tap = _Tap(2)
+    monkeypatch.setattr("app.services.session.manager.ApplicationTap", lambda *_a, **_k: tap)
+    monkeypatch.setattr("app.services.session.manager.tap_streams", lambda: [_stream()])
+    store = ConfigStore(config_path=tmp_path / "config.json")
+    store.update({"audio.source_type": "microphone"})
+    manager = SessionManager(
+        store, emit=lambda name, payload: events.append((name, payload)), session_dir=tmp_path
+    )
+
+    manager._open_source(store.resolve(), modes.WINDOW)
+
+    codes = [payload.get("code") for name, payload in events if name == "error"]
+    assert "window-audio-not-delivering" in codes
+
+
+@pipewire
+def test_the_probe_reports_unknown_rather_than_silent_for_an_unresolvable_target() -> None:
+    """The distinction the whole comparison rests on.
+
+    A target that does not resolve cannot be measured, and reporting that as *silent* would let a
+    broken probe widen every recording on the machine.
+    """
+    from app.services.audio.sources.monitor import probe_peak
+
+    assert probe_peak("no-such-node-anywhere", capture_sink=True, seconds=0.2) == -1.0
+
+
+# -- one name, several nodes ---------------------------------------------------------------------
+
+
+def test_two_nodes_sharing_a_name_are_both_linked(monkeypatch) -> None:
+    """A browser names every tab's playback node after itself, and both tabs must be captured.
+
+    Keyed by name, the first tab's ``LibreWolf:FL`` marked the second tab's port already linked and
+    it was skipped — so exactly one tab was ever recorded, which is the fault this module's own
+    docstring warns about.
+    """
+    from app.services.audio import tap as tap_module
+
+    commands: list[list[str]] = []
+    monkeypatch.setattr(tap_module, "_output_ports", lambda node_id: {})
+    monkeypatch.setattr(tap_module, "_succeeded", lambda command: commands.append(command) or True)
+
+    tap = tap_module.ApplicationTap(sink_name="transcriber-tap-test")
+    tap._module = "42"  # opened, without touching the daemon
+
+    def node(node_id: int):
+        return tap_module.PlaybackStream(
+            node_id=node_id,
+            serial=node_id,
+            node_name="LibreWolf",
+            application="LibreWolf",
+            binary="librewolf",
+            media_name=f"tab {node_id}",
+            state="running",
+        )
+
+    assert tap.link_all([node(101), node(117)]) == 4, "both tabs' stereo pairs must be linked"
+    assert len(commands) == 4
+
+
+def test_the_same_node_is_not_linked_twice(monkeypatch) -> None:
+    """The re-link runs once a second; it must not pile duplicate links onto the same ports."""
+    from app.services.audio import tap as tap_module
+
+    monkeypatch.setattr(tap_module, "_output_ports", lambda node_id: {})
+    monkeypatch.setattr(tap_module, "_succeeded", lambda command: True)
+
+    tap = tap_module.ApplicationTap(sink_name="transcriber-tap-test")
+    tap._module = "42"
+    stream = tap_module.PlaybackStream(
+        node_id=101,
+        serial=101,
+        node_name="LibreWolf",
+        application="LibreWolf",
+        binary="librewolf",
+        media_name="tab",
+        state="running",
+    )
+
+    assert tap.link_all([stream]) == 2
+    assert tap.link_all([stream]) == 0
