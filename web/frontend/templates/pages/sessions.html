@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Past sessions · Live Seminar Transcriber{% endblock %}
+{% block title %}Recordings · Live Seminar Transcriber{% endblock %}
 {% block entry %}sessions{% endblock %}
 
 {% block body %}
 <div class="page">
   <header class="page__header">
     <div>
-      <h1 class="page__title">Past sessions</h1>
+      <h1 class="page__title">Recordings</h1>
       <p class="page__subtitle" data-sessions-directory></p>
     </div>
     <a class="button" href="/">Back to recording</a>
@@ -19,7 +19,7 @@
     <div class="sessions" data-sessions-list role="list"></div>
 
     <p class="sessions__empty" data-sessions-empty hidden>
-      Nothing recorded yet. Sessions appear here as soon as you stop one.
+      Nothing recorded yet. Recordings appear here as soon as you stop one.
     </p>
 
     <p class="sessions__error" data-sessions-error hidden role="status"></p>

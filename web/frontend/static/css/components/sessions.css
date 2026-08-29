@@ -38,6 +38,53 @@
   margin: var(--space-3) 0 0;
 }
 
+/* What a session holds, as three chips rather than a sentence.
+ *
+ * Present and absent are both drawn. A row showing only what it has cannot be read at a glance —
+ * "video · transcript" and "video · audio" have different shapes, so the eye has to read the words.
+ * Three fixed positions, dimmed where absent, can be scanned down a column.
+ */
+.session__media {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-5) 0 0;
+  flex-wrap: wrap;
+}
+
+.media-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 2px var(--space-4);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius);
+  color: var(--text-faint);
+  background: transparent;
+}
+
+.media-chip[data-present="true"] {
+  color: var(--accent-bright);
+  border-color: var(--accent-border);
+  background: var(--accent-wash);
+}
+
+/* Absent is stated, not implied by a gap. Struck through so it reads as "no video" at a glance
+   rather than as a video the row forgot to highlight. */
+.media-chip[data-present="false"] {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  opacity: 0.75;
+}
+
+.media-chip svg {
+  flex: none;
+}
+
 /* A file that could not be read is listed with its reason rather than dropped: a session the user
    can see and cannot open beats one that has silently vanished. */
 .session__problem {

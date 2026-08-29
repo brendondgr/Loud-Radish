@@ -223,3 +223,101 @@ def test_deleting_a_finished_session_removes_it(client: TestClient, sessions_dir
 
 def test_deleting_something_that_is_already_gone_is_not_an_error(client: TestClient) -> None:
     assert client.delete("/api/sessions/never-existed").json() == {"deleted": False}
+
+
+# -- what a session holds ---------------------------------------------------------------------
+
+
+KEY = "20260829-174113-d60b37a9e3c4"
+
+
+def _config(tmp_path, sessions_dir, recordings_dir):
+    config = ConfigStore(config_path=tmp_path / "media.json")
+    config.update(
+        {
+            "storage.session_dir": str(sessions_dir),
+            "recording.recording_dir": str(recordings_dir),
+        }
+    )
+    return config.resolve()
+
+
+def test_a_session_with_everything_reports_everything(sessions_dir, tmp_path) -> None:
+    recordings = tmp_path / "recordings"
+    (recordings / KEY).mkdir(parents=True)
+    (recordings / KEY / "video.webm").write_bytes(b"a video")
+    (recordings / KEY / "audio.wav").write_bytes(b"\x00" * 200)
+    write_session(sessions_dir, KEY, segments=3)
+
+    media = archive.list_sessions(_config(tmp_path, sessions_dir, recordings))[0].media
+
+    assert (media.video, media.audio, media.transcript) == (True, True, True)
+    assert media.exportable is True
+    assert media.recording_bytes > 0
+
+
+def test_a_session_with_no_recording_folder_reports_only_its_transcript(
+    sessions_dir, tmp_path
+) -> None:
+    """The `live` mode case: there is a transcript and there was never a file."""
+    recordings = tmp_path / "recordings"
+    recordings.mkdir()
+    write_session(sessions_dir, KEY, segments=2)
+
+    media = archive.list_sessions(_config(tmp_path, sessions_dir, recordings))[0].media
+
+    assert (media.video, media.audio, media.transcript) == (False, False, True)
+    assert media.exportable is False
+
+
+def test_an_empty_database_is_not_reported_as_having_a_transcript(sessions_dir, tmp_path) -> None:
+    """A pass that never ran leaves a database with no segments. That is not a transcript."""
+    recordings = tmp_path / "recordings"
+    (recordings / KEY).mkdir(parents=True)
+    (recordings / KEY / "audio.wav").write_bytes(b"\x00" * 200)
+    write_session(sessions_dir, KEY, segments=0)
+
+    media = archive.list_sessions(_config(tmp_path, sessions_dir, recordings))[0].media
+
+    assert media.transcript is False
+    assert media.audio is True
+    assert media.exportable is False
+
+
+def test_audio_deleted_after_a_successful_pass_leaves_video_and_transcript(
+    sessions_dir, tmp_path
+) -> None:
+    """Retention is off by default, so this is the *normal* end state of a window recording."""
+    recordings = tmp_path / "recordings"
+    (recordings / KEY).mkdir(parents=True)
+    (recordings / KEY / "video-with-audio.webm").write_bytes(b"a muxed video")
+    write_session(sessions_dir, KEY, segments=5)
+
+    media = archive.list_sessions(_config(tmp_path, sessions_dir, recordings))[0].media
+
+    assert (media.video, media.audio, media.transcript) == (True, False, True)
+
+
+def test_a_missing_recordings_directory_costs_the_indicators_not_the_listing(
+    sessions_dir, tmp_path
+) -> None:
+    write_session(sessions_dir, KEY, segments=1)
+
+    sessions = archive.list_sessions(_config(tmp_path, sessions_dir, tmp_path / "gone"))
+
+    assert len(sessions) == 1
+    assert sessions[0].media.video is False
+
+
+def test_the_media_block_reaches_the_api(client, sessions_dir) -> None:
+    write_session(sessions_dir, KEY, segments=2)
+
+    row = client.get("/api/sessions").json()["sessions"][0]
+
+    assert row["media"] == {
+        "video": False,
+        "audio": False,
+        "transcript": True,
+        "recording_bytes": 0,
+        "exportable": False,
+    }

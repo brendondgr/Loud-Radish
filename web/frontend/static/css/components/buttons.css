@@ -71,6 +71,30 @@
   padding: 0;
 }
 
+/* The route to every past recording.
+ *
+ * Deliberately not `--quiet`, and deliberately not icon-only. It was both, and it read as chrome:
+ * a borderless hamburger next to the settings cog, which is where a user's eye stops looking. It
+ * carries an accent edge so it is visibly a destination rather than a decoration, without
+ * competing with the record control for primacy — that one is the only thing on this bar that
+ * should ever be the brightest.
+ */
+.button--recordings {
+  color: var(--accent-bright);
+  background: var(--accent-wash);
+  border-color: var(--accent-border);
+}
+
+.button--recordings:hover {
+  color: var(--accent-bright);
+  background: var(--accent-wash-strong);
+  border-color: var(--accent-dim);
+}
+
+.button--recordings svg {
+  flex: none;
+}
+
 /* A compact segmented control — the transcript text-size stepper. */
 .segmented {
   display: flex;
