@@ -1,6 +1,6 @@
 # Recording Folders, Transcription Completion, and the HTML Web-App Export
 
-*Status: in progress — phases are marked complete only once their validation has run.*
+*Status: complete — every phase implemented, validated, and committed.*
 *Owner: this plan is the handoff artifact. Resume from the phase table at the bottom.*
 
 ## 1. Introduction
@@ -156,9 +156,9 @@ directly from the browser — delivered as a ZIP.
 
 | Phase | Status |
 | --- | --- |
-| 1 — One directory per recording | ⬜ Not started |
-| 2 — Transcription completion state | ⬜ Not started |
-| 3 — Test data isolation | ⬜ Not started |
-| 4 — Recordings button and media indicators | ⬜ Not started |
-| 5 — HTML web-app export | ⬜ Not started |
-| 6 — Documentation and merge | ⬜ Not started |
+| 1 — One directory per recording | ✅ Complete |
+| 2 — Transcription completion state | ✅ Complete |
+| 3 — Test data isolation | ✅ Complete |
+| 4 — Recordings button and media indicators | ✅ Complete |
+| 5 — HTML web-app export | ✅ Complete |
+| 6 — Documentation and merge | ✅ Complete |

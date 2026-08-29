@@ -1,9 +1,8 @@
 # API Contract
 
-*Last updated: 2026-08-14 (Phase 1 — foundations)*
+*Last updated: 2026-08-29 (past-session media, and the web-app export — D-031, D-033)*
 
-> **Status: the WebSocket event contract below is frozen; the HTTP shapes land phase by phase.**
-> Only `GET /api/health` is implemented. The machine-readable contract lives in
+> **Status: the WebSocket event contract below is frozen.** The machine-readable contract lives in
 > `web/shared/contracts/` and is generated from the backend; this document is its human-readable
 > companion. Update both together.
 
@@ -134,6 +133,82 @@ absent is indistinguishable from a mode that does not exist. **An empty `missing
 case**: only `window` has a hard requirement. A missing capture device deliberately does *not*
 disable the audio modes — the file source replaces one entirely, and gating on it made every mode
 unavailable on a machine that transcribes perfectly well.
+
+### `GET /api/sessions`
+
+Response `200 OK`:
+
+```json
+{
+  "sessions": [
+    {
+      "key": "20260829-174113-d60b37a9e3c4",
+      "title": "Operator theory",
+      "started_at": "2026-08-29T17:41:13+00:00",
+      "ended_at": "2026-08-29T18:29:02+00:00",
+      "segments": 412,
+      "words": 9130,
+      "duration_seconds": 2869.0,
+      "summaries": 9,
+      "glossary_terms": 22,
+      "size_bytes": 483328,
+      "media": {
+        "video": true,
+        "audio": false,
+        "transcript": true,
+        "recording_bytes": 264518912,
+        "exportable": false
+      },
+      "problem": "",
+      "readable": true
+    }
+  ],
+  "directory": "/home/…/data/sessions",
+  "running_key": ""
+}
+```
+
+`media` says what the session's **recording folder** holds (D-031). The folder is named with the
+same key as the database, so this is a directory listing rather than a filename search.
+
+Two subtleties in it. `transcript` means the database holds segments, not merely that the file
+exists — a recording whose transcription pass never ran leaves an empty database, and calling that
+a transcript sends someone to open it and find nothing. `audio` is commonly `false` on a healthy
+recording, because a successful pass deletes its own audio unless retention is on; `exportable`
+therefore requires all three and is `false` for most finished sessions, which is correct.
+
+A row with a non-empty `problem` could not be read. It is listed anyway: a session the user can see
+and cannot open is more useful than one that has silently vanished.
+
+### `GET /api/sessions/{key}/webapp`
+
+Response `200 OK`: `application/zip`, `Content-Disposition: attachment`. The archive holds one
+folder named for the key (D-033):
+
+```text
+<key>/index.html                 The application. Opens with no server.
+<key>/theme.css, app.css         Its stylesheets.
+<key>/util.js … app.js           Its scripts, classic — not modules.
+<key>/media/<video>              The video, stored uncompressed and byte-identical.
+<key>/data/transcript.json       The talk: session, media reference, segments, summaries,
+                                 glossary, and the conversation already had about it.
+<key>/data/settings.json         The Q&A configuration: endpoint, model, temperature, output
+                                 cap, transcript budget, the system prompt, quick actions.
+<key>/data/bundle.js             The same two documents as a script, for `file://`.
+<key>/README.txt                 What is here and how to open it.
+```
+
+`settings.json` carries `llm.api_key` **present and empty, always**. Nothing else in the archive
+carries a credential either: a ZIP is exactly the sort of thing that gets forwarded, and the
+exported page keeps whatever key the user types in that browser's storage alone.
+
+Refusals:
+
+| Condition | Status | Code |
+|---|---|---|
+| The key is not a recording key | `404` | `no-recording` |
+| The session file is gone | `404` | `no-such-session` |
+| No video, or no transcript | `409` | `not-exportable` |
 
 ## Agreed shapes, not yet implemented
 

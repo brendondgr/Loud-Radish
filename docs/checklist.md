@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-08-28 (one transcription pass in the finished result)*
+*Last updated: 2026-08-29 (folders per recording, a usable state after transcription, and the web-app export)*
 
 The active work list for TranscriberPrototype. Update it whenever a task is finished or new work is
 discovered.
@@ -364,6 +364,58 @@ Still open, and deliberately not guessed at:
       `speech-dispatcher-dummy`), against one node on the run that worked — so "several linked
       nodes" is now the strongest lead, though linking only the video's node by port id during the
       repair also measured zeros, which that lead does not explain.
+
+---
+
+## Part 3h — Recording Folders, the Completion State, and the Web-App Export
+
+Five reported problems, planned in
+[plans/recording-folders-and-web-export.md](plans/recording-folders-and-web-export.md) and closed
+(6 / 6). Recorded as **D-031**, **D-032**, and **D-033**.
+
+- [x] **One directory per recording.** `data/recordings/` held every artefact from every session in
+      one flat list. Each recording now owns `<YYYYMMDD-HHMMSS>-<session-id>/` with fixed names
+      inside it, owned by `services/recording/layout.py`; nothing else builds a path in there. The
+      folder name is the transcript database's stem, which is what joins a recording to its
+      transcript without moving an open SQLite file.
+- [x] **Files written before the layout are migrated once, at start-up.** Grouped by the key their
+      names already carry. Nothing deleted, nothing overwritten, and anything that does not parse
+      left where it is — a recordings directory is a user directory.
+- [x] **A finished pass no longer wedges the interface.** The hub replayed the last
+      `transcription.progress` frame — which says `running` — to every client that connected
+      afterwards. Terminal events retract the coalescing events they end.
+- [x] **The clock freezes when the session does.** `stores/session.js` adopts the server's
+      `ended_at` rather than a stop the page may never have witnessed, which is the other half of
+      the same report.
+- [x] **A client that arrives after a pass ended finds its way back to idle.** `adoptSession`
+      protects `processing` from a stop, so the `session.state` handler is the only route out.
+- [x] **The suite stopped writing into `data/`.** 949 session files, 690 empty, written by test
+      runs into the developer's own session directory — which is why the past-sessions page opened
+      on "0 words, 0 segments". An autouse fixture patches the bottom configuration layer;
+      `tests/utils/test_data_isolation.py` asserts a run creates nothing under `data/`.
+- [x] **The route to past recordings is a labelled button.** It was a borderless hamburger icon
+      beside the settings cog. It reads "Recordings" and the page is titled the same.
+- [x] **Every past session says what it holds.** Video, audio, and transcript as three chips, all
+      three always drawn so a column of rows can be scanned. "Has a transcript" means the database
+      holds segments, not that the file exists.
+- [x] **A recording with all three exports as a self-contained web application.** A ZIP holding the
+      video, a transcript that follows it, and a Q&A panel with the model settings built in. Opens
+      with no server: classic scripts and a data bundle beside the JSON, because browsers refuse
+      both `import` and `fetch` across `file://`. Verified in a browser, both ways.
+- [x] **No credential leaves in the archive.** `llm.api_key` ships present and empty; the page keeps
+      what the user types in that browser alone.
+
+- [ ] **The developer's `data/sessions` still holds the suite's leavings.** The cause is fixed and
+      the files are harmless, but roughly 690 empty databases from before the fix are still in the
+      user's own directory and still at the top of the recordings page. Deleting another person's
+      data is their call, not ours; the list can be pruned by removing session files whose database
+      holds no segments.
+- [ ] **The export cannot be scoped to a revision.** It ships the latest pass, like every other
+      export. Same gap as the one recorded in Part 3g, and the same remedy — a revision control on
+      the recordings page.
+- [ ] **The exported page speaks OpenAI-compatible endpoints only.** Anthropic's shape genuinely
+      differs (D-014) and a static page cannot hold a key safely, so the export deliberately points
+      at a local model. Worth revisiting only if someone asks for it.
 
 ---
 

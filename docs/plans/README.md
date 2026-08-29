@@ -29,6 +29,7 @@ conventions in [../skills/planner/SKILL.md](../skills/planner/SKILL.md).
 | [window-capture-repair.md](window-capture-repair.md) | Window recording repaired against the machine rather than the test double: recorded resolution, repeated portal dialogs, the live preview, window audio instead of the microphone, immediate stop, and timestamps that correlate | **Complete (8 / 8)** |
 | [four-reported-faults.md](four-reported-faults.md) | Four faults reported together: the assistant's rejected system message, copied timestamps of zero, window audio refused by its own guard, and forced commits that drop speech | **Complete (5 / 5)** |
 | [duplicate-final-transcript.md](duplicate-final-transcript.md) | The finished result showed the rewritten transcript and then the whole raw one again: one transcription pass is displayed and exported, never the union of both | **Complete (4 / 4)** |
+| [recording-folders-and-web-export.md](recording-folders-and-web-export.md) | One folder per recording, a transcription pass that leaves the interface usable, a labelled Recordings button with media indicators, and a self-contained HTML web-app export | **Complete (6 / 6)** |
 
 ## The multi-mode expansion
 

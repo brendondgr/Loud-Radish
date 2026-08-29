@@ -1,6 +1,6 @@
 # Data Flow
 
-*Last updated: 2026-08-14 (Phase 1 — foundations)*
+*Last updated: 2026-08-29 (one folder per recording, and the web-app export)*
 
 > **Status: the design is agreed; the stages land phase by phase.** Update this file in the same
 > change that alters how data moves between capture, pipeline, storage, transport, or browser.
@@ -89,7 +89,7 @@ never uploaded; it is captured locally and consumed in flight.
 ```text
 device ──► capture ──► VAD (meter only, gates nothing)
                  │
-                 └──► WavSink ──► data/recordings/<stamp>-<id>.wav
+                 └──► WavSink ──► data/recordings/<stamp>-<id>/audio.wav
                                    │  (toggle off)
                                    ▼
                         batch pass, overlapping windows
@@ -108,6 +108,40 @@ Three differences from the live flow, each deliberate:
 - **The pass outlives the session.** The transcript store is handed to the runner, which alone
   closes it; the manager keeps a read-only reference so `/api/transcript/...` still serves during
   the pass, and drops it when the runner says the store is gone.
+
+## Where a recording's pieces end up (D-031)
+
+```text
+data/sessions/<stamp>-<id>.db        the transcript, summaries, glossary, conversation
+data/recordings/<stamp>-<id>/        everything the capture itself produced
+    ├── audio.wav                    deleted by a successful pass, unless retention is on
+    ├── audio.json                   what the audio measured as, written by the pass
+    ├── video.<ext>                  window mode only
+    ├── video-with-audio.<ext>       the muxed copy; both sources are kept
+    └── preview.jpg                  the monitor pane's frame
+```
+
+**The two names are the same string on purpose.** The transcript is an open SQLite file for the
+whole of a session and is not moved into the folder to tidy a listing; sharing the stem joins them
+without moving anything. Every consumer that has to answer "what does this session hold" — the
+past-sessions list, the media indicators, the web-app export — does it by listing one directory.
+
+## Export flow — a recording as a web application (D-033)
+
+```text
+GET /api/sessions/{key}/webapp
+    ├──► transcript store  ──► transcript.json   (latest revision only — never the union)
+    ├──► resolved config   ──► settings.json     (local endpoint; api_key present and empty)
+    ├──► both again        ──► bundle.js         (the file:// fallback; fetch is refused there)
+    ├──► template/         ──► index.html + 2 stylesheets + 5 scripts, copied verbatim
+    └──► recording folder  ──► media/<video>     (streamed in, stored uncompressed)
+                                   ▼
+                              one ZIP, built on a worker thread
+```
+
+Nothing in the archive reaches outside it, and nothing in it is a credential. The video is streamed
+a megabyte at a time rather than read whole: a talk is measured in hundreds of megabytes and this
+runs in the same process as the speech model.
 
 ## The two timestamp domains
 

@@ -1,6 +1,6 @@
 # Repository Structure
 
-*Last updated: 2026-08-15 (the multi-mode expansion — plans and the mode vocabulary)*
+*Last updated: 2026-08-29 (one folder per recording, and the web-app export)*
 
 Canonical map of TranscriberPrototype. This file documents **purpose**, not source code. Update it in
 the same change that adds, moves, renames, or removes a directory or significant file.
@@ -25,7 +25,9 @@ TranscriberPrototype/
 │   │   ├── multi-mode-ui-implementation.md    # Expansion 2 — building that interface
 │   │   ├── recorded-transcription.md          # Expansion 3 — toggle to record, transcribe on stop
 │   │   ├── window-recording-transcription.md  # Expansion 4 — portal window capture and video
-│   │   └── system-integration.md              # Expansion 5 — autostart, tray, global keybinds
+│   │   ├── system-integration.md              # Expansion 5 — autostart, tray, global keybinds
+│   │   └── recording-folders-and-web-export.md  # Per-recording folders, the completion-state
+│   │                                            #   repair, and the self-contained export
 │   ├── skills/                    # Canonical skill definitions used by every agent tool
 │   │   ├── global-project-rules/SKILL.md
 │   │   ├── planner/{SKILL.md,SETUP.md,planner.md}
@@ -59,7 +61,11 @@ TranscriberPrototype/
 │   │   │   ├── session.py         # Start/stop, devices, model loading, prompts
 │   │   │   ├── transcript.py      # Replay, ranges, search, summaries, export
 │   │   │   ├── recordings.py      # List, re-run, and delete captured audio (D-021)
+│   │   │   ├── sessions.py        # Past sessions: list, read, export, web-app export, delete
+│   │   │   ├── chat.py            # Ask, cancel, history, the read mark
+│   │   │   ├── llm.py             # Language-model probing and credentials
 │   │   │   ├── capture.py         # The window capture's preview frame and state (D-022)
+│   │   │   ├── pages.py           # The two server-rendered pages
 │   │   │   └── config.py          # Read, patch with hot-swap cost, presets, save
 │   │   ├── transport/             # The push channel — separate from routes/
 │   │   │   ├── events.py          # The event vocabulary and coalescing rules
@@ -102,6 +108,7 @@ TranscriberPrototype/
 │   │   │       ├── recorder.py    # The subprocess, its lifetime, and its finalisation
 │   │   │       └── mux.py         # Combines the video with the session's audio afterwards
 │   │   │   └── recording/         # Capture to disk, and transcribe it whole (D-021)
+│   │   │       ├── layout.py      # One directory per recording, named for when it started (D-031)
 │   │   │       ├── sink.py        # Incremental WAV writer; crash-safe header, duration cap
 │   │   │       ├── batch.py       # Whole-file pass in overlapping windows; bypasses agreement
 │   │   │       ├── job.py         # One pass's state, progress, and the one-at-a-time rule
@@ -135,6 +142,12 @@ TranscriberPrototype/
 │   │   │       └── worker.py      # Rolling summaries and glossary extraction
 │   │   │   └── chat/              # Question → context → provider → streamed answer
 │   │   │       └── orchestrator.py
+│   │   │   └── export/            # A recording as a folder that opens on its own (D-033)
+│   │   │       ├── webapp.py      # Builds the ZIP; streams the video rather than reading it in
+│   │   │       ├── payload.py     # transcript.json and settings.json; never a credential
+│   │   │       └── template/      # The exported page, copied verbatim: index.html, two
+│   │   │                          #   stylesheets, and five classic scripts (not modules —
+│   │   │                          #   `import` is refused across file:// URLs)
 │   │   ├── companion/             # The desktop presence — a remote control, not a rewrite (D-024)
 │   │   │   ├── visual_states.py   # (capture mode, run state) → which picture the instrument shows
 │   │   │   ├── aperture.py        # Draws one frame of it, from docs/motion-spec.md
@@ -175,6 +188,10 @@ TranscriberPrototype/
 │   ├── run_file_session.py        # Console-only pipeline run over a WAV file (BE M4)
 │   └── generate_contracts.py      # Writes openapi.json and ws-events.json
 ├── data/                          # Sessions, config file, audio, recordings (gitignored)
+│   ├── sessions/<stamp>-<id>.db   # One transcript per session
+│   └── recordings/<stamp>-<id>/   # One folder per recording — audio.wav, video.<ext>,
+│                                  #   video-with-audio.<ext>, preview.jpg, audio.json.
+│                                  #   The folder name is the session database's stem (D-031)
 ├── logs/                          # Runtime logs (gitignored)
 │
 ├── .claude/skills/ · .agents/skills/ · .cursor/rules/   # Pointers → docs/skills/
