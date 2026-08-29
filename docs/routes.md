@@ -1,10 +1,10 @@
 # Route Map
 
-*Last updated: 2026-08-15 (capture modes and recordings — D-020, D-021)*
+*Last updated: 2026-08-29 (per-recording folders and the web-app export — D-032, D-034)*
 
 > **Status column is authoritative.** Every API group is implemented and tested, as is the
-> WebSocket. Only the `/sessions` page remains. Update this file in the same change that adds,
-> removes, or changes a route.
+> WebSocket and both pages. Update this file in the same change that adds, removes, or changes a
+> route.
 
 The upload-and-poll job routes recorded at initialization are **gone** — see Decision D-010 in
 `docs/documentation.md`. There is no `/api/transcriptions` surface.
@@ -16,7 +16,7 @@ Server-rendered from `web/frontend/templates/` by `web/backend/app/routes/pages.
 | Path | Purpose | Template | Status |
 |---|---|---|---|
 | `/` | The live application — transcript pane, header, status bar | `pages/app.html` | **Implemented** |
-| `/sessions` | Past sessions, with export | `pages/sessions.html` | Phase 14 |
+| `/sessions` | Recordings — every past session, what it holds, and its exports | `pages/sessions.html` | **Implemented** |
 
 ## WebSocket
 
@@ -45,7 +45,7 @@ Served by `web/backend/app/routes/`. All paths are prefixed `/api`.
 | `POST` | `/api/session/stop` | End the session and return final statistics | **Implemented** |
 | `POST` | `/api/session/toggle` | Start if idle, stop if running — one call, because a keystroke cannot know which (D-024) | **Implemented** |
 | `GET` | `/api/session` | Current session state and metadata | **Implemented** |
-| `GET` | `/api/session/list` | Past sessions | Phase 14 (with the sessions page) |
+| `GET` | `/api/session/list` | — superseded by `/api/sessions`, below | Removed |
 
 **Capture mode on start (D-020).** `POST /api/session/start` takes `mode` — `live`, `recorded`, or
 `window` — defaulting to `live` so a client written before capture modes keeps working. `window`
@@ -72,14 +72,39 @@ is on — a successful pass deletes its own audio (D-021).
 
 | Method | Path | Purpose | Status |
 |---|---|---|---|
-| `GET` | `/api/recordings` | Every recording still on disk, newest first | **Implemented** |
-| `POST` | `/api/recordings/{name}/transcribe` | Run or re-run a pass, into a **new** session | **Implemented** |
-| `DELETE` | `/api/recordings/{name}` | Remove one | **Implemented** |
+| `GET` | `/api/recordings` | Every recording whose audio is still on disk, newest first | **Implemented** |
+| `POST` | `/api/recordings/{key}/transcribe` | Run or re-run a pass, into a **new** session | **Implemented** |
+| `DELETE` | `/api/recordings/{key}` | Delete one recording's audio. The video beside it is kept. | **Implemented** |
 
-`{name}` is a file name and is resolved strictly inside the recordings directory: a loopback-bound
-server is still reachable from any page in any other tab, so a traversal here would be a real file
-read. A re-run writes into a new session rather than the one that produced the recording, because
-the original may hold a partial transcript from the pass that failed.
+`{key}` is a **recording folder key** — `20260829-174113-d60b37a9e3c4` — not a file name (D-032).
+It is checked against that shape *before* it is joined onto a path, and the result is required to
+be inside the recordings directory: a loopback-bound server is still reachable from any page in any
+other tab, so a traversal here would be a real file read. A re-run writes into a new session rather
+than the one that produced the recording, because the original may hold a partial transcript from
+the pass that failed.
+
+### Past sessions
+
+Everything recorded before the one currently open. The routes under `/api/transcript` answer for the
+*running* session only, which is correct for the live view and useless for a talk that finished ten
+minutes ago.
+
+| Method | Path | Purpose | Status |
+|---|---|---|---|
+| `GET` | `/api/sessions` | Every session on disk, newest first, each with what it holds | **Implemented** |
+| `GET` | `/api/sessions/{key}` | One session's transcript, summaries, glossary, and conversation | **Implemented** |
+| `GET` | `/api/sessions/{key}/export?fmt=` | Text, Markdown, SRT, VTT, or JSON | **Implemented** |
+| `GET` | `/api/sessions/{key}/webapp` | The recording as a self-contained web application, as a ZIP | **Implemented** |
+| `DELETE` | `/api/sessions/{key}` | Delete a session file. Refuses the one still recording. | **Implemented** |
+
+`{key}` is the database file's stem, which is also the name of the recording's folder (D-032) — that
+equality is how a session reaches its own video without a second identifier.
+
+**The web-app export refuses rather than degrades.** It needs video, audio, and a transcript, and
+returns `409 not-exportable` naming the missing piece when it has fewer: a page with an empty player
+and nothing to read is not a web application, and shipping one under that name disappoints quietly
+instead of explaining. `GET /api/sessions` reports `media.exportable` so the page offers the button
+only where it will work.
 
 ### Window capture
 

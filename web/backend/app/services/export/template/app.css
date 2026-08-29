@@ -1,0 +1,447 @@
+/* The arrangement: two columns of panels, the player, the transcript, and the assistant.
+ *
+ * Which panel is in which column is decided by the script and expressed by where the element sits
+ * in the DOM, so moving one is an append and a save rather than a stylesheet change. The one rule
+ * worth stating here: an empty column takes no width. That is what turns "close the assistant"
+ * into "the video gets the screen", with no mode and no second layout to keep in step.
+ *
+ * `theme.css` carries the palette and the plain controls, and loads first.
+ */
+
+/* -- the two columns --------------------------------------------------------------------- */
+
+.workspace {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-6);
+  gap: 0;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.column[data-column="left"] {
+  flex: 0 0 var(--left-width);
+}
+
+.column[data-column="right"] {
+  flex: 1 1 0;
+}
+
+/* A column with nothing in it takes no space at all, which is what makes closing the assistant
+   hand the whole width to the video rather than leaving a gap where a panel used to be. */
+.column:empty {
+  flex: 0 0 0;
+}
+
+.column:empty + .splitter,
+.splitter:has(+ .column:empty) {
+  display: none;
+}
+
+.splitter {
+  flex: 0 0 10px;
+  cursor: col-resize;
+  position: relative;
+}
+
+.splitter::after {
+  content: "";
+  position: absolute;
+  inset: 0 4px;
+  border-radius: 2px;
+  background: var(--border-default);
+  transition: background var(--duration-fast) ease;
+}
+
+.splitter:hover::after,
+.splitter:focus-visible::after {
+  background: var(--accent-border);
+}
+
+/* -- panels ------------------------------------------------------------------------------ */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 0;
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+}
+
+/* Panels claim space in proportion to what they hold: a transcript wants more than a player's
+   chrome. `data-grow` is the only knob, so a moved panel keeps its proportion. */
+.panel[data-grow="2"] {
+  flex-grow: 2;
+}
+
+.panel[data-grow="3"] {
+  flex-grow: 3;
+}
+
+.panel[data-collapsed="true"] {
+  flex: 0 0 auto;
+}
+
+.panel[data-collapsed="true"] .panel__body,
+.panel[data-collapsed="true"] .composer,
+.panel[data-collapsed="true"] .model-settings {
+  display: none;
+}
+
+.panel[data-dragging="true"] {
+  opacity: 0.5;
+}
+
+.panel[data-drop-target="true"] {
+  border-color: var(--accent-dim);
+}
+
+.panel__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border-subtle);
+  flex: none;
+  cursor: grab;
+}
+
+.panel__title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.panel__tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.panel__search {
+  width: 120px;
+  min-height: 28px;
+  padding: 0 var(--space-4);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  background: var(--surface-input);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius);
+}
+
+.follow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.panel__body {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-6);
+}
+
+.panel__body--scroll {
+  overflow-y: auto;
+}
+
+.panel__body--video {
+  display: flex;
+  padding: 0;
+  background: #000;
+}
+
+/* -- the player -------------------------------------------------------------------------- */
+
+.player {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+}
+
+.player__video {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  background: #000;
+  object-fit: contain;
+}
+
+.player__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface-raised);
+  border-top: 1px solid var(--border-subtle);
+  flex: none;
+  flex-wrap: wrap;
+}
+
+.player__scrub {
+  flex: 1;
+  min-width: 100px;
+  accent-color: var(--accent);
+}
+
+.player__time {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.player__rate select {
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  background: var(--surface-control);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius);
+  padding: 2px var(--space-3);
+}
+
+/* -- the transcript ---------------------------------------------------------------------- */
+
+.line {
+  display: flex;
+  gap: var(--space-6);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  cursor: pointer;
+  border-left: 2px solid transparent;
+}
+
+.line:hover {
+  background: var(--surface-control);
+}
+
+/* The line the video is currently inside. Marked with a rule and a wash rather than a colour
+   change: the text is read at length, and recolouring the words themselves is what makes a
+   caption track tiring. */
+.line[data-active="true"] {
+  background: var(--accent-wash);
+  border-left-color: var(--accent);
+}
+
+.line[data-past="true"] .line__text {
+  color: var(--text-muted);
+}
+
+.line[data-hit="true"] {
+  outline: 1px solid var(--warning-text);
+}
+
+.line__time {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  padding-top: 4px;
+}
+
+.line__text {
+  font-family: var(--font-transcript);
+  font-size: var(--transcript-size);
+  line-height: 1.6;
+  color: var(--text-transcript);
+}
+
+/* -- the assistant ----------------------------------------------------------------------- */
+
+.model-settings {
+  padding: var(--space-6);
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border-subtle);
+  flex: none;
+}
+
+.model-settings__note {
+  margin: var(--space-5) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.field em {
+  font-style: normal;
+  color: var(--text-faint);
+}
+
+.field input {
+  min-height: 30px;
+  padding: 0 var(--space-5);
+  font-family: inherit;
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  background: var(--surface-input);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius);
+}
+
+.field-row {
+  display: flex;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.field-row .field {
+  flex: 1 1 120px;
+}
+
+.message {
+  margin-bottom: var(--space-7);
+  font-size: var(--text-md);
+  line-height: 1.6;
+}
+
+.message__role {
+  display: block;
+  margin-bottom: var(--space-3);
+  font-size: var(--text-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.message[data-role="user"] .message__text {
+  color: var(--text-primary);
+}
+
+.message[data-role="assistant"] .message__text {
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
+.message[data-role="error"] .message__text {
+  color: var(--danger-text);
+}
+
+/* A timestamp the model cited. Clicking it seeks the player, which is how a question about the
+   video gets answered by a model that can only read the transcript. */
+.cite {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  color: var(--accent-bright);
+  background: var(--accent-wash);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius);
+  padding: 0 3px;
+  cursor: pointer;
+}
+
+.cite:hover {
+  background: var(--accent-wash-strong);
+}
+
+.empty {
+  color: var(--text-muted);
+  font-size: var(--text-md);
+  line-height: 1.6;
+}
+
+.composer {
+  padding: var(--space-6);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+  flex: none;
+}
+
+.composer__quick {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-5);
+}
+
+.composer__form {
+  display: flex;
+  gap: var(--space-5);
+  align-items: flex-end;
+}
+
+.composer__form textarea {
+  flex: 1;
+  padding: var(--space-5);
+  font-family: inherit;
+  font-size: var(--text-md);
+  color: var(--text-primary);
+  background: var(--surface-input);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius);
+  resize: vertical;
+}
+
+.composer__status {
+  margin: var(--space-5) 0 0;
+  min-height: 1em;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.composer__status[data-tone="error"] {
+  color: var(--danger-text);
+}
+
+.boot-error {
+  margin: var(--space-12);
+  padding: var(--space-8);
+  font-size: var(--text-md);
+  line-height: 1.6;
+  color: var(--danger-text);
+  background: var(--danger-wash);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-lg);
+}
+
+.boot-error[hidden] {
+  display: none;
+}
+
+/* One column on a narrow screen. Side-by-side panels below this are each too narrow to read,
+   and a transcript that has to be scrolled horizontally is not a transcript. */
+@media (max-width: 900px) {
+  .workspace {
+    flex-direction: column;
+  }
+
+  .column[data-column="left"],
+  .column[data-column="right"] {
+    flex: 1 1 auto;
+  }
+
+  .splitter {
+    display: none;
+  }
+}

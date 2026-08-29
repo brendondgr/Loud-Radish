@@ -169,6 +169,13 @@ uv run pytest tests/transcription
 
 Tests live in `tests/<area>/test_<behavior>.py`. Add them alongside features, not afterwards.
 
+**The suite never touches `data/`.** An autouse fixture in `tests/conftest.py` points the bottom
+configuration layer at a per-test temporary directory, so a store built with no config path — or
+one built with a config path that overrides only *some* of the directories — still writes its
+sessions and recordings into `tmp_path`. This is not a nicety: before it existed the suite had left
+949 session files in the developer's `data/sessions`, 690 of them empty, and the past-sessions page
+lists that directory newest first. `tests/utils/test_data_isolation.py` is what keeps it true.
+
 ## Lint and Format
 
 ```bash

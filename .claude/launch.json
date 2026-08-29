@@ -4,7 +4,11 @@
     {
       "name": "transcriber",
       "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "python", "app.py"],
+      "runtimeArgs": [
+        "run",
+        "python",
+        "app.py"
+      ],
       "port": 8395
     }
   ]

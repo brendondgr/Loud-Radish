@@ -159,6 +159,55 @@ class TestHub:
         hub.emit("status", {"rtf": 2.0})
         assert hub.latest_state()[0]["data"]["rtf"] == 2.0
 
+    def test_a_finished_pass_is_not_replayed_as_a_running_one(self) -> None:
+        """The bug behind "stuck at Transcribing… 100%".
+
+        Progress coalesces, so the hub keeps the newest frame and replays it to every client that
+        connects. Without a retraction the last frame of a *finished* pass says `running` forever,
+        and every reload afterwards was told a transcription was still going — which in a mode with
+        a `processing` state wedged the record button, and in `live`, which has no such state, left
+        the clock running under a button that said "Start recording".
+        """
+        hub = EventHub()
+        hub.emit("transcription.progress", {"state": "running", "progress": 0.97})
+        assert "transcription.progress" in {f["event"] for f in hub.latest_state()}
+
+        hub.emit("transcription.done", {"state": "done", "progress": 1.0})
+
+        assert "transcription.progress" not in {f["event"] for f in hub.latest_state()}
+
+    def test_a_failed_pass_retracts_its_progress_too(self) -> None:
+        hub = EventHub()
+        hub.emit("transcription.progress", {"state": "running", "progress": 0.4})
+        hub.emit("transcription.failed", {"state": "failed", "error": "disk full"})
+
+        assert "transcription.progress" not in {f["event"] for f in hub.latest_state()}
+
+    def test_stopping_retracts_the_recording_figure_and_the_hypothesis(self) -> None:
+        """Both describe a capture that is over. Replaying either shows a session still running."""
+        hub = EventHub()
+        hub.emit("recording.progress", {"duration_s": 12.0, "bytes": 400_000})
+        hub.emit("transcript.hypothesis", {"text": "half a sentence", "start": 11.0})
+        hub.emit("session.stopped", {"session_id": "abc"})
+
+        assert hub.latest_state() == []
+
+    def test_health_events_survive_a_stop_because_they_are_still_true(self) -> None:
+        """Retraction is targeted. A level meter after a stop is stale, not wrong to keep."""
+        hub = EventHub()
+        hub.emit("status", {"rtf": 1.8})
+        hub.emit("session.stopped", {"session_id": "abc"})
+
+        assert {f["event"] for f in hub.latest_state()} == {"status"}
+
+    def test_a_pass_that_is_still_running_is_replayed(self) -> None:
+        """The retraction must not cost the feature it protects."""
+        hub = EventHub()
+        hub.emit("transcription.progress", {"state": "running", "progress": 0.5})
+
+        frames = hub.latest_state()
+        assert [f["data"]["progress"] for f in frames] == [0.5]
+
     def test_disconnecting_removes_the_client(self) -> None:
         hub = EventHub()
         hub.connect("c1")

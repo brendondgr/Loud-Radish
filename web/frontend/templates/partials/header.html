@@ -76,10 +76,16 @@
       <span data-llm-name>Assistant not set up</span>
     </button>
 
-    <a class="button button--icon button--quiet" href="/sessions" aria-label="Past sessions" title="Past sessions">
+    {# Labelled, not an icon. Three horizontal lines is the universal sign for "a menu is here",
+       and this is not a menu — it is one destination, and the only route to every recording the
+       user has ever made. An icon that has to be hovered to find that out is a feature nobody
+       finds. #}
+    <a class="button button--recordings" href="/sessions" title="Every recording you have made">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-        <path d="M2.5 3.5h11M2.5 8h11M2.5 12.5h11" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+        <rect x="2" y="3.5" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1.2" />
+        <path d="M6.5 6.5l3.5 2-3.5 2v-4z" fill="currentColor" />
       </svg>
+      <span>Recordings</span>
     </a>
 
     <button

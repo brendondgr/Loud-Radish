@@ -1,6 +1,6 @@
 # Component Map
 
-*Last updated: 2026-08-15 (capture modes — D-020)*
+*Last updated: 2026-08-29 (the recordings page's media indicators)*
 
 > **Status: implemented.** Update this file in the same change that adds, moves, or renames a
 > component.
@@ -36,7 +36,8 @@ web/frontend/
     │   └── components/         one stylesheet per component
     └── js/
         ├── main.js             the application page's entry point
-        ├── sessions.js         the sessions page's entry point
+        ├── sessions.js         the recordings page's entry point — the list, the media
+        │                       chips, and the four exports including the web application
         ├── core/               DOM helpers, the event bus, formatting, preferences, modes
         ├── transport/          HTTP client, WebSocket, event names
         ├── stores/             state: transcript, polish, session, mode, health, config, chat

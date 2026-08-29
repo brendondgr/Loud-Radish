@@ -20,9 +20,13 @@ TEMPLATES_DIR: Path = FRONTEND_DIR / "templates"
 STATIC_DIR: Path = FRONTEND_DIR / "static"
 
 DATA_DIR: Path = REPO_ROOT / "data"
-#: Audio captured by `recorded` and `window` sessions. Deliberately *not* ``data/audio``, which is
-#: the library of recordings the file source replays — one is the machine's own output and the
-#: other is the user's input, and a single list mixing them invites deleting the wrong thing.
+#: Audio and video captured by `recorded` and `window` sessions. Deliberately *not* ``data/audio``,
+#: which is the library of recordings the file source replays — one is the machine's own output and
+#: the other is the user's input, and a single list mixing them invites deleting the wrong thing.
+#:
+#: One directory per recording, named ``<YYYYMMDD-HHMMSS>-<session-id>`` — the same name as the
+#: transcript database's stem in ``data/sessions``, which is how the two are joined. The layout is
+#: owned by ``services/recording/layout.py``; nothing else builds a path inside here.
 RECORDINGS_DIR: Path = DATA_DIR / "recordings"
 #: Where a hand-installed wheel is kept so a later ``uv sync`` that replaces it can be undone
 #: without downloading it again. Only the ROCm build of CTranslate2 lives here today; nothing

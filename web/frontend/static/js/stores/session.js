@@ -61,7 +61,11 @@ class SessionStore {
     this.running = Boolean(state?.running);
     this.sessionId = session?.session_id ?? null;
     this.startedAt = session?.started_at ? new Date(session.started_at) : null;
-    this.stoppedAt = this.running ? null : this.stoppedAt;
+    // **`ended_at`, not the local stop.** A fresh page has never seen a stop, so on a reload after
+    // a session ended `stoppedAt` was null and `elapsedSeconds` measured from the old start time
+    // to *now* — a clock climbing forever under a button that says "Start recording", which is
+    // precisely what was reported. The server knows when it ended; take that.
+    this.stoppedAt = this.running ? null : (_endedAt(session) ?? this.stoppedAt);
     this.title = session?.title ?? "";
     this.mode = session?.mode ?? this.mode;
     this.stats = state?.stats ?? null;
@@ -95,6 +99,13 @@ class SessionStore {
     const remoteLlm = config.llm?.mode === "api";
     return !remoteAsr && !remoteLlm;
   }
+}
+
+/** When a session ended, as the server reports it. Null while one is running or has never run. */
+function _endedAt(session) {
+  if (!session?.ended_at) return null;
+  const ended = new Date(session.ended_at);
+  return Number.isNaN(ended.getTime()) ? null : ended;
 }
 
 export const session = new SessionStore();

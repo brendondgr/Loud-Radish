@@ -5,6 +5,9 @@ These endpoints are the recovery path. When a transcription pass fails, the fail
 the tests here are weighted towards the refusals: an endpoint that re-runs a pass while one is
 already running, or that resolves a path outside the recordings directory, is worse than no
 endpoint at all.
+
+A recording is a **directory** now, addressed by its key — ``20260815-120000-abc123`` — so the
+helper below writes one the way the session manager does rather than dropping a loose ``.wav``.
 """
 
 from __future__ import annotations
@@ -41,8 +44,11 @@ def client(tmp_path: Path, recordings_dir: Path):
         yield client
 
 
-def write_recording(directory: Path, name: str, seconds: float = 2.0) -> Path:
-    path = directory / name
+def write_recording(directory: Path, key: str, seconds: float = 2.0) -> Path:
+    """Write one recording folder holding ``audio.wav``, as a real session would."""
+    folder = directory / key
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / "audio.wav"
     t = np.arange(int(seconds * SAMPLE_RATE), dtype=np.float64) / SAMPLE_RATE
     signal = (np.sin(2 * np.pi * 220 * t) * 0.4 * 32767).astype(np.int16)
     with wave.open(str(path), "wb") as handle:
@@ -65,17 +71,18 @@ def test_an_empty_directory_lists_nothing_and_explains_itself(client: TestClient
 
 
 def test_a_recording_is_listed_with_its_duration(client: TestClient, recordings_dir: Path) -> None:
-    write_recording(recordings_dir, "20260815-120000-abc123.wav", seconds=3.0)
+    write_recording(recordings_dir, "20260815-120000-abc123", seconds=3.0)
     entry = client.get("/api/recordings").json()["recordings"][0]
 
-    assert entry["name"] == "20260815-120000-abc123.wav"
+    assert entry["name"] == "20260815-120000-abc123"
+    assert entry["audio"] == "audio.wav"
     assert entry["duration_s"] == pytest.approx(3.0, abs=0.05)
     assert entry["bytes"] > 44
 
 
 def test_recordings_are_listed_newest_first(client: TestClient, recordings_dir: Path) -> None:
-    for name in ("20260815-090000-a.wav", "20260815-120000-b.wav", "20260815-100000-c.wav"):
-        write_recording(recordings_dir, name, seconds=0.5)
+    for key in ("20260815-090000-aaaaaa", "20260815-120000-bbbbbb", "20260815-100000-cccccc"):
+        write_recording(recordings_dir, key, seconds=0.5)
     names = [entry["name"] for entry in client.get("/api/recordings").json()["recordings"]]
     assert names == sorted(names, reverse=True)
 
@@ -84,9 +91,11 @@ def test_an_unreadable_file_is_listed_rather_than_hidden(
     client: TestClient, recordings_dir: Path
 ) -> None:
     """Hiding it leaves a file nothing in the interface can explain or remove."""
-    (recordings_dir / "truncated.wav").write_bytes(b"RIFF....garbage")
+    folder = recordings_dir / "20260815-120000-abc123"
+    folder.mkdir()
+    (folder / "audio.wav").write_bytes(b"RIFF....garbage" * 8)
     entry = client.get("/api/recordings").json()["recordings"][0]
-    assert entry["name"] == "truncated.wav"
+    assert entry["name"] == "20260815-120000-abc123"
     assert entry["unreadable"] is True
     assert entry["duration_s"] is None
 
@@ -105,6 +114,7 @@ def test_the_retention_setting_is_reported(client: TestClient) -> None:
         "../../../etc/passwd",
         "..%2f..%2fetc%2fpasswd",
         "subdir/../../escape.wav",
+        "20260815-120000-abc123/../../escape",
     ],
 )
 def test_a_path_outside_the_directory_is_refused(client: TestClient, name: str) -> None:
@@ -114,7 +124,9 @@ def test_a_path_outside_the_directory_is_refused(client: TestClient, name: str) 
     assert response.status_code != 200
 
 
-def test_a_non_wav_name_is_refused(client: TestClient, recordings_dir: Path) -> None:
+def test_a_name_that_is_not_a_recording_key_is_refused(
+    client: TestClient, recordings_dir: Path
+) -> None:
     (recordings_dir / "notes.txt").write_text("not audio")
     response = client.delete("/api/recordings/notes.txt")
     assert response.status_code == 422
@@ -122,7 +134,7 @@ def test_a_non_wav_name_is_refused(client: TestClient, recordings_dir: Path) -> 
 
 
 def test_a_missing_recording_is_a_clean_404(client: TestClient) -> None:
-    response = client.delete("/api/recordings/nothing-here.wav")
+    response = client.delete("/api/recordings/20260815-120000-abc123")
     assert response.status_code == 404
     assert response.json()["detail"]["error"]["code"] == "no-recording"
 
@@ -131,10 +143,25 @@ def test_a_missing_recording_is_a_clean_404(client: TestClient) -> None:
 
 
 def test_a_recording_can_be_deleted(client: TestClient, recordings_dir: Path) -> None:
-    write_recording(recordings_dir, "old.wav", seconds=0.5)
-    assert client.delete("/api/recordings/old.wav").json()["removed"] is True
-    assert not (recordings_dir / "old.wav").exists()
+    key = "20260815-120000-abc123"
+    write_recording(recordings_dir, key, seconds=0.5)
+    assert client.delete(f"/api/recordings/{key}").json()["removed"] is True
+    assert not (recordings_dir / key / "audio.wav").exists()
     assert client.get("/api/recordings").json()["recordings"] == []
+
+
+def test_deleting_the_audio_keeps_the_video_beside_it(
+    client: TestClient, recordings_dir: Path
+) -> None:
+    """ "Delete this recording's audio" must not quietly take a video with it."""
+    key = "20260815-120000-abc123"
+    write_recording(recordings_dir, key, seconds=0.5)
+    video = recordings_dir / key / "video.webm"
+    video.write_bytes(b"a video")
+
+    client.delete(f"/api/recordings/{key}")
+
+    assert video.read_bytes() == b"a video"
 
 
 # -- re-running a pass --------------------------------------------------------------------------
@@ -144,8 +171,8 @@ def test_a_re_run_is_refused_without_a_loaded_model(
     client: TestClient, recordings_dir: Path
 ) -> None:
     """Naming the remedy, because this is a button the user just pressed."""
-    write_recording(recordings_dir, "talk.wav", seconds=1.0)
-    response = client.post("/api/recordings/talk.wav/transcribe")
+    write_recording(recordings_dir, "20260815-120000-abc123", seconds=1.0)
+    response = client.post("/api/recordings/20260815-120000-abc123/transcribe")
 
     assert response.status_code == 409
     error = response.json()["detail"]["error"]
@@ -156,13 +183,15 @@ def test_a_re_run_is_refused_without_a_loaded_model(
 def test_a_re_run_of_an_unreadable_recording_is_refused(
     client: TestClient, recordings_dir: Path
 ) -> None:
-    (recordings_dir / "broken.wav").write_bytes(b"RIFF....garbage")
-    response = client.post("/api/recordings/broken.wav/transcribe")
+    folder = recordings_dir / "20260815-120000-abc123"
+    folder.mkdir()
+    (folder / "audio.wav").write_bytes(b"RIFF....garbage" * 8)
+    response = client.post("/api/recordings/20260815-120000-abc123/transcribe")
     assert response.status_code in (409, 422)
 
 
 def test_a_re_run_of_a_missing_recording_is_a_404(client: TestClient) -> None:
-    assert client.post("/api/recordings/gone.wav/transcribe").status_code == 404
+    assert client.post("/api/recordings/20260815-120000-abc123/transcribe").status_code == 404
 
 
 # -- the pass and the session share one model ----------------------------------------------------
@@ -172,13 +201,13 @@ def test_a_re_run_is_refused_while_a_session_records(
     client: TestClient, recordings_dir: Path
 ) -> None:
     """They cannot share the speech model, and the message says so rather than failing obscurely."""
-    write_recording(recordings_dir, "talk.wav", seconds=1.0)
+    write_recording(recordings_dir, "20260815-120000-abc123", seconds=1.0)
     started = client.post("/api/session/start", json={})
     if started.status_code != 200:
         pytest.skip("no capture source available in this environment")
 
     try:
-        response = client.post("/api/recordings/talk.wav/transcribe")
+        response = client.post("/api/recordings/20260815-120000-abc123/transcribe")
         assert response.status_code == 409
         assert response.json()["detail"]["error"]["code"] == "session-running"
     finally:

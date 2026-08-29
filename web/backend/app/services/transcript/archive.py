@@ -5,6 +5,12 @@ that is a SQLite file in the session directory, and until this module existed th
 reach one from the interface at all — a talk that had been recorded, transcribed, summarised, and
 stopped became unreachable the moment it ended.
 
+**What a session holds is answered from the recording folder, not guessed.** A session's transcript
+database and its recording directory share a name — ``<YYYYMMDD-HHMMSS>-<session-id>`` — so asking
+whether a past session has a video is one directory listing rather than a filename search. That is
+what lets the page say "video · audio · transcript" instead of leaving the user to open each one to
+find out (and it is what the web-app export tests before it will run).
+
 **Reading here is strictly read-only and defensive.** The directory is a user directory: it will
 contain half-written files from a session that crashed, files from an older schema, and whatever
 else happens to be sitting there. One unreadable file must not take the listing down with it, so
@@ -16,17 +22,54 @@ from __future__ import annotations
 
 import logging
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from ...config.schema import AppConfig
+from ..recording.layout import resolve_recording
 
 logger = logging.getLogger(__name__)
 
 #: Files in the session directory that are ours.
 SESSION_SUFFIX = ".db"
+
+
+@dataclass(frozen=True)
+class SessionMedia:
+    """What a past session actually holds, so the list can say so without opening anything.
+
+    ``transcript`` is true when the database has segments in it — not merely when the file exists.
+    A session that recorded audio and whose transcription pass never ran leaves a database with no
+    segments, and calling that "has a transcript" is the answer that sends someone to open it and
+    find nothing.
+    """
+
+    video: bool = False
+    audio: bool = False
+    transcript: bool = False
+    #: Bytes in the recording folder. Zero when there is no folder.
+    recording_bytes: int = 0
+
+    @property
+    def exportable(self) -> bool:
+        """Whether this session can become a self-contained web application.
+
+        All three, because the export *is* the three of them: a page with a video panel, a
+        synchronised transcript, and questions asked against it. Two out of three is a different
+        artefact, and offering it under the same name would disappoint quietly.
+        """
+        return self.video and self.audio and self.transcript
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "video": self.video,
+            "audio": self.audio,
+            "transcript": self.transcript,
+            "recording_bytes": self.recording_bytes,
+            "exportable": self.exportable,
+        }
 
 
 @dataclass(frozen=True)
@@ -46,6 +89,8 @@ class ArchivedSession:
     summaries: int
     glossary_terms: int
     size_bytes: int
+    #: What this session's recording folder actually holds. See :class:`SessionMedia`.
+    media: SessionMedia = field(default_factory=lambda: SessionMedia())
     #: Empty when the file is readable. Otherwise says what is wrong with it.
     problem: str = ""
 
@@ -67,6 +112,7 @@ class ArchivedSession:
             "summaries": self.summaries,
             "glossary_terms": self.glossary_terms,
             "size_bytes": self.size_bytes,
+            "media": self.media.as_dict(),
             "problem": self.problem,
             "readable": self.readable,
         }
@@ -75,6 +121,11 @@ class ArchivedSession:
 def session_dir(config: AppConfig) -> Path:
     """Where sessions are written, as configured."""
     return Path(config.storage.session_dir).expanduser()
+
+
+def recording_dir(config: AppConfig) -> Path:
+    """Where recordings are written, as configured."""
+    return Path(config.recording.recording_dir).expanduser()
 
 
 def list_sessions(config: AppConfig) -> list[ArchivedSession]:
@@ -90,11 +141,17 @@ def list_sessions(config: AppConfig) -> list[ArchivedSession]:
         logger.info("No session directory at %s yet", directory)
         return []
 
-    return [describe(path) for path in files]
+    recordings = recording_dir(config)
+    return [describe(path, recordings) for path in files]
 
 
-def describe(path: Path) -> ArchivedSession:
-    """Read one session file's summary without loading its transcript."""
+def describe(path: Path, recordings: Path | None = None) -> ArchivedSession:
+    """Read one session file's summary without loading its transcript.
+
+    ``recordings`` is the recordings root. Given one, the returned row also says what media the
+    session holds; omitted, it reports none — which is the honest answer when nobody said where to
+    look, rather than a guess.
+    """
     try:
         size = path.stat().st_size
     except OSError as exc:
@@ -126,6 +183,7 @@ def describe(path: Path) -> ArchivedSession:
     finally:
         connection.close()
 
+    segments = int(stats["segments"] or 0)
     started = (meta["started_at"] if meta else "") or _mtime(path)
     return ArchivedSession(
         key=path.stem,
@@ -133,12 +191,13 @@ def describe(path: Path) -> ArchivedSession:
         title=(meta["title"] if meta else "") or _default_title(started),
         started_at=started,
         ended_at=(meta["ended_at"] if meta else "") or "",
-        segments=int(stats["segments"] or 0),
+        segments=segments,
         words=int(stats["words"] or 0),
         duration_seconds=float(stats["duration"] or 0.0),
         summaries=int(summaries["n"] or 0),
         glossary_terms=int(glossary["n"] or 0),
         size_bytes=size,
+        media=media_for(path.stem, recordings, has_transcript=segments > 0),
     )
 
 
@@ -157,6 +216,30 @@ def find(config: AppConfig, key: str) -> Path | None:
         logger.warning("Refusing a session key that escapes the session directory: %r", key)
         return None
     return candidate if candidate.is_file() else None
+
+
+def media_for(key: str, recordings: Path | None, *, has_transcript: bool) -> SessionMedia:
+    """What the recording folder named ``key`` holds, if there is one.
+
+    Never raises. A recordings directory that has been moved, renamed in settings, or deleted
+    entirely must cost the indicators, not the listing — a page that will not load is worse than a
+    page that cannot say whether there is a video.
+    """
+    if recordings is None:
+        return SessionMedia(transcript=has_transcript)
+    try:
+        layout = resolve_recording(recordings, key)
+        if layout is None or not layout.exists():
+            return SessionMedia(transcript=has_transcript)
+        return SessionMedia(
+            video=layout.existing_video() is not None,
+            audio=layout.has_audio(),
+            transcript=has_transcript,
+            recording_bytes=layout.size_bytes(),
+        )
+    except OSError:
+        logger.warning("Could not read the recording folder for %s", key)
+        return SessionMedia(transcript=has_transcript)
 
 
 def _unreadable(path: Path, size: int, problem: str) -> ArchivedSession:

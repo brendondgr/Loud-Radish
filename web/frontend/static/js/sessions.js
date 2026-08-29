@@ -1,5 +1,5 @@
 /**
- * The past-sessions page.
+ * The recordings page — every session that has been captured.
  *
  * Its own entry point rather than part of `main.js`: this page has no WebSocket, no transcript
  * store, and no assistant, and loading that machinery to render a list would mean a page that
@@ -31,6 +31,13 @@ function when(iso) {
         minute: "2-digit",
       });
 }
+
+/** The three things a recording can hold, in a fixed order so a column of rows scans. */
+const MEDIA = [
+  ["video", "Video"],
+  ["audio", "Audio"],
+  ["transcript", "Transcript"],
+];
 
 function size(bytes) {
   return bytes >= 1024 * 1024
@@ -67,13 +74,17 @@ class SessionsPage {
 
   row(session) {
     const running = session.key === this.runningKey;
+    const media = session.media ?? {};
+    const stored = media.recording_bytes
+      ? size(session.size_bytes + media.recording_bytes)
+      : size(session.size_bytes);
     const meta = [
       when(session.started_at),
       session.duration_seconds ? formatDuration(session.duration_seconds) : null,
       `${session.segments} segments`,
       `${session.words} words`,
       session.glossary_terms ? `${session.glossary_terms} terms` : null,
-      size(session.size_bytes),
+      stored,
     ].filter(Boolean);
 
     const children = [
@@ -87,6 +98,7 @@ class SessionsPage {
         ],
       }),
       el("p", { className: "session__meta", text: meta.join(" · ") }),
+      this.media(media),
     ];
 
     if (session.problem) {
@@ -99,6 +111,31 @@ class SessionsPage {
       className: "session",
       attrs: { role: "listitem", "data-session-key": session.key },
       children,
+    });
+  }
+
+  /**
+   * What this recording holds — video, audio, transcript — as three chips.
+   *
+   * All three are always drawn, present or not. A row that showed only what it had would need
+   * reading rather than scanning, because "video · transcript" and "video · audio" have the same
+   * shape and different meanings.
+   */
+  media(media) {
+    return el("div", {
+      className: "session__media",
+      attrs: { "aria-label": "What this recording holds" },
+      children: MEDIA.map(([key, label]) => {
+        const present = Boolean(media[key]);
+        return el("span", {
+          className: "media-chip",
+          text: label,
+          attrs: {
+            "data-present": String(present),
+            title: present ? `${label} is available` : `No ${label.toLowerCase()}`,
+          },
+        });
+      }),
     });
   }
 
@@ -129,7 +166,27 @@ class SessionsPage {
     });
     remove.addEventListener("click", () => this.remove(session));
 
-    return el("div", { className: "session__actions", children: [format, download, remove] });
+    // Offered only when the session holds video, audio, and a transcript. The export *is* those
+    // three — a player, a transcript that follows it, and questions asked against both — so a
+    // button that produced two of them under the same name would disappoint quietly.
+    const webapp = session.media?.exportable
+      ? el("a", {
+          className: "button button--primary",
+          text: "Web app (.zip)",
+          attrs: {
+            href: api.sessionWebappUrl(session.key),
+            download: "",
+            title:
+              "A self-contained page with the video, the transcript, and a question panel. " +
+              "Opens in any browser, with no server.",
+          },
+        })
+      : null;
+
+    return el("div", {
+      className: "session__actions",
+      children: [format, download, webapp, remove].filter(Boolean),
+    });
   }
 
   async remove(session) {

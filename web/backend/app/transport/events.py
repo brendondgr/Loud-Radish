@@ -70,6 +70,7 @@ ERROR: Final = "error"
 ALL_EVENTS: Final[tuple[str, ...]] = (
     SESSION_STARTED,
     SESSION_STOPPED,
+    SESSION_CAPTURE_ENDED,
     TRANSCRIPT_COMMITTED,
     TRANSCRIPT_HYPOTHESIS,
     TRANSCRIPT_POLISHED,
@@ -123,6 +124,32 @@ CRITICAL_EVENTS: Final[frozenset[str]] = frozenset(
         ERROR,
     }
 )
+
+
+#: Terminal events, and the coalescing events they retract.
+#:
+#: **This is what stops a finished pass announcing itself forever.** The hub keeps the newest
+#: instance of every coalescing event and replays the set to each client that connects, so a page
+#: paints a correct screen immediately instead of waiting for the next tick. That is right for a
+#: level meter and wrong for progress: once a transcription pass has finished, its last
+#: ``transcription.progress`` frame says *running*, and every client that connects afterwards —
+#: every reload, every reconnect, for the life of the process — was told the pass was still going.
+#:
+#: The symptom was two-faced and both faces were reported. In a mode that has a `processing` state
+#: the interface sat on "Transcribing… 100%" with the record button disabled; in `live`, which has
+#: no such state, the state change was refused and the page instead showed "Start recording" over a
+#: clock that kept climbing. One stale frame, two bug reports.
+INVALIDATES: Final[dict[str, frozenset[str]]] = {
+    TRANSCRIPTION_DONE: frozenset({TRANSCRIPTION_PROGRESS}),
+    TRANSCRIPTION_FAILED: frozenset({TRANSCRIPTION_PROGRESS}),
+    # Capture has ended, so how much of it had been written is no longer a live figure either.
+    SESSION_STOPPED: frozenset({RECORDING_PROGRESS, TRANSCRIPT_HYPOTHESIS}),
+}
+
+
+def invalidated_by(event: str) -> frozenset[str]:
+    """Which retained coalescing events ``event`` makes obsolete. Empty for most events."""
+    return INVALIDATES.get(event, frozenset())
 
 
 def envelope(event: str, data: dict[str, Any]) -> dict[str, Any]:

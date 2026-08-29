@@ -31,7 +31,18 @@ CONTRACTS_DIR = REPO_ROOT / "web" / "shared" / "contracts"
 #: the whole contract and is stated here in machine-readable form so it cannot be misread.
 EVENT_NOTES: dict[str, dict[str, str]] = {
     "session.started": {"action": "set", "note": "Capture began. Carries a config snapshot."},
-    "session.stopped": {"action": "set", "note": "Capture ended. Carries final statistics."},
+    "session.stopped": {
+        "action": "set",
+        "note": "Capture ended and everything that follows it is done. Carries final statistics.",
+    },
+    "session.capture_ended": {
+        "action": "set",
+        "note": (
+            "The microphone or monitor has been released. Emitted immediately on stop, before the "
+            "video is finalised, remuxed, or transcribed — all of which can take tens of seconds. "
+            "`finalising` is true when work remains."
+        ),
+    },
     "transcript.committed": {
         "action": "append",
         "note": "Append permanently. Never modify an existing entry. Order by id, not arrival.",

@@ -22,9 +22,12 @@ from fastapi import APIRouter, HTTPException, Request
 from ..models.session import SessionMetadata
 from ..services.recording import (
     BatchError,
+    RecordingLayout,
     TranscriptionJob,
     TranscriptionRunner,
+    iter_recordings,
     read_wav,
+    resolve_recording,
 )
 from ..services.session import modes
 from ..services.transcript import TranscriptStore
@@ -51,24 +54,25 @@ def _recording_dir(request: Request) -> Path:
     return Path(request.app.state.config.resolve().recording.recording_dir)
 
 
-def _resolve(request: Request, name: str) -> Path:
-    """Resolve a recording by file name, refusing anything outside the recordings directory.
+def _resolve(request: Request, name: str) -> RecordingLayout:
+    """Resolve a recording by its folder key, refusing anything outside the recordings directory.
 
-    The name comes from a URL. Without this an id of ``../../etc/passwd`` would be a file read on a
-    process running as the user, which is a real hole even on a loopback-bound server — a page in
-    any other tab can reach localhost.
+    The key comes from a URL. Without this a key of ``../../etc`` would be a file read on a process
+    running as the user, which is a real hole even on a loopback-bound server — a page in any other
+    tab can reach localhost. ``resolve_recording`` refuses anything that is not a recording key
+    before it joins the path at all.
     """
-    directory = _recording_dir(request).resolve()
-    candidate = (directory / name).resolve()
-    if not candidate.is_relative_to(directory) or candidate.suffix != ".wav":
+    layout = resolve_recording(_recording_dir(request), name)
+    if layout is None:
         raise HTTPException(
             status_code=422, detail=_error("bad-recording", "That is not a recording.")
         )
-    if not candidate.is_file():
+    if not layout.has_audio():
         raise HTTPException(
-            status_code=404, detail=_error("no-recording", f"No recording named {name}.")
+            status_code=404,
+            detail=_error("no-recording", f"No audio in the recording folder {name}."),
         )
-    return candidate
+    return layout
 
 
 @router.get("")
@@ -78,24 +82,35 @@ async def list_recordings(request: Request) -> dict[str, Any]:
     A recording present here has *not* been transcribed, or was kept deliberately: the pass deletes
     its audio on success unless audio retention is on. So this list is mostly a list of things that
     went wrong, which is exactly what it is for.
+
+    Addressed by folder key — ``20260829-174113-d60b37a9e3c4`` — rather than by file name, since a
+    recording is now a directory holding audio, video, a preview frame, and a sidecar.
     """
     directory = _recording_dir(request)
     retain = request.app.state.config.resolve().storage.retain_audio
 
     files: list[dict[str, Any]] = []
-    for path in sorted(directory.glob("*.wav"), reverse=True):
+    for layout in iter_recordings(directory):
+        if not layout.has_audio():
+            # A folder whose audio has already been transcribed away still holds the video and the
+            # measurement sidecar. It is not a recording *waiting* for a pass, which is what this
+            # list is for, so it belongs on the past-sessions page rather than here.
+            continue
         try:
-            stat = path.stat()
-        except OSError:  # noqa: PERF203 - deleted between the glob and the stat
+            stat = layout.audio.stat()
+        except OSError:  # noqa: PERF203 - deleted between the listing and the stat
             continue
         entry: dict[str, Any] = {
-            "name": path.name,
+            # The folder key, which is what every other endpoint addresses a recording by.
+            "name": layout.key,
+            "audio": layout.audio.name,
             "bytes": stat.st_size,
             "modified": stat.st_mtime,
             "duration_s": None,
+            "has_video": layout.existing_video() is not None,
         }
         try:
-            _, entry["duration_s"] = read_wav(path)
+            _, entry["duration_s"] = read_wav(layout.audio)
         except BatchError:
             # Unreadable is worth *listing*, so it can be deleted. Hiding it would leave a file
             # nothing in the interface can explain or remove.
@@ -122,7 +137,8 @@ async def transcribe_recording(request: Request, name: str) -> dict[str, Any]:
     a second attempt to it would interleave two runs into one unreadable record.
     """
     manager = _manager(request)
-    path = _resolve(request, name)
+    layout = _resolve(request, name)
+    path = layout.audio
 
     if manager.is_running:
         raise HTTPException(
@@ -195,7 +211,8 @@ async def transcribe_recording(request: Request, name: str) -> dict[str, Any]:
 async def delete_recording(request: Request, name: str) -> dict[str, Any]:
     """Remove a recording. Refuses one a transcription pass is currently reading."""
     manager = _manager(request)
-    path = _resolve(request, name)
+    layout = _resolve(request, name)
+    path = layout.audio
 
     current = manager.jobs.current
     if current is not None and current.is_running and current.source_path == str(path):
@@ -207,6 +224,9 @@ async def delete_recording(request: Request, name: str) -> dict[str, Any]:
             ),
         )
 
+    # The audio only, not the folder. The video and the measurement sidecar are separate artefacts
+    # with their own value, and "delete this recording's audio" must not quietly take a video with
+    # it — deleting the whole recording is what the past-sessions page is for.
     try:
         path.unlink()
     except OSError as exc:
