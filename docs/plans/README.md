@@ -29,7 +29,7 @@ conventions in [../skills/planner/SKILL.md](../skills/planner/SKILL.md).
 | [window-capture-repair.md](window-capture-repair.md) | Window recording repaired against the machine rather than the test double: recorded resolution, repeated portal dialogs, the live preview, window audio instead of the microphone, immediate stop, and timestamps that correlate | **Complete (8 / 8)** |
 | [four-reported-faults.md](four-reported-faults.md) | Four faults reported together: the assistant's rejected system message, copied timestamps of zero, window audio refused by its own guard, and forced commits that drop speech | **Complete (5 / 5)** |
 | [duplicate-final-transcript.md](duplicate-final-transcript.md) | The finished result showed the rewritten transcript and then the whole raw one again: one transcription pass is displayed and exported, never the union of both | **Complete (4 / 4)** |
-| [questions-after-a-session-ends.md](questions-after-a-session-ends.md) | The assistant refused every question once a session stopped, because teardown closed the transcript store: the finished store stays readable until the next session starts | **In progress (0 / 3)** |
+| [questions-after-a-session-ends.md](questions-after-a-session-ends.md) | The assistant refused every question once a session stopped, because teardown closed the transcript store: the finished store stays readable until the next session starts | **Complete (3 / 3)** |
 
 ## The multi-mode expansion
 

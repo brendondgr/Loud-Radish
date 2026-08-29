@@ -86,6 +86,13 @@ Three consequences worth stating separately, because each is a constraint on eve
   capture widens to the machine's whole output and says so over the `error` channel: a wider
   recording still contains what was asked for, and an empty one contains nothing. See **D-030**.
 
+- **The transcript store outlives its session, deliberately.** It is held open for reading until the
+  next session starts, because the questions people ask about a talk mostly come *after* it: a
+  summary, a definition, what was missed. Closing it at the moment a session ended left the
+  assistant refusing every question, a reload showing an empty transcript, and the session clock
+  reading zero — one line, and all three read to the user as separate bugs. The record on disk was
+  never at risk; what was missing was a handle to read it through. See **D-031**.
+
 ## The pipeline
 
 ```text

@@ -1,6 +1,6 @@
 # Questions After a Session Ends
 
-*Status: in progress. Written 2026-08-29.*
+*Status: **complete (3 / 3)**. Written and executed 2026-08-29.*
 
 ## 1. Introduction
 

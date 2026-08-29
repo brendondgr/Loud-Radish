@@ -165,13 +165,10 @@ each was invisible to reading and obvious to using, which is the argument for th
 - **The primary control was pushed off-screen at 320 px.** The header has wrapped since Phase 12,
   but each header *group* was a non-wrapping row — fine at three items, not at four.
 
-- [ ] **A finished transcript is not reloadable until the sessions page is opened.** When a session
-      ends the store closes, so `GET /api/session` reports no stats and the page cannot re-fetch its
-      segments; a reload shows an empty transcript. This is **pre-existing live-mode behaviour**, not
-      something recorded mode introduced — but it lands harder here, because the transcript arrives
-      *after* the toggle and a reload a moment later loses text the user has only just seen. The
-      record itself is safe on disk and readable from `/sessions`. Worth closing by keeping the last
-      session's store open for reading until the next one starts.
+- [x] **A finished transcript is not reloadable until the sessions page is opened.** Closed by the
+      remedy this item proposed: the last session's store stays open for reading until the next one
+      starts. See Part 3g and **D-031** — the same line was refusing every question the assistant
+      was asked after a stop, which is how it came to be fixed.
 
 - [ ] **The transcription pass is neither resumable nor cancellable.** It runs whole or fails whole.
       A forty-minute recording at RTF ≈ 1.5 takes around twenty-seven minutes, which is long enough
@@ -364,6 +361,44 @@ Still open, and deliberately not guessed at:
       `speech-dispatcher-dummy`), against one node on the run that worked — so "several linked
       nodes" is now the strongest lead, though linking only the video's node by port id during the
       repair also measured zeros, which that lead does not explain.
+
+---
+
+## Part 3g — Questions After a Session Ends
+
+Tracked in [plans/questions-after-a-session-ends.md](plans/questions-after-a-session-ends.md).
+**All three steps are complete.** Reported: after stopping a transcription, *"Summarise the last 10
+minutes"* answered **"There is no transcript to ask about yet"** while the finished transcript was
+plainly on screen. Recorded as **D-031**.
+
+- [x] The finished session's store is retained, open for reading, until the next session starts
+- [x] `state()` and `session_seconds` read through the `store` property rather than `_store`
+- [x] A batch pass reopens the store on release, so `recorded` and `window` are covered too
+- [x] Released on the next start and on shutdown, so exactly one is ever held
+- [x] Thirteen tests, eleven of which fail on the previous code
+
+Three faults, one line. Worth separating because only the first was reported and the other two were
+each sufficient on their own to keep the feature broken:
+
+- **The assistant refused every question.** `ChatService` is wired to `lambda: manager.store`, and
+  teardown set that to `None`. The transcript on screen is the *client's* copy, accumulated over the
+  socket during the session — it outlives the store, which is exactly why the interface and the
+  server disagreed and why the message read as nonsense to the user.
+- **A reload showed an empty transcript**, because `state()` read `_store` directly and so reported
+  no stats to re-fetch from. Carried above as its own item since the multi-mode expansion.
+- **The clock fell to `0.0`**, because `session_seconds` also read `_store` directly — so *"the last
+  ten minutes"* would have resolved to the range `[0, 0]` and selected nothing **even once the store
+  was retained**. Its own docstring promised the opposite ("so a question asked after a session ends
+  is still positioned correctly"); the promise was defeated one line below where it was written.
+
+Deliberately unchanged, recorded so the absence is not mistaken for an oversight:
+
+- **"There is no transcript to ask about yet" still exists, and still fires.** It is correct for an
+  application that has never recorded, and two tests hold it there. Retention must not convert an
+  honest refusal into an answer invented from nothing.
+- **Nothing about the assistant, the quick actions, or the context assembler changed.** They were
+  already right; they were being handed `None`. A fix inside them would have been a workaround for a
+  fault one layer down.
 
 ---
 
