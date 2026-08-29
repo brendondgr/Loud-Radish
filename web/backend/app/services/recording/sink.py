@@ -27,6 +27,7 @@ from __future__ import annotations
 import logging
 import struct
 import threading
+import time
 from pathlib import Path
 from typing import Final
 
@@ -81,6 +82,10 @@ class WavSink:
 
         self._lock = threading.Lock()
         self._samples = 0
+        #: Monotonic time of the first frame written. **Not** of the sink being opened: the sink is
+        #: created before the audio source is started, and the gap between them is not audio. This
+        #: is sample zero of the file, which is what the video has to be aligned against.
+        self._first_write_at = 0.0
         self._samples_at_last_header = 0
         self._closed = False
         self._limit_reported = False
@@ -101,6 +106,11 @@ class WavSink:
     def samples(self) -> int:
         """Frames written so far."""
         return self._samples
+
+    @property
+    def first_write_monotonic(self) -> float:
+        """When the first frame arrived, or 0.0 if none has. The file's own time zero."""
+        return self._first_write_at
 
     @property
     def duration_s(self) -> float:
@@ -147,6 +157,9 @@ class WavSink:
                 logger.error("Recording write to %s failed: %s", self.path, exc)
                 self._closed = True
                 return True
+
+            if self._first_write_at == 0.0 and block.size:
+                self._first_write_at = time.monotonic()
 
             self._samples += block.size
             self._maybe_refresh_header()

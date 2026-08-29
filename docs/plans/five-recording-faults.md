@@ -34,10 +34,12 @@ two reporting the same lie by a different route.
   and starting audio afterwards would lose the first words of a talk to however long someone takes
   to choose a window. That decision is *why* the offset exists, which makes measuring and
   correcting it the fix rather than reordering the start.
-- **Can the offset be measured after the fact for recordings already on disk?** *Human intervention
-  is needed to answer this question* for a given file — the two start times are not recorded
-  anywhere in the existing artefacts. Recordings made before this change keep whatever drift they
-  have; the sidecar will carry the measurement from now on.
+- **Can the offset be measured after the fact for recordings already on disk?** No — the two start
+  times are not recorded in any existing artefact, so a file made before this change cannot be
+  corrected automatically. Those recordings keep whatever drift they have. From now on the measured
+  offset is written to the log at INFO when a recording is combined; it is deliberately *not* given
+  a file of its own, since the same report also asked for fewer files in a recording folder, not
+  more.
 
 ## 3. Hierarchical Step-by-Step Instructions
 

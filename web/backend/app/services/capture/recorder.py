@@ -56,6 +56,11 @@ class RecorderState:
     video_path: str = ""
     preview_path: str = ""
     started_at: float = 0.0
+    #: Monotonic time at which capture was told to end — as close to the last encoded frame as this
+    #: process can observe. With the file's own duration it gives the moment the video *started*,
+    #: which is what aligning it with the audio needs and which cannot be measured at the other end:
+    #: spawning GStreamer and its first frame arriving are seconds apart on a bad day.
+    stopped_at: float = 0.0
 
     @property
     def bytes_written(self) -> int:
@@ -148,6 +153,10 @@ class WindowRecorder:
             return self.state
 
         if process.poll() is None:
+            # Stamped before the signal, not after the wait: finalising a container takes seconds
+            # and encodes nothing new, so the last frame belongs to this instant rather than to
+            # whenever the process finally exits.
+            self.state.stopped_at = time.monotonic()
             # SIGINT, not SIGTERM: `gst-launch-1.0 -e` turns interrupt into end-of-stream, which is
             # what writes the container's index. SIGTERM just ends the process.
             try:
