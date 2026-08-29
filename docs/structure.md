@@ -106,7 +106,8 @@ TranscriberPrototype/
 │   │   │       ├── portal.py      # ScreenCast over D-Bus: consent, and a PipeWire node
 │   │   │       ├── pipeline.py    # The GStreamer launch line, built from what is installed
 │   │   │       ├── recorder.py    # The subprocess, its lifetime, and its finalisation
-│   │   │       └── mux.py         # Combines the video with the session's audio afterwards
+│   │   │       └── mux.py         # Combines the video with the session's audio, correcting the
+│   │   │                          #   capture-start offset between them (D-035)
 │   │   │   └── recording/         # Capture to disk, and transcribe it whole (D-021)
 │   │   │       ├── layout.py      # One directory per recording, named for when it started (D-032)
 │   │   │       ├── sink.py        # Incremental WAV writer; crash-safe header, duration cap

@@ -1,6 +1,6 @@
 # API Contract
 
-*Last updated: 2026-08-29 (past-session media, and the web-app export — D-032, D-034)*
+*Last updated: 2026-08-29 (what the media block means, corrected — D-032, D-034, D-035)*
 
 > **Status: the WebSocket event contract below is frozen.** The machine-readable contract lives in
 > `web/shared/contracts/` and is generated from the backend; this document is its human-readable
@@ -154,10 +154,11 @@ Response `200 OK`:
       "size_bytes": 483328,
       "media": {
         "video": true,
-        "audio": false,
+        "audio": true,
         "transcript": true,
+        "audio_file": false,
         "recording_bytes": 264518912,
-        "exportable": false
+        "exportable": true
       },
       "problem": "",
       "readable": true
@@ -171,11 +172,21 @@ Response `200 OK`:
 `media` says what the session's **recording folder** holds (D-032). The folder is named with the
 same key as the database, so this is a directory listing rather than a filename search.
 
-Two subtleties in it. `transcript` means the database holds segments, not merely that the file
-exists — a recording whose transcription pass never ran leaves an empty database, and calling that
-a transcript sends someone to open it and find nothing. `audio` is commonly `false` on a healthy
-recording, because a successful pass deletes its own audio unless retention is on; `exportable`
-therefore requires all three and is `false` for most finished sessions, which is correct.
+Three subtleties in it.
+
+`transcript` means the database holds segments, not merely that the file exists — a recording whose
+transcription pass never ran leaves an empty database, and calling that a transcript sends someone
+to open it and find nothing.
+
+`audio` means **there is sound you can play**, from the separate recording or from the video it was
+muxed into. It is deliberately not "there is a WAV": a successful transcription pass deletes that
+file unless retention is on, so the literal reading reported no audio precisely when a recording was
+healthiest — and took `exportable` down with it (D-035). `audio_file` is the narrower fact,
+reported alongside because only that file can be transcribed again.
+
+`segments` and `words` describe **one transcription pass**, the latest, exactly as
+`GET /api/sessions/{key}` and every export do. Counting the table across both passes reported
+roughly double what a session holds.
 
 A row with a non-empty `problem` could not be read. It is listed anyway: a session the user can see
 and cannot open is more useful than one that has silently vanished.

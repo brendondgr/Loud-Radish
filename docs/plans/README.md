@@ -31,6 +31,7 @@ conventions in [../skills/planner/SKILL.md](../skills/planner/SKILL.md).
 | [duplicate-final-transcript.md](duplicate-final-transcript.md) | The finished result showed the rewritten transcript and then the whole raw one again: one transcription pass is displayed and exported, never the union of both | **Complete (4 / 4)** |
 | [questions-after-a-session-ends.md](questions-after-a-session-ends.md) | The assistant refused every question once a session stopped, because teardown closed the transcript store: the finished store stays readable until the next session starts | **Complete (3 / 3)** |
 | [recording-folders-and-web-export.md](recording-folders-and-web-export.md) | One folder per recording, a transcription pass that leaves the interface usable, a labelled Recordings button with media indicators, and a self-contained HTML web-app export | **Complete (6 / 6)** |
+| [five-recording-faults.md](five-recording-faults.md) | Five faults reported against one recording: a stopped session calling itself live, an Audio chip that read false when all was well, doubled counts, a transcript the page never asked for, two copies of every video, and sound running ahead of the picture | **Complete (5 / 5)** |
 
 ## The multi-mode expansion
 

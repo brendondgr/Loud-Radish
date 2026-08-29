@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-08-29 (a readable finished transcript, folders per recording, a usable state after transcription, and the web-app export)*
+*Last updated: 2026-08-29 (five faults reported against one recording)*
 
 The active work list for TranscriberPrototype. Update it whenever a task is finished or new work is
 discovered.
@@ -451,6 +451,47 @@ Five reported problems, planned in
 - [ ] **The exported page speaks OpenAI-compatible endpoints only.** Anthropic's shape genuinely
       differs (D-014) and a static page cannot hold a key safely, so the export deliberately points
       at a local model. Worth revisiting only if someone asks for it.
+
+---
+
+## Part 3j — Five Faults in One Recording
+
+Reported together against one window session, planned in
+[plans/five-recording-faults.md](plans/five-recording-faults.md) and closed (5 / 5). Recorded as
+**D-035**. None of them had lost anything: the folder held a complete video, both transcription
+passes, and a muxed file with sound in it.
+
+- [x] **A stopped session stopped calling itself live.** The badge asked which session was
+      recording by reading `SessionManager.store`, which since D-031 keeps answering after a
+      session ends. It asks `is_running` now, which is the question it always meant.
+- [x] **Audio means sound you can play.** The chip tested for `audio.wav`, which a successful pass
+      deletes — so it read false exactly when the recording was healthiest, and hid the web-app
+      export from the only session that qualified for it. `audio_file` reports the narrower fact.
+- [x] **The counts describe one pass.** 46 segments and 479 words for a talk of 26. The listing was
+      the last reader still counting both passes rather than the latest (D-022).
+- [x] **A pre-migration database still lists.** The narrowed query is guarded on the column
+      existing: this connection is read-only and 25 of the 965 databases predate the column.
+- [x] **"The transcription was never saved" was the page never asking.** `hydrate` loaded the
+      transcript only while a session was running, so a reload after a pass showed an empty pane.
+- [x] **Polished blocks follow the pass on screen.** A block is built from the segment ids of one
+      pass and the post-capture pass writes different ids for the same audio, so loading both
+      unfiltered renders the talk twice.
+- [x] **One video file per recording.** The silent original goes once the combined file is probed
+      and holds both streams — verified, rather than kept for ever or deleted on faith.
+- [x] **The picture is aligned with the sound.** The capture offset is measured and applied, and
+      the output keeps the audio's timeline because that is the one the transcript is in.
+
+- [ ] **Recordings made before this cannot be re-aligned.** The two start times are not in any
+      existing artefact, so files already on disk keep whatever offset they have. Correcting one by
+      hand is `ffmpeg -itsoffset <seconds> -i video ...`, with the offset found by eye.
+- [ ] **The offset is logged, not stored.** It goes to the log at INFO when a recording is
+      combined. Giving it a file of its own was rejected: the same report asked for *fewer* files
+      in a recording folder.
+- [ ] **A restart still hides the last transcript from the live page.** The finished store is held
+      only until the next session starts, and not across a process restart — so after restarting
+      the application the last talk is reachable through Recordings but not on the main page. That
+      is the documented bound of D-031 rather than a regression, and closing it would mean deciding
+      what "the current session" means to a process that has just started.
 
 ---
 

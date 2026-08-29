@@ -1,6 +1,6 @@
 # Data Flow
 
-*Last updated: 2026-08-29 (one folder per recording, and the web-app export)*
+*Last updated: 2026-08-29 (one folder per recording, the web-app export, and the capture offset)*
 
 > **Status: the design is agreed; the stages land phase by phase.** Update this file in the same
 > change that alters how data moves between capture, pipeline, storage, transport, or browser.
@@ -130,6 +130,29 @@ data/recordings/<stamp>-<id>/        everything the capture itself produced
 whole of a session and is not moved into the folder to tidy a listing; sharing the stem joins them
 without moving anything. Every consumer that has to answer "what does this session hold" — the
 past-sessions list, the media indicators, the web-app export — does it by listing one directory.
+
+## The two capture clocks, and the offset between them (D-035)
+
+```text
+press record
+   │
+   ├─ t0  audio source starts ──────────────► WavSink, and the engine. Transcript time zero.
+   │
+   │      (the screen-cast portal asks which window, and waits for a human)
+   │
+   └─ t1  GStreamer's first encoded frame ──► video.<ext>. Video time zero.
+```
+
+`t1 − t0` is the capture offset. It is **not drift** — it is fixed from the first frame — and it is
+the price of an ordering that is correct: audio starts before the portal is asked, so the first
+words of a talk are not lost while someone chooses a window. Measured at 2.1 s on the recording that
+prompted this, and bounded only by how long that dialog stays open.
+
+The mux corrects it by delaying the video, never by trimming the audio, because **the transcript is
+in the audio's clock** and the exported web application syncs the transcript against the muxed file.
+The offset is derived rather than observed: nothing marks the first encoded frame arriving, so the
+video's start is taken as the moment it was told to stop, minus its own encoded duration. An offset
+that cannot be measured is zero — never a guess.
 
 ## Export flow — a recording as a web application (D-034)
 

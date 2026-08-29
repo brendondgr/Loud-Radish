@@ -1,6 +1,6 @@
 # Five Faults in One Recording
 
-*Status: in progress — phases are marked complete only once their validation has run.*
+*Status: complete — every phase implemented, validated, and committed.*
 *Owner: this plan is the handoff artifact. Resume from the phase table at the bottom.*
 
 ## 1. Introduction
@@ -107,6 +107,20 @@ two reporting the same lie by a different route.
   changes to GitHub stating: Five Recording Faults (4/5) Complete: the muxed recording aligns the
   video with the audio it was captured alongside, on a measured offset.
 
+### Step 4b: The transcript is loaded on every page load
+
+- **Locations**: `web/frontend/static/js/main.js` (`hydrate`, new `loadTranscript`).
+- **Rationale**: added after the investigation found what "the transcription was never saved"
+  actually was. The transcript *is* saved — the reported session holds both passes and every export
+  renders them — but `hydrate` loaded it only `if (state.running)`, so a reload after a session
+  ended showed an empty pane. The server half of this was fixed when the finished store began
+  staying open (D-031); the client was left asking the wrong question. Polished blocks are filtered
+  to the pass on screen at the same time, because a block is derived from the segment ids of the
+  pass it was built from and the post-capture pass writes different ids for the same audio.
+- **Action**: Undergo the verification/tests/validation process for this phase. Once validated, push
+  changes to GitHub stating: Five Recording Faults (4b/5) Complete: a reload after a finished pass
+  shows the transcript rather than an empty pane.
+
 ### Step 5: Documentation, tests, and the merge
 
 - **Locations**: `docs/documentation.md`, `docs/checklist.md`, `docs/api-contract.md`,
@@ -132,8 +146,9 @@ two reporting the same lie by a different route.
 
 | Phase | Status |
 | --- | --- |
-| 1 — "Recording now" after a stop | ⬜ Not started |
-| 2 — Audio chip and one-pass counts | ⬜ Not started |
-| 3 — One video file | ⬜ Not started |
-| 4 — A/V alignment | ⬜ Not started |
-| 5 — Documentation and merge | ⬜ Not started |
+| 1 — "Recording now" after a stop | ✅ Complete |
+| 2 — Audio chip and one-pass counts | ✅ Complete |
+| 3 — One video file | ✅ Complete |
+| 4 — A/V alignment | ✅ Complete |
+| 4b — Transcript on page load | ✅ Complete |
+| 5 — Documentation and merge | ✅ Complete |
