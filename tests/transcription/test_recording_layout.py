@@ -161,3 +161,39 @@ def test_migration_never_overwrites_a_file_already_in_the_folder(tmp_path) -> No
 def test_a_missing_recordings_directory_is_not_an_error(tmp_path) -> None:
     assert migrate_flat_recordings(tmp_path / "absent") == 0
     assert list(layout_module.iter_recordings(tmp_path / "absent")) == []
+
+
+def test_sound_muxed_into_the_video_counts_as_audio(tmp_path) -> None:
+    """The reported fault: "it says there is no audio and the file plainly has audio".
+
+    A successful transcription pass deletes its WAV — retention is off by default — but for a
+    window recording the sound has already been muxed into the video, which is the file anyone
+    actually plays. Testing only for the WAV reported no audio exactly when everything had gone
+    right, and hid the web-app export from the one recording that qualified for it.
+    """
+    layout = layout_for(tmp_path, STARTED, SESSION)
+    layout.ensure()
+    (layout.directory / "video-with-audio.webm").write_bytes(b"picture and sound")
+
+    assert layout.has_audio() is False, "the WAV really is gone"
+    assert layout.has_playable_audio() is True
+
+
+def test_a_silent_video_is_not_audio(tmp_path) -> None:
+    """The un-muxed original carries no sound, so it must not answer for it."""
+    layout = layout_for(tmp_path, STARTED, SESSION)
+    layout.ensure()
+    (layout.directory / "video.webm").write_bytes(b"picture only")
+
+    assert layout.existing_video() is not None
+    assert layout.has_playable_audio() is False
+
+
+def test_the_wav_alone_is_audio(tmp_path) -> None:
+    """The `recorded`-mode case: no video at all, and sound in the file the pass will read."""
+    layout = layout_for(tmp_path, STARTED, SESSION)
+    layout.ensure()
+    layout.audio.write_bytes(b"\x00" * 400)
+
+    assert layout.has_playable_audio() is True
+    assert layout.muxed_video() is None

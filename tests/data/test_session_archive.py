@@ -307,10 +307,14 @@ def test_an_empty_database_is_not_reported_as_having_a_transcript(sessions_dir, 
     assert media.exportable is False
 
 
-def test_audio_deleted_after_a_successful_pass_leaves_video_and_transcript(
+def test_audio_deleted_after_a_successful_pass_still_counts_as_audio(
     sessions_dir, tmp_path
 ) -> None:
-    """Retention is off by default, so this is the *normal* end state of a window recording."""
+    """Retention is off by default, so this is the *normal* end state of a window recording.
+
+    The WAV is gone and the sound is in the video. Reporting "no audio" here was the reported
+    fault: it described the healthiest possible outcome as a missing piece.
+    """
     recordings = tmp_path / "recordings"
     (recordings / KEY).mkdir(parents=True)
     (recordings / KEY / "video-with-audio.webm").write_bytes(b"a muxed video")
@@ -318,7 +322,8 @@ def test_audio_deleted_after_a_successful_pass_leaves_video_and_transcript(
 
     media = archive.list_sessions(_config(tmp_path, sessions_dir, recordings))[0].media
 
-    assert (media.video, media.audio, media.transcript) == (True, False, True)
+    assert (media.video, media.audio, media.transcript) == (True, True, True)
+    assert media.audio_file is False
 
 
 def test_a_missing_recordings_directory_costs_the_indicators_not_the_listing(
@@ -341,6 +346,7 @@ def test_the_media_block_reaches_the_api(client, sessions_dir) -> None:
         "video": False,
         "audio": False,
         "transcript": True,
+        "audio_file": False,
         "recording_bytes": 0,
         "exportable": False,
     }
@@ -383,3 +389,116 @@ def test_a_finished_session_can_be_deleted(client, sessions_dir) -> None:
     key = next(s["key"] for s in client.get("/api/sessions").json()["sessions"] if s["key"] != running)
 
     assert client.delete(f"/api/sessions/{key}").status_code == 200
+
+
+# -- describing a healthy finished recording ---------------------------------------------------
+
+
+def test_a_transcribed_window_recording_reports_audio_and_is_exportable(
+    sessions_dir, tmp_path
+) -> None:
+    """The exact shape of the reported recording: video with sound, transcript, no WAV.
+
+    This is what a *successful* window session leaves behind — the pass deleted its own audio and
+    the sound is in the muxed video. It was reported as having no audio, which also made it
+    non-exportable, so the one recording that had everything was offered the least.
+    """
+    recordings = tmp_path / "recordings"
+    (recordings / KEY).mkdir(parents=True)
+    (recordings / KEY / "video-with-audio.webm").write_bytes(b"picture and sound")
+    (recordings / KEY / "audio.json").write_text("{}")
+    write_session(sessions_dir, KEY, segments=6)
+
+    media = archive.list_sessions(_config(tmp_path, sessions_dir, recordings))[0].media
+
+    assert (media.video, media.audio, media.transcript) == (True, True, True)
+    assert media.exportable is True
+    # Still reported separately, because "a pass has not run" is a different fact worth having.
+    assert media.audio_file is False
+
+
+def test_the_counts_describe_one_pass_not_two(sessions_dir, tmp_path) -> None:
+    """A session with a live pass and a post-capture pass holds the same talk twice (D-022).
+
+    Reported as 46 segments and 479 words for a recording that holds 26 — the listing was the last
+    reader still counting the union.
+    """
+    path = sessions_dir / f"{KEY}.db"
+    metadata = SessionMetadata(session_id="d60b37a9e3c4")
+    with TranscriptStore(path, metadata=metadata) as store:
+        for index in range(4):
+            store.append_segment(
+                Segment(id=index + 1, text="live text here", start=index, end=index + 1, revision=0)
+            )
+        for index in range(6):
+            store.append_segment(
+                Segment(
+                    id=index + 100,
+                    text="the final pass text",
+                    start=index,
+                    end=index + 1,
+                    revision=1,
+                )
+            )
+
+    row = archive.list_sessions(_config(tmp_path, sessions_dir, tmp_path / "recordings"))[0]
+
+    assert row.segments == 6
+    assert row.words == 6 * 4
+
+
+def test_a_database_without_a_revision_column_is_still_described(sessions_dir, tmp_path) -> None:
+    """The listing connection is read-only and does not migrate.
+
+    Databases written before the revision column exist in the wild — 25 of them in the directory
+    this was found in — and a query naming a missing column would turn every one of those rows into
+    "not a readable session file".
+    """
+    _write_legacy_session(sessions_dir / f"{KEY}.db", segments=3)
+
+    row = archive.list_sessions(_config(tmp_path, sessions_dir, tmp_path / "recordings"))[0]
+
+    assert row.problem == ""
+    assert row.segments == 3
+
+
+def _write_legacy_session(path, *, segments: int) -> None:
+    """A session file from before the revision column, written by hand.
+
+    Built rather than migrated-backwards: SQLite refuses to drop the column while the index and
+    triggers reference it, and a hand-built table is a truer stand-in for a file this old anyway.
+    """
+    connection = sqlite3.connect(path)
+    connection.executescript(
+        """
+        CREATE TABLE session (
+            id INTEGER PRIMARY KEY CHECK (id = 1), session_id TEXT NOT NULL,
+            title TEXT NOT NULL DEFAULT '', venue TEXT NOT NULL DEFAULT '',
+            speaker TEXT NOT NULL DEFAULT '', started_at TEXT NOT NULL, ended_at TEXT,
+            session_prompt TEXT NOT NULL DEFAULT '', config_json TEXT NOT NULL DEFAULT '{}'
+        );
+        CREATE TABLE segments (
+            id INTEGER PRIMARY KEY, text TEXT NOT NULL, start REAL NOT NULL, end REAL NOT NULL,
+            wall_clock TEXT NOT NULL, confidence REAL, model_id TEXT NOT NULL DEFAULT '',
+            speaker TEXT, words_json TEXT
+        );
+        CREATE TABLE summaries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, start REAL NOT NULL, end REAL NOT NULL,
+            text TEXT NOT NULL, created_at TEXT NOT NULL
+        );
+        CREATE TABLE glossary (
+            term TEXT PRIMARY KEY, definition TEXT NOT NULL, first_seen REAL NOT NULL,
+            created_at TEXT NOT NULL
+        );
+        """
+    )
+    connection.execute(
+        "INSERT INTO session (id, session_id, started_at) VALUES (1, 'legacy', '2026-01-01T00:00:00')"
+    )
+    for index in range(segments):
+        connection.execute(
+            "INSERT INTO segments (id, text, start, end, wall_clock) VALUES (?, ?, ?, ?, ?)",
+            (index + 1, "some words here", float(index), float(index) + 1.0, "2026-01-01T00:00:00"),
+        )
+    connection.commit()
+    connection.close()
