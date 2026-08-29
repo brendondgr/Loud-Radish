@@ -348,3 +348,57 @@ async def test_the_reopened_transcript_is_released_on_shutdown(manager) -> None:
     await session.shutdown()
 
     assert session.store is None
+
+
+# -- reading it back once the pass has ended ---------------------------------------------------
+#
+# Reported as "the transcription was never saved". It *was* — the reported session's database holds
+# both passes and every export renders them — so anything wrong is in reaching the transcript
+# afterwards. These are the reads the interface makes the instant `transcription.done` arrives, and
+# the ones a page load makes after it.
+
+
+async def test_the_finished_pass_is_readable_the_moment_it_ends(manager) -> None:
+    session, _store, recorder, tmp_path = manager
+    assert await drive(session, recorder, tmp_path)
+
+    store = session.store
+    assert store is not None, "the store the interface reads through went away with the session"
+    assert store.revisions(), "a finished pass reported no transcription passes at all"
+    assert store.segments_at(store.latest_revision()), "segments were written but cannot be read"
+
+
+async def test_the_stats_survive_the_pass(manager) -> None:
+    """A reload after a pass must find a transcript to re-fetch, not an empty session."""
+    session, _store, recorder, tmp_path = manager
+    assert await drive(session, recorder, tmp_path)
+
+    state = session.state()
+
+    assert state["running"] is False
+    assert state["stats"] is not None
+    assert state["stats"]["segments"] > 0
+
+
+async def test_the_transcript_on_disk_matches_what_the_pass_reported(manager) -> None:
+    """Reopening the file is what a reader does; it must agree with the finished job's count."""
+    from app.services.transcript import TranscriptStore
+
+    session, _store, recorder, tmp_path = manager
+    assert await drive(session, recorder, tmp_path)
+    done = recorder.of("transcription.done")[-1]
+
+    with TranscriptStore(session.store.path) as reopened:
+        assert len(reopened.latest_segments()) == done["segments"]
+
+
+async def test_a_new_session_does_not_take_the_previous_transcript_with_it(manager) -> None:
+    """Retention is released on the next start — the file must survive that release."""
+    session, _store, recorder, tmp_path = manager
+    assert await drive(session, recorder, tmp_path)
+    path = session.store.path
+
+    await session.start(recorded_session())
+    await session.stop()
+
+    assert path.is_file(), "starting another session removed the previous transcript"

@@ -12,8 +12,9 @@ receive a PipeWire node we may read. That puts a dialog that can be declined in 
 feature, and it means this application never learns what windows exist.
 """
 
-from .mux import MuxResult
+from .mux import MuxResult, has_both_streams
 from .mux import combine as mux_audio_video
+from .mux import probe_duration as probe_video_duration
 from .pipeline import PipelineSpec
 from .pipeline import build as build_pipeline
 from .portal import (
@@ -42,7 +43,9 @@ __all__ = [
     "build_pipeline",
     "detect",
     "gstreamer_elements",
+    "has_both_streams",
     "mux_audio_video",
+    "probe_video_duration",
     "open_window_stream",
     "session_type",
 ]

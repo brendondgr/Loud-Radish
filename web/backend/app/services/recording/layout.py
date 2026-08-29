@@ -98,20 +98,45 @@ class RecordingLayout:
     # -- what is in there ------------------------------------------------------------
 
     def existing_video(self) -> Path | None:
-        """The best video to hand to a viewer: the muxed one when it exists, else the raw one.
+        """The best video to hand to a viewer: the muxed one when it exists, else the raw one."""
+        return self.muxed_video() or self._video_named(VIDEO_STEM)
 
-        The muxed file is preferred because it is the one with sound. Both are kept on disk —
-        `mux.combine` never deletes its sources — so preferring one costs nothing.
+    def muxed_video(self) -> Path | None:
+        """The video with the session's audio in it, if the mux ran and succeeded.
+
+        Separate from :meth:`existing_video` because it answers a different question. That one asks
+        "what should a viewer be shown"; this one asks "is the sound in the video", which is what
+        makes a recording whose WAV has been transcribed away still count as having audio.
         """
-        for stem in (MUXED_STEM, VIDEO_STEM):
-            for suffix in VIDEO_SUFFIXES:
-                candidate = self.directory / f"{stem}{suffix}"
-                if candidate.is_file() and candidate.stat().st_size > 0:
-                    return candidate
+        return self._video_named(MUXED_STEM)
+
+    def _video_named(self, stem: str) -> Path | None:
+        for suffix in VIDEO_SUFFIXES:
+            candidate = self.directory / f"{stem}{suffix}"
+            if candidate.is_file() and candidate.stat().st_size > 0:
+                return candidate
         return None
 
     def has_audio(self) -> bool:
+        """Whether the separate WAV is still here — the file a transcription pass reads.
+
+        Not the same question as "does this recording have sound", which is
+        :meth:`has_playable_audio`. A successful pass *deletes* this file, so it is false for most
+        healthy recordings.
+        """
         return self.audio.is_file() and self.audio.stat().st_size > 44
+
+    def has_playable_audio(self) -> bool:
+        """Whether this recording has sound a person can listen to.
+
+        **The WAV is not the only place sound lives.** A successful transcription pass deletes it —
+        retention is off by default — but for a window recording the audio has already been muxed
+        into `video-with-audio`, which is the file anyone actually plays. Testing only for the WAV
+        reported "no audio" precisely when everything had gone right, and dragged the web-app export
+        down with it: the one recording that had video, sound and a transcript was told it had no
+        audio and offered no export.
+        """
+        return self.has_audio() or self.muxed_video() is not None
 
     def exists(self) -> bool:
         return self.directory.is_dir()

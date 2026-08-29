@@ -44,6 +44,7 @@ from ..capture import (
     WindowRecorder,
     build_pipeline,
     mux_audio_video,
+    probe_video_duration,
 )
 from ..capture import detect as detect_capture
 from ..recording import (
@@ -905,6 +906,9 @@ class SessionManager:
             try:
                 recorder.stop()
                 self._video_path = recorder.state.video_path
+                # Kept for the mux, which needs it and the file's own duration to work out when
+                # the video *started* — the one moment in this sequence nothing observes directly.
+                self._video_stopped_at = recorder.state.stopped_at
             except Exception:  # noqa: BLE001 - a failed teardown must not fail the stop
                 logger.exception("The video recorder did not stop cleanly")
 
@@ -934,11 +938,54 @@ class SessionManager:
         except SinkError:
             return
 
-        result: MuxResult = mux_audio_video(video, audio, keep_sources=True)
+        result: MuxResult = mux_audio_video(
+            video, audio, video_lag_s=self._measure_video_lag(video, sink)
+        )
         if not result.ok:
             logger.warning("Could not combine audio and video: %s", result.reason)
             return
-        logger.info("Recording saved with audio: %s", result.path)
+        logger.info(
+            "Recording saved with audio: %s (video delayed %.3fs; silent original %s)",
+            result.path,
+            result.video_lag_s,
+            "removed" if result.removed_source else "kept",
+        )
+
+    def _measure_video_lag(self, video: str, sink: WavSink) -> float:
+        """How much later than the audio the video began, in seconds.
+
+        **Both capture paths start on purpose at different moments**, and this is the cost of that
+        decision rather than a fault in it: audio begins before the screen-cast portal is asked, so
+        the first words of a talk are not lost while someone chooses a window from a dialog. The
+        video then starts whenever the portal is answered and GStreamer has warmed up — a fraction
+        of a second at best, and however long the dialog was on screen at worst.
+
+        Derived rather than observed at the near end. Nothing marks the arrival of the first
+        encoded frame, so the video's start is taken as *the moment it was told to stop, minus its
+        own encoded duration* — two quantities that are both measurable, and whose error is a frame
+        or two rather than the seconds the direct route would carry.
+
+        Returns 0.0 whenever any input is missing, which leaves the mux doing exactly what it did
+        before. An unmeasurable offset must never become a guessed one.
+        """
+        stopped_at = self._video_stopped_at
+        audio_started_at = sink.first_write_monotonic
+        if not stopped_at or not audio_started_at:
+            return 0.0
+
+        duration = probe_video_duration(video)
+        if duration <= 0.0:
+            logger.info("Could not read the video's duration; leaving the two tracks as captured.")
+            return 0.0
+
+        lag = (stopped_at - duration) - audio_started_at
+        logger.info(
+            "Capture offset: audio began %.3fs before the video (video %.2fs, audio %.2fs).",
+            lag,
+            duration,
+            sink.duration_s,
+        )
+        return lag
 
     def _on_recorder_stopped(self, state: RecorderState) -> None:
         """The video ended without being asked to. Usually the window was closed."""

@@ -47,8 +47,14 @@ class SessionMedia:
     """
 
     video: bool = False
+    #: Whether there is sound to listen to — from the separate WAV, or muxed into the video.
+    #: **Not** "is there a WAV": a successful transcription pass deletes that, so testing for it
+    #: reported no audio exactly when the recording was healthiest.
     audio: bool = False
     transcript: bool = False
+    #: Whether the untranscribed WAV is still on disk. Narrower than ``audio`` and rarer: it means
+    #: a pass has not run, or failed, or audio retention is on.
+    audio_file: bool = False
     #: Bytes in the recording folder. Zero when there is no folder.
     recording_bytes: int = 0
 
@@ -67,6 +73,7 @@ class SessionMedia:
             "video": self.video,
             "audio": self.audio,
             "transcript": self.transcript,
+            "audio_file": self.audio_file,
             "recording_bytes": self.recording_bytes,
             "exportable": self.exportable,
         }
@@ -166,14 +173,16 @@ def describe(path: Path, recordings: Path | None = None) -> ArchivedSession:
         return _unreadable(path, size, f"Could not be opened ({type(exc).__name__}).")
 
     try:
-        stats = connection.execute(
-            """
-            SELECT COUNT(*) AS segments,
-                   COALESCE(MAX(end), 0) - COALESCE(MIN(start), 0) AS duration,
-                   COALESCE(SUM(LENGTH(text) - LENGTH(REPLACE(text, ' ', '')) + 1), 0) AS words
-            FROM segments
-            """
-        ).fetchone()
+        # **One transcription pass, not every row.** A session that transcribed live and then ran
+        # a post-capture pass holds both (D-022), and counting the table reported roughly double
+        # what the session contains — 46 segments and 479 words for a recording of 26. Every other
+        # reader takes the latest revision; this one was missed when that rule landed.
+        #
+        # Guarded on the column existing, because this connection is **read-only and does not
+        # migrate**. Databases written before the revision column exist in the wild — 25 of them in
+        # the directory this was found in — and a query naming a missing column would turn every
+        # one of those rows into "not a readable session file".
+        stats = connection.execute(_stats_query(connection)).fetchone()
         meta = connection.execute("SELECT * FROM session WHERE id = 1").fetchone()
         summaries = connection.execute("SELECT COUNT(*) AS n FROM summaries").fetchone()
         glossary = connection.execute("SELECT COUNT(*) AS n FROM glossary").fetchone()
@@ -218,6 +227,23 @@ def find(config: AppConfig, key: str) -> Path | None:
     return candidate if candidate.is_file() else None
 
 
+def _stats_query(connection: sqlite3.Connection) -> str:
+    """The totals query, narrowed to the latest pass when this database knows about passes."""
+    totals = """
+        SELECT COUNT(*) AS segments,
+               COALESCE(MAX(end), 0) - COALESCE(MIN(start), 0) AS duration,
+               COALESCE(SUM(LENGTH(text) - LENGTH(REPLACE(text, ' ', '')) + 1), 0) AS words
+        FROM segments
+    """
+    try:
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(segments)")}
+    except sqlite3.Error:
+        return totals
+    if "revision" not in columns:
+        return totals
+    return f"{totals} WHERE revision = (SELECT COALESCE(MAX(revision), 0) FROM segments)"
+
+
 def media_for(key: str, recordings: Path | None, *, has_transcript: bool) -> SessionMedia:
     """What the recording folder named ``key`` holds, if there is one.
 
@@ -233,8 +259,9 @@ def media_for(key: str, recordings: Path | None, *, has_transcript: bool) -> Ses
             return SessionMedia(transcript=has_transcript)
         return SessionMedia(
             video=layout.existing_video() is not None,
-            audio=layout.has_audio(),
+            audio=layout.has_playable_audio(),
             transcript=has_transcript,
+            audio_file=layout.has_audio(),
             recording_bytes=layout.size_bytes(),
         )
     except OSError:

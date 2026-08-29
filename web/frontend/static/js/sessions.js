@@ -39,6 +39,21 @@ const MEDIA = [
   ["transcript", "Transcript"],
 ];
 
+/**
+ * What a chip's tooltip says.
+ *
+ * Audio gets a sentence of its own because "yes" has two meanings worth telling apart: the
+ * separate recording is still on disk, or a successful transcription pass deleted it and the sound
+ * now lives in the video. Both are audio; only one of them can be transcribed again.
+ */
+function chipTitle(key, label, present, media) {
+  if (!present) return `No ${label.toLowerCase()}`;
+  if (key !== "audio") return `${label} is available`;
+  return media.audio_file
+    ? "The recorded audio is still on disk and can be transcribed again"
+    : "The audio is in the video — the separate recording was removed once it was transcribed";
+}
+
 function size(bytes) {
   return bytes >= 1024 * 1024
     ? `${(bytes / 1024 / 1024).toFixed(1)} MB`
@@ -130,10 +145,7 @@ class SessionsPage {
         return el("span", {
           className: "media-chip",
           text: label,
-          attrs: {
-            "data-present": String(present),
-            title: present ? `${label} is available` : `No ${label.toLowerCase()}`,
-          },
+          attrs: { "data-present": String(present), title: chipTitle(key, label, present, media) },
         });
       }),
     });
