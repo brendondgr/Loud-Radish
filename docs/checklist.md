@@ -331,8 +331,26 @@ Still open, and deliberately not guessed at:
       `likely_music_or_game` at ratio 0.29 and dominant 29.7 Hz, so the empty transcripts then were
       the audio, not the pipeline.
 
-- [ ] **The tap delivered on that run, so D-030's fault did not reproduce and the widening never
-      fired.** Stated plainly because it matters for what is actually known: the repair is verified
+- [x] **The widening recorded the microphone, and did so for most of a day.** Found only because
+      a second real recording tripped it: `default_monitor()` returns `<sink>.monitor`, and that
+      target **does not resolve on either sink on this machine** — an unresolved target falls back
+      to the default *source*. Measured against a simultaneous microphone capture: the Bluetooth
+      output's `.monitor` and the USB dock's both correlate with the microphone at **+1.000**,
+      identical to five decimals. It looked plausible throughout because a microphone hears the
+      speakers. This is D-028's fault reintroduced by the repair meant to prevent an empty
+      transcript, and it is the worse of the two — an empty transcript is visibly empty, a room
+      recording reads as a working one. The widening now addresses the sink with
+      `stream.capture.sink` (`default_sink()`, not `default_monitor()`), verified live at
+      **-0.005** correlation against the microphone on the Bluetooth output.
+- [x] **`node.dont-fallback` cannot be the guard on a device sink.** It is right on the tap's null
+      sink and refused outright by a device sink on PipeWire 1.6.8 — by name and by node id — so a
+      capture carrying it never starts. Without it a *bad* target still falls back silently
+      (measured, RMS 0.076), so the safety comes from provenance instead: that path is only given
+      a sink `pactl get-default-sink` just named, and the test doubles assert the two sink kinds
+      never swap property sets.
+
+- [ ] **The tap delivered on the first successful run, so D-030's fault did not reproduce there
+      and the widening never fired.** Stated plainly because it matters for what is actually known: the repair is verified
       to *detect and widen* (its own tests, plus a live run earlier the same day where it fired in
       2.1 s), but this successful recording did not exercise it. Nor can the change be attributed
       with confidence. The browser's stream state differed — two playback nodes during the repair,
@@ -341,7 +359,11 @@ Still open, and deliberately not guessed at:
       repair still measured bit-exact zeros, which the browser-state explanation does not cover.
       **So the silent-tap condition is intermittent and its trigger is not known.** Both guards
       stay. If it recurs, capture `pw-dump` and the playback-node set at the moment it happens —
-      that is the observation the repair never got.
+      that is the observation the repair never got. **It has since reproduced twice more**, both
+      times with more than one playback node linked (6 ports across two LibreWolf nodes and
+      `speech-dispatcher-dummy`), against one node on the run that worked — so "several linked
+      nodes" is now the strongest lead, though linking only the video's node by port id during the
+      repair also measured zeros, which that lead does not explain.
 
 ---
 

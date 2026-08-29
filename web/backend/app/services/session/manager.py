@@ -29,7 +29,7 @@ from ...models.session import SessionMetadata, SessionStats
 from ..asr import AsrLifecycle, LoadProgress, PromptBuilder
 from ..asr.contract import AsrLoadError
 from ..audio import LevelMeter, WavFileSource
-from ..audio.monitor import MonitorUnavailable, default_monitor
+from ..audio.monitor import MonitorUnavailable, default_sink
 from ..audio.sources import AudioSource, DeviceSource, MonitorSource, SourceInfo, probe_peak
 from ..audio.tap import ApplicationTap, TapError
 from ..audio.tap import playback_streams as tap_streams
@@ -1142,12 +1142,22 @@ class SessionManager:
             return None
 
         try:
-            whole_output = default_monitor()
+            whole_output = default_sink()
         except MonitorUnavailable:
-            # No monitor to widen to. The tap is the only route there is, so it stays.
+            # No output to widen to. The tap is the only route there is, so it stays.
             return None
 
-        if probe_peak(whole_output, capture_sink=False, seconds=TAP_PROBE_S) <= 0.0:
+        # **`capture_sink=True` here too, and it is load-bearing.** Widening through
+        # `<name>.monitor` was this repair's own worst bug: that target does not resolve on either
+        # sink on this machine, and an unresolved target falls back to the *default source* — so
+        # the widened capture recorded the **microphone**, correlating with it at +1.000. It went
+        # unnoticed because a microphone hears the speakers, which makes the level look right.
+        # A window recording that transcribes the room is the exact fault D-028 exists to prevent,
+        # and widening must not be the thing that reintroduces it.
+        if (
+            probe_peak(whole_output, capture_sink=True, device_sink=True, seconds=TAP_PROBE_S)
+            <= 0.0
+        ):
             # The machine is not playing anything, so the tap's silence is the ordinary kind —
             # someone who pressed record before pressing play. Leave it alone; it will fill.
             return None
@@ -1161,7 +1171,7 @@ class SessionManager:
         tap.close()
         self._tap = None
         self._emit_failure(degradation.window_audio_not_delivering())
-        return MonitorSource(node=whole_output, frame_ms=config.audio.frame_ms)
+        return MonitorSource(node=whole_output, frame_ms=config.audio.frame_ms, capture_sink=True)
 
     def _tap_candidates(self, match: bool) -> list:
         """The playback streams this run should tap.
