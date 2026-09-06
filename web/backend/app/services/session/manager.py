@@ -19,7 +19,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 import numpy as np
 
@@ -35,6 +35,8 @@ from ..audio.tap import ApplicationTap, TapError
 from ..audio.tap import playback_streams as tap_streams
 from ..audio.tap import score as tap_score
 from ..capture import (
+    CaptureSegment,
+    CaptureSupport,
     MuxResult,
     PortalDeclined,
     PortalError,
@@ -45,16 +47,19 @@ from ..capture import (
     build_pipeline,
     mux_audio_video,
     probe_video_duration,
+    stitch_segments,
 )
 from ..capture import detect as detect_capture
 from ..recording import (
     JobRegistry,
+    RecordingLayout,
     SinkError,
     TranscriptionJob,
     TranscriptionRunner,
     WavSink,
     layout_for,
 )
+from ..recording.layout import key_for as layout_key_for
 from ..streaming.events import CommittedSegment, EngineNotice, HypothesisUpdate
 from ..streaming.guards import Severity
 from ..streaming.passthrough import build_engine
@@ -65,6 +70,16 @@ from .metrics import PipelineMetrics
 from .workers import DropOldestQueue, Worker
 
 logger = logging.getLogger(__name__)
+
+#: How many times one session's video capture may be reopened after dying (D-036). Above this the
+#: video ends with a message: a portal that has failed five times is not coming back, and a loop
+#: that keeps asking it is one that fills the recording folder with empty segments.
+MAX_CAPTURE_RESUMES: Final = 5
+
+#: The shortest interval between two attempts. A capture that dies the instant it starts would
+#: otherwise burn the whole allowance in a second, and report a permanent failure for what was a
+#: transient one.
+RESUME_BACKOFF_S: Final = 5.0
 
 #: Emits one transport event. Called from worker threads.
 EmitFn = Callable[[str, dict[str, Any]], None]
@@ -186,6 +201,23 @@ class SessionManager:
         self._tap_match = False
         #: Where the video landed, kept past teardown so the audio can be muxed into it.
         self._video_path = ""
+        #: Every piece of this session's video, in capture order: the path, and the monotonic
+        #: moment that piece was told to stop. A capture that never broke has one. The starts are
+        #: derived from these at finalisation, the same way the mux's offset always has been.
+        self._capture_segments: list[tuple[str, float]] = []
+        #: How many times this session's capture has been reopened after dying. Bounded, because a
+        #: portal that will never come back should produce one message and not a restart loop.
+        self._capture_resumes = 0
+        #: Monotonic time of the last resume attempt, successful or not.
+        self._last_resume_at = 0.0
+        #: What a resumed capture needs to rebuild the identical pipeline. Held from the first
+        #: start, because `detect_capture` is not free and its answer cannot change mid-session.
+        self._capture_support: CaptureSupport | None = None
+        self._capture_layout: RecordingLayout | None = None
+        #: Seconds of sound the combined file does not carry, because the video stopped early.
+        #: Non-zero makes the WAV the only complete copy of the talk, so retention stops being a
+        #: setting for this run: it is kept whatever Settings → Storage says.
+        self._audio_shortfall_s = 0.0
         #: The per-run options a window session was armed with.
         self._options: CaptureOptions | None = None
         #: The post-capture transcription pass. Deliberately owned here rather than by the session:
@@ -453,6 +485,7 @@ class SessionManager:
             "session.started",
             {
                 "session_id": session.session_id,
+                "key": self._session_key(),
                 "started_at": session.started_at.isoformat(),
                 "mode": session.mode,
                 "config": session.config,
@@ -527,7 +560,18 @@ class SessionManager:
             self._store.mark_ended(self._metadata.ended_at)
 
         await self._teardown()
-        self._emit("session.stopped", {"session_id": session_id, "stats": stats.as_dict()})
+        # **The key, not only the id.** Everything about a finished recording is addressed by the
+        # transcript database's stem — the recordings listing, the exports, the media route — and a
+        # client that had only the session id would have to search a listing to find the recording
+        # it had just made. `session.started` carries it for the same reason.
+        self._emit(
+            "session.stopped",
+            {
+                "session_id": session_id,
+                "key": self._session_key(),
+                "stats": stats.as_dict(),
+            },
+        )
         logger.info("Session %s stopped: %s", session_id, stats.as_dict())
         return stats
 
@@ -829,6 +873,9 @@ class SessionManager:
         if not support.available:
             self._emit_failure(degradation.capture_unavailable(support.reason))
             return
+        self._capture_support = support
+        self._capture_segments = []
+        self._capture_resumes = 0
 
         token = ""
         credentials = getattr(self, "credentials", None)
@@ -864,11 +911,12 @@ class SessionManager:
         # joined without moving an open SQLite file.
         layout = layout_for(config.recording.recording_dir, session.started_at, session.session_id)
         layout.ensure()
+        self._capture_layout = layout
         spec = build_pipeline(
             support,
             node_id=stream.node_id,
             fd=stream.fd,
-            video_path=str(layout.video(support.extension)),
+            video_path=str(layout.video_segment(1, support.extension)),
             preview_path=str(layout.preview),
             frame_rate=config.capture.frame_rate,
             max_height=config.capture.max_height,
@@ -894,10 +942,130 @@ class SessionManager:
             spec,
             portal_fd=stream.fd,
             on_stopped=self._on_recorder_stopped,
+            on_health=self._on_recorder_health,
             log_dir=Path("logs"),
         )
         self._recorder.start()
         self._emit("capture.state", self.capture_state())
+
+    # -- resuming a capture that died mid-session (D-036) ------------------------------
+
+    def _resume_window_capture(self) -> bool:
+        """Reopen the portal and start recording again, into the next segment.
+
+        **The user's own request, and the machinery was already all there.** The restore token is
+        persisted on every start precisely so a later recording skips the picker; using it to
+        reopen *within* a session is the same call. What was missing is anyone making it: a video
+        that ended mid-talk simply stayed ended, which cost a seminar its last thirty-nine minutes.
+
+        Returns whether a new recorder is running. Every refusal is quiet and bounded — a portal
+        that will never come back should produce one message and not a restart loop.
+        """
+        config = self._config.resolve()
+        support = self._capture_support
+        layout = self._capture_layout
+        session = self._metadata
+        if support is None or layout is None or session is None or not self.is_running:
+            return False
+
+        now = time.monotonic()
+        if self._capture_resumes >= MAX_CAPTURE_RESUMES:
+            logger.info(
+                "Not reopening the capture again: %d attempts is the limit.",
+                self._capture_resumes,
+            )
+            return False
+        if self._last_resume_at and now - self._last_resume_at < RESUME_BACKOFF_S:
+            return False
+
+        self._capture_resumes += 1
+        self._last_resume_at = now
+
+        # **Silently, or not at all.** KDE restores a window session by fuzzy-matching the saved
+        # title, so a token can legitimately fail to match — and the compositor's answer to that is
+        # to put its picker on screen, over the talk being recorded, un-asked-for. A capture that
+        # ends with a banner is a disappointment; a dialog thrown across a live seminar is worse.
+        credentials = getattr(self, "credentials", None)
+        token = ""
+        if credentials is not None:
+            token = credentials.get("capture-restore-token") or ""
+        if not token:
+            logger.info("Not reopening the capture: no stored consent to restore it with.")
+            return False
+
+        self._release_portal()
+        try:
+            self._portal = PortalSession(
+                cursor_mode=config.capture.cursor_mode, restore_token=token
+            )
+            stream = self._portal.open()
+        except (PortalDeclined, PortalError) as exc:
+            logger.info("Could not reopen the capture: %s", exc)
+            self._release_portal()
+            return False
+
+        if stream.restore_token and credentials is not None:
+            credentials.set("capture-restore-token", stream.restore_token)
+
+        index = len(self._capture_segments) + 1
+        video_path = layout.video_segment(index, support.extension)
+        spec = build_pipeline(
+            support,
+            node_id=stream.node_id,
+            fd=stream.fd,
+            video_path=str(video_path),
+            preview_path=str(layout.preview),
+            frame_rate=config.capture.frame_rate,
+            max_height=config.capture.max_height,
+            want_preview=config.capture.preview,
+            source_width=stream.width,
+            source_height=stream.height,
+            quality=config.capture.quality,
+        )
+        try:
+            self._recorder = WindowRecorder(
+                spec,
+                portal_fd=stream.fd,
+                on_stopped=self._on_recorder_stopped,
+                on_health=self._on_recorder_health,
+                log_dir=Path("logs"),
+                log_name=f"capture-{index:03d}.log",
+            )
+            self._recorder.start()
+        except RecorderError as exc:
+            logger.info("Could not restart the video recorder: %s", exc)
+            self._recorder = None
+            self._release_portal()
+            return False
+
+        logger.info("Video capture resumed into %s (attempt %d).", video_path.name, index)
+        self._emit_failure(degradation.capture_resumed())
+        self._emit("capture.state", self.capture_state())
+        return True
+
+    def _retire_recorder(self, recorder: WindowRecorder) -> None:
+        """Record where a finished piece landed and when it stopped.
+
+        Those two facts are what put it on the session's timeline: a segment's first frame is *the
+        moment it was told to stop, minus its own encoded duration* — the same derivation the mux's
+        offset has always used, because the near end is not observable either way.
+        """
+        path = recorder.state.video_path
+        if not path:
+            return
+        stopped_at = recorder.state.stopped_at or time.monotonic()
+        if any(existing == path for existing, _ in self._capture_segments):
+            return
+        self._capture_segments.append((path, stopped_at))
+
+    def _release_portal(self) -> None:
+        portal, self._portal = self._portal, None
+        if portal is None:
+            return
+        try:
+            portal.close()
+        except Exception:  # noqa: BLE001 - releasing consent must not fail a recording
+            logger.debug("Could not close the portal session", exc_info=True)
 
     def _stop_window_capture(self) -> None:
         """Finalise the video and release the portal. Safe in any mode and at any point."""
@@ -905,18 +1073,67 @@ class SessionManager:
         if recorder is not None:
             try:
                 recorder.stop()
-                self._video_path = recorder.state.video_path
-                # Kept for the mux, which needs it and the file's own duration to work out when
-                # the video *started* — the one moment in this sequence nothing observes directly.
-                self._video_stopped_at = recorder.state.stopped_at
+                self._retire_recorder(recorder)
             except Exception:  # noqa: BLE001 - a failed teardown must not fail the stop
                 logger.exception("The video recorder did not stop cleanly")
 
-        portal, self._portal = self._portal, None
-        if portal is not None:
-            # Closing the portal session is what makes the compositor's sharing indicator go away.
-            # Leaving it open shows the user they are still sharing a window when they are not.
-            portal.close()
+        # Closing the portal session is what makes the compositor's sharing indicator go away.
+        # Leaving it open shows the user they are still sharing a window when they are not.
+        self._release_portal()
+        self._join_capture_segments()
+
+    def _join_capture_segments(self) -> None:
+        """Put a capture that had to be restarted back onto one timeline (D-036).
+
+        Each piece's first frame is derived the same way the mux's offset is — the moment it was
+        told to stop, minus its own encoded duration — because that is the only end of a GStreamer
+        pipeline this process can observe. The gaps between the pieces are then known rather than
+        guessed, and `stitch` holds a frame across each one so nothing after a gap slides out of
+        sync with the transcript.
+
+        **A failure keeps the pieces and takes the first one.** They all play; combining them
+        wrongly would be worse than not combining them, and the first is the one the mux and the
+        alignment measurement were already built around.
+        """
+        segments = self._capture_segments
+        if not segments:
+            self._video_path = ""
+            self._video_stopped_at = 0.0
+            return
+
+        # Kept for the mux, which needs it and the file's own duration to work out when the video
+        # *started* — the one moment in this sequence nothing observes directly. It is the *first*
+        # piece's, not the last: a stitched file opens on the first piece's first frame.
+        first_path, first_stopped_at = segments[0]
+        self._video_path = first_path
+        self._video_stopped_at = first_stopped_at
+
+        if len(segments) == 1:
+            return
+
+        pieces: list[CaptureSegment] = []
+        for path, stopped_at in segments:
+            duration = probe_video_duration(path)
+            if duration <= 0.0:
+                logger.warning("Cannot place %s on the timeline; keeping the pieces apart.", path)
+                return
+            pieces.append(CaptureSegment(Path(path), stopped_at - duration))
+
+        output = Path(first_path)
+        joined = output.with_name(f"{output.stem}.joined{output.suffix}")
+        result = stitch_segments(pieces, joined)
+        if not result.ok:
+            logger.warning("Could not join the recorded pieces: %s", result.reason)
+            self._emit_failure(degradation.capture_pieces_kept(len(segments)))
+            return
+
+        # The joined file takes the plain name, so nothing downstream — the export, the media
+        # indicators, the recordings listing — has to learn that segments exist.
+        for path, _stopped_at in segments:
+            Path(path).unlink(missing_ok=True)
+        joined.replace(output)
+        self._video_path = str(output)
+        self._emit_failure(degradation.capture_pieces_joined(len(segments), result.filled_s))
 
     def _mux_if_wanted(self) -> None:
         """Combine the video with the session's audio, when there is both and it was asked for.
@@ -944,12 +1161,20 @@ class SessionManager:
         if not result.ok:
             logger.warning("Could not combine audio and video: %s", result.reason)
             return
+        self._audio_shortfall_s = result.audio_shortfall_s
         logger.info(
             "Recording saved with audio: %s (video delayed %.3fs; silent original %s)",
             result.path,
             result.video_lag_s,
             "removed" if result.removed_source else "kept",
         )
+        if result.audio_shortfall_s:
+            # Said out loud rather than absorbed. The combined file is short because the picture
+            # stopped, and the user is about to be told the video ended early anyway; what this
+            # adds is that the sound did not, and where the whole of it still is.
+            self._emit_failure(
+                degradation.video_ended_early(result.audio_shortfall_s, Path(audio).name)
+            )
 
     def _measure_video_lag(self, video: str, sink: WavSink) -> float:
         """How much later than the audio the video began, in seconds.
@@ -987,13 +1212,81 @@ class SessionManager:
         )
         return lag
 
+    def _on_recorder_health(self, state: RecorderState) -> None:
+        """The video started or stopped writing while the process stayed alive (D-036).
+
+        Reported both ways round. A stall banner left standing after the capture recovered is the
+        same class of fault as no banner at all — it says something untrue about a recording in
+        progress — so the recovery gets its own message rather than a silent clearance.
+        """
+        if not state.stalled:
+            self._emit_failure(degradation.capture_resumed())
+            self._emit("capture.state", self.capture_state())
+            return
+
+        self._emit_failure(degradation.capture_stalled(state.stalled_seconds))
+        self._emit("capture.state", self.capture_state())
+
+        # **A stall is acted on, not only reported.** The stream that produced this recording's
+        # frames stopped at 14 m 43 s and the process stayed alive until 29 m 25 s: waiting for it
+        # to end on its own cost fifteen minutes of picture that a reopened portal would have had.
+        # Ending it here is what turns the detection into a recovery.
+        recorder = self._recorder
+        if recorder is None:
+            return
+        threading.Thread(
+            target=self._restart_stalled_capture,
+            args=(recorder,),
+            name="capture-restart",
+            daemon=True,
+        ).start()
+
+    def _restart_stalled_capture(self, recorder: WindowRecorder) -> None:
+        """End a stalled capture and open its successor. Runs off the watcher's own thread.
+
+        `stop()` joins the watcher, and the watcher is what called us — so doing this inline would
+        have the supervisor waiting for itself.
+        """
+        if self._recorder is not recorder:
+            return
+        try:
+            recorder.stop()
+        except Exception:  # noqa: BLE001 - a stalled recorder that will not stop must not raise here
+            logger.exception("A stalled video recorder did not stop cleanly")
+        self._retire_recorder(recorder)
+        self._recorder = None
+        if not self._resume_window_capture():
+            self._emit_failure(degradation.capture_failed("the window stopped sending pictures."))
+            self._emit("capture.state", self.capture_state())
+
     def _on_recorder_stopped(self, state: RecorderState) -> None:
-        """The video ended without being asked to. Usually the window was closed."""
+        """The video ended without being asked to. Usually the window was closed.
+
+        **And now it is a reason to try again.** "The window was closed" and "the stream went away"
+        are indistinguishable from here — a Zoom call that drops its connection and rebuilds its
+        surface produces exactly the clean end that a person closing a window does — so both are
+        treated as resumable while the session is still running. If the portal restores, the talk
+        keeps being recorded; if it does not, the message is the one that was always shown.
+        """
+        recorder = self._recorder
+        if recorder is not None and recorder.state is state:
+            self._retire_recorder(recorder)
+            self._recorder = None
+            if self._resume_window_capture():
+                return
+
         if state.window_closed:
             self._emit_failure(degradation.capture_window_closed())
         elif state.failed:
             self._emit_failure(degradation.capture_failed(state.error))
         self._emit("capture.state", self.capture_state())
+
+    def _session_key(self) -> str:
+        """This session's key: the transcript database's stem, and its recording folder's name."""
+        metadata = self._metadata
+        if metadata is None:
+            return ""
+        return layout_key_for(metadata.started_at, metadata.session_id)
 
     def capture_state(self) -> dict[str, Any]:
         """What the monitor pane draws. Empty outside `window` mode."""
@@ -1003,6 +1296,10 @@ class SessionManager:
             "recording": bool(recorder and recorder.is_running),
             "window_closed": bool(recorder and recorder.state.window_closed),
             "failed": bool(recorder and recorder.state.failed),
+            # Alive and writing nothing — the state that had no name, and the reason a seminar
+            # recorded fourteen minutes and then reported itself healthy for another fifteen.
+            "stalled": bool(recorder and recorder.state.stalled),
+            "stalled_seconds": round(recorder.state.stalled_seconds, 1) if recorder else 0.0,
             "error": recorder.state.error if recorder else "",
             "video_path": recorder.state.video_path if recorder else "",
             "bytes": recorder.state.bytes_written if recorder else 0,
@@ -1080,7 +1377,10 @@ class SessionManager:
         started = self._runner.start(
             job=job,
             store=self._store,
-            retain_audio=config.storage.retain_audio,
+            # **Retention is not a setting when the video came up short.** The combined file is
+            # then the only other copy of the sound and it does not hold all of it, so deleting
+            # the WAV would destroy the part no other file contains.
+            retain_audio=config.storage.retain_audio or bool(self._audio_shortfall_s),
             prompt=self._prompts.build() if self._prompts else None,
         )
         # The reference is deliberately *kept*, unlike ownership. `GET /api/transcript/...` serves

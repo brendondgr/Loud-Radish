@@ -88,10 +88,16 @@ export class RecordingMonitor {
     // not-recording are genuinely different situations and the first two used to render
     // identically: an `<img>` whose src had not resolved, which is a blank rectangle — the exact
     // thing this pane exists not to show. The card stays up until a frame has actually decoded.
-    const showImage = wanted && this.hasFrame;
+    // **A stalled capture hides its own preview.** The last frame that arrived is still there and
+    // still looks like a recording, which is precisely the impression that let a seminar record
+    // fourteen minutes and report itself healthy for another fifteen.
+    const showImage = wanted && this.hasFrame && !capture.stalled;
     const { title, body } = this._emptyCopy();
 
-    this.empty?.setAttribute("data-variant", capture.failed ? "failed" : "idle");
+    let variant = "idle";
+    if (capture.failed) variant = "failed";
+    else if (capture.stalled) variant = "stalled";
+    this.empty?.setAttribute("data-variant", variant);
     toggle(this.empty, !showImage);
     setText(this.emptyTitle, title);
     if (this.emptyBody) this.emptyBody.textContent = body;
@@ -120,6 +126,15 @@ export class RecordingMonitor {
   }
 
   _emptyCopy() {
+    if (capture.stalled) {
+      const quiet = Math.round(capture.stalledSeconds);
+      return {
+        title: "The video has stopped recording",
+        body:
+          `Nothing has been written for ${quiet} seconds. The window may have been minimised, ` +
+          "closed, or frozen. Audio and the transcript are still recording.",
+      };
+    }
     if (capture.failed) {
       return {
         title: "Video recording stopped",

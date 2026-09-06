@@ -63,8 +63,11 @@ class Assistant {
     this.system = settings.prompts.system;
     this.pending = false;
 
-    // The conversation that already happened during the talk, so the exported page opens where the
-    // user left off rather than pretending the recording was never discussed.
+    // **Usually empty, and that is the default.** An export the user keeps can carry the
+    // conversation they had during the talk, so the page opens where they left off. One they send
+    // to somebody else does not: the point of this panel is that the recipient connects their own
+    // model and asks their own questions, and finding it half-full of another person's questions
+    // about a talk they have not watched yet is the opposite of that.
     this.history = (data.chat ?? [])
       .filter((message) => message.role === "user" || message.role === "assistant")
       .map((message) => ({ role: message.role, content: message.text }));

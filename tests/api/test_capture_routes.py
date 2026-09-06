@@ -37,6 +37,8 @@ class FakeRecorderState:
         self.error = ""
         self.bytes_written = 0
         self.duration_s = 0.0
+        self.stalled = False
+        self.stalled_seconds = 0.0
 
 
 class FakeRecorder:

@@ -95,6 +95,9 @@ class ArchivedSession:
     duration_seconds: float
     summaries: int
     glossary_terms: int
+    #: How many turns the user exchanged with the assistant during this recording. Counted so the
+    #: conversation can be offered as its own export only where there is one (D-037).
+    chat_messages: int
     size_bytes: int
     #: What this session's recording folder actually holds. See :class:`SessionMedia`.
     media: SessionMedia = field(default_factory=lambda: SessionMedia())
@@ -118,6 +121,7 @@ class ArchivedSession:
             "duration_seconds": round(self.duration_seconds, 1),
             "summaries": self.summaries,
             "glossary_terms": self.glossary_terms,
+            "chat_messages": self.chat_messages,
             "size_bytes": self.size_bytes,
             "media": self.media.as_dict(),
             "problem": self.problem,
@@ -186,6 +190,11 @@ def describe(path: Path, recordings: Path | None = None) -> ArchivedSession:
         meta = connection.execute("SELECT * FROM session WHERE id = 1").fetchone()
         summaries = connection.execute("SELECT COUNT(*) AS n FROM summaries").fetchone()
         glossary = connection.execute("SELECT COUNT(*) AS n FROM glossary").fetchone()
+        # **Guarded on the table existing**, for the same reason the revision column is. This
+        # connection is read-only and does not migrate, and a count of a table an older database
+        # does not have would turn every one of those sessions into "not a readable session file"
+        # — which is exactly what it did, caught by the test written for the previous instance.
+        chat = _count_or_zero(connection, "chat_messages")
     except sqlite3.Error as exc:
         # A file from an older schema, or one truncated by a crash. Listed with the reason.
         return _unreadable(path, size, f"Not a readable session file ({type(exc).__name__}).")
@@ -205,6 +214,7 @@ def describe(path: Path, recordings: Path | None = None) -> ArchivedSession:
         duration_seconds=float(stats["duration"] or 0.0),
         summaries=int(summaries["n"] or 0),
         glossary_terms=int(glossary["n"] or 0),
+        chat_messages=chat,
         size_bytes=size,
         media=media_for(path.stem, recordings, has_transcript=segments > 0),
     )
@@ -225,6 +235,21 @@ def find(config: AppConfig, key: str) -> Path | None:
         logger.warning("Refusing a session key that escapes the session directory: %r", key)
         return None
     return candidate if candidate.is_file() else None
+
+
+def _count_or_zero(connection: sqlite3.Connection, table: str) -> int:
+    """Rows in ``table``, or zero when this database predates it."""
+    if not _has_table(connection, table):
+        return 0
+    row = connection.execute(f"SELECT COUNT(*) AS n FROM {table}").fetchone()  # noqa: S608
+    return int(row["n"] or 0)
+
+
+def _has_table(connection: sqlite3.Connection, table: str) -> bool:
+    row = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (table,)
+    ).fetchone()
+    return row is not None
 
 
 def _stats_query(connection: sqlite3.Connection) -> str:
@@ -281,6 +306,7 @@ def _unreadable(path: Path, size: int, problem: str) -> ArchivedSession:
         duration_seconds=0.0,
         summaries=0,
         glossary_terms=0,
+        chat_messages=0,
         size_bytes=size,
         problem=problem,
     )

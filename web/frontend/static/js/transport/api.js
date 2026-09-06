@@ -159,6 +159,35 @@ export const api = {
   deleteSession: (key) => del(`/api/sessions/${encodeURIComponent(key)}`),
   sessionExportUrl: (key, fmt) =>
     `/api/sessions/${encodeURIComponent(key)}/export?fmt=${encodeURIComponent(fmt)}`,
+  /**
+   * The conversation the user had with the assistant during a recording, on its own.
+   *
+   * Separate from the transcript export on purpose: a transcript is usually being handed to
+   * somebody else, and one person's questions are not part of the record of the talk.
+   */
+  sessionChatUrl: (key, fmt) =>
+    `/api/sessions/${encodeURIComponent(key)}/chat?fmt=${encodeURIComponent(fmt)}`,
   /** The self-contained web application, as a ZIP. Only offered when a session holds all three. */
   sessionWebappUrl: (key) => `/api/sessions/${encodeURIComponent(key)}/webapp`,
+
+  // -- the export window (D-037) -----------------------------------------------------
+  //
+  // Every figure the window draws comes from here rather than from the mirrored constants. The
+  // server measured the recording; the browser knows what the presets are *called*.
+
+  /** What this recording measurably is, and what each preset would turn it into. */
+  exportOptions: (key) => get(`/api/sessions/${encodeURIComponent(key)}/export/options`),
+  /** Begin an export. Returns the job to watch it by, not the file. */
+  startExport: (key, preset, includeChat) =>
+    post(
+      `/api/sessions/${encodeURIComponent(key)}/export/start` +
+        `?preset=${encodeURIComponent(preset)}&include_chat=${includeChat ? "true" : "false"}`,
+    ),
+  /** Where a job got to. The reconciliation path after a reload, as `GET /api/session` is. */
+  exportStatus: (key) => get(`/api/sessions/${encodeURIComponent(key)}/export/status`),
+  cancelExport: (key) => post(`/api/sessions/${encodeURIComponent(key)}/export/cancel`),
+  /** What the export produced. A separate request, so a finished one survives a reload. */
+  exportResultUrl: (key) => `/api/sessions/${encodeURIComponent(key)}/export/result`,
+  /** The recording itself, for the window's preview player. */
+  sessionMediaUrl: (key) => `/api/sessions/${encodeURIComponent(key)}/media`,
 };

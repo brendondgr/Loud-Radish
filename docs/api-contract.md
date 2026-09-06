@@ -46,7 +46,7 @@ Every frame is `{"event": "<name>", "data": { … }}`.
 | `transcription.progress` | `session_id`, `state`, `progress`, `transcribed_seconds`, `total_seconds`, `segments`, `error` | The post-capture pass. Progress is by **audio position** — honest, monotonic, and needing no instrumentation inside the model |
 | `transcription.done` | same shape | The pass finished. Never dropped: losing it leaves a progress bar running for a pass that ended |
 | `transcription.failed` | same shape, with `error` | The pass failed **and the recording is still on disk**. The message names the file, because it is now the only copy of what was said and `/api/recordings` can run the pass again against it |
-| `capture.state` | `recording`, `window_closed`, `failed`, `error`, `video_path`, `bytes`, `duration_s`, `preview`, `options` | The window capture started, stopped, or failed (D-022). Never dropped: a missed window-closed frame leaves a live preview showing for a capture that ended |
+| `capture.state` | `recording`, `window_closed`, `failed`, `stalled`, `stalled_seconds`, `error`, `video_path`, `bytes`, `duration_s`, `preview`, `options` | The window capture started, stopped, stalled, or failed (D-022, D-036). Never dropped: a missed window-closed frame leaves a live preview showing for a capture that ended. `stalled` is the state that had no name — alive, running, and writing nothing — and is deliberately distinct from `failed`, because the recording is still going and there is still time to act on it |
 | `audio.level` | `rms`, `peak`, `clipping` | Drives the level meter |
 | `vad.state` | `speaking` (bool) | Drives the speaking indicator |
 | `status` | `rtf`, `queue_depth`, `commit_latency_s`, `model_id`, `device`, `dropped_frames`, `suppressed` | Health telemetry. `suppressed` counts passes discarded as invented speech |
@@ -191,7 +191,7 @@ roughly double what a session holds.
 A row with a non-empty `problem` could not be read. It is listed anyway: a session the user can see
 and cannot open is more useful than one that has silently vanished.
 
-### `GET /api/sessions/{key}/webapp`
+### `GET /api/sessions/{key}/webapp?include_chat=`
 
 Response `200 OK`: `application/zip`, `Content-Disposition: attachment`. The archive holds one
 folder named for the key (D-034):
@@ -202,7 +202,7 @@ folder named for the key (D-034):
 <key>/util.js … app.js           Its scripts, classic — not modules.
 <key>/media/<video>              The video, stored uncompressed and byte-identical.
 <key>/data/transcript.json       The talk: session, media reference, segments, summaries,
-                                 glossary, and the conversation already had about it.
+                                 glossary. Plus `chat` only when `include_chat=true`.
 <key>/data/settings.json         The Q&A configuration: endpoint, model, temperature, output
                                  cap, transcript budget, the system prompt, quick actions.
 <key>/data/bundle.js             The same two documents as a script, for `file://`.
@@ -212,6 +212,23 @@ folder named for the key (D-034):
 `settings.json` carries `llm.api_key` **present and empty, always**. Nothing else in the archive
 carries a credential either: a ZIP is exactly the sort of thing that gets forwarded, and the
 exported page keeps whatever key the user types in that browser's storage alone.
+
+**`include_chat` defaults to false, and that default is the point (D-037).** The archive is for
+sending to other people, and its Q&A panel exists so that whoever opens it connects their own model
+and asks their own questions. Carrying the exporter's conversation made it open half-full of
+somebody else's questions about a talk the reader had not watched. The flag is checked in both
+places the conversation would otherwise appear — `transcript.json` and the `bundle.js` that mirrors
+it — because a check of one alone would pass while it shipped in the other.
+
+### `GET /api/sessions/{key}/chat?fmt=markdown|json`
+
+The conversation on its own, as `<stamp>-chat.md` or `.json`. Markdown for reading; JSON carries the
+full `ChatMessage` shape. Each answer keeps the transcript position it was based on, which is what
+makes it re-checkable against the talk.
+
+A recording nobody asked about is `200` with a sentence saying so, never `404`: "you asked nothing
+during this recording" is information, and an error code is not. `422 unknown-format` for anything
+but those two, naming both.
 
 Refusals:
 

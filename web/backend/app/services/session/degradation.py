@@ -287,6 +287,92 @@ def capture_failed(detail: str) -> Failure:
     )
 
 
+def capture_stalled(quiet_s: float) -> Failure:
+    """The video recorder is alive and has stopped writing anything (D-036).
+
+    **The failure that had no name.** A capture whose source stops delivering buffers keeps its
+    process, keeps its file handle, and keeps answering "still running" to the only question the
+    supervisor used to ask — so fourteen minutes of a seminar went unrecorded without a log line.
+    Saying it while it is happening is the whole point: the recording is still going, and there is
+    still time to do something about the window it is pointed at.
+    """
+    return Failure(
+        code="capture-stalled",
+        message=(
+            f"The video has recorded nothing for {quiet_s:.0f} seconds. The window may have been "
+            "minimised, closed, or frozen. Audio and the transcript are unaffected."
+        ),
+        severity=Severity.WARNING,
+        transcription_continues=True,
+    )
+
+
+def capture_resumed() -> Failure:
+    """The video is being written again.
+
+    Reported so a stall banner is answered rather than left standing.
+    """
+    return Failure(
+        code="capture-resumed",
+        message="The video is recording again.",
+        severity=Severity.INFO,
+        transcription_continues=True,
+    )
+
+
+def capture_pieces_joined(pieces: int, filled_s: float) -> Failure:
+    """A capture that was restarted has been put back onto one timeline (D-036)."""
+    return Failure(
+        code="capture-pieces-joined",
+        message=(
+            f"The video recording restarted {pieces - 1} time(s) and has been joined into one "
+            f"file, holding the last frame across {filled_s:.0f} seconds it could not capture."
+        ),
+        severity=Severity.INFO,
+        transcription_continues=True,
+    )
+
+
+def capture_pieces_kept(pieces: int) -> Failure:
+    """The pieces could not be joined, so they are kept as they are.
+
+    **Said, because the alternative is a recording that looks half its length.** Everything
+    downstream reads one video file; if only the first piece is found, the rest is on disk beside
+    it and invisible. Naming the count is what makes it findable.
+    """
+    return Failure(
+        code="capture-pieces-kept",
+        message=(
+            f"The video recording restarted, and its {pieces} pieces could not be joined. They are "
+            "all kept in the recording's folder, numbered in order, and each one plays on its own."
+        ),
+        severity=Severity.WARNING,
+        transcription_continues=True,
+    )
+
+
+def video_ended_early(shortfall_s: float, audio_name: str) -> Failure:
+    """The combined file is shorter than the recording, because the picture stopped first.
+
+    **Said rather than absorbed.** The user is already being told the video ended; what they are
+    not told, and would otherwise discover only by playing the file to the end, is that the sound
+    kept going and the combined file does not carry all of it. Naming the surviving WAV is the
+    point of the message — it is the only complete copy, and this run keeps it regardless of
+    Settings → Storage.
+    """
+    minutes = shortfall_s / 60.0
+    length = f"{minutes:.0f} minutes" if minutes >= 1.0 else f"{shortfall_s:.0f} seconds"
+    return Failure(
+        code="video-ended-early",
+        message=(
+            f"The video stopped {length} before the recording did, so the combined file is that "
+            f"much shorter. The whole of the sound is kept in {audio_name}."
+        ),
+        severity=Severity.WARNING,
+        transcription_continues=True,
+    )
+
+
 def window_audio_stopped() -> Failure:
     """Everything the tap was carrying went away while the recording was still running.
 

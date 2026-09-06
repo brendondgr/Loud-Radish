@@ -25,4 +25,8 @@
     <p class="sessions__error" data-sessions-error hidden role="status"></p>
   </main>
 </div>
+
+{# Outside `.page`, so the dialog is not constrained by the layout it opens over. The same
+   arrangement the settings modal and the pre-flight sheet have on the live page. #}
+{% include "partials/export.html" %}
 {% endblock %}

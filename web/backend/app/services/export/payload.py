@@ -10,6 +10,14 @@ touching anything that describes the talk.
 **No credential is ever written into either.** The exported page asks for an API key in its own
 panel and keeps it in that browser's local storage. Exporting a talk should never be a way to hand
 someone an API key, and a ZIP is exactly the sort of thing that gets forwarded.
+
+**And no conversation, unless it is asked for.** ``transcript.json`` used to carry the questions
+the user asked the assistant *during* the recording, so that the exported page opened where they
+had left off. That is right for a page you keep and wrong for one you send: the point of the export
+is that a recipient connects their own model and asks their own questions, and what they got
+instead was somebody else's half of a conversation about a talk they had not watched yet. The
+conversation is a third document now — ``chat.json``, written only when the export asks for it —
+and the shared archive is the transcript, the video, and nothing that was said about them.
 """
 
 from __future__ import annotations
@@ -46,6 +54,7 @@ def transcript_payload(
     metadata: SessionMetadata | None,
     video_name: str,
     video_type: str,
+    include_chat: bool = False,
 ) -> dict[str, Any]:
     """Everything the exported page needs in order to render the talk.
 
@@ -56,7 +65,7 @@ def transcript_payload(
     segments = store.latest_segments()
     stats = store.stats()
 
-    return {
+    payload: dict[str, Any] = {
         "version": 1,
         "session": {
             "key": key,
@@ -94,16 +103,32 @@ def transcript_payload(
             {"term": t.term, "definition": t.definition, "first_seen": round(t.first_seen, 2)}
             for t in store.glossary()
         ],
-        # The conversation that already happened, so the exported page opens where the user left
-        # off rather than pretending the talk was never discussed.
-        "chat": [
+    }
+    if include_chat:
+        # Kept in the same document when it is wanted at all, because the exported page reads one
+        # bundle and a conversation without the transcript it refers to is not worth carrying.
+        payload["chat"] = chat_payload(store)["messages"]
+    return payload
+
+
+def chat_payload(store: TranscriptStore) -> dict[str, Any]:
+    """The questions the user asked during the recording, as a document of its own.
+
+    Narrow on purpose. `ChatMessage.as_dict()` carries an id, a wall-clock time and a `meta` block
+    of cited timestamps and context tiers, all of which describe *the machinery that produced an
+    answer* rather than the conversation. What survives here is what a person would recognise as
+    what they asked and what came back, plus the transcript position the answer was based on —
+    which is what makes an answer re-checkable against the talk.
+    """
+    return {
+        "messages": [
             {
                 "role": message.role,
                 "text": message.text,
                 "context_timestamp": message.context_timestamp,
             }
             for message in store.chat_history()
-        ],
+        ]
     }
 
 

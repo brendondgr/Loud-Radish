@@ -32,6 +32,7 @@ conventions in [../skills/planner/SKILL.md](../skills/planner/SKILL.md).
 | [questions-after-a-session-ends.md](questions-after-a-session-ends.md) | The assistant refused every question once a session stopped, because teardown closed the transcript store: the finished store stays readable until the next session starts | **Complete (3 / 3)** |
 | [recording-folders-and-web-export.md](recording-folders-and-web-export.md) | One folder per recording, a transcription pass that leaves the interface usable, a labelled Recordings button with media indicators, and a self-contained HTML web-app export | **Complete (6 / 6)** |
 | [five-recording-faults.md](five-recording-faults.md) | Five faults reported against one recording: a stopped session calling itself live, an Audio chip that read false when all was well, doubled counts, a transcript the page never asked for, two copies of every video, and sound running ahead of the picture | **Complete (5 / 5)** |
+| [capture-resilience-and-export.md](capture-resilience-and-export.md) | A Zoom seminar that stopped recording partway through: stall detection, portal resume and segment stitching, the mux that stops destroying audio, the user's conversation split out of the shared export, and a post-recording export window with quality options, projected sizes, and staged progress | **Complete (9 / 9)** |
 
 ## The multi-mode expansion
 

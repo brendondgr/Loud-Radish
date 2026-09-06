@@ -1,0 +1,319 @@
+/* The post-recording export window (D-037).
+ *
+ * Reuses the modal shell — the scrim, the dialog frame, the header, the footer — and describes only
+ * what is different: a wider dialog than the pre-flight sheet because it holds a video preview, the
+ * preset rows, and the stage list.
+ *
+ * Every colour and length is a token. The one exception a file like this always wants to make is a
+ * progress bar's height, and it does not make it: `--space-2` is the height, because a bar that is
+ * 6px here and 5px in the transcription pane is two bars rather than one component.
+ */
+
+.export__dialog {
+  width: min(720px, 100%);
+  max-height: min(760px, 100%);
+}
+
+.export__body {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-9);
+  overflow-y: auto;
+}
+
+.export__choose,
+.export__progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+/* -- the preview ------------------------------------------------------------------------------ */
+
+.export__preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.export__video {
+  width: 100%;
+  /* A recording of a window is whatever shape that window was — 2560x1532 in the one that prompted
+   * this — so the box is capped by height rather than by ratio, and the picture is contained
+   * inside it rather than cropped. A preview that cut off the slide would be worse than none. */
+  max-height: 280px;
+  object-fit: contain;
+  background: var(--surface-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+}
+
+.export__measured {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+/* -- the presets ------------------------------------------------------------------------------ */
+
+.export__presets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.export__legend {
+  /* The dialog's own heading says this; the legend exists for the fieldset's accessible name. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.export__preset {
+  display: flex;
+  gap: var(--space-5);
+  align-items: flex-start;
+  padding: var(--space-5) var(--space-6);
+  background: var(--surface-control);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color var(--duration-fast) var(--ease);
+}
+
+.export__preset:hover {
+  border-color: var(--border-control);
+}
+
+.export__preset--chosen {
+  border-color: var(--accent-border);
+  background: var(--accent-wash);
+}
+
+.export__preset-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.export__preset-head {
+  display: flex;
+  gap: var(--space-4);
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.export__preset-name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* The number the whole window exists for. Tabular figures so a column of them lines up, which is
+ * what makes two presets comparable at a glance rather than by reading. */
+.export__preset-size {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.export__preset-hint {
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.export__preset-shape {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+/* -- the conversation switch ------------------------------------------------------------------ */
+
+.export__switch {
+  display: flex;
+  gap: var(--space-5);
+  align-items: flex-start;
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--border-subtle);
+  cursor: pointer;
+}
+
+.export__switch-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.export__switch-name {
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.export__switch-hint {
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+/* -- progress --------------------------------------------------------------------------------- */
+
+.export__overall {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.export__bar {
+  display: block;
+  width: 100%;
+  height: var(--space-2);
+  overflow: hidden;
+  background: var(--surface-control);
+  border-radius: var(--radius-pill);
+}
+
+.export__bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: var(--radius-pill);
+  transition: width var(--duration-default) var(--ease);
+}
+
+.export__overall-text {
+  display: flex;
+  gap: var(--space-4);
+  justify-content: space-between;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.export__overall-time {
+  color: var(--text-secondary);
+}
+
+.export__stages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.export__stage {
+  display: grid;
+  grid-template-areas:
+    "label detail"
+    "bar   bar";
+  grid-template-columns: 1fr auto;
+  gap: var(--space-2) var(--space-4);
+  align-items: baseline;
+}
+
+.export__stage-label {
+  grid-area: label;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.export__stage-detail {
+  grid-area: detail;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.export__bar--stage {
+  grid-area: bar;
+  height: 3px;
+}
+
+/* The stage being worked on is the one worth finding without reading four labels. */
+.export__stage--running .export__stage-label {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.export__stage--done .export__stage-label,
+.export__stage--skipped .export__stage-label {
+  color: var(--text-muted);
+}
+
+.export__stage--skipped .export__bar {
+  background: transparent;
+  border: 1px dashed var(--border-subtle);
+}
+
+.export__stage--failed .export__stage-label,
+.export__stage--failed .export__stage-detail {
+  color: var(--danger-text);
+}
+
+.export__stage--failed .export__bar-fill {
+  background: var(--danger);
+}
+
+.export__result {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+/* -- the footer ------------------------------------------------------------------------------- */
+
+.export__footer {
+  display: flex;
+  gap: var(--space-5);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.export__refusal {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--warning-text);
+}
+
+.export__actions {
+  display: flex;
+  gap: var(--space-4);
+  margin-left: auto;
+}
+
+/* At a narrow viewport the dialog is the whole screen and the preview is the first thing to give
+ * up height — the decision being made is about numbers, and the picture is confirmation that the
+ * right recording is in front of you rather than the thing being read. */
+@media (max-width: 480px) {
+  .export__body {
+    padding: var(--space-7);
+  }
+
+  .export__video {
+    max-height: 160px;
+  }
+
+  .export__preset-head {
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .export__actions {
+    flex-wrap: wrap;
+  }
+}

@@ -33,6 +33,13 @@ export const TRANSCRIPTION_FAILED = "transcription.failed";
  *  frame leaves a live preview showing for a capture that ended. */
 export const CAPTURE_STATE = "capture.state";
 
+/** One export's stages and weighted progress (D-037). Coalescing, like transcription progress. */
+export const EXPORT_PROGRESS = "export.progress";
+/** The export finished and there is a file to collect. */
+export const EXPORT_DONE = "export.done";
+/** The export failed, or was stopped. */
+export const EXPORT_FAILED = "export.failed";
+
 export const AUDIO_LEVEL = "audio.level";
 export const VAD_STATE = "vad.state";
 export const STATUS = "status";

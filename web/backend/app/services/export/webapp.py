@@ -12,6 +12,13 @@ person can open, read, and edit.
 
 **The video is streamed into the archive rather than read into memory.** A talk is measured in
 hundreds of megabytes and this runs in the same process as the speech model.
+
+**And the archive carries the talk, not the conversation about it.** The questions the user asked
+the assistant while recording used to ride in `transcript.json`, so a recipient opening the ZIP
+found the assistant panel already half-full of somebody else's questions about a talk they had not
+watched. `include_chat` puts them back for an export the user is keeping; the default is off,
+because the common case is sending this to other people so that they can connect their own model
+and ask their own questions.
 """
 
 from __future__ import annotations
@@ -20,7 +27,7 @@ import io
 import json
 import logging
 import zipfile
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -78,8 +85,23 @@ def build_webapp(
     metadata: SessionMetadata | None,
     layout: RecordingLayout,
     config: AppConfig,
+    include_chat: bool = False,
+    media_override: Path | None = None,
+    on_progress: Callable[[float], None] | None = None,
 ) -> bytes:
     """Return the ZIP for one session.
+
+    Args:
+        media_override: the video to package *instead of* the one in the recording folder — a
+            re-encode written by `encode.py`. The archive still names it by the recording's own
+            conventions, because what the exported page plays is a detail of the archive rather
+            than a fact about the recording.
+        on_progress: called with a fraction while the media is written. The media is nearly all of
+            the archive, so it is the only part whose progress is worth reporting.
+        include_chat: carry the conversation the user had with the assistant during the recording.
+            **Off by default, deliberately.** A shared archive is a transcript and a video; the
+            recipient's own questions are the point of the panel, and pre-filling it with someone
+            else's is the fault this flag exists to have a default for.
 
     Raises:
         ExportError: when there is no video, or the transcript is empty. Both are refusals rather
@@ -87,7 +109,7 @@ def build_webapp(
             is not the thing the user asked for, and shipping one under the same name disappoints
             quietly instead of explaining.
     """
-    video = layout.existing_video()
+    video = media_override or layout.existing_video()
     if video is None:
         raise ExportError(
             "This recording has no video, so there is nothing for the player to show. "
@@ -100,6 +122,7 @@ def build_webapp(
         metadata=metadata,
         video_name=video.name,
         video_type=video_type(video),
+        include_chat=include_chat,
     )
     if not transcript["segments"]:
         raise ExportError(
@@ -123,21 +146,31 @@ def build_webapp(
         # this when they are not.
         archive.writestr(f"{key}/{DATA_DIR}/bundle.js", _bundle(transcript, settings))
         archive.writestr(f"{key}/README.txt", _readme(key, transcript))
-        _write_video(archive, f"{key}/{MEDIA_DIR}/{video.name}", video)
+        _write_video(archive, f"{key}/{MEDIA_DIR}/{video.name}", video, on_progress)
 
     logger.info("Exported session %s as a web application (%d bytes)", key, buffer.tell())
     return buffer.getvalue()
 
 
-def _write_video(archive: zipfile.ZipFile, name: str, path: Path) -> None:
+def _write_video(
+    archive: zipfile.ZipFile,
+    name: str,
+    path: Path,
+    on_progress: Callable[[float], None] | None = None,
+) -> None:
     """Stream the video in, so a two-hour recording never sits in memory."""
     info = zipfile.ZipInfo(name)
     # Stored, not deflated: WebM and MP4 are already compressed, and deflating them again spends
     # minutes of CPU for a fraction of a percent.
     info.compress_type = zipfile.ZIP_STORED
+    total = max(1, path.stat().st_size)
+    written = 0
     with path.open("rb") as source, archive.open(info, "w") as target:
         for chunk in _chunks(source):
             target.write(chunk)
+            written += len(chunk)
+            if on_progress is not None:
+                on_progress(min(1.0, written / total))
 
 
 def _chunks(handle: Any) -> Iterator[bytes]:
@@ -170,6 +203,13 @@ def _json(payload: dict[str, Any]) -> str:
 
 def _readme(key: str, transcript: dict[str, Any]) -> str:
     session = transcript["session"]
+    # Named only when it is there. A README that lists a file the archive does not contain is a
+    # README that will be believed and then contradicted.
+    chat_note = (
+        "\n                      Plus the conversation recorded during the talk."
+        if transcript.get("chat")
+        else ""
+    )
     return f"""{session["title"]}
 {"=" * max(3, len(session["title"]))}
 
@@ -186,7 +226,7 @@ index.html            The application. Open this.
 theme.css, app.css    Its stylesheets.
 util.js … app.js      Its scripts, loaded in the order index.html lists them.
 media/                The video, exactly as it was recorded.
-data/transcript.json  The transcript, summaries, glossary, and any conversation you already had.
+data/transcript.json  The transcript, summaries, and glossary.{chat_note}
 data/settings.json    Which language model to ask, and how. Edit it in a text editor if you like.
 data/bundle.js        The same two documents as a script, for when the page is opened from a file.
 

@@ -48,6 +48,10 @@ FLAT_PATTERN = re.compile(r"^(\d{8}-\d{6}-[0-9a-f]{6,32})(?:-(.+?))?(\.[^.]+)$")
 VIDEO_SUFFIXES = (".webm", ".mkv", ".mp4", ".ogg", ".avi")
 
 
+def _suffix(extension: str) -> str:
+    return extension if extension.startswith(".") else f".{extension}"
+
+
 def key_for(started_at: datetime, session_id: str) -> str:
     """The directory name for a recording that started at ``started_at``."""
     return f"{started_at.strftime('%Y%m%d-%H%M%S')}-{session_id}"
@@ -87,8 +91,36 @@ class RecordingLayout:
 
     def video(self, extension: str) -> Path:
         """The video path for a container extension, with or without its leading dot."""
-        suffix = extension if extension.startswith(".") else f".{extension}"
-        return self.directory / f"{VIDEO_STEM}{suffix}"
+        return self.directory / f"{VIDEO_STEM}{_suffix(extension)}"
+
+    def video_segment(self, index: int, extension: str) -> Path:
+        """The ``index``-th piece of a capture that had to be restarted mid-session (D-036).
+
+        Segment 1 is the plain ``video.<ext>``, so a recording that never broke is named exactly as
+        it always was and nothing downstream has to know this exists. Later segments are
+        ``video.002.<ext>`` and so on, because **appending to a finalised container is not a thing
+        that can be done safely** — a piece that plays is worth more than one file that might not.
+        They are joined at the end of the session by `capture/stitch.py`.
+        """
+        if index <= 1:
+            return self.video(extension)
+        return self.directory / f"{VIDEO_STEM}.{index:03d}{_suffix(extension)}"
+
+    def video_segments(self) -> list[Path]:
+        """Every segment on disk, in capture order. Empty when there is no video at all."""
+        found: list[tuple[int, Path]] = []
+        for suffix in VIDEO_SUFFIXES:
+            first = self.directory / f"{VIDEO_STEM}{suffix}"
+            if first.is_file() and first.stat().st_size > 0:
+                found.append((1, first))
+            for path in sorted(self.directory.glob(f"{VIDEO_STEM}.[0-9][0-9][0-9]{suffix}")):
+                if path.stat().st_size == 0:
+                    continue
+                try:
+                    found.append((int(path.name.split(".")[1]), path))
+                except (IndexError, ValueError):
+                    continue
+        return [path for _index, path in sorted(found)]
 
     def ensure(self) -> Path:
         """Create the directory and return it."""

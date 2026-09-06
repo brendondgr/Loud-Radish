@@ -93,12 +93,44 @@ minutes ago.
 |---|---|---|---|
 | `GET` | `/api/sessions` | Every session on disk, newest first, each with what it holds | **Implemented** |
 | `GET` | `/api/sessions/{key}` | One session's transcript, summaries, glossary, and conversation | **Implemented** |
-| `GET` | `/api/sessions/{key}/export?fmt=` | Text, Markdown, SRT, VTT, or JSON | **Implemented** |
-| `GET` | `/api/sessions/{key}/webapp` | The recording as a self-contained web application, as a ZIP | **Implemented** |
+| `GET` | `/api/sessions/{key}/export?fmt=&include_chat=` | Text, Markdown, SRT, VTT, or JSON. `include_chat` defaults to **false** | **Implemented** |
+| `GET` | `/api/sessions/{key}/chat?fmt=` | The conversation on its own — Markdown or JSON | **Implemented** |
+| `GET` | `/api/sessions/{key}/webapp?include_chat=` | The recording as a self-contained web application, as a ZIP. `include_chat` defaults to **false** | **Implemented** |
+| `GET` | `/api/sessions/{key}/media` | The recording itself, with range support, for the export window's preview | **Implemented** |
+| `GET` | `/api/sessions/{key}/export/options` | What this recording measurably is, and what each preset would turn it into | **Implemented** |
+| `POST` | `/api/sessions/{key}/export/start?preset=&include_chat=` | Begin a staged export. Returns the job, not the file | **Implemented** |
+| `GET` | `/api/sessions/{key}/export/status` | The current or most recent export — the reconciliation path after a reload | **Implemented** |
+| `POST` | `/api/sessions/{key}/export/cancel` | Stop a running export. The partial output is removed | **Implemented** |
+| `GET` | `/api/sessions/{key}/export/result` | Download what the export produced | **Implemented** |
 | `DELETE` | `/api/sessions/{key}` | Delete a session file. Refuses the one still recording. | **Implemented** |
 
 `{key}` is the database file's stem, which is also the name of the recording's folder (D-032) — that
 equality is how a session reaches its own video without a second identifier.
+
+**A shared export carries the talk, not the conversation about it (D-037).** The questions the user
+put to the assistant *during* a recording used to ride in `transcript.json`, in the `bundle.js`
+beside it, in the Markdown export and in the JSON export — so a recipient opening the ZIP found the
+assistant panel already half-full of somebody else's questions about a talk they had not watched,
+which is the opposite of that panel's purpose. It is a separate document now: `GET /{key}/chat`
+renders it as Markdown or JSON, `include_chat=true` puts it back into either of the other two for
+anyone who wants one file, and `GET /api/sessions` reports `chat_messages` so the conversation is
+offered only where there is one. Asking nothing during a recording renders as a sentence saying so,
+never a 404 — "you asked nothing" is information and an error code is not.
+
+**Exporting is a job, not a download (D-037).** `GET /{key}/webapp` is still there and still
+synchronous, because for a stream copy it is the right shape. A re-encode is not: an hour of talk is
+minutes of work, and holding a browser connection open for it is how an export becomes a black box
+with a spinner. So `export/start` begins a job and returns immediately, progress arrives over the
+WebSocket as `export.progress` with per-stage figures, and `export/result` collects the archive —
+which lives in the recording's own folder, so a finished export survives a reload. One at a time:
+an encode uses every core the machine has, and those are the transcriber's cores too.
+
+`export/options` is what makes the choice informed. It measures the recording with `ffprobe` and
+resolves every preset against the *real* dimensions, because the reported seminar asked for a 720p
+ceiling at capture and recorded at 2560 × 1532 — a window offering choices against the configured
+number would be describing a file that does not exist. Every size is a range: a constant-quality
+encode depends on content the estimator has not watched, and the whole question is whether a file is
+small enough to send.
 
 **The web-app export refuses rather than degrades.** It needs video, audio, and a transcript, and
 returns `409 not-exportable` naming the missing piece when it has fewer: a page with an empty player

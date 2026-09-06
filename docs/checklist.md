@@ -493,6 +493,101 @@ passes, and a muxed file with sound in it.
       is the documented bound of D-031 rather than a regression, and closing it would mean deciding
       what "the current session" means to a process that has just started.
 
+## Part 3k — A Seminar That Stopped Recording, and the Export Window
+
+Reported after a Zoom seminar on 2026-09-04, planned in
+[plans/capture-resilience-and-export.md](plans/capture-resilience-and-export.md).
+
+The evidence is still in `data/recordings/20260904-155600-08ab28c2d732/`, and it is unambiguous.
+Audio and transcript run the full **3925.7 s**. Video frames run at a steady 15.0 fps from 0.000 s
+to **882.542 s**, then stop entirely for 882.6 s, then two final frames at 1765.16 s — the EOS
+flush. The combined file ends **both** streams at 1765.227 s. And the session's own config snapshot
+says `max_height: 720` against a recording made at **2560 × 1532**.
+
+- [x] **The mux keeps the whole of what it was given.** `-shortest` truncated the sound to the
+      broken picture; the result still held one stream of each kind, so it passed verification and
+      the sources went. Thirty-six minutes of the talk survived the recording and were destroyed by
+      the tidy-up. The output now runs as long as its longer input, and a source is deleted only
+      when the output demonstrably *contains* it — same duration, not merely the same kinds of
+      stream. Step 1 / 9.
+- [x] **A short combined file keeps the audio whatever Settings says.** Retention stops being a
+      preference at the moment the WAV becomes the only complete copy of the talk. Step 1 / 9.
+- [x] **A capture that stops producing frames is noticed.** `_watch` polled `process.poll()` and
+      asked one question — has it exited — which a stalled pipeline answers "no" to for as long as
+      it lasts. It samples the output file's size on the same tick now, drops `-q` so GStreamer's
+      bus messages survive, and sends stderr to a file rather than to a pipe nobody drains — which
+      blocks its writer at 64 KB and is a way of *causing* the stall. Step 2 / 9.
+- [x] **A capture that ends mid-session resumes.** Reopened on the stored consent token, into
+      `video.002.<ext>` and up, bounded at five attempts with a backoff — and silently or not at
+      all, because the compositor's answer to a token it cannot restore is to put its picker across
+      the talk. A stall is acted on rather than only reported: waiting for the stalled pipeline to
+      end on its own cost this recording fifteen minutes of picture. The pieces are joined at
+      teardown, each placed by the same derivation the mux's offset uses, with the last frame held
+      across every gap — dropped instead, the video would be exactly as much shorter as the
+      recording had failed for, and every frame after the gap would sit that far ahead of its own
+      transcript line. Step 3 / 9.
+- [x] **The user's conversation leaves the shared export.** Six chat messages in the reported
+      recording, and every one of them rode into `transcript.json`, into the `bundle.js` beside it,
+      into the Markdown export and into the JSON export — then seeded the exported page's assistant,
+      so a recipient opened the ZIP mid-conversation with someone else's questions about a talk they
+      had not watched. It is a document of its own now (`GET /{key}/chat`), the flag that puts it
+      back defaults to off, and the listing reports `chat_messages` so it is offered only where
+      there is one. Verified against the real session: nought of six turns in the default archive,
+      six of six with `include_chat=true`. Step 4 / 9.
+- [x] **A re-encode can be measured before it is committed to.** `ffprobe` says what the recording
+      is; five named plans say what it could become; and the estimate is anchored to the
+      recording's *own* bits per pixel per frame rather than to a table, because a flat "720p costs
+      N MB an hour" is wrong by a factor of three depending on what is on screen. It returns a
+      range and says so. Verified with `scripts/calibrate_export_estimate.py` against the reported
+      recording: five of five predictions contained the measurement, and the time predictions came
+      within a second or two. Step 5 / 9.
+- [x] **Exporting is a staged job with real progress.** Four stages — measure, encode, transcript,
+      package — each with its own bar and its own estimate, and an overall figure weighted by
+      predicted cost rather than by stage count. `export.done` and `export.failed` retract
+      `export.progress`, without which a window opened after an export finished would be replayed a
+      stale "running" frame for the life of the process, which is the bug D-033 fixed twice for
+      transcription. Verified end to end against the reported recording: **129.2 MB to 28.9 MB in
+      14 seconds**, against 29.7 MB predicted. Step 6 / 9.
+- [x] **One post-recording window: preview, options, projected sizes, stages.** It opens when a
+      recording stops — the old flow returned silently to an idle screen and left the user to find
+      the Recordings page, pick the right row, and choose between two download links with no idea
+      what either would produce — and from the Recordings page, which is where an export is retried.
+      Preview, five presets each carrying what it would produce for *this* file, a size that moves
+      with the choice, and then one row per stage with its own bar and estimate. Verified in the
+      browser against the reported recording: **123 MB to 18 MB in 14 seconds**, against 19 MB
+      predicted; focus stays inside the dialog under Tab; and at 320 px nothing scrolls sideways.
+      Three faults were found by running it and are fixed: a stray click reaching an unopened
+      controller issued `POST /api/sessions//export/start`, a refusal was left standing beside a
+      successful export, and a finished job's elapsed time kept climbing — "took 14 s" to the
+      window that watched it and "took 2 min" to one opened later, about the same file. Steps
+      7–8 / 9.
+
+- [x] **The plan is complete (9 / 9) and recorded as D-036 and D-037.** What was departed from, and
+      why, is written down in the plan's own "What Changed From the Plan" section rather than left
+      to be rediscovered.
+
+- [ ] **`max_height` is advisory whenever the portal reports no geometry**, which
+      `_record_scaler`'s own comment calls "the normal case on this desktop" — so a ceiling of 720
+      recorded at 2560 × 1532, roughly four times the intended pixel work, competing with the
+      speech model for the same cores. Not fixed at capture: the caps history in that function is
+      bad enough that changing it blind is how a recording came out 480 × 16. The remedy taken is
+      to make resolution an **export-time** decision, where the real dimensions are known from the
+      finished file. Whether capture should also enforce it needs a real portal stream to test
+      against.
+- [ ] **Why the PipeWire node stalled rather than ended is not recoverable** from what survives.
+      `logs/capture.log` still holds an unrelated `amdgpu` line from 2026-08-16, because
+      `_write_log` writes only when stderr was non-empty and this run produced none — `gst-launch`
+      is invoked with `-q`. Step 2 drops `-q` so the next occurrence is diagnosable.
+
+- [ ] **Four tests in `tests/transcription/test_window_audio.py` fail on a quiet machine.**
+      `test_window_mode_opens_the_machines_output_not_a_microphone` and three beside it reach the
+      real PipeWire graph and raise `MonitorUnavailable` when nothing is playing. Pre-existing and
+      unrelated to this plan — confirmed by running them against a clean tree — but they make
+      `uv run pytest` red for anyone who is not playing audio, which is most runs. They need either
+      a stubbed graph or a skip guard.
+
+---
+
 ---
 
 ## Part 4 — Still Open
@@ -612,6 +707,21 @@ user's own machine, and none may be reported as passing until it has had one.
       whether it honours the no-markup rule, whether the no-reasoning fields are accepted by the
       user's server, and whether the length guard's default floor is right. Run a talk with a local
       model and read the result against the raw transcript.
+- [ ] **A window recording that has to resume (D-036).** The stall detector, the reopen, and the
+      stitching are covered by tests against a real `ffmpeg` and a stubbed portal, and the pieces
+      have been joined into a correct timeline under measurement. What has **not** been observed is
+      the whole thing on a real desktop: close the captured window mid-talk, or drop the network
+      under a video call, and confirm that the portal restores without a picker appearing, that the
+      video that comes out plays continuously with a held frame across the gap, and that the sound
+      after the gap is still in step with the transcript. This is the one behaviour in the repair
+      whose failure mode is silent, since a capture that does not resume looks exactly like a
+      capture that ended.
+- [ ] **The export estimator against your own content and your own CPU (D-037).** Both constants are
+      local: content decides the size and the processor decides the time, and the ones shipped were
+      fitted to a slide-heavy seminar on a 32-core machine. Run
+      `uv run scripts/calibrate_export_estimate.py data/recordings/<key>/video-with-audio.webm`
+      against a recording of a *different* kind — one that cuts between cameras rather than sitting
+      on a slide — and see whether the measurement still lands inside the range.
 - [ ] **A genuine 90-minute soak** — the accelerated soak in `tests/transcription/test_soak.py`
       drives ninety minutes of transcript through the engine in seconds and holds bounded memory,
       contiguous segment ids, and a clock that has not drifted. It is not the same as ninety

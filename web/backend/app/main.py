@@ -26,6 +26,7 @@ from .config import ConfigStore, CredentialStore
 from .routes import build_router
 from .services.chat import ChatService
 from .services.context import ContextWorker
+from .services.export import ExportRegistry, ExportRunner
 from .services.llm import build_llm
 from .services.polish import PolishWorker
 from .services.recording import migrate_flat_recordings
@@ -102,6 +103,12 @@ def create_app(config: ConfigStore | None = None) -> FastAPI:
     # calling `hub.emit` from whichever thread produced the event, and the hub marshals.
     app.state.hub = EventHub()
     app.state.session_manager = SessionManager(app.state.config, emit=app.state.hub.emit)
+
+    # One export at a time, held here rather than on the session manager: an export runs against a
+    # *past* session and outlives whatever is recording now, in the same way a post-capture pass
+    # outlives the session that made its file.
+    app.state.export_jobs = ExportRegistry()
+    app.state.export_runner = ExportRunner(registry=app.state.export_jobs, emit=app.state.hub.emit)
     _wire_assistant(app)
 
     app.include_router(build_router())

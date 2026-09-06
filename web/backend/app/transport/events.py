@@ -45,9 +45,19 @@ TRANSCRIPTION_DONE: Final = "transcription.done"
 #: the message names the file the audio survives in.
 TRANSCRIPTION_FAILED: Final = "transcription.failed"
 
-#: The window capture started, stopped, or failed (D-022). Critical: a client that missed the
-#: window-closed frame would keep showing a live preview of a capture that ended.
+#: The window capture started, stopped, stalled, or failed (D-022, D-036). Critical: a client that
+#: missed the window-closed frame would keep showing a live preview of a capture that ended.
 CAPTURE_STATE: Final = "capture.state"
+
+# -- export (D-037) ---------------------------------------------------------------------
+#: One export's stages, weighted progress, and estimated time. Coalescing: only the newest frame
+#: means anything, exactly as `transcription.progress` is.
+EXPORT_PROGRESS: Final = "export.progress"
+#: The export finished and there is a file to collect. Critical: dropping it leaves a window
+#: showing an encode that ended, with no way to reach what it produced.
+EXPORT_DONE: Final = "export.done"
+#: The export failed or was cancelled. Critical for the same reason.
+EXPORT_FAILED: Final = "export.failed"
 
 # -- health ---------------------------------------------------------------------------
 AUDIO_LEVEL: Final = "audio.level"
@@ -79,6 +89,9 @@ ALL_EVENTS: Final[tuple[str, ...]] = (
     TRANSCRIPTION_DONE,
     TRANSCRIPTION_FAILED,
     CAPTURE_STATE,
+    EXPORT_PROGRESS,
+    EXPORT_DONE,
+    EXPORT_FAILED,
     AUDIO_LEVEL,
     VAD_STATE,
     STATUS,
@@ -100,6 +113,7 @@ COALESCING_EVENTS: Final[frozenset[str]] = frozenset(
         STATUS,
         RECORDING_PROGRESS,
         TRANSCRIPTION_PROGRESS,
+        EXPORT_PROGRESS,
     }
 )
 
@@ -119,6 +133,10 @@ CRITICAL_EVENTS: Final[frozenset[str]] = frozenset(
         TRANSCRIPTION_DONE,
         TRANSCRIPTION_FAILED,
         CAPTURE_STATE,
+        # An export that finished and never said so leaves a window watching an encode that ended,
+        # with no way to reach the file it produced.
+        EXPORT_DONE,
+        EXPORT_FAILED,
         CHAT_DELTA,
         CHAT_DONE,
         ERROR,
@@ -144,6 +162,11 @@ INVALIDATES: Final[dict[str, frozenset[str]]] = {
     TRANSCRIPTION_FAILED: frozenset({TRANSCRIPTION_PROGRESS}),
     # Capture has ended, so how much of it had been written is no longer a live figure either.
     SESSION_STOPPED: frozenset({RECORDING_PROGRESS, TRANSCRIPT_HYPOTHESIS}),
+    # **The same retraction, for the same reason, before it can happen again.** An export's last
+    # progress frame says `running` too, and a window opened an hour later would otherwise be
+    # replayed it and sit watching an encode that finished before it was opened.
+    EXPORT_DONE: frozenset({EXPORT_PROGRESS}),
+    EXPORT_FAILED: frozenset({EXPORT_PROGRESS}),
 }
 
 
