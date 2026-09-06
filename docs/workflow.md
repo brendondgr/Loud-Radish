@@ -258,6 +258,22 @@ against a **real recording** — a synthetic tone cannot answer the question, an
 uv run scripts/measure_capture_cost.py --audio path/to/a/talk.wav
 ```
 
+### The export estimator, on your own machine
+
+The export window predicts a size and a duration for every preset before anything is encoded. Both
+halves of that are local: content decides the size and the CPU decides the time, and the constants
+shipped were fitted to one recording on a 32-core machine. Check them against your own:
+
+```bash
+uv run scripts/calibrate_export_estimate.py data/recordings/<key>/video-with-audio.webm
+```
+
+It encodes a slice at every preset and prints the prediction beside the measurement. A prediction is
+doing its job when the measurement falls inside the printed range. Against the recording the
+estimator was fitted to, five of five did — and the run that produced those numbers is also what
+removed the VP9 preset, which measured a sixth larger and ten times slower than H.264 at the same
+nominal quality.
+
 ### What cannot be verified in a headless environment
 
 State these explicitly rather than implying coverage:

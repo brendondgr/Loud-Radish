@@ -27,7 +27,7 @@ import io
 import json
 import logging
 import zipfile
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -86,10 +86,18 @@ def build_webapp(
     layout: RecordingLayout,
     config: AppConfig,
     include_chat: bool = False,
+    media_override: Path | None = None,
+    on_progress: Callable[[float], None] | None = None,
 ) -> bytes:
     """Return the ZIP for one session.
 
     Args:
+        media_override: the video to package *instead of* the one in the recording folder — a
+            re-encode written by `encode.py`. The archive still names it by the recording's own
+            conventions, because what the exported page plays is a detail of the archive rather
+            than a fact about the recording.
+        on_progress: called with a fraction while the media is written. The media is nearly all of
+            the archive, so it is the only part whose progress is worth reporting.
         include_chat: carry the conversation the user had with the assistant during the recording.
             **Off by default, deliberately.** A shared archive is a transcript and a video; the
             recipient's own questions are the point of the panel, and pre-filling it with someone
@@ -101,7 +109,7 @@ def build_webapp(
             is not the thing the user asked for, and shipping one under the same name disappoints
             quietly instead of explaining.
     """
-    video = layout.existing_video()
+    video = media_override or layout.existing_video()
     if video is None:
         raise ExportError(
             "This recording has no video, so there is nothing for the player to show. "
@@ -138,21 +146,31 @@ def build_webapp(
         # this when they are not.
         archive.writestr(f"{key}/{DATA_DIR}/bundle.js", _bundle(transcript, settings))
         archive.writestr(f"{key}/README.txt", _readme(key, transcript))
-        _write_video(archive, f"{key}/{MEDIA_DIR}/{video.name}", video)
+        _write_video(archive, f"{key}/{MEDIA_DIR}/{video.name}", video, on_progress)
 
     logger.info("Exported session %s as a web application (%d bytes)", key, buffer.tell())
     return buffer.getvalue()
 
 
-def _write_video(archive: zipfile.ZipFile, name: str, path: Path) -> None:
+def _write_video(
+    archive: zipfile.ZipFile,
+    name: str,
+    path: Path,
+    on_progress: Callable[[float], None] | None = None,
+) -> None:
     """Stream the video in, so a two-hour recording never sits in memory."""
     info = zipfile.ZipInfo(name)
     # Stored, not deflated: WebM and MP4 are already compressed, and deflating them again spends
     # minutes of CPU for a fraction of a percent.
     info.compress_type = zipfile.ZIP_STORED
+    total = max(1, path.stat().st_size)
+    written = 0
     with path.open("rb") as source, archive.open(info, "w") as target:
         for chunk in _chunks(source):
             target.write(chunk)
+            written += len(chunk)
+            if on_progress is not None:
+                on_progress(min(1.0, written / total))
 
 
 def _chunks(handle: Any) -> Iterator[bytes]:

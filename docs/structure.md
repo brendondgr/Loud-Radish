@@ -147,7 +147,14 @@ TranscriberPrototype/
 │   │   │       └── orchestrator.py
 │   │   │   └── export/            # A recording as a folder that opens on its own (D-034)
 │   │   │       ├── webapp.py      # Builds the ZIP; streams the video rather than reading it in
-│   │   │       ├── payload.py     # transcript.json and settings.json; never a credential
+│   │   │       ├── payload.py     # transcript.json and settings.json; never a credential, and
+│   │   │                          #   never the conversation unless asked (D-037)
+│   │   │       ├── profile.py     # What a recording measurably is, and what a re-encode would be
+│   │   │       ├── presets.py     # The five named plans, mirrored into the frontend
+│   │   │       ├── estimate.py    # Size and time, predicted before anything is encoded
+│   │   │       ├── encode.py      # The ffmpeg invocation, with progress read from `-progress`
+│   │   │       ├── job.py         # One export as stages, weighted by predicted cost
+│   │   │       ├── runner.py      # Driving those stages on a background thread
 │   │   │       └── template/      # The exported page, copied verbatim: index.html, two
 │   │   │                          #   stylesheets, and five classic scripts (not modules —
 │   │   │                          #   `import` is refused across file:// URLs)
@@ -193,7 +200,8 @@ TranscriberPrototype/
 ├── data/                          # Sessions, config file, audio, recordings (gitignored)
 │   ├── sessions/<stamp>-<id>.db   # One transcript per session
 │   └── recordings/<stamp>-<id>/   # One folder per recording — audio.wav, video.<ext>,
-│                                  #   video-with-audio.<ext>, preview.jpg, audio.json.
+│                                  #   video-with-audio.<ext>, preview.jpg, audio.json,
+│                                  #   exports/ once one has been exported (D-037).
 │                                  #   The folder name is the session database's stem (D-032).
 │                                  #   video.002.<ext> and up appear only while a capture that
 │                                  #   was restarted is still being joined together (D-036)

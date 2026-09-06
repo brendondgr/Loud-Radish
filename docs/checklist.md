@@ -534,8 +534,20 @@ says `max_height: 720` against a recording made at **2560 × 1532**.
       back defaults to off, and the listing reports `chat_messages` so it is offered only where
       there is one. Verified against the real session: nought of six turns in the default archive,
       six of six with `include_chat=true`. Step 4 / 9.
-- [ ] **A re-encode can be measured before it is committed to.** Step 5 / 9.
-- [ ] **Exporting is a staged job with real progress.** Step 6 / 9.
+- [x] **A re-encode can be measured before it is committed to.** `ffprobe` says what the recording
+      is; five named plans say what it could become; and the estimate is anchored to the
+      recording's *own* bits per pixel per frame rather than to a table, because a flat "720p costs
+      N MB an hour" is wrong by a factor of three depending on what is on screen. It returns a
+      range and says so. Verified with `scripts/calibrate_export_estimate.py` against the reported
+      recording: five of five predictions contained the measurement, and the time predictions came
+      within a second or two. Step 5 / 9.
+- [x] **Exporting is a staged job with real progress.** Four stages — measure, encode, transcript,
+      package — each with its own bar and its own estimate, and an overall figure weighted by
+      predicted cost rather than by stage count. `export.done` and `export.failed` retract
+      `export.progress`, without which a window opened after an export finished would be replayed a
+      stale "running" frame for the life of the process, which is the bug D-033 fixed twice for
+      transcription. Verified end to end against the reported recording: **129.2 MB to 28.9 MB in
+      14 seconds**, against 29.7 MB predicted. Step 6 / 9.
 - [ ] **One post-recording window: preview, options, projected sizes, stages.** Steps 7–8 / 9.
 
 - [ ] **`max_height` is advisory whenever the portal reports no geometry**, which
