@@ -320,6 +320,37 @@ def capture_resumed() -> Failure:
     )
 
 
+def capture_pieces_joined(pieces: int, filled_s: float) -> Failure:
+    """A capture that was restarted has been put back onto one timeline (D-036)."""
+    return Failure(
+        code="capture-pieces-joined",
+        message=(
+            f"The video recording restarted {pieces - 1} time(s) and has been joined into one "
+            f"file, holding the last frame across {filled_s:.0f} seconds it could not capture."
+        ),
+        severity=Severity.INFO,
+        transcription_continues=True,
+    )
+
+
+def capture_pieces_kept(pieces: int) -> Failure:
+    """The pieces could not be joined, so they are kept as they are.
+
+    **Said, because the alternative is a recording that looks half its length.** Everything
+    downstream reads one video file; if only the first piece is found, the rest is on disk beside
+    it and invisible. Naming the count is what makes it findable.
+    """
+    return Failure(
+        code="capture-pieces-kept",
+        message=(
+            f"The video recording restarted, and its {pieces} pieces could not be joined. They are "
+            "all kept in the recording's folder, numbered in order, and each one plays on its own."
+        ),
+        severity=Severity.WARNING,
+        transcription_continues=True,
+    )
+
+
 def video_ended_early(shortfall_s: float, audio_name: str) -> Failure:
     """The combined file is shorter than the recording, because the picture stopped first.
 

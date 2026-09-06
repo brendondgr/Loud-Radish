@@ -5,6 +5,7 @@
 * ``pipeline`` — the GStreamer launch line, built from what is actually installed
 * ``recorder`` — the subprocess, its lifetime, and its finalisation
 * ``mux``      — combining the video with the session's audio once both are closed
+* ``stitch``   — joining the pieces of a capture that had to be restarted, onto one timeline
 
 **Under Wayland an application cannot enumerate windows or read another window's pixels.** The only
 sanctioned route is the portal: the compositor shows its own picker, the user consents, and we
@@ -27,8 +28,11 @@ from .portal import (
 )
 from .probe import CaptureSupport, detect, gstreamer_elements, session_type
 from .recorder import RecorderError, RecorderState, WindowRecorder
+from .stitch import CaptureSegment, StitchResult
+from .stitch import stitch as stitch_segments
 
 __all__ = [
+    "CaptureSegment",
     "CaptureSupport",
     "MuxResult",
     "PipelineSpec",
@@ -38,6 +42,7 @@ __all__ = [
     "PortalUnavailable",
     "RecorderError",
     "RecorderState",
+    "StitchResult",
     "WindowRecorder",
     "WindowStream",
     "build_pipeline",
@@ -48,4 +53,5 @@ __all__ = [
     "probe_video_duration",
     "open_window_stream",
     "session_type",
+    "stitch_segments",
 ]

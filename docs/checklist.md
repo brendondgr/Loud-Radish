@@ -512,11 +512,20 @@ says `max_height: 720` against a recording made at **2560 × 1532**.
       stream. Step 1 / 9.
 - [x] **A short combined file keeps the audio whatever Settings says.** Retention stops being a
       preference at the moment the WAV becomes the only complete copy of the talk. Step 1 / 9.
-- [ ] **A capture that stops producing frames is noticed.** `_watch` polls `process.poll()` and
-      asks one question — has it exited — which a stalled pipeline answers "no" to for as long as
-      it lasts. Step 2 / 9.
-- [ ] **A capture that ends mid-session resumes.** The portal's restore token is persisted on every
-      start for exactly this reuse and has never been used for it within a session. Step 3 / 9.
+- [x] **A capture that stops producing frames is noticed.** `_watch` polled `process.poll()` and
+      asked one question — has it exited — which a stalled pipeline answers "no" to for as long as
+      it lasts. It samples the output file's size on the same tick now, drops `-q` so GStreamer's
+      bus messages survive, and sends stderr to a file rather than to a pipe nobody drains — which
+      blocks its writer at 64 KB and is a way of *causing* the stall. Step 2 / 9.
+- [x] **A capture that ends mid-session resumes.** Reopened on the stored consent token, into
+      `video.002.<ext>` and up, bounded at five attempts with a backoff — and silently or not at
+      all, because the compositor's answer to a token it cannot restore is to put its picker across
+      the talk. A stall is acted on rather than only reported: waiting for the stalled pipeline to
+      end on its own cost this recording fifteen minutes of picture. The pieces are joined at
+      teardown, each placed by the same derivation the mux's offset uses, with the last frame held
+      across every gap — dropped instead, the video would be exactly as much shorter as the
+      recording had failed for, and every frame after the gap would sit that far ahead of its own
+      transcript line. Step 3 / 9.
 - [ ] **The user's conversation leaves the shared export.** Step 4 / 9.
 - [ ] **A re-encode can be measured before it is committed to.** Step 5 / 9.
 - [ ] **Exporting is a staged job with real progress.** Step 6 / 9.
