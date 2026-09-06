@@ -6,8 +6,10 @@
  * cannot open when the pipeline is unhealthy — exactly when someone wants to retrieve a transcript.
  */
 
+import { ExportDialog } from "./components/export-dialog.js";
 import { $, el, setText, toggle } from "./core/dom.js";
 import { duration as formatDuration } from "./core/format.js";
+import { exportJob } from "./stores/export.js";
 import { api } from "./transport/api.js";
 
 const FORMATS = [
@@ -67,6 +69,37 @@ class SessionsPage {
     this.error = $("[data-sessions-error]");
     this.directory = $("[data-sessions-directory]");
     this.runningKey = "";
+    // The same window that opens when a recording stops, reached from the other end. This page has
+    // no socket, so it polls while an export runs — see `openExport`.
+    this.exportDialog = new ExportDialog($("[data-export]"));
+  }
+
+  /**
+   * Open the export window for one session, and keep it fed.
+   *
+   * **This page deliberately has no WebSocket** — its own header says so: loading the transport,
+   * the stores and the transcript machinery to render a list would mean a page that cannot open
+   * when the pipeline is unhealthy, which is exactly when someone wants to retrieve a recording.
+   * So an export's progress is polled here rather than pushed, which for a job that reports about
+   * once a second is a difference nobody can see.
+   */
+  async openExport(session) {
+    const poll = setInterval(async () => {
+      if (!this.exportDialog.isOpen) return;
+      try {
+        const body = await api.exportStatus(session.key);
+        if (body.job) exportJob.set(body.job);
+      } catch {
+        // A failed poll is a frame missed, not a state. The next one answers.
+      }
+    }, 1000);
+
+    try {
+      await this.exportDialog.show(session.key, { title: session.title });
+    } finally {
+      clearInterval(poll);
+      await this.load();
+    }
   }
 
   async load() {
@@ -199,20 +232,24 @@ class SessionsPage {
     // Offered only when the session holds video, audio, and a transcript. The export *is* those
     // three — a player, a transcript that follows it, and questions asked against both — so a
     // button that produced two of them under the same name would disappoint quietly.
-    const webapp = session.media?.exportable
-      ? el("a", {
-          className: "button button--primary",
-          text: "Web app (.zip)",
-          attrs: {
-            href: api.sessionWebappUrl(session.key),
-            download: "",
-            title:
-              "A self-contained page with the video, the transcript, and a question panel. " +
-              "Opens in any browser, with no server. Your own conversation is not in it — " +
-              "whoever opens it connects their own model and asks their own questions.",
-          },
-        })
-      : null;
+    //
+    // **A button rather than a link, since D-037.** It used to be an `<a download>` that fetched
+    // hundreds of megabytes with no options and no idea what it would produce. It opens the export
+    // window now: the same window that opens when a recording stops, reached from the other end.
+    let webapp = null;
+    if (session.media?.exportable) {
+      webapp = el("button", {
+        className: "button button--primary",
+        text: "Export…",
+        attrs: {
+          type: "button",
+          title:
+            "Preview the recording, choose its size and quality, and watch the export run. " +
+            "Your own conversation is not included unless you ask for it.",
+        },
+      });
+      webapp.addEventListener("click", () => void this.openExport(session));
+    }
 
     return el("div", {
       className: "session__actions",

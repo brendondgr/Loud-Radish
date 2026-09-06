@@ -113,6 +113,7 @@ class ExportJob:
     started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     finished_at: datetime | None = None
     _started_monotonic: float = field(default_factory=time.monotonic)
+    _finished_monotonic: float = 0.0
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     # -- reading -----------------------------------------------------------------------
@@ -134,7 +135,14 @@ class ExportJob:
 
     @property
     def elapsed_s(self) -> float:
-        return max(0.0, time.monotonic() - self._started_monotonic)
+        """How long this export took, and **frozen once it is over**.
+
+        A finished job whose elapsed time keeps climbing reports "took 14 s" to the window that
+        watched it and "took 1 min" to the one opened a minute later, about the same file. The same
+        fault the session clock had (D-033) and the same remedy: the end is a fact, so it is stored.
+        """
+        end = self._finished_monotonic or time.monotonic()
+        return max(0.0, end - self._started_monotonic)
 
     @property
     def remaining_s(self) -> float:
@@ -195,12 +203,14 @@ class ExportJob:
             self.output_path = output_path
             self.output_bytes = output_bytes
             self.finished_at = datetime.now(UTC)
+            self._finished_monotonic = time.monotonic()
 
     def fail(self, message: str, stage_id: str = "") -> None:
         with self._lock:
             self.state = ExportState.FAILED
             self.error = message
             self.finished_at = datetime.now(UTC)
+            self._finished_monotonic = time.monotonic()
             stage = self.stage(stage_id) if stage_id else None
             if stage is not None:
                 stage.state = StageState.FAILED
@@ -212,6 +222,7 @@ class ExportJob:
             if self.state is ExportState.RUNNING:
                 self.state = ExportState.CANCELLED
                 self.finished_at = datetime.now(UTC)
+                self._finished_monotonic = time.monotonic()
 
     @property
     def cancelled(self) -> bool:

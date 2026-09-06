@@ -1,0 +1,115 @@
+{# The post-recording export window (D-037).
+
+   Reported: "On recording stop, I want a dedicated window rather than the current minimal flow" —
+   one that previews the recording, offers the video and audio options, shows the projected size for
+   each before committing, and then shows the pipeline running through its stages.
+
+   Two halves in one dialog, swapped rather than stacked. **Choosing** is a preview, a list of
+   presets each carrying what it would produce for *this* recording, and a size that moves as the
+   choice does. **Watching** is one row per stage, each with its own bar and its own estimate. They
+   are the same window because they are the same task, and because the thing you want to see when an
+   export finishes is what it produced against what it promised.
+
+   Reuses the modal shell and the focus trap, as the pre-flight sheet does. Focus containment and
+   restoration are the accessibility behaviour most easily got wrong twice; there is one
+   implementation of it and this is the third caller.
+
+   The sizes are **ranges** and say so. A constant-quality encode depends on what is on screen, and
+   this window's whole purpose is deciding whether a file is small enough to send — a figure
+   presented as exact would be wrong in precisely the way that matters. #}
+
+<div class="modal export" data-export hidden>
+  <div class="modal__scrim" data-export-close aria-hidden="true"></div>
+
+  <div
+    class="modal__dialog export__dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="export-title"
+    data-export-dialog
+  >
+    <header class="modal__header">
+      <h2 class="modal__title" id="export-title">Export this recording</h2>
+      <p class="modal__subtitle" data-export-subtitle>Choose how it should look, and how large it should be.</p>
+      <button
+        type="button"
+        class="button button--icon button--quiet modal__close"
+        data-export-close
+        aria-label="Close"
+      >
+        <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+          <path d="M2.5 2.5 11.5 11.5M11.5 2.5 2.5 11.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+        </svg>
+      </button>
+    </header>
+
+    <div class="modal__body export__body">
+      {# -- choosing ------------------------------------------------------------------------ #}
+      <section class="export__choose" data-export-choose>
+        <div class="export__preview">
+          {# `preload="metadata"` rather than `auto`: the file is hundreds of megabytes and sits on
+             the same disk the encoder is about to read. The first frame and the duration are what
+             this is for. #}
+          <video
+            class="export__video"
+            data-export-video
+            controls
+            preload="metadata"
+            playsinline
+          ></video>
+          <p class="export__measured" data-export-measured>Measuring the recording…</p>
+        </div>
+
+        <fieldset class="export__presets" data-export-presets>
+          <legend class="export__legend">Quality</legend>
+          {# One row per preset, built by the controller from `GET /{key}/export/options` — every
+             figure in them is measured against this recording rather than assumed, because the
+             capture ceiling is advisory and a nominal number would describe a file that does not
+             exist. #}
+        </fieldset>
+
+        <label class="export__switch">
+          <input type="checkbox" data-export-include-chat />
+          <span class="export__switch-text">
+            <span class="export__switch-name">Include my conversation with the assistant</span>
+            <span class="export__switch-hint" data-export-chat-hint>
+              Off by default. Whoever opens the export connects their own model and asks their own
+              questions; your questions would be waiting in the panel when they did.
+            </span>
+          </span>
+        </label>
+      </section>
+
+      {# -- watching ------------------------------------------------------------------------ #}
+      <section class="export__progress" data-export-progress hidden>
+        <div class="export__overall">
+          <div class="export__bar" data-export-overall-bar>
+            <span class="export__bar-fill" data-export-overall-fill></span>
+          </div>
+          <p class="export__overall-text">
+            <span data-export-overall-percent>0%</span>
+            <span class="export__overall-time" data-export-overall-time></span>
+          </p>
+        </div>
+
+        <ol class="export__stages" data-export-stages>
+          {# One row per stage, built by the controller from the job's own list rather than from a
+             hardcoded set here: the backend decides what the stages are, and a copy in the markup
+             would be a second vocabulary to keep in step. #}
+        </ol>
+
+        <p class="export__result" data-export-result role="status" hidden></p>
+      </section>
+    </div>
+
+    <footer class="modal__footer export__footer">
+      <p class="export__refusal" data-export-refusal role="alert" hidden></p>
+      <div class="export__actions">
+        <button type="button" class="button" data-export-close>Close</button>
+        <button type="button" class="button" data-export-cancel hidden>Stop</button>
+        <a class="button button--primary" data-export-download download hidden>Download</a>
+        <button type="button" class="button button--primary" data-export-start>Export</button>
+      </div>
+    </footer>
+  </div>
+</div>

@@ -548,7 +548,19 @@ says `max_height: 720` against a recording made at **2560 × 1532**.
       stale "running" frame for the life of the process, which is the bug D-033 fixed twice for
       transcription. Verified end to end against the reported recording: **129.2 MB to 28.9 MB in
       14 seconds**, against 29.7 MB predicted. Step 6 / 9.
-- [ ] **One post-recording window: preview, options, projected sizes, stages.** Steps 7–8 / 9.
+- [x] **One post-recording window: preview, options, projected sizes, stages.** It opens when a
+      recording stops — the old flow returned silently to an idle screen and left the user to find
+      the Recordings page, pick the right row, and choose between two download links with no idea
+      what either would produce — and from the Recordings page, which is where an export is retried.
+      Preview, five presets each carrying what it would produce for *this* file, a size that moves
+      with the choice, and then one row per stage with its own bar and estimate. Verified in the
+      browser against the reported recording: **123 MB to 18 MB in 14 seconds**, against 19 MB
+      predicted; focus stays inside the dialog under Tab; and at 320 px nothing scrolls sideways.
+      Three faults were found by running it and are fixed: a stray click reaching an unopened
+      controller issued `POST /api/sessions//export/start`, a refusal was left standing beside a
+      successful export, and a finished job's elapsed time kept climbing — "took 14 s" to the
+      window that watched it and "took 2 min" to one opened later, about the same file. Steps
+      7–8 / 9.
 
 - [ ] **`max_height` is advisory whenever the portal reports no geometry**, which
       `_record_scaler`'s own comment calls "the normal case on this desktop" — so a ceiling of 720

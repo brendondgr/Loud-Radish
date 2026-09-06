@@ -59,6 +59,7 @@ from ..recording import (
     WavSink,
     layout_for,
 )
+from ..recording.layout import key_for as layout_key_for
 from ..streaming.events import CommittedSegment, EngineNotice, HypothesisUpdate
 from ..streaming.guards import Severity
 from ..streaming.passthrough import build_engine
@@ -484,6 +485,7 @@ class SessionManager:
             "session.started",
             {
                 "session_id": session.session_id,
+                "key": self._session_key(),
                 "started_at": session.started_at.isoformat(),
                 "mode": session.mode,
                 "config": session.config,
@@ -558,7 +560,18 @@ class SessionManager:
             self._store.mark_ended(self._metadata.ended_at)
 
         await self._teardown()
-        self._emit("session.stopped", {"session_id": session_id, "stats": stats.as_dict()})
+        # **The key, not only the id.** Everything about a finished recording is addressed by the
+        # transcript database's stem — the recordings listing, the exports, the media route — and a
+        # client that had only the session id would have to search a listing to find the recording
+        # it had just made. `session.started` carries it for the same reason.
+        self._emit(
+            "session.stopped",
+            {
+                "session_id": session_id,
+                "key": self._session_key(),
+                "stats": stats.as_dict(),
+            },
+        )
         logger.info("Session %s stopped: %s", session_id, stats.as_dict())
         return stats
 
@@ -1267,6 +1280,13 @@ class SessionManager:
         elif state.failed:
             self._emit_failure(degradation.capture_failed(state.error))
         self._emit("capture.state", self.capture_state())
+
+    def _session_key(self) -> str:
+        """This session's key: the transcript database's stem, and its recording folder's name."""
+        metadata = self._metadata
+        if metadata is None:
+            return ""
+        return layout_key_for(metadata.started_at, metadata.session_id)
 
     def capture_state(self) -> dict[str, Any]:
         """What the monitor pane draws. Empty outside `window` mode."""

@@ -23,6 +23,7 @@ from ..services.export import DEFAULT_PRESET, PRESETS, ExportError, SourceProfil
 from ..services.export import by_id as by_preset_id
 from ..services.export import estimate as estimate_export
 from ..services.export import probe as probe_media
+from ..services.export.webapp import video_type as video_mime
 from ..services.recording import resolve_recording
 from ..services.transcript import archive
 from ..services.transcript import export as render_export
@@ -197,6 +198,34 @@ def _recording(request: Request, key: str):  # noqa: ANN202 - returns RecordingL
             },
         )
     return layout
+
+
+@router.get("/{key}/media")
+async def session_media(request: Request, key: str) -> Response:
+    """The recording itself, for the export window's preview player.
+
+    **Served with range support**, which `FileResponse` provides: a `<video>` element seeking a
+    hundreds-of-megabytes file over a route that could only send the whole thing would download all
+    of it to show a frame two minutes in.
+
+    The path is resolved from the key rather than taken from the request — the same rule every
+    route here follows, because a loopback-bound server is still reachable from any page in any
+    browser, and a route that served a path would serve any file on the machine.
+    """
+    layout = _recording(request, key)
+    video = layout.existing_video()
+    if video is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": {
+                    "code": "no-video",
+                    "message": "That recording has no video.",
+                    "severity": "warning",
+                }
+            },
+        )
+    return FileResponse(video, media_type=video_mime(video) or "application/octet-stream")
 
 
 @router.get("/{key}/export/options")

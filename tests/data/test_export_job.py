@@ -22,6 +22,7 @@ progress bar stops being believed.
 from __future__ import annotations
 
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -379,3 +380,29 @@ def test_asking_for_a_result_before_there_is_one_says_so(client, dirs) -> None:
 
     assert response.status_code == 404
     assert response.json()["detail"]["error"]["code"] == "no-export"
+
+
+def test_a_finished_job_stops_counting() -> None:
+    """It reported "took 14 s" to the window that watched it and "took 1 min" a minute later.
+
+    The same fault the session clock had (D-033), found in the browser against a real export: the
+    elapsed figure was derived from `now`, so every reader got a different answer about a file that
+    had stopped changing.
+    """
+    job = job_of(1.0)
+    job.finish("/tmp/x.zip", 1234)
+    settled = job.elapsed_s
+
+    time.sleep(0.05)
+
+    assert job.elapsed_s == pytest.approx(settled)
+
+
+def test_a_failed_job_stops_counting_too() -> None:
+    job = job_of(1.0)
+    job.fail("the encoder fell over")
+    settled = job.elapsed_s
+
+    time.sleep(0.05)
+
+    assert job.elapsed_s == pytest.approx(settled)

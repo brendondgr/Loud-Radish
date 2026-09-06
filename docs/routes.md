@@ -96,6 +96,7 @@ minutes ago.
 | `GET` | `/api/sessions/{key}/export?fmt=&include_chat=` | Text, Markdown, SRT, VTT, or JSON. `include_chat` defaults to **false** | **Implemented** |
 | `GET` | `/api/sessions/{key}/chat?fmt=` | The conversation on its own — Markdown or JSON | **Implemented** |
 | `GET` | `/api/sessions/{key}/webapp?include_chat=` | The recording as a self-contained web application, as a ZIP. `include_chat` defaults to **false** | **Implemented** |
+| `GET` | `/api/sessions/{key}/media` | The recording itself, with range support, for the export window's preview | **Implemented** |
 | `GET` | `/api/sessions/{key}/export/options` | What this recording measurably is, and what each preset would turn it into | **Implemented** |
 | `POST` | `/api/sessions/{key}/export/start?preset=&include_chat=` | Begin a staged export. Returns the job, not the file | **Implemented** |
 | `GET` | `/api/sessions/{key}/export/status` | The current or most recent export — the reconciliation path after a reload | **Implemented** |

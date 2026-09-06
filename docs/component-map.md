@@ -24,6 +24,8 @@ web/frontend/
 │   └── partials/               one file per region of the interface
 │       ├── header.html, banners.html, status_bar.html
 │       ├── preflight.html      the per-run capture options sheet
+│       ├── export.html         the post-recording export window: preview and presets on one
+│       │                       face, the pipeline's stages on the other
 │       ├── transcript/         pane, toolbar, hypothesis, empty state, glossary panel…
 │       ├── chat/               pane, composer, quick actions, empty state
 │       ├── monitor/            the recording monitor pane and its states
@@ -37,10 +39,14 @@ web/frontend/
     └── js/
         ├── main.js             the application page's entry point
         ├── sessions.js         the recordings page's entry point — the list, the media
-        │                       chips, and the four exports including the web application
-        ├── core/               DOM helpers, the event bus, formatting, preferences, modes
+        │                       chips, the transcript and conversation exports, and the
+        │                       export window (polled, since this page has no socket)
+        ├── core/               DOM helpers, the event bus, formatting, preferences, modes,
+        │                       export presets — the last two mirrored from the backend and
+        │                       held identical by a test
         ├── transport/          HTTP client, WebSocket, event names
-        ├── stores/             state: transcript, polish, session, mode, health, config, chat
+        ├── stores/             state: transcript, polish, session, mode, health, config, chat,
+        │                       capture, export
         ├── components/         one class per region, plus settings/ per tab
         └── a11y/               the focus trap
 ```

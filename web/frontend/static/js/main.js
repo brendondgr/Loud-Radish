@@ -12,6 +12,7 @@ import { ARMING, IDLE, PROCESSING, STOPPING, WINDOW } from "./core/modes.js";
 import * as prefs from "./core/storage.js";
 import { Banners } from "./components/banners.js";
 import { ChatPane } from "./components/chat-pane.js";
+import { ExportDialog } from "./components/export-dialog.js";
 import { GlossaryPanel } from "./components/glossary-panel.js";
 import { Header } from "./components/header.js";
 import { ModeSwitcher } from "./components/mode-switcher.js";
@@ -32,6 +33,9 @@ import {
   SESSION_STARTED,
   SESSION_STATE,
   SESSION_CAPTURE_ENDED,
+  EXPORT_DONE,
+  EXPORT_FAILED,
+  EXPORT_PROGRESS,
   SESSION_STOPPED,
   STATUS,
   TRANSCRIPT_COMMITTED,
@@ -49,6 +53,7 @@ import { health } from "./stores/health.js";
 import { MODE_CHANGED, mode } from "./stores/mode.js";
 import { polish } from "./stores/polish.js";
 import { capture } from "./stores/capture.js";
+import { exportJob } from "./stores/export.js";
 import { recording } from "./stores/recording.js";
 import { session } from "./stores/session.js";
 import { transcript } from "./stores/transcript.js";
@@ -89,6 +94,8 @@ function boot() {
     onOpenSettings: (section) => settings.show(section),
   });
 
+  exportWindow = new ExportDialog($("[data-export]"));
+
   const header = new Header($(".header"), {
     onStart: (name) => start(name, null, banners, settings),
     onArm: (name) => arm(name, preflight, banners, settings),
@@ -120,6 +127,7 @@ function boot() {
   wireTranscript(socket, pane);
   wireHealth();
   wireRecording(banners);
+  wireExport();
   wireSession(header);
   wireControls(pane);
   wireChat(chatPane);
@@ -175,6 +183,28 @@ function wireTranscript(socket, pane) {
  * The run state is driven from the server's events rather than guessed locally, because the pass
  * outlives the page: a reload halfway through must resume showing progress.
  */
+/**
+ * The export window, held here rather than passed down.
+ *
+ * It is opened from two unrelated places — the moment a recording stops, and the transport events
+ * that report an export already running — and threading one reference through both would mean the
+ * socket wiring taking a component argument it otherwise has no use for.
+ */
+let exportWindow = null;
+
+async function openExport(key) {
+  if (!exportWindow || exportWindow.isOpen) return;
+  await exportWindow.show(key);
+}
+
+function wireExport() {
+  // Every event carries the same payload, so there is one adoption and a separate question about
+  // which arrived — the arrangement that keeps the two from getting out of step.
+  for (const event of [EXPORT_PROGRESS, EXPORT_DONE, EXPORT_FAILED]) {
+    on(event, (payload) => exportJob.set(payload));
+  }
+}
+
 function wireRecording(banners) {
   on(RECORDING_PROGRESS, (payload) => recording.setRecording(payload));
   on(CAPTURE_STATE, (payload) => capture.set(payload));
@@ -257,6 +287,13 @@ function wireSession(header) {
   on(SESSION_STOPPED, (payload) => {
     session.stop(payload);
     mode.adoptSession({ running: false, mode: session.mode });
+    // **The recording is the thing that just happened, so the window about it opens now.** The old
+    // flow returned silently to an idle screen and left the user to find the Recordings page, pick
+    // the right row, and choose between two download links with no idea what either would produce.
+    // Opened after a tick, so the stop's own state changes have painted first.
+    if (payload?.key) {
+      setTimeout(() => void openExport(payload.key), 0);
+    }
   });
 
   on(SESSION_STATE, (state) => {
