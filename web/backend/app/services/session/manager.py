@@ -898,6 +898,7 @@ class SessionManager:
             spec,
             portal_fd=stream.fd,
             on_stopped=self._on_recorder_stopped,
+            on_health=self._on_recorder_health,
             log_dir=Path("logs"),
         )
         self._recorder.start()
@@ -999,6 +1000,19 @@ class SessionManager:
         )
         return lag
 
+    def _on_recorder_health(self, state: RecorderState) -> None:
+        """The video started or stopped writing while the process stayed alive (D-036).
+
+        Reported both ways round. A stall banner left standing after the capture recovered is the
+        same class of fault as no banner at all — it says something untrue about a recording in
+        progress — so the recovery gets its own message rather than a silent clearance.
+        """
+        if state.stalled:
+            self._emit_failure(degradation.capture_stalled(state.stalled_seconds))
+        else:
+            self._emit_failure(degradation.capture_resumed())
+        self._emit("capture.state", self.capture_state())
+
     def _on_recorder_stopped(self, state: RecorderState) -> None:
         """The video ended without being asked to. Usually the window was closed."""
         if state.window_closed:
@@ -1015,6 +1029,10 @@ class SessionManager:
             "recording": bool(recorder and recorder.is_running),
             "window_closed": bool(recorder and recorder.state.window_closed),
             "failed": bool(recorder and recorder.state.failed),
+            # Alive and writing nothing — the state that had no name, and the reason a seminar
+            # recorded fourteen minutes and then reported itself healthy for another fifteen.
+            "stalled": bool(recorder and recorder.state.stalled),
+            "stalled_seconds": round(recorder.state.stalled_seconds, 1) if recorder else 0.0,
             "error": recorder.state.error if recorder else "",
             "video_path": recorder.state.video_path if recorder else "",
             "bytes": recorder.state.bytes_written if recorder else 0,

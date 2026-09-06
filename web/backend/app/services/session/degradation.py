@@ -287,6 +287,39 @@ def capture_failed(detail: str) -> Failure:
     )
 
 
+def capture_stalled(quiet_s: float) -> Failure:
+    """The video recorder is alive and has stopped writing anything (D-036).
+
+    **The failure that had no name.** A capture whose source stops delivering buffers keeps its
+    process, keeps its file handle, and keeps answering "still running" to the only question the
+    supervisor used to ask — so fourteen minutes of a seminar went unrecorded without a log line.
+    Saying it while it is happening is the whole point: the recording is still going, and there is
+    still time to do something about the window it is pointed at.
+    """
+    return Failure(
+        code="capture-stalled",
+        message=(
+            f"The video has recorded nothing for {quiet_s:.0f} seconds. The window may have been "
+            "minimised, closed, or frozen. Audio and the transcript are unaffected."
+        ),
+        severity=Severity.WARNING,
+        transcription_continues=True,
+    )
+
+
+def capture_resumed() -> Failure:
+    """The video is being written again.
+
+    Reported so a stall banner is answered rather than left standing.
+    """
+    return Failure(
+        code="capture-resumed",
+        message="The video is recording again.",
+        severity=Severity.INFO,
+        transcription_continues=True,
+    )
+
+
 def video_ended_early(shortfall_s: float, audio_name: str) -> Failure:
     """The combined file is shorter than the recording, because the picture stopped first.
 

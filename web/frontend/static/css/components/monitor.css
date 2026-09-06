@@ -84,7 +84,8 @@
   color: var(--text-muted);
 }
 
-.monitor-empty[data-variant="failed"] .monitor-empty__title {
+.monitor-empty[data-variant="failed"] .monitor-empty__title,
+.monitor-empty[data-variant="stalled"] .monitor-empty__title {
   color: var(--warning-text);
 }
 

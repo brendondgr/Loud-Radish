@@ -70,10 +70,13 @@ class FakeRecorder:
 
     instances: list[FakeRecorder] = []
 
-    def __init__(self, spec, *, portal_fd=None, on_stopped=None, log_dir=None) -> None:
+    def __init__(
+        self, spec, *, portal_fd=None, on_stopped=None, on_health=None, log_dir=None, log_name=""
+    ) -> None:
         self.spec = spec
         self.portal_fd = portal_fd
         self.on_stopped = on_stopped
+        self.on_health = on_health
         self.started = False
         self.stopped = False
         self.fail_on_start = False

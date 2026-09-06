@@ -190,7 +190,10 @@ def build(
 
     args: list[str] = [
         "gst-launch-1.0",
-        "-q",
+        # **No `-q`.** It suppressed the bus messages GStreamer posts when a source renegotiates,
+        # errors, or goes away — which is precisely the account that was missing when a seminar's
+        # capture went quiet at 14 m 43 s and stayed that way. stderr goes to a file rather than a
+        # pipe (see `recorder.py`), so a talkative pipeline cannot block on it.
         # `-e` sends end-of-stream on SIGINT, which is what finalises the container. Without it a
         # stopped recording is a file with no duration index that many players refuse to seek.
         "-e",

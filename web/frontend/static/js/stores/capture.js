@@ -15,6 +15,8 @@ class CaptureStore {
     this.recording = false;
     this.windowClosed = false;
     this.failed = false;
+    this.stalled = false;
+    this.stalledSeconds = 0;
     this.error = "";
     this.videoPath = "";
     this.bytes = 0;
@@ -32,6 +34,10 @@ class CaptureStore {
     this.recording = Boolean(payload.recording);
     this.windowClosed = Boolean(payload.window_closed);
     this.failed = Boolean(payload.failed);
+    // Alive and writing nothing. Distinct from `failed` on purpose: the recording is still going
+    // and there is still time to do something about the window it is pointed at.
+    this.stalled = Boolean(payload.stalled);
+    this.stalledSeconds = payload.stalled_seconds ?? 0;
     this.error = payload.error ?? "";
     this.videoPath = payload.video_path ?? "";
     this.bytes = payload.bytes ?? 0;
@@ -45,6 +51,8 @@ class CaptureStore {
     this.recording = false;
     this.windowClosed = false;
     this.failed = false;
+    this.stalled = false;
+    this.stalledSeconds = 0;
     this.error = "";
     this.videoPath = "";
     this.bytes = 0;
