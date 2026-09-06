@@ -562,6 +562,10 @@ says `max_height: 720` against a recording made at **2560 × 1532**.
       window that watched it and "took 2 min" to one opened later, about the same file. Steps
       7–8 / 9.
 
+- [x] **The plan is complete (9 / 9) and recorded as D-036 and D-037.** What was departed from, and
+      why, is written down in the plan's own "What Changed From the Plan" section rather than left
+      to be rediscovered.
+
 - [ ] **`max_height` is advisory whenever the portal reports no geometry**, which
       `_record_scaler`'s own comment calls "the normal case on this desktop" — so a ceiling of 720
       recorded at 2560 × 1532, roughly four times the intended pixel work, competing with the
@@ -703,6 +707,21 @@ user's own machine, and none may be reported as passing until it has had one.
       whether it honours the no-markup rule, whether the no-reasoning fields are accepted by the
       user's server, and whether the length guard's default floor is right. Run a talk with a local
       model and read the result against the raw transcript.
+- [ ] **A window recording that has to resume (D-036).** The stall detector, the reopen, and the
+      stitching are covered by tests against a real `ffmpeg` and a stubbed portal, and the pieces
+      have been joined into a correct timeline under measurement. What has **not** been observed is
+      the whole thing on a real desktop: close the captured window mid-talk, or drop the network
+      under a video call, and confirm that the portal restores without a picker appearing, that the
+      video that comes out plays continuously with a held frame across the gap, and that the sound
+      after the gap is still in step with the transcript. This is the one behaviour in the repair
+      whose failure mode is silent, since a capture that does not resume looks exactly like a
+      capture that ended.
+- [ ] **The export estimator against your own content and your own CPU (D-037).** Both constants are
+      local: content decides the size and the processor decides the time, and the ones shipped were
+      fitted to a slide-heavy seminar on a 32-core machine. Run
+      `uv run scripts/calibrate_export_estimate.py data/recordings/<key>/video-with-audio.webm`
+      against a recording of a *different* kind — one that cuts between cameras rather than sitting
+      on a slide — and see whether the measurement still lands inside the range.
 - [ ] **A genuine 90-minute soak** — the accelerated soak in `tests/transcription/test_soak.py`
       drives ninety minutes of transcript through the engine in seconds and holds bounded memory,
       contiguous segment ids, and a clock that has not drifted. It is not the same as ninety

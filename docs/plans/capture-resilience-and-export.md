@@ -1,6 +1,6 @@
 # Capture Resilience and the Export Window
 
-*Written 2026-09-06. Status: **Planned (0 / 9 steps)**.*
+*Written 2026-09-06. Status: **Complete (9 / 9 steps)**. Recorded as D-036 and D-037.*
 
 Four things reported together against the application after a Zoom seminar: a recording that stopped
 capturing partway through, an export that carries the user's own conversation into a file meant for
@@ -132,7 +132,7 @@ middle steps introduce.
 
 ## 3. Hierarchical Step-by-Step Instructions
 
-### Step 1: The mux stops destroying the audio it was given
+### Step 1: The mux stops destroying the audio it was given ✅
 
 - **Locations**: `web/backend/app/services/capture/mux.py` — `combine()`, `MuxResult`,
   `has_both_streams()`, new `_duration()` helper. `web/backend/app/services/recording/runner.py` —
@@ -154,7 +154,7 @@ middle steps introduce.
   output does not fully contain.
 - **Docs**: `docs/documentation.md` (Decision Log — new entry), `docs/checklist.md`.
 
-### Step 2: The recorder notices a capture that has stopped producing
+### Step 2: The recorder notices a capture that has stopped producing ✅
 
 - **Locations**: `web/backend/app/services/capture/recorder.py` — `RecorderState` (new
   `stalled`, `last_progress_at`, `frozen_seconds` fields), `_watch()`, new `_sample_progress()`.
@@ -180,7 +180,7 @@ middle steps introduce.
   reported instead of running silently to the end of the session.
 - **Docs**: `docs/documentation.md`, `docs/api-contract.md` (the `capture.state` shape).
 
-### Step 3: A capture that ends mid-session resumes where it left off
+### Step 3: A capture that ends mid-session resumes where it left off ✅
 
 - **Locations**: `web/backend/app/services/session/manager.py` — `_on_recorder_stopped`, new
   `_resume_window_capture()` and `_capture_segments` list; `_start_window_capture` refactored so the
@@ -215,7 +215,7 @@ middle steps introduce.
 - **Docs**: `docs/documentation.md`, `docs/structure.md` (the new `stitch.py`), `docs/data-flow.md`,
   `docs/checklist.md`.
 
-### Step 4: The user's conversation leaves the shared export
+### Step 4: The user's conversation leaves the shared export ✅
 
 - **Locations**: `web/backend/app/services/export/payload.py` — drop `chat` from
   `transcript_payload()`, add `chat_payload()`. `web/backend/app/services/export/webapp.py` —
@@ -243,7 +243,7 @@ middle steps introduce.
   exports on its own.
 - **Docs**: `docs/api-contract.md`, `docs/routes.md`, `docs/documentation.md`, `docs/data-flow.md`.
 
-### Step 5: A recording can be measured, and a re-encode of it can be predicted
+### Step 5: A recording can be measured, and a re-encode of it can be predicted ✅
 
 - **Locations**: `web/backend/app/services/export/profile.py` (new) — `SourceProfile` from
   `ffprobe` (width, height, frame rate, duration, video and audio bitrate, size on disk) and
@@ -272,7 +272,7 @@ middle steps introduce.
   predicted from it before anything is encoded.
 - **Docs**: `docs/structure.md`, `docs/documentation.md`, `docs/api-contract.md`.
 
-### Step 6: The export runs as a staged job that reports its progress
+### Step 6: The export runs as a staged job that reports its progress ✅
 
 - **Locations**: `web/backend/app/services/export/job.py` (new) — `ExportJob` and `ExportStage`,
   modelled on `services/recording/job.py`, with per-stage progress and its own single-slot
@@ -305,7 +305,7 @@ middle steps introduce.
 - **Docs**: `docs/api-contract.md`, `docs/routes.md`, `docs/data-flow.md`, `docs/structure.md`,
   `docs/documentation.md`.
 
-### Step 7: The export window — preview, options, and projected sizes
+### Step 7: The export window — preview, options, and projected sizes ✅
 
 - **Locations**: `web/frontend/templates/partials/export.html` (new), included in
   `templates/pages/app.html` outside `.app` beside `preflight.html`.
@@ -331,7 +331,7 @@ middle steps introduce.
   file size for each before anything is exported.
 - **Docs**: `docs/component-map.md`, `docs/design-system.md`, `docs/routes.md`, `docs/structure.md`.
 
-### Step 8: The window watches the pipeline run
+### Step 8: The window watches the pipeline run ✅
 
 - **Locations**: `web/frontend/static/js/components/export-dialog.js` — the progress view.
   `web/frontend/static/js/stores/export.js` — consume `export.progress` / `.done` / `.failed`.
@@ -356,7 +356,7 @@ middle steps introduce.
 - **Docs**: `docs/component-map.md`, `docs/data-flow.md`, `docs/motion-spec.md` if any new indicator
   motion is introduced.
 
-### Step 9: Documentation, the decision log, and the merge
+### Step 9: Documentation, the decision log, and the merge ✅
 
 - **Locations**: `docs/documentation.md` (status table and Decision Log entries D-036 and D-037),
   `docs/structure.md`, `docs/api-contract.md`, `docs/routes.md`, `docs/data-flow.md`,
@@ -409,3 +409,33 @@ middle steps introduce.
 | **Preset vocabulary test** | `core/export-presets.js` and `services/export/presets.py` agree exactly | `tests/utils/test_export_preset_vocabulary.py` |
 | Estimator calibration script | Encodes a real recording at every preset and reports predicted against actual | `scripts/calibrate_export_estimate.py` |
 | Recording forensics script | Reports frame-rate continuity, gaps, and stream end times for a recording folder — the analysis that diagnosed this fault, made repeatable | `scripts/inspect_recording.py` |
+
+
+---
+
+## 5. What Changed From the Plan
+
+Recorded because a plan that is quietly departed from is a plan nobody trusts next time.
+
+- **`progressreport` was not added to the GStreamer pipeline** (Step 2). Sampling the output file's
+  size answers the same question — is it still writing — for one `stat` per tick and no change to a
+  launch line with a bad history. `progressreport` writes to stdout, which the recorder sends to
+  `DEVNULL`, so using it would have meant a second reader thread for an answer already in hand.
+
+- **stderr goes to a file rather than a pipe** (Step 2), which the plan did not call for. Dropping
+  `-q` makes the pipeline talkative, and a pipe nobody drains until the process exits blocks its
+  writer at 64 KB — a way of *causing* the stall being detected.
+
+- **The sixth export preset was removed after it was measured** (Step 5). VP9 in WebM at the same
+  nominal quality produced a sixth more bytes in ten times the wall clock. The plan listed it; the
+  calibration script the plan also called for is what disqualified it.
+
+- **`capture.max_height` was left as it is** (Step 5's rationale, not its steps). The plan's §2 said
+  the ceiling is advisory; the remedy taken is to make resolution an export-time decision rather
+  than to change `_record_scaler`, whose caps history includes a 480 × 16 recording and an integer
+  overflow. Whether capture should also enforce it is now an open item in
+  [../checklist.md](../checklist.md), needing a real portal stream to test against.
+
+- **Three faults were found by running the window in a browser** (Step 8) rather than by the tests:
+  a stray click reaching an unopened controller, a refusal left standing beside a success, and a
+  finished job whose elapsed time kept climbing. All three are fixed and the last has a test.
