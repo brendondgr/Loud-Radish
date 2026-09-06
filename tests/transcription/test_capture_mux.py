@@ -184,3 +184,105 @@ def test_the_duration_probe_reports_zero_for_something_it_cannot_read(tmp_path) 
 
     assert mux.probe_duration(junk) == 0.0
     assert mux.probe_duration(tmp_path / "absent.webm") == 0.0
+
+
+# -- the whole of both inputs ------------------------------------------------------------------
+#
+# Measured against `data/recordings/20260904-155600-08ab28c2d732`: 3925.7 s of audio, a video whose
+# frames stop at 882.5 s, and a combined file in which *both* streams end at 1765.2 s. `-shortest`
+# cut the sound to the broken picture, the result still held one stream of each kind so it passed
+# verification, and the sources went. Thirty-six minutes of a seminar survived the recording and
+# were lost to the tidy-up.
+
+
+def test_the_output_runs_as_long_as_the_sound_when_the_video_stopped_early(tmp_path) -> None:
+    video = write_video(tmp_path / "video.webm", seconds=2.0)
+    audio = write_audio(tmp_path / "audio.wav", seconds=8.0)
+
+    result = mux.combine(video, audio)
+
+    assert result.ok
+    assert mux.probe_duration(result.path) == pytest.approx(8.0, abs=0.3), (
+        "the sound was truncated to the picture"
+    )
+
+
+def test_a_video_that_stopped_early_keeps_every_source(tmp_path) -> None:
+    """The deletion guard. The combined file is the only other copy and it is not a whole one."""
+    video = write_video(tmp_path / "video.webm", seconds=2.0)
+    audio = write_audio(tmp_path / "audio.wav", seconds=8.0)
+
+    result = mux.combine(video, audio)
+
+    assert result.ok
+    assert result.audio_shortfall_s == 0.0, "the output carries all of the sound, so nothing is due"
+    assert result.removed_source is True
+    assert not video.exists()
+
+
+def test_an_output_shorter_than_its_audio_reports_it_and_deletes_nothing(
+    tmp_path, monkeypatch
+) -> None:
+    """What the guard actually guards: an output that does not contain what it was given.
+
+    `combine` can no longer produce such an output, which is the repair — so the shortfall is
+    injected and the *branch* is what gets exercised. Without this the guard would be untested
+    code protecting against the exact fault that was reported.
+    """
+    video = write_video(tmp_path / "video.webm", seconds=4.0)
+    audio = write_audio(tmp_path / "audio.wav", seconds=6.0)
+
+    def short_audio(output, source):
+        return 36.0 * 60.0 if str(source).endswith(".wav") else 0.0
+
+    monkeypatch.setattr(mux, "shortfall_against", short_audio)
+
+    result = mux.combine(video, audio)
+
+    assert result.ok
+    assert result.audio_shortfall_s == pytest.approx(2160.0)
+    assert result.removed_source is False
+    assert video.exists(), "the source went while the output did not hold all of the sound"
+
+
+def test_a_shortfall_in_the_video_also_keeps_every_source(tmp_path, monkeypatch) -> None:
+    """A mux that dropped picture is a fault, and a fault is never a reason to delete."""
+    video = write_video(tmp_path / "video.webm", seconds=4.0)
+    audio = write_audio(tmp_path / "audio.wav", seconds=6.0)
+
+    monkeypatch.setattr(
+        mux,
+        "shortfall_against",
+        lambda output, source: 5.0 if str(source).endswith(".webm") else 0.0,
+    )
+
+    result = mux.combine(video, audio)
+
+    assert result.video_shortfall_s == pytest.approx(5.0)
+    assert result.removed_source is False
+    assert video.exists()
+
+
+def test_a_longer_output_is_never_reported_as_short(tmp_path) -> None:
+    video = write_video(tmp_path / "video.webm", seconds=2.0)
+    audio = write_audio(tmp_path / "audio.wav", seconds=8.0)
+
+    assert mux.shortfall_against(audio, video) == 0.0
+
+
+def test_a_shortfall_inside_the_tolerance_is_not_one(tmp_path) -> None:
+    """Container durations disagree by a frame or two as a matter of course."""
+    long = write_video(tmp_path / "long.webm", seconds=4.0)
+    short = write_video(tmp_path / "short.webm", seconds=3.6)
+
+    assert mux.shortfall_against(short, long) == 0.0
+
+
+def test_an_unreadable_duration_reports_no_shortfall(tmp_path) -> None:
+    """A probe that could not run must not stop a tidy-up, any more than it may cause a loss."""
+    video = write_video(tmp_path / "video.webm", seconds=2.0)
+    junk = tmp_path / "notes.txt"
+    junk.write_text("not a video")
+
+    assert mux.shortfall_against(junk, video) == 0.0
+    assert mux.shortfall_against(video, junk) == 0.0

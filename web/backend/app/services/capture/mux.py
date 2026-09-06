@@ -26,6 +26,18 @@ audio-relative and the exported web application syncs the transcript against thi
 the audio's head to meet the video would silently invalidate every timestamp in every export. The
 recording opens instead on its first frame, held still for as long as the capture took to start,
 which is a truthful picture of a moment when nothing was being captured yet.
+
+**And it keeps the whole of both, which is a repair.** This used to pass ``-shortest``, to avoid a
+long tail of audio over a frozen frame when the captured window was closed early. Measured against
+a 68-minute seminar whose video died at 14 m 43 s: the sound ran to 3925.7 s, the picture to
+1765.2 s, and ``-shortest`` cut the output to the picture. The combined file was then probed,
+found to hold both a video and an audio track — both truncated, but both present — so the source
+video was deleted, and the source WAV went with the transcription pass that had already succeeded.
+**Thirty-six minutes of a talk survived every stage of the recording and were destroyed by the one
+that tidies up.** A frozen tail is a cosmetic complaint; deleting evidence to answer it is not a
+trade worth making, and the tail is in any case a truthful picture of a capture that stopped. So
+the output now runs as long as its longer input, and a source is deleted only when the output
+demonstrably contains it — same duration, not merely the same kinds of stream.
 """
 
 from __future__ import annotations
@@ -58,10 +70,22 @@ class MuxResult:
     video_lag_s: float = 0.0
     #: Whether the silent original was removed. False when it was kept, and the reason says why.
     removed_source: bool = False
+    #: Seconds of audio the output is missing against the source WAV. Non-zero means the video
+    #: stopped early, and is what tells the caller the source audio must not be deleted either.
+    audio_shortfall_s: float = 0.0
+    #: Seconds of video the output is missing against the source video. Non-zero means the mux
+    #: itself dropped picture, which is a fault rather than a short recording.
+    video_shortfall_s: float = 0.0
 
 
 #: Offsets below this are not worth correcting and are within the measurement's own error.
 MIN_LAG_S: Final = 0.08
+
+#: How much shorter than a source the output may be before it counts as missing something.
+#: Container durations disagree with each other by a frame or two as a matter of course — the
+#: measured muxes in ``data/recordings/`` differ from their inputs by up to 6 ms — so the threshold
+#: is far above that noise and far below any truncation worth worrying about.
+DURATION_TOLERANCE_S: Final = 1.0
 
 #: An offset larger than this is not a measurement, it is a fault. Applying one would push the
 #: picture minutes away from the sound, which is far worse than the drift it was meant to fix.
@@ -124,6 +148,22 @@ def has_both_streams(path: str | Path) -> bool:
     """
     kinds = set(_probe(Path(path), "stream=codec_type"))
     return {"video", "audio"} <= kinds
+
+
+def shortfall_against(output: str | Path, source: str | Path) -> float:
+    """Seconds of ``source`` the muxed ``output`` does not contain.
+
+    Zero when the output is at least as long, when either duration cannot be read, or when the
+    difference is inside :data:`DURATION_TOLERANCE_S`. **An unreadable duration reports zero on
+    purpose**: this number guards a deletion, and a probe that could not run must not be what stops
+    the tidy-up any more than it may be what causes a loss. The pairing that matters — both files
+    readable and the output plainly shorter — is unambiguous.
+    """
+    out_s = probe_duration(output)
+    src_s = probe_duration(source)
+    if out_s <= 0.0 or src_s <= 0.0:
+        return 0.0
+    return max(0.0, src_s - out_s) if src_s - out_s > DURATION_TOLERANCE_S else 0.0
 
 
 def combine(
@@ -191,9 +231,10 @@ def combine(
         "libopus",
         "-b:a",
         "64k",
-        # Stop at whichever stream ends first. The video ends early whenever the captured window
-        # was closed, and without this the file gets a long tail of audio over a frozen frame.
-        "-shortest",
+        # **No `-shortest`.** The output runs as long as its longer input. When the video ended
+        # early the file carries a held frame over the remaining sound, which is what actually
+        # happened; truncating to the picture instead deleted thirty-six minutes of a seminar,
+        # because the sources go once the output is judged complete.
         str(output),
     ]
 
@@ -221,12 +262,28 @@ def combine(
     else:
         logger.info("Combined audio and video into %s", output.name)
 
-    # **Verified, then removed.** "Exists and has bytes" was already true of a mux that copied the
-    # video and silently dropped the audio, which is the one failure that must not cost the only
-    # other copy of the picture. Probing for both streams is what makes deletion safe — and
-    # deletion is what stops every window recording storing the same footage twice.
+    # **Verified, then removed — and verification is now about length as well as kind.** "Exists
+    # and has bytes" was already true of a mux that copied the video and silently dropped the
+    # audio. "Holds both kinds of stream" was already true of a mux that truncated both to a video
+    # that died at a quarter of the way in. What makes a deletion safe is the output containing the
+    # source, so that is what is asked.
+    audio_short = shortfall_against(output, audio)
+    video_short = shortfall_against(output, video)
+
     removed = False
-    if not keep_sources:
+    if audio_short:
+        # Not an error — a video that stopped early is a thing that happens, and the combined file
+        # is still correct for as far as the picture goes. It does mean every source stays.
+        logger.warning(
+            "The combined file is %.1fs shorter than the recorded audio; keeping both sources.",
+            audio_short,
+        )
+    elif video_short:
+        logger.warning(
+            "The combined file is %.1fs shorter than the recorded video; keeping both sources.",
+            video_short,
+        )
+    elif not keep_sources:
         if has_both_streams(output):
             video.unlink(missing_ok=True)
             removed = True
@@ -236,4 +293,11 @@ def combine(
                 video.name,
             )
 
-    return MuxResult(True, path=str(output), video_lag_s=lag, removed_source=removed)
+    return MuxResult(
+        True,
+        path=str(output),
+        video_lag_s=lag,
+        removed_source=removed,
+        audio_shortfall_s=audio_short,
+        video_shortfall_s=video_short,
+    )

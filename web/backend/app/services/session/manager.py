@@ -186,6 +186,10 @@ class SessionManager:
         self._tap_match = False
         #: Where the video landed, kept past teardown so the audio can be muxed into it.
         self._video_path = ""
+        #: Seconds of sound the combined file does not carry, because the video stopped early.
+        #: Non-zero makes the WAV the only complete copy of the talk, so retention stops being a
+        #: setting for this run: it is kept whatever Settings → Storage says.
+        self._audio_shortfall_s = 0.0
         #: The per-run options a window session was armed with.
         self._options: CaptureOptions | None = None
         #: The post-capture transcription pass. Deliberately owned here rather than by the session:
@@ -944,12 +948,20 @@ class SessionManager:
         if not result.ok:
             logger.warning("Could not combine audio and video: %s", result.reason)
             return
+        self._audio_shortfall_s = result.audio_shortfall_s
         logger.info(
             "Recording saved with audio: %s (video delayed %.3fs; silent original %s)",
             result.path,
             result.video_lag_s,
             "removed" if result.removed_source else "kept",
         )
+        if result.audio_shortfall_s:
+            # Said out loud rather than absorbed. The combined file is short because the picture
+            # stopped, and the user is about to be told the video ended early anyway; what this
+            # adds is that the sound did not, and where the whole of it still is.
+            self._emit_failure(
+                degradation.video_ended_early(result.audio_shortfall_s, Path(audio).name)
+            )
 
     def _measure_video_lag(self, video: str, sink: WavSink) -> float:
         """How much later than the audio the video began, in seconds.
@@ -1080,7 +1092,10 @@ class SessionManager:
         started = self._runner.start(
             job=job,
             store=self._store,
-            retain_audio=config.storage.retain_audio,
+            # **Retention is not a setting when the video came up short.** The combined file is
+            # then the only other copy of the sound and it does not hold all of it, so deleting
+            # the WAV would destroy the part no other file contains.
+            retain_audio=config.storage.retain_audio or bool(self._audio_shortfall_s),
             prompt=self._prompts.build() if self._prompts else None,
         )
         # The reference is deliberately *kept*, unlike ownership. `GET /api/transcript/...` serves

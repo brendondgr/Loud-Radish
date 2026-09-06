@@ -493,6 +493,57 @@ passes, and a muxed file with sound in it.
       is the documented bound of D-031 rather than a regression, and closing it would mean deciding
       what "the current session" means to a process that has just started.
 
+## Part 3k — A Seminar That Stopped Recording, and the Export Window
+
+Reported after a Zoom seminar on 2026-09-04, planned in
+[plans/capture-resilience-and-export.md](plans/capture-resilience-and-export.md).
+
+The evidence is still in `data/recordings/20260904-155600-08ab28c2d732/`, and it is unambiguous.
+Audio and transcript run the full **3925.7 s**. Video frames run at a steady 15.0 fps from 0.000 s
+to **882.542 s**, then stop entirely for 882.6 s, then two final frames at 1765.16 s — the EOS
+flush. The combined file ends **both** streams at 1765.227 s. And the session's own config snapshot
+says `max_height: 720` against a recording made at **2560 × 1532**.
+
+- [x] **The mux keeps the whole of what it was given.** `-shortest` truncated the sound to the
+      broken picture; the result still held one stream of each kind, so it passed verification and
+      the sources went. Thirty-six minutes of the talk survived the recording and were destroyed by
+      the tidy-up. The output now runs as long as its longer input, and a source is deleted only
+      when the output demonstrably *contains* it — same duration, not merely the same kinds of
+      stream. Step 1 / 9.
+- [x] **A short combined file keeps the audio whatever Settings says.** Retention stops being a
+      preference at the moment the WAV becomes the only complete copy of the talk. Step 1 / 9.
+- [ ] **A capture that stops producing frames is noticed.** `_watch` polls `process.poll()` and
+      asks one question — has it exited — which a stalled pipeline answers "no" to for as long as
+      it lasts. Step 2 / 9.
+- [ ] **A capture that ends mid-session resumes.** The portal's restore token is persisted on every
+      start for exactly this reuse and has never been used for it within a session. Step 3 / 9.
+- [ ] **The user's conversation leaves the shared export.** Step 4 / 9.
+- [ ] **A re-encode can be measured before it is committed to.** Step 5 / 9.
+- [ ] **Exporting is a staged job with real progress.** Step 6 / 9.
+- [ ] **One post-recording window: preview, options, projected sizes, stages.** Steps 7–8 / 9.
+
+- [ ] **`max_height` is advisory whenever the portal reports no geometry**, which
+      `_record_scaler`'s own comment calls "the normal case on this desktop" — so a ceiling of 720
+      recorded at 2560 × 1532, roughly four times the intended pixel work, competing with the
+      speech model for the same cores. Not fixed at capture: the caps history in that function is
+      bad enough that changing it blind is how a recording came out 480 × 16. The remedy taken is
+      to make resolution an **export-time** decision, where the real dimensions are known from the
+      finished file. Whether capture should also enforce it needs a real portal stream to test
+      against.
+- [ ] **Why the PipeWire node stalled rather than ended is not recoverable** from what survives.
+      `logs/capture.log` still holds an unrelated `amdgpu` line from 2026-08-16, because
+      `_write_log` writes only when stderr was non-empty and this run produced none — `gst-launch`
+      is invoked with `-q`. Step 2 drops `-q` so the next occurrence is diagnosable.
+
+- [ ] **Four tests in `tests/transcription/test_window_audio.py` fail on a quiet machine.**
+      `test_window_mode_opens_the_machines_output_not_a_microphone` and three beside it reach the
+      real PipeWire graph and raise `MonitorUnavailable` when nothing is playing. Pre-existing and
+      unrelated to this plan — confirmed by running them against a clean tree — but they make
+      `uv run pytest` red for anyone who is not playing audio, which is most runs. They need either
+      a stubbed graph or a skip guard.
+
+---
+
 ---
 
 ## Part 4 — Still Open

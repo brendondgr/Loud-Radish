@@ -437,3 +437,74 @@ async def test_live_transcription_off_produces_no_text(manager) -> None:
         assert events.of("transcript.committed") == []
     finally:
         await session.stop()
+
+
+# -- a video that stopped before the talk did ---------------------------------------------------
+#
+# Measured against `data/recordings/20260904-155600-08ab28c2d732`: audio to 3925.7 s, video frames
+# to 882.5 s, and a combined file ending both at 1765.2 s. The audio survived every stage of the
+# recording and was deleted by the tidy-up, because retention is a setting and the setting said no.
+# It stops being a setting when the combined file is the only other copy and does not hold it all.
+
+
+async def test_a_short_combined_file_keeps_the_audio_whatever_the_setting_says(
+    manager, monkeypatch
+) -> None:
+    session, store, events = manager
+    store.update({"storage.retain_audio": False})
+    retained: list[bool] = []
+
+    monkeypatch.setattr(
+        manager_module,
+        "mux_audio_video",
+        lambda video, audio, **_kw: manager_module.MuxResult(
+            True, path=str(video), audio_shortfall_s=2160.0
+        ),
+    )
+    real_start = manager_module.TranscriptionRunner.start
+
+    def note(self, *, job, store, retain_audio, prompt=None):
+        retained.append(retain_audio)
+        return real_start(self, job=job, store=store, retain_audio=retain_audio, prompt=prompt)
+
+    monkeypatch.setattr(manager_module.TranscriptionRunner, "start", note)
+
+    await session.start(
+        window(), options=CaptureOptions(live_transcription=False, post_transcription=True)
+    )
+    await asyncio.sleep(0.4)
+    await session.stop()
+
+    assert retained == [True], "the only complete copy of the sound was up for deletion"
+    assert "video-ended-early" in events.codes(), "the shortfall was absorbed rather than said"
+
+
+async def test_a_complete_combined_file_leaves_retention_to_the_setting(
+    manager, monkeypatch
+) -> None:
+    """The guard must not turn a preference off for every recording — only for a broken one."""
+    session, store, events = manager
+    store.update({"storage.retain_audio": False})
+    retained: list[bool] = []
+
+    monkeypatch.setattr(
+        manager_module,
+        "mux_audio_video",
+        lambda video, audio, **_kw: manager_module.MuxResult(True, path=str(video)),
+    )
+    real_start = manager_module.TranscriptionRunner.start
+
+    def note(self, *, job, store, retain_audio, prompt=None):
+        retained.append(retain_audio)
+        return real_start(self, job=job, store=store, retain_audio=retain_audio, prompt=prompt)
+
+    monkeypatch.setattr(manager_module.TranscriptionRunner, "start", note)
+
+    await session.start(
+        window(), options=CaptureOptions(live_transcription=False, post_transcription=True)
+    )
+    await asyncio.sleep(0.4)
+    await session.stop()
+
+    assert retained == [False]
+    assert "video-ended-early" not in events.codes()

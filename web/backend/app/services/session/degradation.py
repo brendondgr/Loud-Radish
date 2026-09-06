@@ -287,6 +287,28 @@ def capture_failed(detail: str) -> Failure:
     )
 
 
+def video_ended_early(shortfall_s: float, audio_name: str) -> Failure:
+    """The combined file is shorter than the recording, because the picture stopped first.
+
+    **Said rather than absorbed.** The user is already being told the video ended; what they are
+    not told, and would otherwise discover only by playing the file to the end, is that the sound
+    kept going and the combined file does not carry all of it. Naming the surviving WAV is the
+    point of the message — it is the only complete copy, and this run keeps it regardless of
+    Settings → Storage.
+    """
+    minutes = shortfall_s / 60.0
+    length = f"{minutes:.0f} minutes" if minutes >= 1.0 else f"{shortfall_s:.0f} seconds"
+    return Failure(
+        code="video-ended-early",
+        message=(
+            f"The video stopped {length} before the recording did, so the combined file is that "
+            f"much shorter. The whole of the sound is kept in {audio_name}."
+        ),
+        severity=Severity.WARNING,
+        transcription_continues=True,
+    )
+
+
 def window_audio_stopped() -> Failure:
     """Everything the tap was carrying went away while the recording was still running.
 
