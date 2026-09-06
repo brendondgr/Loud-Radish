@@ -22,6 +22,7 @@ from ..services.export import ExportError, build_webapp
 from ..services.recording import resolve_recording
 from ..services.transcript import archive
 from ..services.transcript import export as render_export
+from ..services.transcript import export_chat as render_chat_export
 from ..services.transcript.store import TranscriptStore
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
@@ -110,8 +111,20 @@ async def read_session(
 
 
 @router.get("/{key}/export")
-async def export_session(request: Request, key: str, fmt: str = Query("markdown")) -> Response:
-    """Download a past session in any of the five formats."""
+async def export_session(
+    request: Request,
+    key: str,
+    fmt: str = Query("markdown"),
+    include_chat: bool = Query(False),
+) -> Response:
+    """Download a past session in any of the five formats.
+
+    **The conversation is not in it unless it is asked for.** Markdown and JSON used to carry the
+    questions the user put to the assistant during the recording, because they were the two formats
+    that could. But a transcript export is mostly a thing being handed to somebody else, and one
+    person's half of a conversation is not part of the record of the talk. It exports on its own
+    from ``/{key}/chat``; `include_chat=true` puts it back in here for anyone who wants one file.
+    """
     store = _open(request, key)
     try:
         metadata = store.metadata()
@@ -121,7 +134,7 @@ async def export_session(request: Request, key: str, fmt: str = Query("markdown"
             metadata=metadata,
             summaries=store.summaries(),
             glossary=store.glossary(),
-            chat=store.chat_history(),
+            chat=store.chat_history() if include_chat else None,
         )
     except ValueError as exc:
         raise HTTPException(
@@ -138,8 +151,35 @@ async def export_session(request: Request, key: str, fmt: str = Query("markdown"
     )
 
 
+@router.get("/{key}/chat")
+async def export_chat_only(request: Request, key: str, fmt: str = Query("markdown")) -> Response:
+    """Download the conversation the user had with the assistant during this recording.
+
+    Its own document, because it belongs to the person who asked rather than to the talk. Empty is
+    a valid answer and renders as a sentence saying so, rather than a 404 — "you asked nothing
+    during this recording" is information, and an error code is not.
+    """
+    store = _open(request, key)
+    try:
+        metadata = store.metadata()
+        body, mime, extension = render_chat_export(fmt, store.chat_history(), metadata)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=422, detail={"error": {"code": "unknown-format", "message": str(exc)}}
+        ) from exc
+    finally:
+        store.close()
+
+    stem = metadata.started_at.strftime("%Y%m%d-%H%M") if metadata else key
+    return Response(
+        content=body,
+        media_type=mime,
+        headers={"Content-Disposition": f'attachment; filename="{stem}-chat.{extension}"'},
+    )
+
+
 @router.get("/{key}/webapp")
-async def export_webapp(request: Request, key: str) -> Response:
+async def export_webapp(request: Request, key: str, include_chat: bool = Query(False)) -> Response:
     """Download this recording as a self-contained HTML web application, in a ZIP.
 
     Refused rather than degraded when the recording has no video or no transcript. A "web
@@ -149,6 +189,11 @@ async def export_webapp(request: Request, key: str) -> Response:
 
     Built on a worker thread. A talk is hundreds of megabytes, and copying that much into an archive
     on the event loop stalls every other request including the transcript the user is watching.
+
+    **The archive carries the talk and not the conversation about it**, unless `include_chat` says
+    otherwise. The exported page's whole purpose is that whoever receives it connects their own
+    model and asks their own questions; opening it to find the panel already half-full of someone
+    else's questions, about a talk they have not watched, is the opposite of that.
     """
     config = _config(request)
     layout = resolve_recording(archive.recording_dir(config), key)
@@ -173,6 +218,7 @@ async def export_webapp(request: Request, key: str) -> Response:
             metadata=store.metadata(),
             layout=layout,
             config=config,
+            include_chat=include_chat,
         )
     except ExportError as exc:
         raise HTTPException(

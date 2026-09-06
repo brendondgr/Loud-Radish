@@ -526,7 +526,14 @@ says `max_height: 720` against a recording made at **2560 × 1532**.
       across every gap — dropped instead, the video would be exactly as much shorter as the
       recording had failed for, and every frame after the gap would sit that far ahead of its own
       transcript line. Step 3 / 9.
-- [ ] **The user's conversation leaves the shared export.** Step 4 / 9.
+- [x] **The user's conversation leaves the shared export.** Six chat messages in the reported
+      recording, and every one of them rode into `transcript.json`, into the `bundle.js` beside it,
+      into the Markdown export and into the JSON export — then seeded the exported page's assistant,
+      so a recipient opened the ZIP mid-conversation with someone else's questions about a talk they
+      had not watched. It is a document of its own now (`GET /{key}/chat`), the flag that puts it
+      back defaults to off, and the listing reports `chat_messages` so it is offered only where
+      there is one. Verified against the real session: nought of six turns in the default archive,
+      six of six with `include_chat=true`. Step 4 / 9.
 - [ ] **A re-encode can be measured before it is committed to.** Step 5 / 9.
 - [ ] **Exporting is a staged job with real progress.** Step 6 / 9.
 - [ ] **One post-recording window: preview, options, projected sizes, stages.** Steps 7–8 / 9.

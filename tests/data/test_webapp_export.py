@@ -75,6 +75,14 @@ def write_session(sessions: Path, key: str = KEY, segments: int = 3) -> Path:
     return path
 
 
+def write_chat(sessions: Path, key: str = KEY) -> None:
+    """Three turns of a conversation, of the kind the reported export carried into a shared ZIP."""
+    with TranscriptStore(sessions / f"{key}.db") as store:
+        store.add_chat_message("user", "So PINNs are used when you have the physics of a system?")
+        store.add_chat_message("assistant", "Not quite. The speaker has not framed them that way.")
+        store.add_chat_message("user", "For what purpose?", context_timestamp=2239.8)
+
+
 def write_recording(recordings: Path, key: str = KEY, *, video: bool = True) -> None:
     folder = recordings / key
     folder.mkdir(parents=True, exist_ok=True)
@@ -258,3 +266,157 @@ def test_the_builder_names_the_missing_piece(config, dirs) -> None:
             layout=layout,
             config=config.resolve(),
         )
+
+
+# -- the conversation is not in the shared archive (D-037) --------------------------------------
+#
+# Reported against the 2026-09-04 seminar, whose database holds six chat messages and every one of
+# which rode into `transcript.json`, into `bundle.js` beside it, into the Markdown export, and into
+# the JSON export. The exported page then seeded its assistant with them — so a recipient opening
+# the ZIP started mid-conversation with someone else's questions about a talk they had not watched,
+# which is the opposite of the panel's whole purpose.
+
+
+def test_the_archive_carries_no_conversation_by_default(client, dirs) -> None:
+    sessions, recordings = dirs
+    write_session(sessions)
+    write_chat(sessions)
+    write_recording(recordings)
+
+    archive = archive_of(client.get(f"/api/sessions/{KEY}/webapp"))
+    transcript = json.loads(archive.read(f"{KEY}/data/transcript.json"))
+    bundle = archive.read(f"{KEY}/data/bundle.js").decode("utf-8")
+
+    assert "chat" not in transcript
+    # The bundle is the same content again, so a check of one document alone would pass while the
+    # conversation shipped in the other — which is exactly how it would be missed.
+    assert "PINNs" not in bundle
+    assert "PINNs" not in archive.read(f"{KEY}/README.txt").decode("utf-8")
+
+
+def test_an_export_can_still_carry_it_when_asked(client, dirs) -> None:
+    """Off is a default, not a removal. An archive the user keeps may open where they left off."""
+    sessions, recordings = dirs
+    write_session(sessions)
+    write_chat(sessions)
+    write_recording(recordings)
+
+    archive = archive_of(client.get(f"/api/sessions/{KEY}/webapp?include_chat=true"))
+    transcript = json.loads(archive.read(f"{KEY}/data/transcript.json"))
+
+    assert [message["text"] for message in transcript["chat"]][1].startswith("Not quite")
+    assert "PINNs" in archive.read(f"{KEY}/data/bundle.js").decode("utf-8")
+
+
+def test_the_readme_does_not_promise_a_conversation_that_is_not_there(client, dirs) -> None:
+    """A README that lists a thing the archive does not contain will be believed, then contradicted."""
+    sessions, recordings = dirs
+    write_session(sessions)
+    write_chat(sessions)
+    write_recording(recordings)
+
+    plain = archive_of(client.get(f"/api/sessions/{KEY}/webapp"))
+    with_chat = archive_of(client.get(f"/api/sessions/{KEY}/webapp?include_chat=true"))
+
+    assert "conversation" not in plain.read(f"{KEY}/README.txt").decode("utf-8").lower()
+    assert "conversation" in with_chat.read(f"{KEY}/README.txt").decode("utf-8").lower()
+
+
+def test_a_recording_nobody_asked_about_carries_no_messages_either_way(client, dirs) -> None:
+    """The flag decides whether the key is there; it can never invent a conversation."""
+    sessions, recordings = dirs
+    write_session(sessions)
+    write_recording(recordings)
+
+    plain = client.get(f"/api/sessions/{KEY}/webapp")
+    asked = client.get(f"/api/sessions/{KEY}/webapp?include_chat=true")
+
+    assert plain.status_code == asked.status_code == 200
+    assert "chat" not in json.loads(archive_of(plain).read(f"{KEY}/data/transcript.json"))
+    assert json.loads(archive_of(asked).read(f"{KEY}/data/transcript.json"))["chat"] == []
+
+
+# -- and it exports on its own -------------------------------------------------------------------
+
+
+def test_the_conversation_exports_as_its_own_document(client, dirs) -> None:
+    sessions, _recordings = dirs
+    write_session(sessions)
+    write_chat(sessions)
+
+    response = client.get(f"/api/sessions/{KEY}/chat?fmt=markdown")
+
+    assert response.status_code == 200
+    assert "PINNs" in response.text
+    assert "Not quite" in response.text
+    assert response.headers["content-disposition"].endswith('-chat.md"')
+
+
+def test_the_conversation_export_keeps_what_each_answer_was_based_on(client, dirs) -> None:
+    """An answer about "the last ten minutes" means nothing without knowing which ten."""
+    sessions, _recordings = dirs
+    write_session(sessions)
+    write_chat(sessions)
+
+    body = client.get(f"/api/sessions/{KEY}/chat?fmt=json").json()
+
+    assert [message["context_timestamp"] for message in body["chat"]][2] == pytest.approx(2239.8)
+
+
+def test_asking_nothing_is_a_sentence_rather_than_an_error(client, dirs) -> None:
+    """"You asked nothing during this recording" is information; a 404 is not."""
+    sessions, _recordings = dirs
+    write_session(sessions)
+
+    response = client.get(f"/api/sessions/{KEY}/chat?fmt=markdown")
+
+    assert response.status_code == 200
+    assert "Nothing was asked" in response.text
+
+
+def test_an_unknown_conversation_format_is_refused_by_name(client, dirs) -> None:
+    sessions, _recordings = dirs
+    write_session(sessions)
+
+    response = client.get(f"/api/sessions/{KEY}/chat?fmt=srt")
+
+    assert response.status_code == 422
+    assert "markdown" in response.json()["detail"]["error"]["message"]
+
+
+def test_the_listing_says_how_many_questions_were_asked(client, dirs) -> None:
+    """So the conversation is offered as an export only where there is one to export."""
+    sessions, _recordings = dirs
+    write_session(sessions)
+    write_chat(sessions)
+    write_session(sessions, key="20260829-180000-aaaaaaaaaaaa")
+
+    rows = {row["key"]: row for row in client.get("/api/sessions").json()["sessions"]}
+
+    assert rows[KEY]["chat_messages"] == 3
+    assert rows["20260829-180000-aaaaaaaaaaaa"]["chat_messages"] == 0
+
+
+def test_the_transcript_export_carries_no_conversation_by_default(client, dirs) -> None:
+    """Markdown and JSON were the two formats that could carry it, so they were the two that did."""
+    sessions, _recordings = dirs
+    write_session(sessions)
+    write_chat(sessions)
+
+    markdown = client.get(f"/api/sessions/{KEY}/export?fmt=markdown").text
+    payload = client.get(f"/api/sessions/{KEY}/export?fmt=json").json()
+
+    assert "## Conversation" not in markdown
+    assert "PINNs" not in markdown
+    assert payload["chat"] == []
+
+
+def test_the_transcript_export_can_still_be_asked_for_one_file(client, dirs) -> None:
+    sessions, _recordings = dirs
+    write_session(sessions)
+    write_chat(sessions)
+
+    markdown = client.get(f"/api/sessions/{KEY}/export?fmt=markdown&include_chat=true").text
+
+    assert "## Conversation" in markdown
+    assert "PINNs" in markdown

@@ -93,12 +93,23 @@ minutes ago.
 |---|---|---|---|
 | `GET` | `/api/sessions` | Every session on disk, newest first, each with what it holds | **Implemented** |
 | `GET` | `/api/sessions/{key}` | One session's transcript, summaries, glossary, and conversation | **Implemented** |
-| `GET` | `/api/sessions/{key}/export?fmt=` | Text, Markdown, SRT, VTT, or JSON | **Implemented** |
-| `GET` | `/api/sessions/{key}/webapp` | The recording as a self-contained web application, as a ZIP | **Implemented** |
+| `GET` | `/api/sessions/{key}/export?fmt=&include_chat=` | Text, Markdown, SRT, VTT, or JSON. `include_chat` defaults to **false** | **Implemented** |
+| `GET` | `/api/sessions/{key}/chat?fmt=` | The conversation on its own — Markdown or JSON | **Implemented** |
+| `GET` | `/api/sessions/{key}/webapp?include_chat=` | The recording as a self-contained web application, as a ZIP. `include_chat` defaults to **false** | **Implemented** |
 | `DELETE` | `/api/sessions/{key}` | Delete a session file. Refuses the one still recording. | **Implemented** |
 
 `{key}` is the database file's stem, which is also the name of the recording's folder (D-032) — that
 equality is how a session reaches its own video without a second identifier.
+
+**A shared export carries the talk, not the conversation about it (D-037).** The questions the user
+put to the assistant *during* a recording used to ride in `transcript.json`, in the `bundle.js`
+beside it, in the Markdown export and in the JSON export — so a recipient opening the ZIP found the
+assistant panel already half-full of somebody else's questions about a talk they had not watched,
+which is the opposite of that panel's purpose. It is a separate document now: `GET /{key}/chat`
+renders it as Markdown or JSON, `include_chat=true` puts it back into either of the other two for
+anyone who wants one file, and `GET /api/sessions` reports `chat_messages` so the conversation is
+offered only where there is one. Asking nothing during a recording renders as a sentence saying so,
+never a 404 — "you asked nothing" is information and an error code is not.
 
 **The web-app export refuses rather than degrades.** It needs video, audio, and a transcript, and
 returns `409 not-exportable` naming the missing piece when it has fewer: a page with an empty player

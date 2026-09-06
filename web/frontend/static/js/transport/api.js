@@ -159,6 +159,14 @@ export const api = {
   deleteSession: (key) => del(`/api/sessions/${encodeURIComponent(key)}`),
   sessionExportUrl: (key, fmt) =>
     `/api/sessions/${encodeURIComponent(key)}/export?fmt=${encodeURIComponent(fmt)}`,
+  /**
+   * The conversation the user had with the assistant during a recording, on its own.
+   *
+   * Separate from the transcript export on purpose: a transcript is usually being handed to
+   * somebody else, and one person's questions are not part of the record of the talk.
+   */
+  sessionChatUrl: (key, fmt) =>
+    `/api/sessions/${encodeURIComponent(key)}/chat?fmt=${encodeURIComponent(fmt)}`,
   /** The self-contained web application, as a ZIP. Only offered when a session holds all three. */
   sessionWebappUrl: (key) => `/api/sessions/${encodeURIComponent(key)}/webapp`,
 };

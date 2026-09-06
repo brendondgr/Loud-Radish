@@ -10,6 +10,9 @@ from app.models.segment import Segment
 from app.models.session import ChatMessage, GlossaryTerm, SessionMetadata, Summary
 from app.services.transcript.export import (
     FORMAT_INFO,
+    export_chat,
+    to_chat_json,
+    to_chat_markdown,
     export,
     format_timestamp,
     to_json,
@@ -180,3 +183,48 @@ class TestDispatch:
     def test_every_format_handles_an_empty_transcript(self, fmt: str) -> None:
         body, _, _ = export(fmt, [])
         assert isinstance(body, str)
+
+
+# -- the conversation on its own (D-037) --------------------------------------------------------
+#
+# Markdown and JSON still take a `chat` argument and still render it — that capability was worth
+# keeping. What changed is who passes it: the routes do not, by default, because a transcript
+# export is mostly a thing being handed to somebody else and one person's questions are not part
+# of the record of the talk.
+
+
+class TestChatExport:
+    def test_it_reads_as_a_conversation(self) -> None:
+        body = to_chat_markdown(CHAT, METADATA)
+
+        assert "**You:**" in body
+        assert "**Assistant:**" in body
+        assert "## Transcript" not in body, "a conversation export is not a transcript export"
+
+    def test_each_answer_keeps_what_it_was_based_on(self) -> None:
+        """An answer about "the last ten minutes" means nothing without knowing which ten."""
+        body = to_chat_markdown(CHAT, METADATA)
+
+        assert "Based on the transcript to 01:00:08" in body
+
+    def test_asking_nothing_says_so_rather_than_producing_an_empty_file(self) -> None:
+        body = to_chat_markdown([], METADATA)
+
+        assert "Nothing was asked" in body
+
+    def test_the_json_form_carries_the_full_record(self) -> None:
+        payload = json.loads(to_chat_json(CHAT, METADATA))
+
+        assert len(payload["chat"]) == len(CHAT)
+        assert payload["session"]["title"] == METADATA.title
+
+    def test_the_dispatcher_offers_two_formats_and_names_them_when_refusing(self) -> None:
+        body, mime, extension = export_chat("markdown", CHAT, METADATA)
+        assert extension == "md" and "markdown" in mime and body
+
+        with pytest.raises(ValueError, match="markdown"):
+            export_chat("srt", CHAT, METADATA)
+
+    def test_the_conversation_is_not_one_of_the_transcript_formats(self) -> None:
+        """Offering it beside SRT would invite someone to pick it and get none of the talk."""
+        assert "chat" not in FORMAT_INFO

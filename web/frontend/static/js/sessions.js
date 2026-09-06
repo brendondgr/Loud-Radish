@@ -171,6 +171,24 @@ class SessionsPage {
       download.href = api.sessionExportUrl(session.key, format.value);
     });
 
+    // **Its own button, and only where there is one.** The transcript export deliberately no
+    // longer carries the conversation: a transcript is usually being handed to somebody else, and
+    // one person's questions are not part of the record of the talk. They are still the user's,
+    // and this is how they get them.
+    const chat = session.chat_messages
+      ? el("a", {
+          className: "button button--quiet",
+          text: "Conversation",
+          attrs: {
+            href: api.sessionChatUrl(session.key, "markdown"),
+            download: "",
+            title:
+              `The ${session.chat_messages} messages you exchanged with the assistant during ` +
+              "this recording, on their own. Not included in the transcript or the web app.",
+          },
+        })
+      : null;
+
     const remove = el("button", {
       className: "button button--quiet",
       text: "Delete",
@@ -190,14 +208,15 @@ class SessionsPage {
             download: "",
             title:
               "A self-contained page with the video, the transcript, and a question panel. " +
-              "Opens in any browser, with no server.",
+              "Opens in any browser, with no server. Your own conversation is not in it — " +
+              "whoever opens it connects their own model and asks their own questions.",
           },
         })
       : null;
 
     return el("div", {
       className: "session__actions",
-      children: [format, download, webapp, remove].filter(Boolean),
+      children: [format, download, chat, webapp, remove].filter(Boolean),
     });
   }
 

@@ -12,6 +12,13 @@ person can open, read, and edit.
 
 **The video is streamed into the archive rather than read into memory.** A talk is measured in
 hundreds of megabytes and this runs in the same process as the speech model.
+
+**And the archive carries the talk, not the conversation about it.** The questions the user asked
+the assistant while recording used to ride in `transcript.json`, so a recipient opening the ZIP
+found the assistant panel already half-full of somebody else's questions about a talk they had not
+watched. `include_chat` puts them back for an export the user is keeping; the default is off,
+because the common case is sending this to other people so that they can connect their own model
+and ask their own questions.
 """
 
 from __future__ import annotations
@@ -78,8 +85,15 @@ def build_webapp(
     metadata: SessionMetadata | None,
     layout: RecordingLayout,
     config: AppConfig,
+    include_chat: bool = False,
 ) -> bytes:
     """Return the ZIP for one session.
+
+    Args:
+        include_chat: carry the conversation the user had with the assistant during the recording.
+            **Off by default, deliberately.** A shared archive is a transcript and a video; the
+            recipient's own questions are the point of the panel, and pre-filling it with someone
+            else's is the fault this flag exists to have a default for.
 
     Raises:
         ExportError: when there is no video, or the transcript is empty. Both are refusals rather
@@ -100,6 +114,7 @@ def build_webapp(
         metadata=metadata,
         video_name=video.name,
         video_type=video_type(video),
+        include_chat=include_chat,
     )
     if not transcript["segments"]:
         raise ExportError(
@@ -170,6 +185,13 @@ def _json(payload: dict[str, Any]) -> str:
 
 def _readme(key: str, transcript: dict[str, Any]) -> str:
     session = transcript["session"]
+    # Named only when it is there. A README that lists a file the archive does not contain is a
+    # README that will be believed and then contradicted.
+    chat_note = (
+        "\n                      Plus the conversation recorded during the talk."
+        if transcript.get("chat")
+        else ""
+    )
     return f"""{session["title"]}
 {"=" * max(3, len(session["title"]))}
 
@@ -186,7 +208,7 @@ index.html            The application. Open this.
 theme.css, app.css    Its stylesheets.
 util.js … app.js      Its scripts, loaded in the order index.html lists them.
 media/                The video, exactly as it was recorded.
-data/transcript.json  The transcript, summaries, glossary, and any conversation you already had.
+data/transcript.json  The transcript, summaries, and glossary.{chat_note}
 data/settings.json    Which language model to ask, and how. Edit it in a text editor if you like.
 data/bundle.js        The same two documents as a script, for when the page is opened from a file.
 
