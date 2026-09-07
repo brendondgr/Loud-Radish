@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from .clipboard import copy, read_back
 from .keystroke import paste
-from .notify import notify
+from .notification import notify
 from .outcome import Outcome
 
 __all__ = ["Outcome", "copy", "notify", "paste", "read_back"]

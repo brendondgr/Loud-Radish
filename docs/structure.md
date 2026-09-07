@@ -170,6 +170,8 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   │   │       └── template/      # The exported page, copied verbatim: index.html, two
 │   │   │                          #   stylesheets, and five classic scripts (not modules —
 │   │   │                          #   `import` is refused across file:// URLs)
+│   │   ├── services/dictation/    # Press a key, speak, press again: the words arrive in
+│   │   │                          #   whatever window has focus (D-049)
 │   │   ├── desktop/               # Talking to the desktop the user is sitting in front of:
 │   │   │   │                      #   clipboard, a keystroke into the focused window, and a
 │   │   │   │                      #   notification. Ordered, probed backends (D-048)

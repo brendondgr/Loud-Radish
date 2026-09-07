@@ -747,7 +747,11 @@ fixtures, and five faults came out of that which no test would have found:
       and `Meta+Alt+S` were already taken by the keyboard layout switcher, Spectacle and the screen
       reader. They had never been checked against a real desktop. The defaults are now
       V/C/W/X/T/D, all verified free, and a conflict is reported rather than stolen.
-- [ ] **Dictation.** The `dictate` shortcut and control command exist and the endpoint does not yet.
+- [x] **Dictation.** Done, and verified twice on this machine. Press `Meta+Alt+D`, speak, press it
+      again: the words are transcribed, tidied, put on the clipboard and pasted into whatever window
+      has focus (D-049). Over 25 s of real speech: 2.0 s to transcribe on the GPU, 0.9 s to tidy.
+      In a silent room it says "nothing was said" and pastes nothing, which is the behaviour that
+      matters most.
 - [ ] **A microphone picker in the tray menu.**
 - [ ] **A native settings window.**
 
@@ -857,6 +861,16 @@ user's own machine, and none may be reported as passing until it has had one.
       build on it, that is the one to try.
 
 ## Discovered work
+
+- [ ] **`uv run` outside `app.py` silently breaks GPU transcription.** `app.py` calls
+      `acceleration.repair_kept_wheel()` on launch, which puts the ROCm CTranslate2 build back after
+      `uv` has replaced it with the PyPI CPU/CUDA one — so starting the application normally
+      self-heals. **Any other `uv run` does not.** A bare `uv run python some_script.py` re-syncs,
+      swaps the wheel, and the next model load fails with "the installed CTranslate2 cannot use it";
+      running the same script again through `uv run` re-breaks what a manual
+      `uv pip install --reinstall` just fixed. Encountered while testing dictation from a script.
+      Either the repair belongs somewhere every entry point passes through, or the scripts under
+      `scripts/` need the same call `app.py` makes.
 
 - [x] **`tests/assistant/test_llm_live.py` can hang the suite.** Done. The tests are now opt-in by
       flag (`--run-live-llm`) rather than by reachability, which is what "skips when nothing

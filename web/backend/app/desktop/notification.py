@@ -1,5 +1,9 @@
 """A desktop notification, so a dictation that fails says so where the user is looking.
 
+Named `notification` rather than `notify` for the same reason `keystroke.py` is not `paste.py`: the
+package exports the function, and a module and a function of the same name shadow each other in a
+way that surfaces as `'function' object has no attribute 'notify'`.
+
 There was no notification code anywhere in this repository. The in-browser banner system
 (`components/banners.js`) is the only way the application has ever had of telling anyone anything —
 and a dictation is precisely the feature where **nobody is looking at the browser**. The words are

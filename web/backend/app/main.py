@@ -27,6 +27,7 @@ from .config import ConfigStore, CredentialStore
 from .routes import build_router
 from .services.chat import ChatService
 from .services.context import ContextWorker
+from .services.dictation import DictationService
 from .services.export import ExportRegistry, ExportRunner
 from .services.llm import build_llm
 from .services.polish import PolishWorker
@@ -114,6 +115,15 @@ def create_app(config: ConfigStore | None = None) -> FastAPI:
     # One export at a time, held here rather than on the session manager: an export runs against a
     # *past* session and outlives whatever is recording now, in the same way a post-capture pass
     # outlives the session that made its file.
+    app.state.dictation = DictationService(
+        config_provider=lambda: app.state.config.resolve(),
+        # The session manager's model, not a second one: loading a copy would cost several seconds
+        # before a dictation heard anything, which is the one thing this feature cannot afford.
+        asr_provider=lambda: app.state.session_manager.asr,
+        backend_factory=lambda: build_llm(app.state.config.resolve().llm, app.state.credentials),
+        session_busy=lambda: app.state.session_manager.is_running,
+        emit=app.state.hub.emit,
+    )
     app.state.export_jobs = ExportRegistry()
     app.state.export_runner = ExportRunner(registry=app.state.export_jobs, emit=app.state.hub.emit)
     _wire_assistant(app)

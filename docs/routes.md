@@ -221,6 +221,11 @@ state is a second place for it to drift.
 
 | Method | Path | Purpose | Status |
 |---|---|---|---|
+| `GET` | `/api/dictation` | What the dictation is doing | **Implemented** |
+| `POST` | `/api/dictation/toggle` | Start one, or finish the one running — what the shortcut calls | **Implemented** |
+| `POST` | `/api/dictation/start` | Begin recording | **Implemented** |
+| `POST` | `/api/dictation/stop` | Stop recording; the transcribe, tidy and paste happen after | **Implemented** |
+| `POST` | `/api/dictation/cancel` | Throw it away — nothing transcribed, nothing pasted | **Implemented** |
 | `GET` | `/api/config` | The full resolved configuration | **Implemented** |
 | `PATCH` | `/api/config` | Apply dotted-path changes; returns the hot-swap class of the change | **Implemented** |
 | `POST` | `/api/config/preset` | Apply a named preset | **Implemented** |

@@ -281,6 +281,50 @@ class CaptureConfig(_Base):
     quality: Literal["efficient", "balanced", "high"] = "balanced"
 
 
+class DictationConfig(_Base):
+    """Press a key, speak, press it again, and the words arrive where you were typing (D-049).
+
+    **The timings here come from measurement, not preference.** Transcribing fifteen seconds on a
+    warm model is a fraction of a second; running the result through the local language model was
+    measured at 8-10 seconds warm and 44 seconds cold. That gap is the whole design: the cleanup is
+    bounded and falls back to the raw transcript, and the text is pasted exactly once either way.
+    """
+
+    enabled: bool = True
+
+    #: ``off`` pastes what was said; ``llm`` tidies it first. Tidying costs the seconds above.
+    cleanup: Literal["off", "llm"] = "llm"
+
+    #: How long to wait for the tidy before giving up and pasting the raw transcript. Generous
+    #: against the 8-10 s measured here, tight enough that a stalled model does not eat the words.
+    cleanup_timeout_s: float = Field(default=20.0, ge=1.0, le=300.0)
+
+    #: Whether to press the paste chord afterwards. Off still leaves the text on the clipboard,
+    #: which is the right behaviour for anyone who wants to choose where it lands.
+    paste: bool = True
+
+    #: **A setting, not a detection.** In a terminal `Ctrl+V` quotes the next character and paste
+    #: is `Ctrl+Shift+V`; nothing can ask the compositor what kind of window has focus.
+    paste_chord: str = "ctrl+v"
+
+    #: A stop nobody pressed. Dictation is push-to-talk, so a recording still running after this
+    #: long is a key that was pressed once and forgotten.
+    max_seconds: float = Field(default=300.0, ge=5.0, le=3600.0)
+
+    #: Kept out of `data/recordings/`, which is for recordings someone means to keep. This
+    #: repository deleted 679 empty session databases one plan ago; fifty dictations a day would
+    #: rebuild that pile from the other end within a fortnight.
+    directory: str = "./data/dictations"
+
+    #: Audio is discarded once the words are delivered. Speech nobody asked to keep should not
+    #: accumulate on disk.
+    keep_audio: bool = False
+
+    #: How many past dictations to keep the text of, so one that pastes into the wrong window is
+    #: recoverable. Oldest are pruned on each new dictation.
+    keep_transcripts: int = Field(default=50, ge=0, le=1000)
+
+
 class ShortcutsConfig(_Base):
     """Global keyboard shortcuts, registered by the companion process (Plan 5).
 
@@ -335,5 +379,6 @@ class AppConfig(_Base):
     recording: RecordingConfig = Field(default_factory=RecordingConfig)
     capture: CaptureConfig = Field(default_factory=CaptureConfig)
     shortcuts: ShortcutsConfig = Field(default_factory=ShortcutsConfig)
+    dictation: DictationConfig = Field(default_factory=DictationConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     quick_actions: list[QuickAction] = Field(default_factory=list)
