@@ -187,7 +187,7 @@ TranscriberPrototype/
 │
 ├── libs/                          # Internal packages with more than one consumer
 ├── utils/                         # Standalone helpers not specific to the web app
-│   └── transcriber_ctl.py         # Drive recording from outside the browser (D-024)
+│   └── loud_radish_ctl.py         # Drive recording from outside the browser (D-024)
 ├── tests/                         # Python tests, grouped by area
 │   ├── api/                       # Routes, transport, audio library
 │   ├── assistant/                 # LLM clients, chat, context, and the polish pass
@@ -195,11 +195,13 @@ TranscriberPrototype/
 │   ├── data/                      # Transcript store, search, export, session archive
 │   └── utils/                     # Configuration and standalone helpers
 ├── scripts/                       # Developer and operational scripts
+│   ├── loud-radish.desktop.in     # Desktop entry template, filled in by install_autostart.py
 │   ├── make_fixture_wav.py        # Generates synthetic WAV fixtures for pipeline tests
 │   ├── measure_capture_cost.py    # Encoding vs. inference contention (D-022)
 │   ├── run_file_session.py        # Console-only pipeline run over a WAV file (BE M4)
 │   └── generate_contracts.py      # Writes openapi.json and ws-events.json
 ├── data/                          # Sessions, config file, audio, recordings (gitignored)
+│   ├── loud-radish-config.json    # User settings; adopted from transcriber-config.json (D-038)
 │   ├── sessions/<stamp>-<id>.db   # One transcript per session
 │   └── recordings/<stamp>-<id>/   # One folder per recording — audio.wav, video.<ext>,
 │                                  #   video-with-audio.<ext>, preview.jpg, audio.json,

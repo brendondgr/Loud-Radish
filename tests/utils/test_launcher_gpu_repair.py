@@ -25,9 +25,9 @@ def launcher():
     It cannot be imported as ``app``: that name belongs to the backend package, and the collision is
     the exact hazard ``_prepare_import_path`` exists to prevent.
     """
-    spec = importlib.util.spec_from_file_location("transcriber_launcher", REPO_ROOT / "app.py")
+    spec = importlib.util.spec_from_file_location("loud_radish_launcher", REPO_ROOT / "app.py")
     module = importlib.util.module_from_spec(spec)
-    sys.modules["transcriber_launcher"] = module
+    sys.modules["loud_radish_launcher"] = module
     spec.loader.exec_module(module)
     return module
 

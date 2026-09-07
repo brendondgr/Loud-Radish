@@ -70,7 +70,7 @@ so a missing capability is visible at startup rather than as a confusing failure
 
 | Path | Holds | Notes |
 |---|---|---|
-| `data/transcriber-config.json` | Settings saved from the interface | Never contains credentials |
+| `data/loud-radish-config.json` | Settings saved from the interface | Never contains credentials. A pre-rename `transcriber-config.json` is adopted by rename on first start (D-038) |
 | `data/sessions/*.db` | One SQLite file per session | Transcript, summaries, glossary, conversation |
 | `data/audio/` | Recordings uploaded through Settings → Audio | Only what you put there |
 | `logs/` | Application logs | Never transcript content (BE §18) |
@@ -233,16 +233,16 @@ communicate over HTTP and one WebSocket. A shell would embed the server and poin
 uv run scripts/install_autostart.py
 ```
 
-Writes and enables a **systemd user unit** at `~/.config/systemd/user/transcriber.service`. A user
+Writes and enables a **systemd user unit** at `~/.config/systemd/user/loud-radish.service`. A user
 unit rather than an XDG autostart entry because it starts with the *session*, restarts on failure,
 and is inspectable:
 
 ```bash
-systemctl --user status transcriber
+systemctl --user status loud-radish.service
 ```
 
 ```bash
-journalctl --user -u transcriber -f
+journalctl --user -u loud-radish.service -f
 ```
 
 The unit runs `uv run app.py --no-takeover`. That flag is deliberate and is the one thing worth
@@ -261,6 +261,6 @@ uv run scripts/install_autostart.py --uninstall
 process being killed, refuses cleanly when something else already holds the port, and uninstalls
 with the unit file gone and the service reported `not-found`.
 
-On a desktop without systemd, put `scripts/transcriber.desktop.in` into `~/.config/autostart/`
+On a desktop without systemd, put `scripts/loud-radish.desktop.in` into `~/.config/autostart/`
 after replacing its paths — it opens the interface rather than starting the server, so the server
 would need its own arrangement.

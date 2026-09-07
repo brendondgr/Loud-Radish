@@ -2,7 +2,7 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "transcriber",
+      "name": "loud-radish",
       "runtimeExecutable": "uv",
       "runtimeArgs": [
         "run",

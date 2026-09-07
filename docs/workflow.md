@@ -2,7 +2,7 @@
 
 *Last updated: 2026-08-14 (root launcher on port 8395)*
 
-Every command needed to work in TranscriberPrototype. If a command here is wrong, fix this file in the
+Every command needed to work in Loud Radish. If a command here is wrong, fix this file in the
 same change — do not work around it silently.
 
 ## Environment Manager
@@ -296,7 +296,7 @@ uv run scripts/install_autostart.py
 Drive it from anywhere without the browser:
 
 ```bash
-uv run utils/transcriber_ctl.py toggle
+uv run utils/loud_radish_ctl.py toggle
 ```
 
 `toggle` starts if idle and stops if running — one command, because a keystroke cannot know which.
@@ -306,6 +306,18 @@ rather than starting, since window capture has three switches to answer first.
 Shortcuts are registered with **your desktop's own service** and are revocable from its settings.
 This application never reads input devices. Settings → Shortcuts shows whether they are actually
 registered, and names the command to bind by hand if your desktop has no such service.
+
+### After the rename to Loud Radish
+
+Re-run `uv run scripts/install_autostart.py`. It writes `loud-radish.service` and removes the old
+`transcriber.service` — leaving both enabled would race two servers for port 8395. Shortcuts
+registered through that installer move with it, because registration unregisters the old component.
+
+**A shortcut you bound by hand will not.** It names `utils/transcriber_ctl.py`, which is now
+`utils/loud_radish_ctl.py`; re-copy the command from Settings → Shortcuts. Everything else migrates
+on its own: the config file is renamed on first start, stored credentials move to the new keyring
+service, and `TRANSCRIBER_CONFIG_PATH`, `TRANSCRIBER_ROOT` and `TRANSCRIBER_NO_GPU_REPAIR` are still
+read, with a warning. See **D-038**.
 
 ## Troubleshooting: everything went quiet but the mixer says full volume
 
