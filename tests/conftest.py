@@ -83,11 +83,32 @@ made with ``--ignore``.
 Reachability is not consent. The marker below makes the opt-in explicit, and `pytest-timeout` gives
 the whole suite the deadline that would have made the original symptom legible in seconds rather
 than in a fortnight of `--ignore`.
+
+## No test may install a `.desktop` file in the developer's menu
+
+The fifth, caught within a minute of the code that could cause it existing. `shortcuts.register_all`
+writes one `.desktop` entry per action into `~/.local/share/applications` so the desktop has
+something to bind a key to — and the first test run that reached it left
+`loud-radish-toggle-live.desktop` in the developer's real applications directory.
+
+That is the same shape as the sinks and the session files: a test exercising a feature whose whole
+job is to write outside the repository. `XDG_DATA_HOME` is redirected below, which covers the
+subprocesses too, because `update-desktop-database` reads the same variable.
 """
 
 from __future__ import annotations
 
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def _no_desktop_entries_in_the_users_menu(monkeypatch, tmp_path):
+    """Point `XDG_DATA_HOME` at a temporary directory for every test.
+
+    `desktop_entry.applications_dir` honours it, and so does `update-desktop-database`, so this
+    covers the subprocess as well as the write. See the fifth lesson in this module's docstring.
+    """
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg-data"))
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:

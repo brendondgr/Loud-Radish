@@ -120,6 +120,21 @@ def cmd_arm(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_dictate(args: argparse.Namespace) -> int:
+    """Start a dictation, or finish the one already running.
+
+    One key for both halves, because that is how a push-to-talk key is used: press it, speak, press
+    it again. A second key to stop would mean remembering two, and getting it wrong mid-sentence
+    means the words are lost rather than merely delayed.
+    """
+    state = _request(f"{_base(args)}/api/dictation/toggle", {}, timeout=ACTION_TIMEOUT_S)
+    if state.get("recording"):
+        print("dictating…")
+    else:
+        print(state.get("summary") or "finished")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="loud-radish-ctl", description=__doc__)
     parser.add_argument("--host", default=os.environ.get("API_HOST", DEFAULT_HOST))
@@ -133,6 +148,7 @@ def main(argv: list[str] | None = None) -> int:
         ("start", cmd_start, True),
         ("stop", cmd_stop, False),
         ("arm", cmd_arm, True),
+        ("dictate", cmd_dictate, False),
     ):
         command = sub.add_parser(name, help=handler.__doc__ or name)
         command.set_defaults(handler=handler)

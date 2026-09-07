@@ -295,11 +295,20 @@ class ShortcutsConfig(_Base):
     """
 
     enabled: bool = True
-    toggle_live: str = "Meta+Alt+L"
-    toggle_recorded: str = "Meta+Alt+R"
+    # **Checked against a real Plasma desktop, which the previous defaults were not.** Three of
+    # them collided with shortcuts KDE ships: `Meta+Alt+L` is the keyboard layout switcher,
+    # `Meta+Alt+R` is Spectacle's screen recorder, and `Meta+Alt+S` toggles the screen reader. A
+    # colliding default is not merely unavailable — it is registered against, refused, and reported
+    # as a conflict on every start, which is a fault report for something nobody chose.
+    #:
+    #: The letters are mnemonic where a free key allowed it: V for voice, C for capture, W for
+    #: window, D for dictate.
+    toggle_live: str = "Meta+Alt+V"
+    toggle_recorded: str = "Meta+Alt+C"
     arm_window: str = "Meta+Alt+W"
-    stop: str = "Meta+Alt+S"
+    stop: str = "Meta+Alt+X"
     open_app: str = "Meta+Alt+T"
+    dictate: str = "Meta+Alt+D"
 
 
 class QuickAction(_Base):

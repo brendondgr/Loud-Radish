@@ -179,6 +179,10 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   │   │   ├── menu.py            # The tray menu's structure, as data
 │   │   │   ├── tray.py            # The StatusNotifierItem and its dbusmenu, served from a
 │   │   │   │                      #   dispatch loop over jeepney's primitives (D-043)
+│   │   │   ├── keys.py            # "Meta+Alt+D" ↔ the integer KGlobalAccel speaks. Its own
+│   │   │   │                      #   module because the encoding is the part that is wrong in
+│   │   │   │                      #   a way nothing else notices (D-047)
+│   │   │   ├── desktop_entry.py   # One .desktop file per shortcut — what the desktop binds to
 │   │   │   ├── shortcuts.py       # Registration through the desktop's own service
 │   │   │   └── main.py            # Polls the server; killable and restartable at any moment
 │   │   ├── models/                # Persistence shape

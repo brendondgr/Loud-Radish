@@ -78,7 +78,7 @@ def test_a_registered_report_is_quiet(monkeypatch) -> None:
     monkeypatch.setattr(
         shortcuts,
         "_register_one",
-        lambda action, sequence: shortcuts.Registration(action, sequence, True),
+        lambda _connection, action, sequence: shortcuts.Registration(action, sequence, True),
     )
     report = shortcuts.describe(shortcuts.register_all(ShortcutsConfig(), "/repo"), "/repo")
     assert "Bind these by hand" not in report
@@ -105,7 +105,7 @@ def test_an_empty_key_is_reported_rather_than_registered(monkeypatch) -> None:
     monkeypatch.setattr(
         shortcuts,
         "_register_one",
-        lambda action, sequence: shortcuts.Registration(action, sequence, True),
+        lambda _connection, action, sequence: shortcuts.Registration(action, sequence, True),
     )
     results = shortcuts.register_all(ShortcutsConfig(stop=""), "/repo")
     stop = next(entry for entry in results if entry.action == "stop")

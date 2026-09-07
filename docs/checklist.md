@@ -736,6 +736,23 @@ fixtures, and five faults came out of that which no test would have found:
       original "Cannot operate on a closed database" fault was introduced. Reproduce it under
       `pytest -p no:randomly --count` or with the store instrumented to log its close, get the
       full traceback rather than the truncated summary line, and fix what it actually names.
+## Part 4b — Shortcuts, dictation, and the tray's own settings
+
+- [x] **Global shortcuts are registered and fire.** Done. `register_all` had never been called by
+      anything; it now runs when the companion starts. The route is one `.desktop` entry per action
+      registered as a KGlobalAccel *service* — the portal refuses unsandboxed callers, and an
+      in-process component only works while the companion lives (D-047). Verified by pressing
+      `Meta+Alt+V` and watching a session start, and `Meta+Alt+X` and watching it stop.
+- [x] **The shipped shortcut defaults collided with KDE's own.** Done. `Meta+Alt+L`, `Meta+Alt+R`
+      and `Meta+Alt+S` were already taken by the keyboard layout switcher, Spectacle and the screen
+      reader. They had never been checked against a real desktop. The defaults are now
+      V/C/W/X/T/D, all verified free, and a conflict is reported rather than stolen.
+- [ ] **Dictation.** The `dictate` shortcut and control command exist and the endpoint does not yet.
+- [ ] **A microphone picker in the tray menu.**
+- [ ] **A native settings window.**
+
+---
+
 ## Part 5 — Verification Debt
 
 Things the plan's phases cannot verify in a headless environment. Each needs a manual pass on the
