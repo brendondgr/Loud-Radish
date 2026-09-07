@@ -39,6 +39,18 @@
       "critical": true,
       "coalescing": false
     },
+    "session.paused": {
+      "critical": true,
+      "coalescing": false
+    },
+    "session.resumed": {
+      "critical": true,
+      "coalescing": false
+    },
+    "session.cancelled": {
+      "critical": true,
+      "coalescing": false
+    },
     "transcript.committed": {
       "action": "append",
       "note": "Append permanently. Never modify an existing entry. Order by id, not arrival.",

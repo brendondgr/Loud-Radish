@@ -17,6 +17,7 @@ import {
   ERROR,
   IDLE,
   LIVE,
+  PAUSED,
   PROCESSING,
   RECORDING,
   isBusy,
@@ -132,14 +133,18 @@ class ModeStore {
   }
 
   /** Adopt the state implied by the session store, without inventing one. */
-  adoptSession({ running, mode }) {
+  adoptSession({ running, mode, paused = false }) {
     if (running && isValidMode(mode) && mode !== this.mode) {
       // The server is authoritative about a session that is already running — a reload during a
       // recording must show the mode being recorded, not the one this browser last selected.
       this.mode = mode;
     }
     if (running) {
-      this.setState(RECORDING);
+      // A reload during a pause must come back paused. `running` stays true while a session is
+      // held — it owns its device, its file and its store — so the server's `paused` flag is what
+      // separates the two, and without it a reload would silently show a recording that is not
+      // advancing as one that is.
+      this.setState(paused ? PAUSED : RECORDING);
     } else if (this.state !== PROCESSING && this.state !== ERROR) {
       // Everything except those two returns to idle, `stopping` very much included — that is the
       // state a stop *passes through*, and an earlier version of this guard listed only
@@ -171,6 +176,8 @@ class ModeStore {
         return statesFor(this.mode).includes(ARMING) ? "arm" : "start";
       case ARMING:
       case RECORDING:
+      case PAUSED:
+        // A paused session still stops. Pausing is a hold, not a way out of one.
         return "stop";
       default:
         // `stopping` and `processing`. The control is disabled in both — a cancel here would

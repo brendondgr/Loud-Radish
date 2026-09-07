@@ -251,6 +251,49 @@ class WindowCaptureMixin:
         except Exception:  # noqa: BLE001 - releasing consent must not fail a recording
             logger.debug("Could not close the portal session", exc_info=True)
 
+    def _pause_window_capture(self) -> None:
+        """Stop the video while the session is held, so it cannot drift from the audio (D-044).
+
+        **The audio clock is the only clock**, and a pause stops it. If the encoder kept running
+        through a five-minute hold, the picture would be five minutes longer than the sound and
+        every frame after the pause would sit that far ahead of its own transcript line — the exact
+        desynchronisation D-036's stitching exists to prevent.
+
+        So the recorder is finalised into the segment it was writing, and a resume starts the next
+        one. Nothing else is needed: `stitch` places each piece by the session second its first
+        frame was captured at, and because the audio clock did not advance during the hold, the next
+        piece's start lands where the previous one ended. The gap it computes is therefore below
+        `MIN_GAP_S` and no filler is inserted — the same code that *holds* a frame across an
+        unintended outage *closes* an intended one, because the difference is entirely in the clock.
+        """
+        recorder, self._recorder = self._recorder, None
+        if recorder is None:
+            return
+        try:
+            recorder.stop()
+            self._retire_recorder(recorder)
+        except Exception:  # noqa: BLE001 - a pause must never end the session
+            logger.exception("The video recorder did not pause cleanly")
+
+    def _resume_window_capture_after_pause(self) -> bool:
+        """Start the next video segment after a hold.
+
+        Uses the same reopen as a stall does, and **does not spend its allowance**: the five-attempt
+        cap in `_resume_window_capture` exists to stop a portal that will never come back from being
+        asked forever, and a user pressing resume is not that. A hold that could only be lifted five
+        times would be a strange thing to explain.
+        """
+        if self._recorder is not None or self._capture_support is None:
+            return False
+        # The backoff is lifted too, and for the same reason: it protects against a capture that
+        # dies the instant it starts, not against someone pressing resume four seconds after pause.
+        before, self._last_resume_at = self._capture_resumes, 0.0
+        try:
+            resumed = self._resume_window_capture()
+        finally:
+            self._capture_resumes = before
+        return resumed
+
     def _stop_window_capture(self) -> None:
         """Finalise the video and release the portal. Safe in any mode and at any point."""
         recorder, self._recorder = self._recorder, None

@@ -624,8 +624,15 @@ close are left in place rather than moved, so nothing is lost by reading this fi
       owning a recording folder — failed transcriptions of real audio, whose empty database is the
       only thing naming the audio. Every candidate was re-checked straight from SQLite before
       deleting: 679 of 679 genuinely held zero segments.
-- [ ] **Pause, resume and cancel** — for a live or recorded capture, for a window recording's video,
-      and for a transcription pass whose checkpoint survives a server restart. Steps 6-9.
+- [x] **Pause, resume and cancel a capture — done (D-044).** `paused` is in the run-state
+      vocabulary on both sides of the wire, with its own control in the header beside the primary
+      one. A pause **removes time from the recording**: verified in the browser against a real
+      server, nine seconds of wall clock across a three-second hold produced 3.01 s → 3.01 s →
+      6.02 s of recorded audio, with the header clock frozen throughout the hold. `window` mode
+      stops its video with the audio so the two cannot drift. Cancel keeps every artefact and runs
+      no pass. 320 px and keyboard passes done.
+- [ ] **Pause, resume and cancel a transcription pass**, with a checkpoint that survives a server
+      restart. Step 9.
 - [x] **`services/session/manager.py` has reached 1782 lines — split, and now 672.** Six files:
       `shapes.py` (the dataclasses and tuning constants, importing no sibling so nothing cycles),
       `frames.py`, `background.py`, `window_capture.py`, `passes.py`, `sources.py`. Every file in

@@ -167,6 +167,50 @@ async def stop_session(request: Request) -> dict[str, Any]:
     return {"session_id": session_id, "stats": stats.as_dict()}
 
 
+@router.post("/session/pause", response_model=SessionResponse)
+async def pause_session(request: Request) -> dict[str, Any]:
+    """Hold the capture. The recording stops growing and the clock stops with it (D-044).
+
+    Idempotent: pausing a session that is already held is not an error, because a second click on
+    a control whose label has not repainted yet is a user's mistake to make and not worth a banner.
+    """
+    manager = _manager(request)
+    try:
+        manager.pause()
+    except SessionError as exc:
+        raise HTTPException(status_code=409, detail=_error("no-session", str(exc))) from exc
+    return manager.state()
+
+
+@router.post("/session/resume", response_model=SessionResponse)
+async def resume_session(request: Request) -> dict[str, Any]:
+    """Continue a held capture, in the same session, the same file and the same store."""
+    manager = _manager(request)
+    try:
+        manager.resume()
+    except SessionError as exc:
+        raise HTTPException(status_code=409, detail=_error("no-session", str(exc))) from exc
+    return manager.state()
+
+
+@router.post("/session/cancel", response_model=SessionStoppedResponse)
+async def cancel_session(request: Request) -> dict[str, Any]:
+    """End the session and transcribe nothing. Every artefact it produced is kept (D-044).
+
+    The difference from `/session/stop` is exactly one thing: the post-capture pass does not run.
+    The audio, the video and any committed segments stay where they are, and the recording remains
+    listed as transcribable, so changing your mind costs one click rather than the talk.
+    """
+    manager = _manager(request)
+    session = manager.state().get("session") or {}
+    session_id = session.get("session_id", "")
+    try:
+        stats = await manager.cancel()
+    except SessionError as exc:
+        raise HTTPException(status_code=409, detail=_error("no-session", str(exc))) from exc
+    return {"session_id": session_id, "stats": stats.as_dict()}
+
+
 # -- audio -----------------------------------------------------------------------------
 
 

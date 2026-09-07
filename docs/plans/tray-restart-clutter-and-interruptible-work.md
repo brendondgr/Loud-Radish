@@ -1,6 +1,6 @@
 # The Tray Icon, the Transcript After a Restart, the Clutter, and Work That Can Be Interrupted
 
-*Written 2026-09-06. Status: **In progress (5 / 10 steps)**. Branch: `interruptible-work`.*
+*Written 2026-09-06. Status: **In progress (8 / 10 steps)**. Branch: `interruptible-work`.*
 
 > **Rebased onto the Loud Radish rebrand.** This plan was written against `main` at `97de92e` and the
 > rebrand (D-038) landed while it was being written. It has been re-based rather than re-planned:
@@ -330,7 +330,7 @@ needed to choose between those two if the picker proves unavoidable.**
   commit stating: `Interruptible Work (5 / 10) Complete: the tray icon is exported over D-Bus and
   appears in the system tray.`
 
-### Step 6 — `paused` enters the vocabulary, and the interface grows a second control
+### Step 6 — `paused` enters the vocabulary, and the interface grows a second control ✅ **Done**
 
 - **Locations.** `services/session/modes.py` — add `PAUSED`, add it to `RECORD_STATES`, and add it
   to `MODE_STATES` for all three modes. `web/frontend/static/js/core/modes.js` — the identical
@@ -353,7 +353,7 @@ needed to choose between those two if the picker proves unavoidable.**
   commit stating: `Interruptible Work (6 / 10) Complete: paused is part of the run-state vocabulary
   on both sides of the wire, with its own control in the header.`
 
-### Step 7 — Pause, resume and cancel a live or recorded capture
+### Step 7 — Pause, resume and cancel a live or recorded capture ✅ **Done**
 
 - **Locations.** `services/session/manager.py` — a paused flag consulted at the top of `_on_frame`,
   after the gate check and **before** `sink.write` and `queue.put`; `pause()`, `resume()` and
@@ -388,7 +388,7 @@ needed to choose between those two if the picker proves unavoidable.**
   commit stating: `Interruptible Work (7 / 10) Complete: a live or recorded capture can be paused,
   resumed and cancelled, with the clock and the recording stopping together.`
 
-### Step 8 — Pause a window capture without losing the picture's place
+### Step 8 — Pause a window capture without losing the picture's place ✅ **Done**
 
 - **Locations.** `services/session/window_capture.py` (from Step 1) — stop the `WindowRecorder` on
   pause and reopen it on resume through the existing restore-token path that
@@ -631,6 +631,44 @@ clock, so the SVG and the pixmap were two instants of the same motion rather tha
 A suite-wide guard was added to `tests/conftest.py` beside the portal and PipeWire ones: `start()`
 raises under test, because the tray is the one part of this package with a visible side effect on the
 developer's desktop and "remember not to start the tray" is a habit. Recorded as **D-043**. 36 tests.
+
+**Steps 6–8 — landed together, because a control with no backend is an inert button.**
+
+The plan separated the vocabulary and the control (6) from the behaviour (7) so each could be
+committed alone. Committing 6 by itself would have shipped a Pause button that called nothing, which
+is worse than no button, so they went in as one change along with the window-mode half (8) — that
+turned out to be twenty lines, because `stitch` already does the right thing once the audio clock is
+the clock being used.
+
+**The headline claim, measured in the browser against a real server**: a session recorded for three
+seconds, held for three, and recorded for three more reports 3.01 s → 3.01 s → 6.02 s of audio
+across nine seconds of wall clock. The header clock froze at `00:00:06` for the whole hold and
+resumed from there. That is the decision working, not a proxy for it.
+
+**Running it corrected the plan on one point.** `session.paused` was written to retract the tentative
+tail and the recording figure, by analogy with `session.stopped`. Looking at the paused screen showed
+the analogy is false: a stop ends capture, so those two are stale, but a hold ends nothing — the
+italic tail is still exactly what the engine has, and the recording is still exactly as long as it
+is. Retracting them would mean a client that reconnected during a pause saw *less* than one that
+stayed connected. The retraction was removed and the reasoning written into `events.py`.
+
+Two things the plan did not anticipate. The header clock is derived from the start time, so it cannot
+know how long a session was held after a reload — `state()` now reports `recorded_seconds` and the
+client reconciles wall-clock elapsed against it. And the window resume path had a five-attempt cap
+and a five-second backoff, both meant for a portal that keeps dying; a deliberate resume lifts them,
+because a hold that could only be lifted five times would be a strange thing to explain.
+
+Verified at 320 px (no horizontal overflow, both controls inside the viewport) and by keyboard (in
+the tab order, focus ring present, activation flips the label and `aria-pressed`). 17 tests, and the
+two that carry the claim were confirmed failing with the pause gate removed.
+
+*The documented SQLite flake fired once during this step and was left alone.*
+`test_session_toggle.py::test_stopping_ignores_the_mode` failed on one full-suite run, passed five
+times in isolation immediately after, and passed on the next full run — which is exactly the
+behaviour Part 4 of the checklist records ("roughly one full-suite run in three, with a SQLite
+error… it passes in isolation every time"). Nothing here touches `TranscriptionRunner.stop`'s join.
+Recorded rather than fixed, because the checklist is explicit that guessing at this is how the
+original closed-database fault was introduced.
 
 *Two tests fail on this machine for reasons that predate the split.*
 `test_a_real_tap_reports_its_links_without_listening_to_them` and

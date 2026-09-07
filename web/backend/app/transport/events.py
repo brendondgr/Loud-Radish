@@ -23,6 +23,12 @@ SESSION_STOPPED: Final = "session.stopped"
 #: container, remuxing and a post-capture pass are not. Without this the interface sat on
 #: "Stopping…" for all of it, and a slow finalise was indistinguishable from a hang.
 SESSION_CAPTURE_ENDED: Final = "session.capture_ended"
+#: Capture is held. The recording and the clock stop together and neither advances (D-044).
+SESSION_PAUSED: Final = "session.paused"
+#: Capture continues, in the same session, the same file and the same store.
+SESSION_RESUMED: Final = "session.resumed"
+#: The session ended without a transcription pass. Every artefact it produced is kept.
+SESSION_CANCELLED: Final = "session.cancelled"
 
 # -- transcript -----------------------------------------------------------------------
 TRANSCRIPT_COMMITTED: Final = "transcript.committed"
@@ -81,6 +87,9 @@ ALL_EVENTS: Final[tuple[str, ...]] = (
     SESSION_STARTED,
     SESSION_STOPPED,
     SESSION_CAPTURE_ENDED,
+    SESSION_PAUSED,
+    SESSION_RESUMED,
+    SESSION_CANCELLED,
     TRANSCRIPT_COMMITTED,
     TRANSCRIPT_HYPOTHESIS,
     TRANSCRIPT_POLISHED,
@@ -126,6 +135,9 @@ CRITICAL_EVENTS: Final[frozenset[str]] = frozenset(
         TRANSCRIPT_POLISHED,
         SESSION_STARTED,
         SESSION_STOPPED,
+        SESSION_PAUSED,
+        SESSION_RESUMED,
+        SESSION_CANCELLED,
         # Dropping it leaves the interface claiming capture is still running after the device has
         # been released, which is the one thing this event exists to deny.
         SESSION_CAPTURE_ENDED,
@@ -162,6 +174,14 @@ INVALIDATES: Final[dict[str, frozenset[str]]] = {
     TRANSCRIPTION_FAILED: frozenset({TRANSCRIPTION_PROGRESS}),
     # Capture has ended, so how much of it had been written is no longer a live figure either.
     SESSION_STOPPED: frozenset({RECORDING_PROGRESS, TRANSCRIPT_HYPOTHESIS}),
+    # **A pause retracts nothing, and that is deliberate.** It was written the other way first, by
+    # analogy with the stop above, and running it showed the analogy is wrong: a stop ends capture,
+    # so its last hypothesis and its last byte count are *stale*. A hold does not end anything — the
+    # tentative tail is still exactly what the engine has, and the recording is still exactly as
+    # long as it is. Retracting them would mean a client that reconnected during a pause saw less
+    # than one that stayed connected, and the tentative text vanishing on pause reads as the
+    # engine having thrown it away.
+    SESSION_CANCELLED: frozenset({RECORDING_PROGRESS, TRANSCRIPT_HYPOTHESIS}),
     # **The same retraction, for the same reason, before it can happen again.** An export's last
     # progress frame says `running` too, and a window opened an hour later would otherwise be
     # replayed it and sit watching an encode that finished before it was opened.

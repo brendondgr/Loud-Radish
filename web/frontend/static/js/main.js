@@ -8,7 +8,7 @@
 
 import { on } from "./core/bus.js";
 import { $ } from "./core/dom.js";
-import { ARMING, IDLE, PROCESSING, STOPPING, WINDOW } from "./core/modes.js";
+import { ARMING, IDLE, PAUSED, PROCESSING, RECORDING, STOPPING, WINDOW } from "./core/modes.js";
 import * as prefs from "./core/storage.js";
 import { Banners } from "./components/banners.js";
 import { ChatPane } from "./components/chat-pane.js";
@@ -30,6 +30,8 @@ import {
   CONNECTION_CHANGED,
   CAPTURE_STATE,
   RECORDING_PROGRESS,
+  SESSION_PAUSED,
+  SESSION_RESUMED,
   SESSION_STARTED,
   SESSION_STATE,
   SESSION_CAPTURE_ENDED,
@@ -100,6 +102,8 @@ function boot() {
     onStart: (name) => start(name, null, banners, settings),
     onArm: (name) => arm(name, preflight, banners, settings),
     onStop: ({ armedOnly }) => stop(armedOnly, banners),
+    onPause: () => hold(true, banners),
+    onResume: () => hold(false, banners),
     onOpenSettings: (section) => settings.show(section),
   });
 
@@ -296,11 +300,21 @@ function wireSession(header) {
     }
   });
 
+  on(SESSION_PAUSED, () => {
+    session.pause();
+    mode.setState(PAUSED);
+  });
+
+  on(SESSION_RESUMED, () => {
+    session.resume();
+    mode.setState(RECORDING);
+  });
+
   on(SESSION_STATE, (state) => {
     session.hydrate(state);
     recording.hydrate(state);
     capture.set(state?.capture);
-    mode.adoptSession({ running: session.running, mode: session.mode });
+    mode.adoptSession({ running: session.running, mode: session.mode, paused: session.paused });
     // After adoptSession, which would otherwise reset a reconnecting client to idle while a pass
     // it cannot see is still running.
     if (recording.isTranscribing) {
@@ -615,6 +629,40 @@ async function stop(armedOnly, banners) {
   } catch (error) {
     mode.fail(error.message);
     banners.show({ code: error.code ?? "stop-failed", severity: "warning", message: error.message });
+  }
+}
+
+/**
+ * Hold the capture, or let it go again (D-044).
+ *
+ * The state is set optimistically and the server's own `session.paused` / `session.resumed` event
+ * confirms it. That ordering matters for the control's label: waiting for the round trip leaves
+ * "Pause" under the finger for as long as the request takes, which invites a second press — and a
+ * second press of a control that has already been obeyed is how a user pauses and immediately
+ * resumes without meaning to.
+ */
+async function hold(pausing, banners) {
+  const previous = mode.state;
+  try {
+    mode.setState(pausing ? PAUSED : RECORDING);
+    if (pausing) {
+      session.pause();
+      await api.pauseSession();
+    } else {
+      session.resume();
+      await api.resumeSession();
+    }
+  } catch (error) {
+    // Put it back. A control showing "Resume" over a session that is still recording is worse
+    // than the error, because the next press stops nothing and the user has no way to tell.
+    mode.setState(previous);
+    if (pausing) session.resume();
+    else session.pause();
+    banners.show({
+      code: error.code ?? "hold-failed",
+      severity: "warning",
+      message: error.message,
+    });
   }
 }
 

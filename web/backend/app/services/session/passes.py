@@ -29,6 +29,14 @@ class TranscriptionPassMixin:
 
         Returns whether the store was handed to the runner, which then owns closing it.
         """
+        # A cancelled session keeps everything and transcribes nothing (D-044). The audio is on
+        # disk and the recording is listed as transcribable, so running it later is one click; the
+        # point of cancelling is not to spend half an hour of CPU on a recording the user has
+        # already said they do not want.
+        if self._cancelled:
+            logger.info("Session %s was cancelled; not transcribing it", session.session_id)
+            return False
+
         sink, self._sink = self._sink, None
         if sink is None or self._store is None:
             return False

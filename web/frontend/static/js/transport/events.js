@@ -11,6 +11,12 @@ export const SESSION_STOPPED = "session.stopped";
 /** The microphone or monitor has been released. Emitted immediately on stop, ahead of finalising
  *  the video, remuxing, and any post-capture pass — all of which can take tens of seconds. */
 export const SESSION_CAPTURE_ENDED = "session.capture_ended";
+/** Capture is held. The recording and the clock stop together; neither advances (D-044). */
+export const SESSION_PAUSED = "session.paused";
+/** Capture continues, in the same session, the same file and the same store. */
+export const SESSION_RESUMED = "session.resumed";
+/** The session ended and nothing will be transcribed. Every artefact it produced is kept. */
+export const SESSION_CANCELLED = "session.cancelled";
 export const SESSION_STATE = "session.state";
 
 export const TRANSCRIPT_COMMITTED = "transcript.committed";

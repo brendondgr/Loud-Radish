@@ -39,6 +39,9 @@ Every frame is `{"event": "<name>", "data": { … }}`.
 |---|---|---|
 | `session.started` | `session_id`, `mode`, `config` snapshot, `started_at`, `source` | Capture began. `mode` is the capture mode (D-020) and is authoritative — a client reloading mid-recording adopts it rather than its own last selection |
 | `session.stopped` | `session_id`, `stats` | Capture ended |
+| `session.paused` | `session_id`, `at_seconds` | Capture is **held** (D-044). The recording stops growing and the clock stops with it — a pause removes time from the recording rather than adding silence to it, so nine seconds of wall clock across a three-second hold produce six seconds of audio. **Retracts nothing**: unlike a stop, a hold ends nothing, so the tentative tail and the recording figure are both still true |
+| `session.resumed` | `session_id`, `at_seconds` | Capture continues, in the same session, the same file and the same store |
+| `session.cancelled` | `session_id`, `kept` | The session ended and **nothing will be transcribed**. Every artefact it produced is kept — the difference from a stop is exactly one thing, whether the post-capture pass runs |
 | `transcript.committed` | `id`, `text`, `start`, `end`, `wall_clock`, `confidence`, `model_id`, `speaker` | Append permanently |
 | `transcript.hypothesis` | `text` (may be empty), `start` | Replace the tentative tail |
 | `transcript.polished` | `id`, `start`, `end`, `text`, `source_ids` | A finished minute rewritten for reading, as one continuous paragraph. Append the block and stop drawing the segments in `source_ids` — do **not** delete them. `text` carries inline `[MM:SS]` markers, in the same format the assistant cites, so a passage can be traced back to when it was said |

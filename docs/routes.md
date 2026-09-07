@@ -43,6 +43,9 @@ Served by `web/backend/app/routes/`. All paths are prefixed `/api`.
 |---|---|---|---|
 | `POST` | `/api/session/start` | Begin capture in a capture mode | **Implemented** — see below |
 | `POST` | `/api/session/stop` | End the session and return final statistics | **Implemented** |
+| `POST` | `/api/session/pause` | Hold the capture; the recording and the clock stop together (D-044) | **Implemented** |
+| `POST` | `/api/session/resume` | Continue a held capture, in the same session, file and store | **Implemented** |
+| `POST` | `/api/session/cancel` | End the session and transcribe nothing; every artefact is kept | **Implemented** |
 | `POST` | `/api/session/toggle` | Start if idle, stop if running — one call, because a keystroke cannot know which (D-024) | **Implemented** |
 | `GET` | `/api/session` | Current session state and metadata | **Implemented** |
 | `GET` | `/api/session/list` | — superseded by `/api/sessions`, below | Removed |

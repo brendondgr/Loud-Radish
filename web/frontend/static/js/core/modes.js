@@ -25,6 +25,8 @@ export const IDLE = "idle";
 export const ARMING = "arming";
 /** Capture is running. */
 export const RECORDING = "recording";
+/** Capture is held. The recording does not advance and the clock does not move (D-044). */
+export const PAUSED = "paused";
 /** Asked to stop, closing files. Brief, and not interruptible. */
 export const STOPPING = "stopping";
 /** Capture finished; a transcription pass is running over what it produced. */
@@ -36,6 +38,7 @@ export const RECORD_STATES = Object.freeze([
   IDLE,
   ARMING,
   RECORDING,
+  PAUSED,
   STOPPING,
   PROCESSING,
   ERROR,
@@ -49,13 +52,13 @@ export const RECORD_STATES = Object.freeze([
  * transcription was switched on before capture began.
  */
 export const MODE_STATES = Object.freeze({
-  live: Object.freeze([IDLE, RECORDING, STOPPING, ERROR]),
-  recorded: Object.freeze([IDLE, RECORDING, STOPPING, PROCESSING, ERROR]),
-  window: Object.freeze([IDLE, ARMING, RECORDING, STOPPING, PROCESSING, ERROR]),
+  live: Object.freeze([IDLE, RECORDING, PAUSED, STOPPING, ERROR]),
+  recorded: Object.freeze([IDLE, RECORDING, PAUSED, STOPPING, PROCESSING, ERROR]),
+  window: Object.freeze([IDLE, ARMING, RECORDING, PAUSED, STOPPING, PROCESSING, ERROR]),
 });
 
 /** States in which a session is doing something and the mode may not be changed. */
-export const BUSY_STATES = Object.freeze([ARMING, RECORDING, STOPPING, PROCESSING]);
+export const BUSY_STATES = Object.freeze([ARMING, RECORDING, PAUSED, STOPPING, PROCESSING]);
 
 /**
  * What each mode needs beyond a plain install, keyed as `GET /api/health` reports it.

@@ -39,6 +39,19 @@ class FramePathMixin:
         if gate is None:
             return
 
+        # **The pause gate, and the only one (D-044).** This method is where a frame is written to
+        # the recording *and* where it is queued for inference, so one flag here stops both in step
+        # and nothing downstream needs to know the session can be held. Anywhere else would stop
+        # one and not the other, and a WAV that keeps growing while the engine's clock does not is
+        # a recording whose timestamps are wrong from the pause onward.
+        #
+        # The meter keeps running. A paused session with a dead level meter looks like a broken
+        # one; a moving meter says "we can still hear you, and we are not writing it down", which
+        # is exactly the state.
+        if self._paused:
+            self._emit_level(frame, False, False)
+            return
+
         result = gate.process(frame)
 
         # Written here, on the capture thread, rather than through the queue. The queue is

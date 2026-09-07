@@ -81,6 +81,13 @@ class SessionResponse(_Model):
     """The current session and pipeline state."""
 
     running: bool
+    #: Whether a running session is being held (D-044). Separate from ``running`` because a paused
+    #: session *is* running — it holds its device, its file and its store — and a client reading
+    #: only ``running`` would draw a recording that is not advancing as one that is.
+    paused: bool = False
+    #: Seconds of audio this session has consumed. Diverges from wall-clock elapsed as soon as a
+    #: session is paused, and is what the page's clock reconciles against on a reload.
+    recorded_seconds: float = 0.0
     session: dict[str, Any] | None = None
     asr: dict[str, Any] = Field(default_factory=dict)
     stats: dict[str, Any] | None = None

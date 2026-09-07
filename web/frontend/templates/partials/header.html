@@ -59,6 +59,14 @@
 
     <span class="clock numeric" data-clock aria-label="Session duration">00:00:00</span>
 
+    {# Pause is its own button, not a seventh meaning for the primary one (D-044). That control
+       already serves six states by asking the store what pressing it means; giving it "stop, and
+       you will be asked to confirm" and "pause, which is free" as two meanings that differ only by
+       current state puts two different consequences under one finger. Hidden outside `recording`
+       and `paused` rather than disabled — there is nothing to explain about pausing a session that
+       does not exist. #}
+    <button type="button" class="button button--hold" data-session-hold hidden>Pause</button>
+
     <button type="button" class="button button--primary" data-session-toggle>Start recording</button>
   </div>
 

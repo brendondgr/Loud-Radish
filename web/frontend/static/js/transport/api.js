@@ -90,6 +90,9 @@ export const api = {
   captureState: () => get("/api/capture/state"),
   startSession: (metadata = {}) => post("/api/session/start", metadata),
   stopSession: () => post("/api/session/stop"),
+  pauseSession: () => post("/api/session/pause"),
+  resumeSession: () => post("/api/session/resume"),
+  cancelSession: () => post("/api/session/cancel"),
 
   devices: () => get("/api/audio/devices"),
   selectDevice: (body) => post("/api/audio/device", body),

@@ -174,6 +174,15 @@ class SessionManager(
         #: The store of the session that has just finished, kept **open for reading** until the
         #: next one starts. See the :attr:`store` property for why.
         self._last_store: TranscriptStore | None = None
+        # **Pause is a flag on the capture thread, not a stopped device.** Releasing the microphone
+        # and reopening it would give the resumed session a different stream, a different clock
+        # origin and — on a monitor source — possibly a different sink; and the portal would ask
+        # again. Holding the device and dropping its frames costs an idle callback every 32 ms and
+        # keeps everything else identical (D-044).
+        self._paused = False
+        #: Set when a session was ended by `cancel()` rather than by `stop()`. Read at teardown to
+        #: skip the post-capture pass — the only difference between the two.
+        self._cancelled = False
 
     # -- state ---------------------------------------------------------------------
 
@@ -240,6 +249,11 @@ class SessionManager(
         return store.stats().duration_seconds if store is not None else 0.0
 
     @property
+    def is_paused(self) -> bool:
+        """Whether a running session is being held. False when nothing is running."""
+        return self._paused and self.is_running
+
+    @property
     def silence_seconds(self) -> float:
         """How long the speaker has currently been silent, from the VAD gate.
 
@@ -260,6 +274,15 @@ class SessionManager(
         stats = store.stats() if store else None
         return {
             "running": self.is_running,
+            # Separate from `running`, because a paused session *is* running: it holds its device,
+            # its file and its store. A client that only read `running` would show a recording that
+            # is not advancing as one that is, which is the misreading that costs a talk.
+            "paused": self.is_paused,
+            # How much audio this session has actually consumed, which is *not* wall-clock elapsed
+            # once it has been paused (D-044). The page's clock is derived from the start time, so
+            # on a reload it has no way to know how long the session was held; this is the figure it
+            # reconciles against, and it is the same one every transcript timestamp comes from.
+            "recorded_seconds": round(self.session_seconds, 2),
             "session": self._metadata.as_dict() if self._metadata else None,
             "asr": self._asr.status(),
             "stats": stats.as_dict() if stats else None,
@@ -318,6 +341,8 @@ class SessionManager(
                 raise SessionError(
                     "A session is already recording. Stop it before starting another."
                 )
+            self._paused = False
+            self._cancelled = False
             self._claimed = True
 
         try:
@@ -442,6 +467,91 @@ class SessionManager(
             self._source_info,
         )
         return session
+
+    def pause(self) -> None:
+        """Hold the capture. The recording stops growing and the clock stops with it.
+
+        **Pause removes time from the recording rather than recording silence (D-044).** Frames are
+        dropped at `_on_frame`, so the WAV stops growing, the engine consumes nothing and its
+        `session_seconds` — which is where every transcript timestamp comes from — stops advancing.
+        A ten-minute talk held for five minutes produces ten minutes of audio whose last timestamp
+        is 10:00.
+
+        The alternative, writing silence, was rejected twice over: it makes the transcript claim
+        time in which nothing was said, and it makes pausing cost exactly as much disk and exactly
+        as much inference as not pausing, which is not what the word means. What is given up is that
+        timestamps no longer correspond to time of day once a session has been paused — and nothing
+        reads them that way. The polish pass, the assistant's citations and the exported page's
+        video sync are all recording-relative.
+
+        The device stays open. Closing and reopening it would change the stream, the clock origin
+        and possibly the sink, and in `window` mode would ask the portal again.
+
+        Raises:
+            SessionError: if nothing is recording.
+        """
+        if not self.is_running:
+            raise SessionError("No session is recording.")
+        if self._paused:
+            return
+
+        self._paused = True
+        self._pause_window_capture()
+        self._emit(
+            "session.paused",
+            {
+                "session_id": self._metadata.session_id if self._metadata else "",
+                "at_seconds": round(self.session_seconds, 2),
+            },
+        )
+        logger.info("Session held at %.1f s", self.session_seconds)
+
+    def resume(self) -> None:
+        """Continue a held capture, in the same session, file and store.
+
+        Raises:
+            SessionError: if nothing is recording.
+        """
+        if not self.is_running:
+            raise SessionError("No session is recording.")
+        if not self._paused:
+            return
+
+        self._paused = False
+        self._resume_window_capture_after_pause()
+        self._emit(
+            "session.resumed",
+            {
+                "session_id": self._metadata.session_id if self._metadata else "",
+                "at_seconds": round(self.session_seconds, 2),
+            },
+        )
+        logger.info("Session resumed at %.1f s", self.session_seconds)
+
+    async def cancel(self) -> SessionStats:
+        """End the session and transcribe nothing. Keeps every artefact it produced.
+
+        **Cancel keeps everything (D-044).** It stops capture, skips the post-capture pass, and
+        leaves the audio, the video and whatever segments were already committed exactly where they
+        are. Deleting is a separate and explicit act from the Recordings page.
+
+        A control that discards a recording is one that will eventually discard the wrong one, and
+        the whole disposition of this application is against that — D-027 refused to move a stream
+        the user was listening to, and D-036 made `mux.py` delete a source only once the output
+        demonstrably contains it. The difference between stopping and cancelling is therefore
+        exactly one thing: whether the transcription pass runs.
+        """
+        if not self.is_running:
+            raise SessionError("No session is recording.")
+
+        self._cancelled = True
+        self._paused = False
+        stats = await self.stop()
+        self._emit(
+            "session.cancelled",
+            {"session_id": stats.session_id if hasattr(stats, "session_id") else "", "kept": True},
+        )
+        return stats
 
     async def stop(self) -> SessionStats:
         """End the session, flushing anything pending so the last words are not lost."""
