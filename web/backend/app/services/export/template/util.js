@@ -11,7 +11,7 @@ const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
 /** Local storage, scoped per recording so two exports open in one browser do not collide. */
 function scopedStore(key) {
-  const name = `transcriber-export:${window.EXPORT_KEY || "session"}:${key}`;
+  const name = `loud-radish-export:${window.EXPORT_KEY || "session"}:${key}`;
   return {
     read(fallback) {
       try {

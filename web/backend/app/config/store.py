@@ -20,6 +20,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from .. import branding
 from .defaults import default_layer
 from .hotswap import HotSwapClass, classify, classify_many
 from .presets import preset_overlay
@@ -32,15 +33,65 @@ LAYER_SESSION = "session"
 LAYER_RUNTIME = "runtime"
 WRITABLE_LAYERS = (LAYER_USER, LAYER_SESSION, LAYER_RUNTIME)
 
-DEFAULT_CONFIG_FILENAME = "transcriber-config.json"
+DEFAULT_CONFIG_FILENAME = branding.CONFIG_FILENAME
+LEGACY_CONFIG_FILENAME = branding.LEGACY_CONFIG_FILENAME
+
+CONFIG_PATH_ENV = branding.env_var("CONFIG_PATH")
+LEGACY_CONFIG_PATH_ENV = branding.legacy_env_var("CONFIG_PATH")
 
 
 def default_config_path() -> Path:
-    """Resolve the user config file location, honouring ``TRANSCRIBER_CONFIG_PATH``."""
-    override = os.environ.get("TRANSCRIBER_CONFIG_PATH")
+    """Resolve the user config file location.
+
+    Honours ``LOUD_RADISH_CONFIG_PATH``, then the deprecated ``TRANSCRIBER_CONFIG_PATH`` (D-038).
+    With neither set, the file lives in the data directory — and if only the pre-rename name is
+    there, :func:`adopt_legacy_config` moves it before anything reads it.
+    """
+    override = os.environ.get(CONFIG_PATH_ENV)
     if override:
         return Path(override).expanduser()
-    return Path("./data") / DEFAULT_CONFIG_FILENAME
+
+    legacy_override = os.environ.get(LEGACY_CONFIG_PATH_ENV)
+    if legacy_override:
+        logger.warning(
+            "%s is deprecated and will stop being read; use %s instead",
+            LEGACY_CONFIG_PATH_ENV,
+            CONFIG_PATH_ENV,
+        )
+        return Path(legacy_override).expanduser()
+
+    path = Path("./data") / DEFAULT_CONFIG_FILENAME
+    adopt_legacy_config(path)
+    return path
+
+
+def adopt_legacy_config(path: Path) -> bool:
+    """Rename a pre-rename config file onto ``path``. Returns whether anything moved.
+
+    The rename is the whole migration: every setting the user has ever chosen lives in this file,
+    and a rebrand that quietly started reading a different filename would present itself as a
+    factory reset. Doing it as a move rather than a copy means it happens exactly once — a second
+    run finds the new name already present and does nothing.
+
+    Silent when there is nothing to do, which is the ordinary case for a fresh install and for
+    every run after the first.
+    """
+    if path.exists():
+        return False
+    legacy = path.with_name(LEGACY_CONFIG_FILENAME)
+    if not legacy.is_file():
+        return False
+    try:
+        legacy.rename(path)
+    except OSError as exc:
+        # Not fatal: the caller falls back to defaults, and the old file is still on disk to be
+        # moved by hand. Losing the settings would be worse than starting without them.
+        logger.warning("Could not adopt %s as %s: %s", legacy, path.name, exc)
+        return False
+    logger.info(
+        "Adopted %s as %s after the rename to %s", legacy.name, path.name, branding.APP_NAME
+    )
+    return True
 
 
 def deep_merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:

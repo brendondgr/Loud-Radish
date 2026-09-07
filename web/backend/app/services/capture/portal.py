@@ -31,6 +31,8 @@ from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any, Final
 
+from ... import branding
+
 logger = logging.getLogger(__name__)
 
 PORTAL_BUS: Final = "org.freedesktop.portal.Desktop"
@@ -151,7 +153,7 @@ def _stream_size(properties: Any) -> tuple[int, int]:
 
 def _token() -> str:
     """A token for one request. Random, because two concurrent requests must not collide."""
-    return f"transcriber_{secrets.token_hex(8)}"
+    return f"{branding.PORTAL_TOKEN_PREFIX}_{secrets.token_hex(8)}"
 
 
 def _request_path(unique_name: str, token: str) -> str:

@@ -16,7 +16,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "utils"))
 
-import transcriber_ctl as ctl  # noqa: E402
+import loud_radish_ctl as ctl  # noqa: E402
 
 
 @pytest.fixture

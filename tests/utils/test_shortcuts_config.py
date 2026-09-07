@@ -11,6 +11,8 @@ from __future__ import annotations
 from app.companion import shortcuts
 from app.config import ShortcutsConfig
 
+from app import branding
+
 
 def test_every_action_has_a_default_key() -> None:
     config = ShortcutsConfig()
@@ -56,10 +58,10 @@ def test_no_service_reports_every_shortcut_as_unregistered(monkeypatch) -> None:
 
 def test_the_manual_command_is_runnable_as_printed(monkeypatch) -> None:
     """It turns "shortcuts do not work here" into two minutes in the desktop's own settings."""
-    command = shortcuts.manual_command("/home/me/transcriber", "toggle_recorded")
-    assert "utils/transcriber_ctl.py" in command
+    command = shortcuts.manual_command("/home/me/loud-radish", "toggle_recorded")
+    assert branding.CONTROL_SCRIPT in command
     assert "toggle --mode recorded" in command
-    assert "/home/me/transcriber" in command
+    assert "/home/me/loud-radish" in command
 
 
 def test_the_report_names_what_to_do_for_each_failure(monkeypatch) -> None:

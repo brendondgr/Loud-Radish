@@ -26,10 +26,11 @@ KGLOBALACCEL_BUS: Final = "org.kde.kglobalaccel"
 KGLOBALACCEL_PATH: Final = "/kglobalaccel"
 KGLOBALACCEL_IFACE: Final = "org.kde.KGlobalAccel"
 
-COMPONENT: Final = "transcriber"
+COMPONENT: Final = branding.SHORTCUT_COMPONENT
+LEGACY_COMPONENT: Final = branding.LEGACY_SHORTCUT_COMPONENT
 COMPONENT_LABEL: Final = branding.APP_TITLE
 
-#: Action name → (human label, `transcriber_ctl.py` arguments).
+#: Action name → (human label, control-script arguments).
 ACTIONS: Final[dict[str, tuple[str, list[str]]]] = {
     "toggle_live": ("Start or stop live transcription", ["toggle", "--mode", "live"]),
     "toggle_recorded": ("Start or stop a recording", ["toggle", "--mode", "recorded"]),
@@ -79,7 +80,7 @@ def manual_command(repo_root: Path | str, action: str) -> str:
     desktop's own settings, and it is the same path a user on GNOME or Sway would take anyway.
     """
     arguments = ACTIONS.get(action, ("", []))[1]
-    return f"uv run --directory {repo_root} utils/transcriber_ctl.py {' '.join(arguments)}"
+    return f"uv run --directory {repo_root} {branding.CONTROL_SCRIPT} {' '.join(arguments)}"
 
 
 def register_all(config, repo_root: Path | str) -> list[Registration]:  # noqa: ANN001
