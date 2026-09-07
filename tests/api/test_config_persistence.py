@@ -120,3 +120,27 @@ def test_the_persistent_set_stays_small(client) -> None:
     """A guard, not a tautology. Persisting everything by accident would silently retire the Save
     button and make every experiment permanent."""
     assert PERSISTENT_PATHS <= {"audio.source_type", "audio.device_id", "audio.file_path"}
+
+
+def test_the_settings_dropdown_endpoint_also_persists(client, config_path) -> None:
+    """**The route the fault was actually reported against.** Settings -> Audio calls
+    `POST /api/audio/device`, not `PATCH /api/config`, so fixing the patch route alone left the
+    dropdown reverting on every restart exactly as before."""
+    response = client.post(
+        "/api/audio/device",
+        json={"source_type": "microphone", "device_id": "samson-gomic-usb-audio-hw-3-0"},
+    )
+
+    assert response.status_code == 200
+    stored = _on_disk(config_path)["audio"]
+    assert stored["device_id"] == "samson-gomic-usb-audio-hw-3-0"
+    assert stored["source_type"] == "microphone"
+
+
+def test_choosing_a_file_source_from_the_dropdown_persists_its_path(client, config_path) -> None:
+    client.post(
+        "/api/audio/device",
+        json={"source_type": "file", "device_id": None, "file_path": "/tmp/a.wav"},
+    )
+
+    assert _on_disk(config_path)["audio"]["file_path"] == "/tmp/a.wav"

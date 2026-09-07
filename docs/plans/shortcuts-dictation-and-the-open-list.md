@@ -222,14 +222,14 @@ Step 2 ships a fallback rather than a hope.
   flat list, item ids become stable rather than positional, `_handle_event` resolves an id through
   the tree, and a parent carries `children-display`. `web/backend/app/companion/menu.py` — `build`
   gains a devices submenu with the current device checkmarked. `web/backend/app/companion/main.py` —
-  polls `GET /api/session/audio/devices`, caches the list, and `activate` sends
+  polls `GET /api/audio/devices`, caches the list, and `activate` sends
   `PATCH /api/config` for `audio.device_id`. Extend `tests/utils/test_tray_export.py` and
   `tests/utils/test_companion_menu.py`.
 - **Rationale**: the menu is **flat by construction** — `_layout` emits `[]` children for every row
   and `_handle_event` maps a click to `items[item_id - 1]` by position. `MenuItem.children` exists on
   the dataclass and has never been used. Nesting breaks the positional mapping, so the id scheme *is*
   the work here and it is where the bug would be: an off-by-one in a nested menu selects the wrong
-  microphone silently. The device list itself is free — `GET /api/session/audio/devices` already
+  microphone silently. The device list itself is free — `GET /api/audio/devices` already
   exists and already merges microphones and loopback sources with their type.
 - **Docs updated**: `docs/documentation.md`, `docs/checklist.md`.
 - **Action**: Undergo the verification/tests/validation process for this phase — including opening

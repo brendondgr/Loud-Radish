@@ -752,7 +752,13 @@ fixtures, and five faults came out of that which no test would have found:
       has focus (D-049). Over 25 s of real speech: 2.0 s to transcribe on the GPU, 0.9 s to tidy.
       In a silent room it says "nothing was said" and pastes nothing, which is the behaviour that
       matters most.
-- [ ] **A microphone picker in the tray menu.**
+- [x] **A microphone picker in the tray menu.** Done (D-050). One level of nesting, the current
+      input ticked and named in the parent row, disabled while recording. Verified over D-Bus on the
+      real desktop: clicking a child switched the microphone and wrote it to the config file.
+- [x] **Choosing a microphone did not survive a restart.** Done, and it took two goes. `PATCH
+      /api/config` was fixed first (D-046) — but Settings → Audio posts to `/api/audio/device`,
+      which was still writing to the discarded runtime layer, so the reported fault was untouched
+      until that route was fixed too.
 - [ ] **A native settings window.**
 
 ---

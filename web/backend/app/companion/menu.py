@@ -8,6 +8,12 @@ for a disable switch mid-talk would want.
 Built as data rather than as D-Bus calls so the structure is testable without a session bus, which
 is the part most likely to be wrong: an item enabled when it should not be is a menu that starts a
 second recording over the first.
+
+**One level of nesting, for the microphones and nothing else.** This module used to say it was flat
+by construction, on the grounds that a submenu would be a second place where an item's enabled
+state is decided. That still holds for the recording controls. A device list is different: it is not
+a set of commands with their own conditions but one choice with many values, and putting fourteen
+inputs at the top level would bury the three items anyone actually clicks.
 """
 
 from __future__ import annotations
@@ -43,12 +49,21 @@ class MenuItem:
         return properties
 
 
-def build(snapshot: Snapshot, *, listening: bool) -> list[MenuItem]:
+def build(
+    snapshot: Snapshot,
+    *,
+    listening: bool,
+    devices: list[dict] | None = None,
+    device_id: str | None = None,
+) -> list[MenuItem]:
     """The whole menu for one moment.
 
     Args:
         listening: whether global shortcuts are armed. Deliberately independent of whether a
             recording is running — see the module docstring.
+        devices: what `GET /api/audio/devices` last returned, or None if it has not been
+            asked yet. An empty list and an unasked list are different things and look different.
+        device_id: the input currently chosen, so it can be ticked.
     """
     if not snapshot.reachable:
         # Nothing else is worth offering: every other item would fail at the moment it was clicked,
@@ -77,6 +92,7 @@ def build(snapshot: Snapshot, *, listening: bool) -> list[MenuItem]:
         items.append(MenuItem("arm-window", "Record a window…", enabled=not busy))
 
     items.append(MenuItem("sep-2", "", kind="separator"))
+    items.append(_devices_item(devices, device_id, enabled=not recording))
     items.append(
         MenuItem("listening", "Listening for shortcuts", kind="checkmark", checked=listening)
     )
@@ -102,3 +118,44 @@ def _status_line(snapshot: Snapshot) -> str:
     if snapshot.running_pass:
         return "Tidying the transcript…"
     return "Ready"
+
+
+def _devices_item(devices: list[dict] | None, device_id: str | None, *, enabled: bool) -> MenuItem:
+    """The microphone submenu, or a row saying why there isn't one.
+
+    Disabled while recording **on purpose**: swapping the input mid-recording restarts the capture
+    stage, and a menu that silently interrupts a talk you are recording is not a convenience.
+    """
+    if devices is None:
+        return MenuItem("devices", "Microphone", enabled=False)
+    inputs = [device for device in devices if device.get("kind") != "file"]
+    if not inputs:
+        return MenuItem("devices", "No microphone found", enabled=False)
+
+    chosen = next((device for device in inputs if device.get("id") == device_id), None)
+    label = f"Microphone: {_short(chosen)}" if chosen else "Microphone"
+    children = [
+        MenuItem(
+            f"device:{device.get('id', '')}",
+            _short(device),
+            kind="checkmark",
+            checked=device.get("id") == device_id,
+            enabled=enabled,
+        )
+        for device in inputs
+    ]
+    return MenuItem("devices", label, enabled=enabled, children=children)
+
+
+def _short(device: dict | None) -> str:
+    """A device name that fits in a menu.
+
+    The names PortAudio reports carry the ALSA address — "Samson GoMic: USB Audio (hw:3,0)" — which
+    is what makes two identical microphones distinguishable and also what makes a menu unreadable.
+    The address is kept only when the name without it would be ambiguous, which is a judgement this
+    cannot make per row, so it is simply trimmed at a length that keeps the useful half.
+    """
+    if not device:
+        return "not chosen"
+    name = str(device.get("name") or device.get("id") or "unknown")
+    return name if len(name) <= 44 else name[:43] + "…"
