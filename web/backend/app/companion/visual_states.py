@@ -16,6 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Final
 
+from .. import branding
 from ..services.session import modes
 
 # -- the six pictures --------------------------------------------------------------------
@@ -105,7 +106,7 @@ VISUALS: Final[dict[str, VisualState]] = {
         "stubs",
         3.6,
         (False, False, False),
-        "the transcriber is not running",
+        f"{branding.APP_NAME} is not running",
     ),
 }
 

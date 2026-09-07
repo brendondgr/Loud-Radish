@@ -1,5 +1,5 @@
 ---
-description: Repository-wide rules for TranscriberPrototype. Read before any work — required reading list, uv/npm environment rules, documentation maintenance duties, testing expectations, and cleanup rules.
+description: Repository-wide rules for Loud Radish. Read before any work — required reading list, uv/npm environment rules, documentation maintenance duties, testing expectations, and cleanup rules.
 globs: ["**/*"]
 alwaysApply: true
 ---

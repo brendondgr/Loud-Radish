@@ -2,7 +2,7 @@
 
 *Last updated: 2026-08-29 (one folder per recording, and the web-app export)*
 
-Canonical map of TranscriberPrototype. This file documents **purpose**, not source code. Update it in
+Canonical map of Loud Radish. This file documents **purpose**, not source code. Update it in
 the same change that adds, moves, renames, or removes a directory or significant file.
 
 The layout follows **Mode G — API plus separate frontend** from
@@ -13,7 +13,7 @@ static assets rather than a separately built Node application. There is no npm t
 ## Tree — what exists today
 
 ```text
-TranscriberPrototype/
+TranscriberPrototype/                # the checkout keeps its old name; the product does not (D-038)
 ├── docs/                          # Source of truth for all repository documentation
 │   ├── plans/
 │   │   ├── README.md              # Plan conventions and index
@@ -48,6 +48,8 @@ TranscriberPrototype/
 ├── web/                           # ALL web application code
 │   ├── backend/app/
 │   │   ├── main.py                # FastAPI factory, lifespan, template and static mounting
+│   │   ├── branding.py            # The product name, and every identifier derived from it —
+│   │   │                          #   each paired with the legacy value it migrates from (D-038)
 │   │   ├── paths.py               # Filesystem locations, resolved in one place
 │   │   ├── config/                # Layered configuration system
 │   │   │   ├── schema.py          # Pydantic models, one per configuration area
@@ -178,6 +180,7 @@ TranscriberPrototype/
 │   │   │   └── partials/          # header, status_bar, banners, preflight,
 │   │   │                          #   transcript/, chat/, monitor/, settings/
 │   │   └── static/
+│   │       ├── brand/radish.svg   # The mark — tab icon, header, export, desktop entry (D-038)
 │   │       ├── css/               # tokens, base, layout + one file per component
 │   │       └── js/                # main + core/, transport/, stores/, components/, a11y/
 │   │           └── core/modes.js  # Mirror of services/session/modes.py; kept identical by test
@@ -185,7 +188,7 @@ TranscriberPrototype/
 │
 ├── libs/                          # Internal packages with more than one consumer
 ├── utils/                         # Standalone helpers not specific to the web app
-│   └── transcriber_ctl.py         # Drive recording from outside the browser (D-024)
+│   └── loud_radish_ctl.py         # Drive recording from outside the browser (D-024)
 ├── tests/                         # Python tests, grouped by area
 │   ├── api/                       # Routes, transport, audio library
 │   ├── assistant/                 # LLM clients, chat, context, and the polish pass
@@ -193,11 +196,13 @@ TranscriberPrototype/
 │   ├── data/                      # Transcript store, search, export, session archive
 │   └── utils/                     # Configuration and standalone helpers
 ├── scripts/                       # Developer and operational scripts
+│   ├── loud-radish.desktop.in     # Desktop entry template, filled in by install_autostart.py
 │   ├── make_fixture_wav.py        # Generates synthetic WAV fixtures for pipeline tests
 │   ├── measure_capture_cost.py    # Encoding vs. inference contention (D-022)
 │   ├── run_file_session.py        # Console-only pipeline run over a WAV file (BE M4)
 │   └── generate_contracts.py      # Writes openapi.json and ws-events.json
 ├── data/                          # Sessions, config file, audio, recordings (gitignored)
+│   ├── loud-radish-config.json    # User settings; adopted from transcriber-config.json (D-038)
 │   ├── sessions/<stamp>-<id>.db   # One transcript per session
 │   └── recordings/<stamp>-<id>/   # One folder per recording — audio.wav, video.<ext>,
 │                                  #   video-with-audio.<ext>, preview.jpg, audio.json,
@@ -230,6 +235,7 @@ listed them has been removed rather than left describing work that has landed.
 | `docs/skills/` | Canonical skill definitions. The three agent-tool folders point here rather than carrying copies. |
 | `web/` | All web application code and assets. Keeps application code out of the repository root. |
 | `web/backend/` | The Python side: the pipeline, the HTTP API, and the WebSocket stream. |
+| `web/backend/app/branding.py` | The product name and every machine identifier built from it, each beside the legacy value it replaces. One file, so the next rename is one diff rather than a hunt through eleven — and so the migration policy is readable in one place instead of scattered across six subsystems. |
 | `web/backend/app/config/` | The layered configuration system. Isolated because every stage reads it and nothing else should own it. |
 | `web/backend/app/routes/` | HTTP endpoint definitions only. Thin — they delegate to services. |
 | `web/backend/app/transport/` | The WebSocket hub and its event envelopes. Separate from `routes/` because it is a push channel with its own reconnection semantics. |
@@ -241,6 +247,7 @@ listed them has been removed rather than left describing work that has landed.
 | `web/backend/app/models/` | Persistence shape, separated so storage concerns do not leak into routes. |
 | `web/backend/app/schemas/` | Request and response validation — the runtime enforcement of `docs/api-contract.md`. |
 | `web/frontend/templates/` | Jinja2 templates, split into many small partials rather than a few large pages. One partial per region of the interface. |
+| `web/frontend/static/brand/` | The logo, in one place. The application header, the browser tab, the desktop entry and every export reference this single file rather than carrying copies. |
 | `web/frontend/static/css/` | Design tokens plus one stylesheet per component. No inline styles. |
 | `web/frontend/static/js/` | ES modules: core utilities, transport, the client stores, one controller per component. No bundler. |
 | `web/shared/contracts/` | The generated OpenAPI spec and the hand-authored WebSocket event schema, which OpenAPI cannot express. Prevents the two sides drifting apart. |

@@ -31,7 +31,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from ... import paths
+from ... import branding, paths
 
 logger = logging.getLogger(__name__)
 
@@ -322,7 +322,8 @@ def _kept_wheel(version: str) -> Path | None:
 
 #: Set to ``1`` to stop the launcher restoring the kept wheel, for anyone who wants the environment
 #: left exactly as the lockfile describes it.
-REPAIR_OFF = "TRANSCRIBER_NO_GPU_REPAIR"
+REPAIR_OFF = branding.env_var("NO_GPU_REPAIR")
+LEGACY_REPAIR_OFF = branding.legacy_env_var("NO_GPU_REPAIR")
 
 
 def repair_kept_wheel() -> str | None:
@@ -345,7 +346,10 @@ def repair_kept_wheel() -> str | None:
 
     Returns the message to print, or ``None`` when there was nothing to do.
     """
-    if os.environ.get(REPAIR_OFF) == "1":
+    # The deprecated name is still honoured: someone who switched the repair off did so because it
+    # broke something for them, and silently switching it back on during a rename would break it
+    # again (D-038).
+    if "1" in (os.environ.get(REPAIR_OFF), os.environ.get(LEGACY_REPAIR_OFF)):
         return None
     if _detect_hardware()[0] != "rocm":
         return None

@@ -27,6 +27,7 @@ import urllib.error
 import urllib.request
 from typing import Any, Final
 
+from .. import branding
 from .animation import FrameClock, Snapshot
 
 logger = logging.getLogger(__name__)
@@ -120,8 +121,10 @@ class Companion:
         """Handle one menu activation. Returns a one-line result, for logs and tests."""
         import subprocess
 
-        repo_root = os.environ.get("TRANSCRIBER_ROOT", ".")
-        ctl = [sys.executable, f"{repo_root}/utils/transcriber_ctl.py"]
+        repo_root = os.environ.get(branding.env_var("ROOT")) or os.environ.get(
+            branding.legacy_env_var("ROOT"), "."
+        )
+        ctl = [sys.executable, f"{repo_root}/{branding.CONTROL_SCRIPT}"]
 
         if item_id == "listening":
             self.listening = not self.listening
@@ -152,7 +155,7 @@ class Companion:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="transcriber-companion", description=__doc__)
+    parser = argparse.ArgumentParser(prog=f"{branding.APP_SLUG}-companion", description=__doc__)
     parser.add_argument("--host", default=os.environ.get("API_HOST", DEFAULT_HOST))
     parser.add_argument("--port", type=int, default=int(os.environ.get("API_PORT", DEFAULT_PORT)))
     parser.add_argument(

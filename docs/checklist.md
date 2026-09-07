@@ -1,8 +1,8 @@
 # Project Checklist
 
-*Last updated: 2026-08-29 (five faults reported against one recording)*
+*Last updated: 2026-09-06 (the Loud Radish rebrand — D-038)*
 
-The active work list for TranscriberPrototype. Update it whenever a task is finished or new work is
+The active work list for Loud Radish. Update it whenever a task is finished or new work is
 discovered.
 
 Phase-level progress lives in [plans/live-seminar-transcriber.md](plans/live-seminar-transcriber.md).
@@ -731,3 +731,31 @@ user's own machine, and none may be reported as passing until it has had one.
       drives ninety minutes of transcript through the engine in seconds and holds bounded memory,
       contiguous segment ids, and a clock that has not drifted. It is not the same as ninety
       wall-clock minutes with a real model and a real device, which remains yours to run.
+
+## Part 4 — After the Loud Radish rebrand (D-038)
+
+- [x] **The rebrand itself.** The name lives in `web/backend/app/branding.py`; every user-visible
+      string, every machine identifier, the documentation, the three agent pointer sets, and the
+      mark are done. `tests/utils/test_no_legacy_brand.py` fails if a pre-rename name reappears
+      anywhere it is not migrating from.
+- [ ] **The migrations against a real pre-rename install.** All four are covered by tests, and the
+      config-file adoption was watched happening on this machine. What has **not** been exercised
+      is the keyring move against a real Secret Service, the pre-rename systemd unit being removed
+      by a real `systemctl`, or the shortcut component being re-registered with a real KGlobalAccel
+      — none of the three was installed here to migrate. If you have another machine with the old
+      build on it, that is the one to try.
+
+## Discovered work
+
+- [ ] **`tests/assistant/test_llm_live.py` can hang the suite.** It skips when nothing answers at
+      `LLM_TEST_ENDPOINT`, but the relay on `localhost:9090` *does* answer here — so it runs for
+      real, and `test_a_real_answer_streams_back_as_content` waits on a full model generation with
+      no timeout. `uv run pytest` therefore does not terminate on this machine; every run during
+      the rebrand used `--ignore=tests/assistant/test_llm_live.py`. Give those tests a deadline.
+- [ ] **`tests/transcription/test_window_audio.py::test_the_container_is_raw` is environment-
+      dependent.** It records from the real default monitor and asserts `|sample| <= 1.0`, so it
+      fails whenever what the developer happens to be playing clips above unity — observed failing
+      and then passing on consecutive runs with no code change. This is the same family as the
+      three lessons recorded at the top of `tests/conftest.py`: a test that reads the developer's
+      audio graph. Assert on the absence of NaN, which is the fault the test was written for, and
+      not on amplitude the test does not control.

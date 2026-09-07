@@ -61,7 +61,7 @@ the same name itself, and a later `monkeypatch.setattr` wins over an autouse one
 ## No test may write into the developer's data directory
 
 The same lesson a third time, and this one had been running for months. A test that constructs
-``ConfigStore()`` with no path resolves ``./data/transcriber-config.json`` and therefore the real
+``ConfigStore()`` with no path resolves ``./data/loud-radish-config.json`` and therefore the real
 ``./data/sessions`` — so every route test that started a session left a transcript database behind.
 Measured on the machine this was found on: **949 session files, 690 of them empty**, all of them
 written by the suite.
@@ -111,7 +111,7 @@ class NoTapInTests:
     """
 
     def __init__(self, sink_name: str = "") -> None:
-        self.sink_name = sink_name or "transcriber-tap-in-tests"
+        self.sink_name = sink_name or "loud-radish-tap-in-tests"
         self._open = False
 
     @property
@@ -232,9 +232,9 @@ def isolated_data_dirs(tmp_path, monkeypatch):
     sessions.mkdir(parents=True)
     recordings.mkdir(parents=True)
 
-    config_path = data / "transcriber-config.json"
+    config_path = data / "loud-radish-config.json"
     config_path.write_text(json.dumps({}), encoding="utf-8")
-    monkeypatch.setenv("TRANSCRIBER_CONFIG_PATH", str(config_path))
+    monkeypatch.setenv("LOUD_RADISH_CONFIG_PATH", str(config_path))
 
     real_default_layer = defaults.default_layer
 

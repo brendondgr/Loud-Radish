@@ -1,6 +1,6 @@
 ---
 name: global-project-rules
-description: Read this first, before any work in the TranscriberPrototype repository. Defines the required reading list, the uv/npm environment rules, documentation maintenance duties, testing expectations, and cleanup rules that every AI agent and human contributor must follow.
+description: Read this first, before any work in the Loud Radish repository. Defines the required reading list, the uv/npm environment rules, documentation maintenance duties, testing expectations, and cleanup rules that every AI agent and human contributor must follow.
 ---
 
 # Global Project Rules

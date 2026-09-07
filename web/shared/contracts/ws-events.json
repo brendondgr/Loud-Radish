@@ -77,6 +77,18 @@
       "critical": true,
       "coalescing": false
     },
+    "export.progress": {
+      "critical": false,
+      "coalescing": true
+    },
+    "export.done": {
+      "critical": true,
+      "coalescing": false
+    },
+    "export.failed": {
+      "critical": true,
+      "coalescing": false
+    },
     "audio.level": {
       "action": "replace",
       "note": "Drives the input meter.",

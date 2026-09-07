@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Start the transcriber with your desktop session, and remove it again (Plan 5).
+"""Start Loud Radish with your desktop session, and remove it again (Plan 5).
 
     uv run scripts/install_autostart.py
     uv run scripts/install_autostart.py --uninstall
@@ -23,12 +23,17 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-UNIT_NAME = "transcriber.service"
+UNIT_NAME = "loud-radish.service"
+
+#: The unit installed before the rename to Loud Radish. Removed on install rather than left beside
+#: the new one: two units enabled at once would start the server twice on the same port, and the
+#: second would fail on a port the first already holds (D-038).
+LEGACY_UNIT_NAME = "transcriber.service"
 UNIT_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "systemd" / "user"
 
 UNIT_TEMPLATE = """\
 [Unit]
-Description=Live Seminar Transcriber
+Description=Loud Radish — Live Audio & Video Transcriber
 Documentation=file://{repo}/docs/documentation.md
 # The graphical session, not the machine: window capture needs a compositor and a portal, and
 # audio capture needs the user's own PipeWire.
@@ -67,6 +72,8 @@ def install() -> int:
         )
         return 2
 
+    remove_legacy_unit()
+
     UNIT_DIR.mkdir(parents=True, exist_ok=True)
     unit_path = UNIT_DIR / UNIT_NAME
     unit_path.write_text(UNIT_TEMPLATE.format(repo=REPO_ROOT, uv=uv), encoding="utf-8")
@@ -84,22 +91,39 @@ def install() -> int:
 
     print(f"  enabled and started {UNIT_NAME}\n")
     print("  It now starts with your desktop session. To check on it:\n")
-    print("      systemctl --user status transcriber")
-    print("      journalctl --user -u transcriber -f\n")
+    print(f"      systemctl --user status {UNIT_NAME}")
+    print(f"      journalctl --user -u {UNIT_NAME} -f\n")
     print("  To remove it:\n")
     print("      uv run scripts/install_autostart.py --uninstall\n")
     return 0
 
 
+def remove_legacy_unit() -> bool:
+    """Disable and delete a pre-rename unit. Returns whether one was there.
+
+    Called on install *and* on uninstall, because an install that leaves it enabled races the new
+    unit for port 8395, and an uninstall that ignores it leaves the application still starting with
+    the session after the user has asked for it to stop.
+    """
+    legacy_path = UNIT_DIR / LEGACY_UNIT_NAME
+    present = legacy_path.exists()
+    if present:
+        systemctl("disable", "--now", LEGACY_UNIT_NAME)
+        legacy_path.unlink(missing_ok=True)
+        print(f"  removed the pre-rename unit at {legacy_path}")
+    return present
+
+
 def uninstall() -> int:
     unit_path = UNIT_DIR / UNIT_NAME
+    remove_legacy_unit()
     systemctl("disable", "--now", UNIT_NAME)
     removed = unit_path.exists()
     unit_path.unlink(missing_ok=True)
     systemctl("daemon-reload")
 
     print(f"  {'removed ' + str(unit_path) if removed else 'nothing was installed'}")
-    print("  The transcriber no longer starts with your session.\n")
+    print("  Loud Radish no longer starts with your session.\n")
     return 0
 
 

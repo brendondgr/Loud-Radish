@@ -497,7 +497,7 @@ class _Tap:
     """A tap double whose link count is whatever the test says it is."""
 
     def __init__(self, links: int) -> None:
-        self.sink_name = "transcriber-tap-double"
+        self.sink_name = "loud-radish-tap-double"
         self.live_links = links
         self.closed = False
         self.is_open = True
@@ -810,7 +810,7 @@ def test_two_nodes_sharing_a_name_are_both_linked(monkeypatch) -> None:
     monkeypatch.setattr(tap_module, "_output_ports", lambda node_id: {})
     monkeypatch.setattr(tap_module, "_succeeded", lambda command: commands.append(command) or True)
 
-    tap = tap_module.ApplicationTap(sink_name="transcriber-tap-test")
+    tap = tap_module.ApplicationTap(sink_name="loud-radish-tap-test")
     tap._module = "42"  # opened, without touching the daemon
 
     def node(node_id: int):
@@ -835,7 +835,7 @@ def test_the_same_node_is_not_linked_twice(monkeypatch) -> None:
     monkeypatch.setattr(tap_module, "_output_ports", lambda node_id: {})
     monkeypatch.setattr(tap_module, "_succeeded", lambda command: True)
 
-    tap = tap_module.ApplicationTap(sink_name="transcriber-tap-test")
+    tap = tap_module.ApplicationTap(sink_name="loud-radish-tap-test")
     tap._module = "42"
     stream = tap_module.PlaybackStream(
         node_id=101,

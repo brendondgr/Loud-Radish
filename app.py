@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Run the Live Seminar Transcriber.
+"""Run Loud Radish — the Live Audio & Video Transcriber.
 
 One command starts everything: the API, the WebSocket event stream, and the browser interface, all
 from a single process.
@@ -307,7 +307,7 @@ def _print_banner(host: str, port: int, reload: bool, repaired: str | None = Non
     """Say what is running, where, and what it can and cannot do."""
     url = f"http://{host}:{port}"
     print()
-    print("  Live Seminar Transcriber")
+    print("  Loud Radish — Live Audio & Video Transcriber")
     print(f"  {url}")
     print()
 
@@ -375,7 +375,7 @@ def _serve(host: str, port: int, reload: bool, log_level: str) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="app.py",
-        description="Run the Live Seminar Transcriber (API, WebSocket, and interface).",
+        description="Run Loud Radish (API, WebSocket, and interface).",
     )
     parser.add_argument(
         "--port",

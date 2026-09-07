@@ -1,7 +1,7 @@
 [project]
-name = "transcriber-prototype"
+name = "loud-radish"
 version = "0.1.0"
-description = "Web application for audio transcription — Python API and transcription pipeline."
+description = "Loud Radish — a local live audio and video transcriber with a language-model assistant."
 requires-python = ">=3.11"
 # Everything the application can do is installed by `uv sync`, which `uv run app.py` performs on
 # its own. There are **no optional groups** — see Decision D-023.

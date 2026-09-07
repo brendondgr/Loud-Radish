@@ -18,9 +18,12 @@ import logging
 import os
 from typing import Any
 
+from .. import branding
+
 logger = logging.getLogger(__name__)
 
-SERVICE_NAME = "transcriber-prototype"
+SERVICE_NAME = branding.KEYRING_SERVICE
+LEGACY_SERVICE_NAME = branding.LEGACY_KEYRING_SERVICE
 
 #: Provider name → environment variable consulted when no OS credential store is available.
 #:
@@ -79,11 +82,51 @@ class CredentialStore:
                 value = None
             if value:
                 return value
+            migrated = self._adopt_legacy(kr, provider)
+            if migrated:
+                return migrated
 
         env_var = ENV_VARS.get(provider)
         if env_var:
             return os.environ.get(env_var) or None
         return None
+
+    def _adopt_legacy(self, kr: Any, provider: str) -> str | None:
+        """Move a credential stored under the pre-rename service, and return it (D-038).
+
+        Only reached when the current service has nothing for ``provider``, so this cannot shadow a
+        key the user has since re-entered. The secret is re-homed and the old entry deleted, making
+        this a one-way move that happens once: a second call finds the new service populated and
+        never gets here.
+
+        A failure to delete is deliberately not an error. The user has their key back, which is the
+        point; a leftover entry in the credential store is untidy rather than harmful, and raising
+        here would turn a successful recovery into a broken provider.
+        """
+        if self._service == LEGACY_SERVICE_NAME:
+            return None
+        try:
+            value = kr.get_password(LEGACY_SERVICE_NAME, provider)
+        except Exception:  # noqa: BLE001 - backend errors vary by platform
+            return None
+        if not value:
+            return None
+
+        try:
+            kr.set_password(self._service, provider, value)
+            kr.delete_password(LEGACY_SERVICE_NAME, provider)
+        except Exception as exc:  # noqa: BLE001 - backend errors vary by platform
+            logger.warning(
+                "Read the %s credential from the pre-rename store but could not move it: %s",
+                provider,
+                type(exc).__name__,
+            )
+            return value
+
+        logger.info(
+            "Moved the %s credential from %s to %s", provider, LEGACY_SERVICE_NAME, self._service
+        )
+        return value
 
     def has(self, provider: str) -> bool:
         """Whether a credential exists. This is the only credential fact the frontend receives."""

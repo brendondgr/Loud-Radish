@@ -3,11 +3,15 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{% block title %}Live Seminar Transcriber{% endblock %}</title>
+    <title>{% block title %}{{ app_title }}{% endblock %}</title>
     <meta name="color-scheme" content="dark" />
+
+    {# Without this every tab shows a blank glyph, and with the app and the sessions page usually
+       both open they are indistinguishable. #}
+    <link rel="icon" type="image/svg+xml" href="/static/{{ logo_path }}" />
     <meta
       name="description"
-      content="Live transcription of a talk, with an assistant that can answer questions about it."
+      content="{{ app_description }}"
     />
 
     {# Stylesheets are loaded individually rather than bundled. There is no build step, and a

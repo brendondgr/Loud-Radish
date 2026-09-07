@@ -56,6 +56,19 @@
    */
   --text-hypothesis: #9a9f99;
 
+  /* -- brand -------------------------------------------------------------------------
+   * The logo's own palette (D-038). Used by the mark and nothing else.
+   *
+   * These are deliberately NOT the accent below. The accent is a teal that is also aliased as
+   * --success, so painting the interface in the radish's crimson would make "healthy" and
+   * "danger" the same colour. Recolouring the interface is a design decision, not a rename.
+   */
+  --brand-radish: #c22d4c;
+  --brand-leaf: #598f3b;
+  --brand-cream: #f6f2e8;
+  --brand-blush: #d9868a;
+  --brand-ink: #080808;
+
   /* -- accent ------------------------------------------------------------------------- */
   --accent: #6fb0a6;
   --accent-bright: #9ed0c8;

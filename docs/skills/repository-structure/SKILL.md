@@ -1,17 +1,17 @@
 ---
 name: repository-structure
-description: Use this skill when setting up, restructuring, documenting, or enforcing repository layout for TranscriberPrototype — creating directories, deciding where a new file belongs, splitting oversized modules, organizing tests, or updating docs/structure.md.
+description: Use this skill when setting up, restructuring, documenting, or enforcing repository layout for Loud Radish — creating directories, deciding where a new file belongs, splitting oversized modules, organizing tests, or updating docs/structure.md.
 ---
 
 # Repository Structure Standard
 
-This is the canonical layout contract for TranscriberPrototype. Read
+This is the canonical layout contract for Loud Radish. Read
 `docs/skills/global-project-rules/SKILL.md` first, then this file, then `docs/structure.md` for the
 current actual tree.
 
 ## Selected Layout
 
-TranscriberPrototype uses **Mode G — API plus separate frontend** from
+Loud Radish uses **Mode G — API plus separate frontend** from
 [structures/web-interfaces.md](structures/web-interfaces.md): a Python backend owns the API and
 transcription pipeline, and a separate Node frontend owns rendering.
 

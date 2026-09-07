@@ -231,6 +231,38 @@ different in each and a blank pane during a recording reads as a broken transcri
 | Window, recording, live transcription on | Nothing; the transcript is filling |
 | Any mode, error | The failure and what to do, per the Required States rule |
 
+## The Mark
+
+`web/frontend/static/brand/radish.svg` — a radish shouting through a megaphone, which is where the
+name comes from (D-038). One file, used in five places: the browser tab, the application header, the
+exported bundle's tab and topbar, the desktop entry, and the README.
+
+Its palette ships as `--brand-*` tokens:
+
+| Token | Value | What it is |
+|---|---|---|
+| `--brand-radish` | `#c22d4c` | The body |
+| `--brand-leaf` | `#598f3b` | The leaves |
+| `--brand-cream` | `#f6f2e8` | The megaphone, and the disc the mark sits on |
+| `--brand-blush` | `#d9868a` | The lower body's highlight |
+| `--brand-ink` | `#080808` | Outline and limbs |
+
+**These are not the accent, and must not be used as one.** `--accent` is a teal and is also aliased
+as `--success`; painting the interface crimson would make "healthy" and "danger" the same colour.
+The brand tokens exist so the mark's own treatment does not hard-code hex values.
+
+**The mark always sits on a cream disc in application chrome.** The logo is drawn for a light
+ground — its outline and the character's legs are near-black — so on `--surface-raised` it loses
+everything but the crimson body and reads as a colour smudge rather than a drawing. Rendered at
+28 px against `#0d1011` and against `#f6f2e8` side by side, only the second is legible. The disc
+carries 2 px of padding because the megaphone reaches the edge of the viewBox.
+
+The SVG keeps its C2PA provenance metadata. It is 7.7 KB of the file's 75 KB, it is served over
+loopback, and stripping provenance to save bytes on a local connection is a poor trade.
+
+Below 700 px the header mark is hidden along with the model identity: the row wraps and every pixel
+is spoken for by controls. The tab icon still carries the mark there.
+
 ## Design Tokens
 
 Every colour, size, radius, and duration lives in `web/frontend/static/css/tokens.css`. No component

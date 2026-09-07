@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Live Seminar Transcriber",
+    "title": "Loud Radish \u2014 Live Audio & Video Transcriber",
     "summary": "Live seminar transcription with an LLM assistant over the running transcript.",
     "version": "0.1.0"
   },
@@ -1512,8 +1512,69 @@
           "sessions"
         ],
         "summary": "Export Session",
-        "description": "Download a past session in any of the five formats.",
+        "description": "Download a past session in any of the five formats.\n\n**The conversation is not in it unless it is asked for.** Markdown and JSON used to carry the\nquestions the user put to the assistant during the recording, because they were the two formats\nthat could. But a transcript export is mostly a thing being handed to somebody else, and one\nperson's half of a conversation is not part of the record of the talk. It exports on its own\nfrom ``/{key}/chat``; `include_chat=true` puts it back in here for anyone who wants one file.",
         "operationId": "export_session_api_sessions__key__export_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "fmt",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "markdown",
+              "title": "Fmt"
+            }
+          },
+          {
+            "name": "include_chat",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Chat"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{key}/chat": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Export Chat Only",
+        "description": "Download the conversation the user had with the assistant during this recording.\n\nIts own document, because it belongs to the person who asked rather than to the talk. Empty is\na valid answer and renders as a sentence saying so, rather than a 404 \u2014 \"you asked nothing\nduring this recording\" is information, and an error code is not.",
+        "operationId": "export_chat_only_api_sessions__key__chat_get",
         "parameters": [
           {
             "name": "key",
@@ -1557,13 +1618,295 @@
         }
       }
     },
+    "/api/sessions/{key}/media": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Session Media",
+        "description": "The recording itself, for the export window's preview player.\n\n**Served with range support**, which `FileResponse` provides: a `<video>` element seeking a\nhundreds-of-megabytes file over a route that could only send the whole thing would download all\nof it to show a frame two minutes in.\n\nThe path is resolved from the key rather than taken from the request \u2014 the same rule every\nroute here follows, because a loopback-bound server is still reachable from any page in any\nbrowser, and a route that served a path would serve any file on the machine.",
+        "operationId": "session_media_api_sessions__key__media_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{key}/export/options": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Export Options",
+        "description": "What this recording is, and what each preset would turn it into (D-037).\n\n**The measurement is the point.** A preset list on its own says \"720p\"; this says what 720p\nmeans for *this* file \u2014 the reported seminar asked for a 720p ceiling at capture and recorded\nat 2560 x 1532, so a window offering choices against the configured number would be describing\na recording that does not exist.\n\nEvery size is a range and says so. A constant-quality encode depends on content the estimator\nhas not watched, and a figure presented as exact would be wrong in the way that matters, since\nthe whole question is whether a file is small enough to send.",
+        "operationId": "export_options_api_sessions__key__export_options_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Export Options Api Sessions  Key  Export Options Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{key}/export/start": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Start Export",
+        "description": "Begin an export, and return the job to watch it by.\n\nA request, not a download. An encode is minutes for an hour of talk, and the old synchronous\nroute held a browser connection open for the whole of it \u2014 tolerable for a stream copy and not\nfor this. Progress arrives over the WebSocket; `export/result` collects the file.",
+        "operationId": "start_export_api_sessions__key__export_start_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "preset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "balanced",
+              "title": "Preset"
+            }
+          },
+          {
+            "name": "include_chat",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Chat"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Start Export Api Sessions  Key  Export Start Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{key}/export/status": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Export Status",
+        "description": "The current or most recent export for this session.\n\nThe reconciliation path, exactly as `GET /api/session` is for the live pipeline: the WebSocket\nis how progress arrives and this is how a page that has just loaded finds out where things got\nto without waiting for the next frame.",
+        "operationId": "export_status_api_sessions__key__export_status_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Export Status Api Sessions  Key  Export Status Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{key}/export/cancel": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Cancel Export",
+        "description": "Stop an export that is running. The partial output is removed rather than left playable.",
+        "operationId": "cancel_export_api_sessions__key__export_cancel_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Cancel Export Api Sessions  Key  Export Cancel Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{key}/export/result": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Export Result",
+        "description": "Download what the export produced.\n\nSeparate from the request that started it, so a finished export survives a reload \u2014 the archive\nis on disk in the recording's own folder, and this is the route that hands it over.",
+        "operationId": "export_result_api_sessions__key__export_result_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sessions/{key}/webapp": {
       "get": {
         "tags": [
           "sessions"
         ],
         "summary": "Export Webapp",
-        "description": "Download this recording as a self-contained HTML web application, in a ZIP.\n\nRefused rather than degraded when the recording has no video or no transcript. A \"web\napplication\" with an empty player and nothing to read is not the thing that was asked for, and\nshipping one under the same name disappoints quietly instead of explaining \u2014 so the refusal\nnames which piece is missing and what to do about it.\n\nBuilt on a worker thread. A talk is hundreds of megabytes, and copying that much into an archive\non the event loop stalls every other request including the transcript the user is watching.",
+        "description": "Download this recording as a self-contained HTML web application, in a ZIP.\n\nRefused rather than degraded when the recording has no video or no transcript. A \"web\napplication\" with an empty player and nothing to read is not the thing that was asked for, and\nshipping one under the same name disappoints quietly instead of explaining \u2014 so the refusal\nnames which piece is missing and what to do about it.\n\nBuilt on a worker thread. A talk is hundreds of megabytes, and copying that much into an archive\non the event loop stalls every other request including the transcript the user is watching.\n\n**The archive carries the talk and not the conversation about it**, unless `include_chat` says\notherwise. The exported page's whole purpose is that whoever receives it connects their own\nmodel and asks their own questions; opening it to find the panel already half-full of someone\nelse's questions, about a talk they have not watched, is the opposite of that.",
         "operationId": "export_webapp_api_sessions__key__webapp_get",
         "parameters": [
           {
@@ -1573,6 +1916,16 @@
             "schema": {
               "type": "string",
               "title": "Key"
+            }
+          },
+          {
+            "name": "include_chat",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Chat"
             }
           }
         ],

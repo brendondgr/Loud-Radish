@@ -247,7 +247,7 @@ def test_a_sink_belonging_to_a_live_process_is_left_alone(monkeypatch) -> None:
 def test_a_sink_under_the_old_constant_name_is_always_stale(monkeypatch) -> None:
     """Nothing creates that name any more, so whatever holds it is left over by definition."""
     unloaded: list[str] = []
-    listing = f"3\tmodule-null-sink\tsink_name={tap_module.LEGACY_SINK_NAME}\t\n"
+    listing = f"3\tmodule-null-sink\tsink_name={tap_module.LEGACY_SINK_NAMES[0]}\t\n"
     monkeypatch.setattr("app.services.audio.tap._run", lambda command, **_k: listing)
     monkeypatch.setattr(
         "app.services.audio.tap._succeeded", lambda command: unloaded.append(command[-1]) is None
@@ -304,7 +304,7 @@ def test_a_tap_opens_and_closes_without_leaving_a_sink_behind() -> None:
     tap_module.sweep_stale_sinks()
     before = _null_sinks()
 
-    tap = ApplicationTap(sink_name="transcriber-tap-test")
+    tap = ApplicationTap(sink_name="loud-radish-tap-test")
     tap.open()
     try:
         assert tap.is_open
@@ -365,7 +365,7 @@ def test_linking_leaves_the_applications_own_routing_alone() -> None:
     if not before:
         pytest.skip("the playing application has no outgoing links to preserve")
 
-    with ApplicationTap(sink_name="transcriber-tap-test") as tap:
+    with ApplicationTap(sink_name="loud-radish-tap-test") as tap:
         tap.link(target)
         during = _links_from(target.node_name)
 

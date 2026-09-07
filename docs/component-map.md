@@ -85,7 +85,7 @@ browser owns is genuinely its own — pane widths, text size, which pane is show
 
 | Component | Owns | Notes |
 |---|---|---|
-| `Header` | Record control, clock, model and privacy identity | Stopping asks first — an accidental stop mid-talk cannot be undone |
+| `Header` | The mark, record control, clock, model and privacy identity | Stopping asks first — an accidental stop mid-talk cannot be undone. The mark is decorative (`alt=""`): the page title already carries the name, and announcing it again at the top of every view is noise. Hidden below 700 px, where the tab icon carries it instead |
 | `TranscriptPane` | Polished blocks, committed segments, the hypothesis tail, search highlighting | Three sibling regions, only the middle one a live region; polished minutes flow as continuous prose with inline timestamps; trims to 300 segments and 240 blocks |
 | `ScrollController` | Follow-the-live-edge behaviour | Stops following the instant the user scrolls |
 | `TranscriptSelection` | "Ask about this", copy-with-timestamp | Positions from the selection rectangle, reads the time from the enclosing segment |

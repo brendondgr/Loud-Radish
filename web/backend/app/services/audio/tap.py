@@ -37,6 +37,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Final
 
+from ... import branding
+
 logger = logging.getLogger(__name__)
 
 #: The class a playback stream carries. Anything else in the graph is a device or a capture.
@@ -45,11 +47,16 @@ PLAYBACK_CLASS: Final = "Stream/Output/Audio"
 #: Shared start of every tap sink's name. Only used to *recognise* this application's sinks — the
 #: name a sink is actually created with always carries the owning process and a random suffix, for
 #: the reason set out on :func:`tap_sink_name`.
-TAP_SINK_PREFIX: Final = "transcriber-tap"
+TAP_SINK_PREFIX: Final = branding.TAP_SINK_PREFIX
 
-#: The name taps used to be created with, before it carried a process id. Left here so the sweep
-#: can still recognise and remove sinks leaked by a build that predates this.
-LEGACY_SINK_NAME: Final = "transcriber-tap"
+#: Names taps used to be created with: the bare prefix, from before it carried a process id, under
+#: both the old product name and the new one. Left here so the sweep can still recognise and remove
+#: sinks leaked by a build that predates either change — a leaked sink outlives the build that
+#: leaked it, so dropping the old name would strand it in the graph forever (D-038).
+LEGACY_SINK_NAMES: Final[tuple[str, ...]] = (
+    TAP_SINK_PREFIX,
+    *branding.LEGACY_TAP_SINK_PREFIXES,
+)
 
 #: How long to wait on the PipeWire tools. They answer in milliseconds when the daemon is healthy.
 TIMEOUT_S: Final = 5.0
@@ -247,7 +254,7 @@ def sweep_stale_sinks() -> int:
             continue
         name = found.group(1)
 
-        if name == LEGACY_SINK_NAME:
+        if name in LEGACY_SINK_NAMES:
             # Nothing creates this name any more, so whatever holds it is by definition stale.
             stale = True
         else:

@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-"""Drive the transcriber from outside the browser (Plan 5).
+"""Drive Loud Radish from outside the browser (Plan 5).
 
-    uv run utils/transcriber_ctl.py toggle
-    uv run utils/transcriber_ctl.py start --mode recorded
-    uv run utils/transcriber_ctl.py status
+    uv run utils/loud_radish_ctl.py toggle
+    uv run utils/loud_radish_ctl.py start --mode recorded
+    uv run utils/loud_radish_ctl.py status
 
 Run by path rather than installed as a console script. Console scripts would mean turning this
 repository into a packaged project with a build backend, and `uv run <path>` already works with no
@@ -66,7 +66,7 @@ def _request(url: str, payload: dict | None = None, timeout: float = TIMEOUT_S) 
             detail = body.strip() or f"HTTP {exc.code}"
         raise ControlError(detail) from exc
     except (urllib.error.URLError, OSError, TimeoutError) as exc:
-        raise ControlError("The transcriber is not running. Start it with: uv run app.py") from exc
+        raise ControlError("Loud Radish is not running. Start it with: uv run app.py") from exc
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -121,7 +121,7 @@ def cmd_arm(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="transcriber-ctl", description=__doc__)
+    parser = argparse.ArgumentParser(prog="loud-radish-ctl", description=__doc__)
     parser.add_argument("--host", default=os.environ.get("API_HOST", DEFAULT_HOST))
     parser.add_argument("--port", type=int, default=int(os.environ.get("API_PORT", DEFAULT_PORT)))
 
