@@ -170,6 +170,14 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   │   │       └── template/      # The exported page, copied verbatim: index.html, two
 │   │   │                          #   stylesheets, and five classic scripts (not modules —
 │   │   │                          #   `import` is refused across file:// URLs)
+│   │   ├── desktop/               # Talking to the desktop the user is sitting in front of:
+│   │   │   │                      #   clipboard, a keystroke into the focused window, and a
+│   │   │   │                      #   notification. Ordered, probed backends (D-048)
+│   │   │   ├── outcome.py         # What was tried and what happened — never an exception
+│   │   │   ├── clipboard.py       # wl-copy → klipper → xclip
+│   │   │   ├── keystroke.py       # ydotool → wtype. That order was measured, not assumed
+│   │   │   └── notify.py          # org.freedesktop.Notifications, for when nobody is looking
+│   │   │                          #   at the browser
 │   │   ├── companion/             # The desktop presence — a remote control, not a rewrite (D-024)
 │   │   │   ├── visual_states.py   # (capture mode, run state) → which picture the instrument shows
 │   │   │   ├── aperture.py        # Draws one frame of it, from docs/motion-spec.md
