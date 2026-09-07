@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-09-06 (the Loud Radish rebrand — D-038)*
+*Last updated: 2026-09-06 (the tray, the restart, the clutter, and work that can be interrupted)*
 
 The active work list for Loud Radish. Update it whenever a task is finished or new work is
 discovered.
@@ -196,9 +196,15 @@ each was invisible to reading and obvious to using, which is the argument for th
       frame per tick; it needs rasterising to ARGB32 and publishing. Recorded here rather than
       claimed, because a tray icon that does not appear is the one part of Plan 5 a user would
       notice immediately.
-- [ ] **Whether `jeepney` can export SNI pixmaps at all.** The reason the hop above is separate. If
-      it proves unworkable the documented fallback is `PySide6`'s `QSystemTrayIcon`, which speaks
-      the same protocol through Qt — decided by trying, not by arguing.
+- [x] **Whether `jeepney` can export SNI pixmaps at all — it can.** Measured 2026-09-06 rather than
+      argued, which is what this item asked for. `jeepney` 0.9.0 serialises a 22 x 22 ARGB32 buffer
+      into a `Properties.Get` reply of signature `a(iiay)` and parses it back **byte-identical**; it
+      builds `NewIcon` signals and `GetAll` replies; and `DBusConnection` exposes
+      `receive`/`send`/`filter` beside `new_method_return` and `new_error`, which is every primitive
+      a served object needs. This machine is already running an `org.kde.StatusNotifierWatcher` with
+      a host registered. **`PySide6` is therefore very unlikely to be needed**, and the remaining
+      unknown is only the dispatch loop, not the protocol. Planned in
+      [plans/tray-restart-clutter-and-interruptible-work.md](plans/tray-restart-clutter-and-interruptible-work.md).
 
 Known blockers and open questions carried by these plans:
 
@@ -224,10 +230,10 @@ Known blockers and open questions carried by these plans:
       Do that with a real recording on the machine you will use. Encoding alone measured 13× real
       time at 720p15 with VP8, which is the one half that *is* answered — the encoder has ample
       headroom on its own; what is unknown is what it does to inference running beside it.
-- [ ] **Whether the StatusNotifierItem protocol can be spoken directly with `jeepney`.** Plan 5
-      avoids pulling a GUI toolkit into the virtualenv for one tray icon. Exporting icon pixmaps as
-      D-Bus properties is the part that may not be worth it; the fallback is `PySide6`'s
-      `QSystemTrayIcon` behind the same optional group, decided by trying rather than by arguing.
+- [x] **Whether the StatusNotifierItem protocol can be spoken directly with `jeepney` — yes.**
+      The same measurement as above, recorded twice because the question was asked twice. Pixmap
+      marshalling was the part feared not worth it and it is a non-issue; what is left is a dispatch
+      loop, which Step 5 of the plan builds.
 - [ ] **Per-window audio is not available.** The KDE ScreenCast portal carries video only, so window
       capture records the machine's audio, not that window's. Plan 4 says so at the moment of arming
       rather than letting a user discover it in the recording.
@@ -595,6 +601,28 @@ says `max_height: 720` against a recording made at **2560 × 1532**.
 
 ---
 
+## Part 3l — The Tray, the Restart, the Clutter, and Work That Can Be Interrupted
+
+Four things asked for together on 2026-09-06 and planned in
+[plans/tray-restart-clutter-and-interruptible-work.md](plans/tray-restart-clutter-and-interruptible-work.md).
+Three of them are open items already carried above; the fourth is new capability. The items they
+close are left in place rather than moved, so nothing is lost by reading this file top to bottom.
+
+- [ ] **The tray icon's D-Bus export** — the outstanding hop from Plan 5, with the `jeepney`
+      question above now answered in its favour. Steps 4-5.
+- [ ] **The last transcript after a restart** — the documented bound of D-031, closed by reopening
+      the newest session that holds segments at startup. Step 3.
+- [ ] **The empty session databases** — measured at 968 files, 69.6 MB, of which 706 hold no
+      segments. **28 of those 706 own a recording folder**: they are failed transcriptions of real
+      audio, not test leavings, and the prune's criterion is no segments *and* no media. Step 2.
+- [ ] **Pause, resume and cancel** — for a live or recorded capture, for a window recording's video,
+      and for a transcription pass whose checkpoint survives a server restart. Steps 6-9.
+- [ ] **`services/session/manager.py` has reached 1782 lines** against a cap of 800, up from the
+      1334 recorded in Part 3f. Every one of the four items above edits it, so Step 1 splits it
+      along the seams Part 3f already named before any of them lands.
+
+---
+
 ## Part 4 — Still Open
 
 - [ ] **Default ASR model and compute device.** Depends entirely on the user's hardware. A
@@ -732,7 +760,7 @@ user's own machine, and none may be reported as passing until it has had one.
       contiguous segment ids, and a clock that has not drifted. It is not the same as ninety
       wall-clock minutes with a real model and a real device, which remains yours to run.
 
-## Part 4 — After the Loud Radish rebrand (D-038)
+## Part 6 — After the Loud Radish rebrand (D-038)
 
 - [x] **The rebrand itself.** The name lives in `web/backend/app/branding.py`; every user-visible
       string, every machine identifier, the documentation, the three agent pointer sets, and the
