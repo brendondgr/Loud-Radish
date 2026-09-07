@@ -188,14 +188,10 @@ each was invisible to reading and obvious to using, which is the argument for th
       `uv run app.py` is the whole story. GStreamer and a desktop portal are still system packages
       and are named in `docs/workflow.md`.
 
-- [ ] **The tray icon is not yet exported to D-Bus.** Everything behind it is built and tested: the
-      Aperture renderer, the frame clock, the (mode, run state) → picture map, the menu model, and
-      shortcut registration verified against the real KGlobalAccel. What is missing is the final
-      hop — one `org.kde.StatusNotifierItem` object with its icon properties and a `NewIcon` signal,
-      so a picture actually appears in the Plasma tray. `Companion.latest_svg` already produces a
-      frame per tick; it needs rasterising to ARGB32 and publishing. Recorded here rather than
-      claimed, because a tray icon that does not appear is the one part of Plan 5 a user would
-      notice immediately.
+- [x] **The tray icon is not yet exported to D-Bus — it is now.** The final hop is written and
+      verified against the real Plasma watcher: `Companion.latest_svg` still produces a frame per
+      tick, and beside it `companion/raster.py` produces the same frame as ARGB32 for the icon
+      property. See Part 3l, **D-042** and **D-043**.
 - [x] **Whether `jeepney` can export SNI pixmaps at all — it can.** Measured 2026-09-06 rather than
       argued, which is what this item asked for. `jeepney` 0.9.0 serialises a 22 x 22 ARGB32 buffer
       into a `Properties.Get` reply of signature `a(iiay)` and parses it back **byte-identical**; it
@@ -603,8 +599,15 @@ Four things asked for together on 2026-09-06 and planned in
 Three of them are open items already carried above; the fourth is new capability. The items they
 close are left in place rather than moved, so nothing is lost by reading this file top to bottom.
 
-- [ ] **The tray icon's D-Bus export** — the outstanding hop from Plan 5, with the `jeepney`
-      question above now answered in its favour. Steps 4-5.
+- [x] **The tray icon's D-Bus export — done, and the icon appears.** `companion/raster.py` draws
+      the instrument as ARGB32 with `numpy` alone (**D-042**), and `companion/tray.py` serves one
+      `org.kde.StatusNotifierItem` plus its `com.canonical.dbusmenu` from a dispatch loop over
+      `jeepney`'s primitives (**D-043**). Verified against the real desktop: registered with the
+      live watcher, `GetAll` returning fifteen properties and a 22 x 22 icon, the picture animating
+      between reads, an eleven-item menu — and on killing the server, the tooltip becoming "Loud
+      Radish is not running", the menu collapsing to four items, and the picture becoming the fault
+      one. No `PySide6`. Start it with `uv run python -m app.companion.main` from `web/backend/`,
+      or `--no-tray` to run the shortcuts without one.
 - [x] **The last transcript after a restart — closed.** The newest session holding segments is
       reopened once at start-up, chosen by the timestamp in its filename rather than by mtime.
       `storage.reopen_last_session` turns it off. Verified against a real server both ways: on, the

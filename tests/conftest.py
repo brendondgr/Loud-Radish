@@ -208,6 +208,23 @@ def no_real_audio_graph(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def no_real_tray_icon(monkeypatch):
+    """Keep every test out of the developer's system tray.
+
+    The companion to `no_real_portal`. Nothing calls `Companion.run()` today, but the tray is the
+    one part of this package with a visible side effect on the desktop, and "remember not to start
+    the tray" is a habit — which is exactly the argument the portal guard was written on. A test
+    that means to exercise the D-Bus side calls `TrayIcon.answer` directly, which needs no bus.
+    """
+    from app.companion import tray as tray_module
+
+    def refuse(self):  # noqa: ANN001, ANN202
+        raise AssertionError("a test tried to place a real icon in the system tray")
+
+    monkeypatch.setattr(tray_module.TrayIcon, "start", refuse)
+
+
+@pytest.fixture(autouse=True)
 def isolated_data_dirs(tmp_path, monkeypatch):
     """Point every default-constructed ``ConfigStore`` at a per-test data directory.
 

@@ -176,6 +176,8 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   │   │   │                     #   icon property. numpy only — no rasteriser (D-042)
 │   │   │   ├── animation.py       # The frame clock, and the hold-still setting
 │   │   │   ├── menu.py            # The tray menu's structure, as data
+│   │   │   ├── tray.py            # The StatusNotifierItem and its dbusmenu, served from a
+│   │   │   │                      #   dispatch loop over jeepney's primitives (D-043)
 │   │   │   ├── shortcuts.py       # Registration through the desktop's own service
 │   │   │   └── main.py            # Polls the server; killable and restartable at any moment
 │   │   ├── models/                # Persistence shape

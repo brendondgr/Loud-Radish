@@ -1,6 +1,6 @@
 # The Tray Icon, the Transcript After a Restart, the Clutter, and Work That Can Be Interrupted
 
-*Written 2026-09-06. Status: **In progress (4 / 10 steps)**. Branch: `interruptible-work`.*
+*Written 2026-09-06. Status: **In progress (5 / 10 steps)**. Branch: `interruptible-work`.*
 
 > **Rebased onto the Loud Radish rebrand.** This plan was written against `main` at `97de92e` and the
 > rebrand (D-038) landed while it was being written. It has been re-based rather than re-planned:
@@ -289,7 +289,7 @@ needed to choose between those two if the picker proves unavoidable.**
   commit stating: `Interruptible Work (4 / 10) Complete: the Aperture renders to an ARGB32 pixmap
   from its own geometry, adding no dependency.`
 
-### Step 5 — Put the icon in the tray
+### Step 5 — Put the icon in the tray ✅ **Done**
 
 - **Locations.** New `web/backend/app/companion/tray.py`, wired into `companion/main.py`'s existing
   loop beside `_on_frame`. Uses `jeepney` — already a dependency, already used by
@@ -607,6 +607,30 @@ Two things the drawing needed that the plan did not mention. Colour has to be av
 size is a visible dark halo. And the specification's hues are `oklch()` strings, so the module needs
 an OKLab conversion rather than a hex table — a table would be a second source of truth against
 `motion-spec.md`. Recorded as **D-042**. 33 tests.
+
+**Step 5 — the spike succeeded, so all three sub-steps landed together.**
+
+The decision point the plan stopped at was never reached. `jeepney` serves properties and emits
+signals perfectly well; what it lacks is only a convenience helper, so the module is a dispatch loop
+rather than a set of decorated handlers. `PySide6` was not needed and was not added, and the
+file-backed-icon fallback was not needed either. The menu went in with the icon rather than after it,
+because `menu.py` already produced `com.canonical.dbusmenu` property maps and the loop that answers
+the item answers the menu at no extra cost.
+
+Verified against the real desktop, not a double: the item registers with the live
+`org.kde.StatusNotifierWatcher`; `GetAll` returns fifteen properties including a 22 x 22 ARGB32
+pixmap; the picture animates between reads; the menu comes back with eleven items correctly enabled.
+Then the server was killed and the tray followed it within a poll — tooltip "Loud Radish is not
+running", menu down to four items, fault picture — which is the property that makes the companion a
+remote control rather than a second copy of the application.
+
+One improvement fell out of running it. `update()` originally resampled the animation with its own
+clock, so the SVG and the pixmap were two instants of the same motion rather than one instant.
+`aperture.Frame` already carries the amplitudes it drew with, so `render_pixmap` now takes them.
+
+A suite-wide guard was added to `tests/conftest.py` beside the portal and PipeWire ones: `start()`
+raises under test, because the tray is the one part of this package with a visible side effect on the
+developer's desktop and "remember not to start the tray" is a habit. Recorded as **D-043**. 36 tests.
 
 *Two tests fail on this machine for reasons that predate the split.*
 `test_a_real_tap_reports_its_links_without_listening_to_them` and

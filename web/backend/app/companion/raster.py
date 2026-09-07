@@ -233,13 +233,25 @@ class _Canvas:
 
 
 def render_pixmap(
-    visual: VisualState, t: float, *, size: int = 22, intensity: float = 1.0
+    visual: VisualState,
+    t: float,
+    *,
+    size: int = 22,
+    intensity: float = 1.0,
+    amplitudes: tuple[float, ...] | None = None,
 ) -> Pixmap:
     """One frame of the Aperture as an ARGB32 pixmap.
 
     The same arguments as :func:`aperture.render`, and the same picture — the fault state is four
     stubs and a slash, transcribing keeps a neutral grille and gives the hue to its read head, and
     the frame darkens when the instrument is doing something.
+
+    Args:
+        amplitudes: the thirteen bar heights, when the caller already has them. `aperture.Frame`
+            carries the ones it drew with, and handing those back is what makes the pixmap the
+            *same* frame rather than a second frame of the same animation — otherwise the two
+            renderers share their geometry but drift in phase, which is a difference nobody would
+            see and everybody would have to reason about.
     """
     canvas = _Canvas(size, SUPERSAMPLE)
     hue = parse_colour(visual.hue)
@@ -248,7 +260,7 @@ def render_pixmap(
 
     _paint_furniture_under(canvas, visual, hue, t)
     _paint_frame(canvas, frame)
-    _paint_grille(canvas, visual, hue, t, intensity)
+    _paint_grille(canvas, visual, hue, t, intensity, amplitudes)
     _paint_furniture_over(canvas, visual, hue, t)
     _paint_leds(canvas, visual, hue)
 
@@ -272,6 +284,7 @@ def _paint_grille(
     hue: tuple[float, float, float],
     t: float,
     intensity: float,
+    amplitudes: tuple[float, ...] | None = None,
 ) -> None:
     """The thirteen elements, which are both the grille and the meter."""
     if visual.motion == "stubs":
@@ -292,7 +305,12 @@ def _paint_grille(
 
     colour = parse_colour(GRILLE_NEUTRAL) if visual.name == "transcribing" else hue
     for index, (dx, height) in enumerate(GEOMETRY):
-        drawn = max(1.0, height * amplitude(index, t, visual.motion, intensity))
+        value = (
+            amplitudes[index]
+            if amplitudes is not None and index < len(amplitudes)
+            else amplitude(index, t, visual.motion, intensity)
+        )
+        drawn = max(1.0, height * value)
         canvas.paint(
             canvas.rounded_rect(
                 CENTRE_X + dx - BAR_WIDTH / 2, CENTRE_Y - drawn / 2, BAR_WIDTH, drawn, 2.2

@@ -121,6 +121,28 @@ Any Python command runs inside the project environment via `uv run`:
 uv run python -c "import sys; print(sys.version)"
 ```
 
+## The tray icon and the global shortcuts
+
+The companion is a second, small process. It places an icon in the system tray, holds the global
+keybinds, and talks to the server over the same loopback HTTP the browser uses. It holds no state
+and can be killed and restarted at any moment without the server noticing.
+
+```bash
+cd web/backend && uv run python -m app.companion.main
+```
+
+| Flag | Effect |
+|---|---|
+| `--no-tray` | Keep the shortcuts, place no icon. Also what a desktop with no tray gets automatically. |
+| `--hold-still` | Do not animate. There is no `prefers-reduced-motion` in a tray, so this is it. |
+| `--once` | Print the current state and exit. |
+| `--port N` | The server to watch (default 8395). |
+
+The icon is drawn from `docs/motion-spec.md` and served as a `StatusNotifierItem` over the session
+bus (**D-043**). A desktop with no `org.kde.StatusNotifierWatcher` gets the shortcuts and no icon,
+which is reported once and is not an error. `scripts/install_autostart.py` starts the server at
+login; the companion is started the same way.
+
 ## Running the pipeline without a UI
 
 The streaming engine can be driven end to end over a recorded file, with console output only. This
