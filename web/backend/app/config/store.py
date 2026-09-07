@@ -33,6 +33,22 @@ LAYER_SESSION = "session"
 LAYER_RUNTIME = "runtime"
 WRITABLE_LAYERS = (LAYER_USER, LAYER_SESSION, LAYER_RUNTIME)
 
+#: Settings that are written straight to the user layer and to disk, whatever layer was asked for.
+#:
+#: **Which input to listen to is an identity, not a tuning experiment.** Everything else the
+#: settings interface writes lands in the runtime layer on purpose, so a threshold can be nudged
+#: mid-talk and abandoned by restarting — that is what the Save button is for. A microphone is not
+#: like that. Choosing one and having it silently revert on the next launch is indistinguishable
+#: from the application ignoring you, and it is worse than the reverted threshold because the
+#: symptom appears much later: the next recording is made with the wrong input, or with none.
+PERSISTENT_PATHS = frozenset(
+    {
+        "audio.source_type",
+        "audio.device_id",
+        "audio.file_path",
+    }
+)
+
 DEFAULT_CONFIG_FILENAME = branding.CONFIG_FILENAME
 LEGACY_CONFIG_FILENAME = branding.LEGACY_CONFIG_FILENAME
 
@@ -121,6 +137,22 @@ def set_in(target: dict[str, Any], path: str, value: Any) -> None:
             cursor[part] = nxt
         cursor = nxt
     cursor[parts[-1]] = value
+
+
+def unset_in(target: dict[str, Any], path: str) -> None:
+    """Remove a dotted ``path`` if it is there, leaving any now-empty parents behind.
+
+    Empty parents are harmless — a sparse overlay of ``{"audio": {}}`` merges to nothing — and
+    pruning them would mean deciding whether a branch someone else is holding is safe to remove.
+    """
+    parts = path.split(".")
+    cursor = target
+    for part in parts[:-1]:
+        nxt = cursor.get(part)
+        if not isinstance(nxt, dict):
+            return
+        cursor = nxt
+    cursor.pop(parts[-1], None)
 
 
 def get_in(source: dict[str, Any], path: str) -> Any:
@@ -253,10 +285,38 @@ class ConfigStore:
         self._layers[LAYER_USER] = merged
         self._layers[LAYER_RUNTIME] = {}
         self._cached = None
+        self._write(merged)
 
+    def persist(self, changes: dict[str, Any]) -> HotSwapClass:
+        """Write ``changes`` to the user layer and to disk, without folding runtime down with them.
+
+        Deliberately not ``update(..., layer=LAYER_USER)`` followed by ``save()``: `save` folds the
+        whole runtime layer into the user layer, so persisting a microphone that way would also
+        commit every unrelated slider the user had been experimenting with in the same session.
+        """
+        if not changes:
+            return HotSwapClass.LIVE
+
+        candidate = deepcopy(self._layers[LAYER_USER])
+        for path, value in changes.items():
+            set_in(candidate, path, value)
+
+        self._validate_with(LAYER_USER, candidate)
+        self._layers[LAYER_USER] = candidate
+        # A stale higher layer would win over what was just written and the setting would appear
+        # not to have taken until a restart — the exact confusion this method exists to end.
+        for name in (LAYER_SESSION, LAYER_RUNTIME):
+            for path in changes:
+                unset_in(self._layers[name], path)
+        self._cached = None
+        self._write(candidate)
+        return classify_many(list(changes))
+
+    def _write(self, payload: dict[str, Any]) -> None:
+        """Atomically replace the config file. Written to a sibling first, then renamed."""
         self._path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self._path.with_suffix(f"{self._path.suffix}.tmp")
-        tmp.write_text(json.dumps(merged, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        tmp.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         tmp.replace(self._path)
 
     # -- internals -----------------------------------------------------------------

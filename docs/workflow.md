@@ -191,6 +191,23 @@ uv run pytest tests/transcription
 
 Tests live in `tests/<area>/test_<behavior>.py`. Add them alongside features, not afterwards.
 
+**A run always ends.** `[tool.pytest.ini_options]` sets `timeout = 120`, so a test that blocks fails
+with a traceback instead of stopping the suite. Two families used to do exactly that: the tests that
+talk to a real language model, and the two that read the machine's live audio graph through a
+blocking pipe read.
+
+**The live-model tests are opt-in by flag, not by reachability.** They talk to a real
+OpenAI-compatible server and are skipped unless asked for:
+
+```bash
+uv run pytest --run-live-llm
+```
+
+They were previously skipped only when nothing answered at `LLM_TEST_ENDPOINT` — which reads like an
+opt-in and is not. On a machine with a relay running they ran on every `uv run pytest`, draining a
+reasoning model's stream with nothing bounding it, and for a fortnight every full run was made with
+`--ignore`. Point them elsewhere with `LLM_TEST_ENDPOINT` and `LLM_TEST_MODEL`.
+
 **The suite never touches `data/`.** An autouse fixture in `tests/conftest.py` points the bottom
 configuration layer at a per-test temporary directory, so a store built with no config path — or
 one built with a config path that overrides only *some* of the directories — still writes its

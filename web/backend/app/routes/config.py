@@ -12,7 +12,9 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 
 from ..config import CLASS_CONSEQUENCE, HotSwapClass
+from ..config.hotswap import classify_many
 from ..config.presets import PRESET_DESCRIPTIONS, preset_names
+from ..config.store import PERSISTENT_PATHS
 from ..schemas.api import ConfigPatchRequest, ConfigPatchResponse, ConfigResponse, PresetRequest
 
 router = APIRouter(prefix="/api/config", tags=["config"])
@@ -36,8 +38,19 @@ async def patch_config(request: Request, body: ConfigPatchRequest) -> dict[str, 
     commits to something that will interrupt transcription (BE §13.3).
     """
     config = request.app.state.config
+    # Which input to listen to is written straight through to the config file, whatever layer was
+    # asked for. Everything else goes to the requested layer and waits for Save. See
+    # `PERSISTENT_PATHS` for why the microphone is not like a threshold — and note that this lives
+    # here, on the shared route, so the tray's device picker and the native settings window inherit
+    # it rather than each having to remember.
+    lasting = {path: value for path, value in body.changes.items() if path in PERSISTENT_PATHS}
+    passing = {path: value for path, value in body.changes.items() if path not in PERSISTENT_PATHS}
     try:
-        hot_swap: HotSwapClass = config.update(body.changes, layer=body.layer)
+        config.update(passing, layer=body.layer)
+        config.persist(lasting)
+        # Classified over every path the caller sent, not per group: the user is warned about the
+        # worst consequence of the whole write, which is what `update` reports for a single layer.
+        hot_swap: HotSwapClass = classify_many(list(body.changes))
     except (ValueError, KeyError) as exc:
         raise HTTPException(
             status_code=422,

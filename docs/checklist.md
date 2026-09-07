@@ -841,15 +841,22 @@ user's own machine, and none may be reported as passing until it has had one.
 
 ## Discovered work
 
-- [ ] **`tests/assistant/test_llm_live.py` can hang the suite.** It skips when nothing answers at
-      `LLM_TEST_ENDPOINT`, but the relay on `localhost:9090` *does* answer here — so it runs for
-      real, and `test_a_real_answer_streams_back_as_content` waits on a full model generation with
-      no timeout. `uv run pytest` therefore does not terminate on this machine; every run during
-      the rebrand used `--ignore=tests/assistant/test_llm_live.py`. Give those tests a deadline.
-- [ ] **`tests/transcription/test_window_audio.py::test_the_container_is_raw` is environment-
-      dependent.** It records from the real default monitor and asserts `|sample| <= 1.0`, so it
-      fails whenever what the developer happens to be playing clips above unity — observed failing
-      and then passing on consecutive runs with no code change. This is the same family as the
-      three lessons recorded at the top of `tests/conftest.py`: a test that reads the developer's
-      audio graph. Assert on the absence of NaN, which is the fault the test was written for, and
-      not on amplitude the test does not control.
+- [x] **`tests/assistant/test_llm_live.py` can hang the suite.** Done. The tests are now opt-in by
+      flag (`--run-live-llm`) rather than by reachability, which is what "skips when nothing
+      answers" was mistaken for. `pytest-timeout` gives the whole suite a 120-second per-test
+      deadline, the two draining tests get 300 seconds when deliberately asked for, and the server
+      probe moved into a fixture so collection no longer makes an HTTP request on every run.
+      `uv run pytest` completes unattended in about 95 seconds with no `--ignore`.
+- [x] **`tests/transcription/test_window_audio.py::test_the_container_is_raw` is environment-
+      dependent.** Done, and it was worse than reported. The amplitude assertion is gone from it and
+      from `test_a_capture_produces_finite_audio_at_the_canonical_rate`; both now assert that the
+      samples are finite, which is the fault the flag was added for. The blocking
+      `stdout.read(64000)` — which would never return on a machine whose default monitor is silent,
+      and so would never reach the `finally` that kills `pw-record` — is now a bounded read with a
+      ten-second deadline.
+
+      A **third** test in the same file was failing on every full-module run and had not been
+      reported: `test_a_real_tap_reports_its_links_without_listening_to_them` threw away the count
+      `link_all` returns and asserted `live_links > 0` regardless, so it failed whenever `pw-dump`
+      listed a node that could not actually be linked. It now skips on that, which is a fact about
+      the machine, and still asserts the counter whenever there is something to count.
