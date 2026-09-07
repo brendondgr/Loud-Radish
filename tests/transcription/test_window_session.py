@@ -24,8 +24,8 @@ from pathlib import Path
 import pytest
 from app.config import ConfigStore
 from app.models.session import SessionMetadata
-from app.services.capture import CaptureSupport, RecorderError
-from app.services.session import CaptureOptions, SessionError, SessionManager, modes
+from app.services.capture import CaptureSupport, MuxResult, RecorderError
+from app.services.session import CaptureOptions, SessionError, SessionManager, modes, window_capture
 from app.services.session import manager as manager_module
 
 from .capture_doubles import FakePortal, FakeRecorder, Recorder, install, write_talk_wav
@@ -229,7 +229,7 @@ async def test_a_recorder_that_will_not_start_keeps_the_session(manager) -> None
 async def test_an_unavailable_machine_keeps_the_session(manager, monkeypatch) -> None:
     session, _store, events = manager
     monkeypatch.setattr(
-        manager_module,
+        window_capture,
         "detect_capture",
         lambda **_kwargs: CaptureSupport(
             available=False, missing="portal", reason="Install xdg-desktop-portal-kde."
@@ -342,11 +342,9 @@ async def test_a_short_combined_file_keeps_the_audio_whatever_the_setting_says(
     retained: list[bool] = []
 
     monkeypatch.setattr(
-        manager_module,
+        window_capture,
         "mux_audio_video",
-        lambda video, audio, **_kw: manager_module.MuxResult(
-            True, path=str(video), audio_shortfall_s=2160.0
-        ),
+        lambda video, audio, **_kw: MuxResult(True, path=str(video), audio_shortfall_s=2160.0),
     )
     real_start = manager_module.TranscriptionRunner.start
 
@@ -375,9 +373,9 @@ async def test_a_complete_combined_file_leaves_retention_to_the_setting(
     retained: list[bool] = []
 
     monkeypatch.setattr(
-        manager_module,
+        window_capture,
         "mux_audio_video",
-        lambda video, audio, **_kw: manager_module.MuxResult(True, path=str(video)),
+        lambda video, audio, **_kw: MuxResult(True, path=str(video)),
     )
     real_start = manager_module.TranscriptionRunner.start
 

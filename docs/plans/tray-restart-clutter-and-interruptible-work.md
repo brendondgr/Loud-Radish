@@ -1,10 +1,10 @@
 # The Tray Icon, the Transcript After a Restart, the Clutter, and Work That Can Be Interrupted
 
-*Written 2026-09-06. Status: **In progress (0 / 10 steps)**. Branch: `interruptible-work`.*
+*Written 2026-09-06. Status: **In progress (1 / 10 steps)**. Branch: `interruptible-work`.*
 
 > **Rebased onto the Loud Radish rebrand.** This plan was written against `main` at `97de92e` and the
 > rebrand (D-038) landed while it was being written. It has been re-based rather than re-planned:
-> decision numbers moved up by one to start at **D-039**, `utils/transcriber_ctl.py` is now
+> decision numbers moved up to start at **D-039**, `utils/transcriber_ctl.py` is now
 > `utils/loud_radish_ctl.py`, and every user-visible name a new module needs comes from
 > `web/backend/app/branding.py` rather than a literal — `tests/utils/test_no_legacy_brand.py` fails
 > the build otherwise, and it is right to. The measurements in §1 were taken before that merge and
@@ -183,7 +183,7 @@ needed to choose between those two if the picker proves unavoidable.**
 
 ## 3. Hierarchical Step-by-Step Instructions
 
-### Step 1 — Split the session manager, changing nothing it does
+### Step 1 — Split the session manager, changing nothing it does ✅ **Done**
 
 - **Locations.** `web/backend/app/services/session/manager.py` (1782 lines) splits into:
   - `services/session/sources.py` — audio source and tap selection (currently manager lines
@@ -257,7 +257,7 @@ needed to choose between those two if the picker proves unavoidable.**
   sessions reopens the newest with segments and not the newest empty one; an empty directory
   reopens nothing and does not raise; the flag off reopens nothing; a corrupt database is skipped
   with a log line rather than preventing startup. Full suite, ruff.
-- **Docs.** `docs/documentation.md` (**D-039**, extending D-031 across a process boundary),
+- **Docs.** `docs/documentation.md` (**D-040**, extending D-031 across a process boundary),
   `docs/architecture.md`, `docs/data-flow.md`, `.env.example` if a variable is added,
   `docs/checklist.md`.
 - **Action.** Undergo the verification/tests/validation process for this phase. Once validated,
@@ -323,7 +323,7 @@ needed to choose between those two if the picker proves unavoidable.**
   registers, `GetAll` returns the properties an SNI host requires, the pixmap has the shape from
   Step 4, `NewIcon` is emitted on a visual change and **not** on an identical frame, and a bus that
   refuses the connection leaves the companion running rather than crashing it. Full suite, ruff.
-- **Docs.** `docs/documentation.md` (**D-040**), `docs/structure.md`, `docs/deployment.md`,
+- **Docs.** `docs/documentation.md` (**D-041**), `docs/structure.md`, `docs/deployment.md`,
   `docs/checklist.md` (close the two tray items, or record precisely what the spike found).
 - **Action.** Undergo the verification/tests/validation process for this phase. Once validated,
   commit stating: `Interruptible Work (5 / 10) Complete: the tray icon is exported over D-Bus and
@@ -382,7 +382,7 @@ needed to choose between those two if the picker proves unavoidable.**
   committed segments, marks the metadata cancelled and starts **no** transcription pass. Full suite,
   ruff. `uv run python scripts/generate_contracts.py` and commit the regenerated contracts.
 - **Docs.** `docs/api-contract.md`, `docs/routes.md`, `docs/data-flow.md`, `docs/architecture.md`,
-  `docs/documentation.md` (**D-041** — pause removes time, and why).
+  `docs/documentation.md` (**D-042** — pause removes time, and why).
 - **Action.** Undergo the verification/tests/validation process for this phase. Once validated,
   commit stating: `Interruptible Work (7 / 10) Complete: a live or recorded capture can be paused,
   resumed and cancelled, with the clock and the recording stopping together.`
@@ -410,7 +410,7 @@ needed to choose between those two if the picker proves unavoidable.**
   real `ffmpeg` (following the existing D-036 tests): two pieces separated by a pause stitch into
   one file whose duration is the sum of the pieces, not the sum plus the pause; a reopen that fails
   leaves the session recording audio and raises a banner rather than ending it. Full suite, ruff.
-- **Docs.** `docs/architecture.md`, `docs/data-flow.md`, `docs/documentation.md` (**D-042**),
+- **Docs.** `docs/architecture.md`, `docs/data-flow.md`, `docs/documentation.md` (**D-043**),
   `docs/checklist.md` — including the picker's real behaviour, whatever it turns out to be.
 - **Action.** Undergo the verification/tests/validation process for this phase. Once validated,
   commit stating: `Interruptible Work (8 / 10) Complete: pausing a window recording stops the video
@@ -459,7 +459,7 @@ needed to choose between those two if the picker proves unavoidable.**
   Full suite, ruff, `scripts/generate_contracts.py`. Note explicitly whether
   `test_stopping_ignores_the_mode` still flakes, with evidence either way.
 - **Docs.** `docs/api-contract.md`, `docs/routes.md`, `docs/data-flow.md`,
-  `docs/component-map.md`, `docs/documentation.md` (**D-043**, and an amendment to D-021 recording
+  `docs/component-map.md`, `docs/documentation.md` (**D-044**, and an amendment to D-021 recording
   that "deliberately not persisted" no longer holds and why), `docs/checklist.md`.
 - **Action.** Undergo the verification/tests/validation process for this phase. Once validated,
   commit stating: `Interruptible Work (9 / 10) Complete: a transcription pass can be paused,
@@ -518,4 +518,41 @@ needed to choose between those two if the picker proves unavoidable.**
 
 ## 5. What Changed From the Plan
 
-*To be written as the steps land. Departures belong here, not in the reader's memory.*
+**Step 1 — five new modules, not three, and the "no tests edited" rule did not survive.**
+
+*Three modules were not enough.* The plan named `sources.py`, `window_capture.py` and `passes.py`.
+Extracting exactly those left `manager.py` at **851 lines** — still over the cap, so the split would
+have failed its own purpose. Two more came out: `frames.py` (what happens to one captured frame, on
+both the threads that touch one) and `background.py` (the status ticker and the context and polish
+workers). A sixth, `shapes.py`, holds the dataclasses and tuning constants and imports no sibling,
+which is what lets the other five import them without a cycle. Final count: `manager.py` **1782 →
+672**, and every file in the package is now under 500.
+
+*The split is by file, not by interface, and the code says so.* The five modules are mixins on
+`SessionManager`, not collaborators. Recorded as **D-039** with the reasoning, including the part
+that is a cost rather than a benefit: coupling is unchanged, and the seam is a filename.
+
+*Tests were edited, and the rule that forbade it earned its place by catching that.* The plan said
+no test file may be touched in Step 1, on the grounds that a test needing a change means behaviour
+moved. Roughly thirty patch sites named `app.services.session.manager` as the module to
+monkeypatch — in two forms, `monkeypatch.setattr(manager_module, ...)` and the string path
+`"app.services.session.manager.X"`. Monkeypatching binds to a *module namespace*, so where a name
+lives is observable behaviour, and the targets had to move with the code.
+
+That mattered more than tidiness, because four of those sites are the autouse fixtures in
+`tests/conftest.py` that keep the entire suite out of the developer's PipeWire graph and away from
+the screen-share dialog. Left pointing at `manager`, they would have kept passing while protecting
+nothing — the precise failure the commit "No test may read the developer's audio graph either" was
+written to prevent. So they were verified the same way that commit verified them: every real
+`ApplicationTap`, `playback_streams`, `default_sink`, `default_monitor` and `PortalSession` made to
+raise, and the resulting failure set compared before the split against after. **Identical — 24
+failures on each side**, all of them tests that legitimately construct those objects themselves. The
+one extra failure on the "after" side is `test_stopping_ignores_the_mode`, the SQLite flake Part 4 of
+the checklist already documents, and it is left alone.
+
+*Two tests fail on this machine for reasons that predate the split.*
+`test_a_real_tap_reports_its_links_without_listening_to_them` and
+`test_a_capture_produces_finite_audio_at_the_canonical_rate` are `@pipewire`-gated and read the live
+graph, so whether they pass depends on what the developer happens to be playing. Confirmed by
+stashing the whole split and running them twice against the untouched baseline: they fail there too.
+Not caused here, not fixed here, and recorded so the next person does not spend the afternoon on it.

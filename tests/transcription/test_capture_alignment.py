@@ -21,7 +21,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 from app.services.recording import WavSink
-from app.services.session import manager as manager_module
+from app.services.session import window_capture
 from app.services.session.manager import SessionManager
 
 
@@ -43,7 +43,7 @@ def test_the_offset_is_the_gap_between_the_two_starts(tmp_path, monkeypatch) -> 
     sink = _sink_with_audio(tmp_path)
     # The video ran for ten seconds and was stopped twelve seconds after the audio began, so it
     # began two seconds late — without anything ever having observed its first frame.
-    monkeypatch.setattr(manager_module, "probe_video_duration", lambda path: 10.0)
+    monkeypatch.setattr(window_capture, "probe_video_duration", lambda path: 10.0)
     manager = _manager(sink.first_write_monotonic + 12.0)
 
     lag = SessionManager._measure_video_lag(manager, "video.webm", sink)
@@ -53,7 +53,7 @@ def test_the_offset_is_the_gap_between_the_two_starts(tmp_path, monkeypatch) -> 
 
 def test_two_streams_that_started_together_need_no_correction(tmp_path, monkeypatch) -> None:
     sink = _sink_with_audio(tmp_path)
-    monkeypatch.setattr(manager_module, "probe_video_duration", lambda path: 10.0)
+    monkeypatch.setattr(window_capture, "probe_video_duration", lambda path: 10.0)
     manager = _manager(sink.first_write_monotonic + 10.0)
 
     assert SessionManager._measure_video_lag(manager, "video.webm", sink) == pytest.approx(
@@ -64,7 +64,7 @@ def test_two_streams_that_started_together_need_no_correction(tmp_path, monkeypa
 def test_an_unreadable_video_leaves_the_tracks_as_captured(tmp_path, monkeypatch) -> None:
     """An unmeasurable offset must never become a guessed one."""
     sink = _sink_with_audio(tmp_path)
-    monkeypatch.setattr(manager_module, "probe_video_duration", lambda path: 0.0)
+    monkeypatch.setattr(window_capture, "probe_video_duration", lambda path: 0.0)
     manager = _manager(sink.first_write_monotonic + 12.0)
 
     assert SessionManager._measure_video_lag(manager, "video.webm", sink) == 0.0
@@ -74,7 +74,7 @@ def test_a_recorder_that_never_reported_stopping_leaves_the_tracks_alone(
     tmp_path, monkeypatch
 ) -> None:
     sink = _sink_with_audio(tmp_path)
-    monkeypatch.setattr(manager_module, "probe_video_duration", lambda path: 10.0)
+    monkeypatch.setattr(window_capture, "probe_video_duration", lambda path: 10.0)
 
     assert SessionManager._measure_video_lag(_manager(0.0), "video.webm", sink) == 0.0
 
@@ -82,7 +82,7 @@ def test_a_recorder_that_never_reported_stopping_leaves_the_tracks_alone(
 def test_a_sink_that_captured_nothing_leaves_the_tracks_alone(tmp_path, monkeypatch) -> None:
     """A sink that was opened but never written has no time zero to measure against."""
     sink = WavSink(tmp_path / "audio.wav")
-    monkeypatch.setattr(manager_module, "probe_video_duration", lambda path: 10.0)
+    monkeypatch.setattr(window_capture, "probe_video_duration", lambda path: 10.0)
 
     assert SessionManager._measure_video_lag(_manager(1000.0), "video.webm", sink) == 0.0
 

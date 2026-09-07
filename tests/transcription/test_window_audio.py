@@ -163,11 +163,11 @@ def test_window_mode_opens_the_machines_output_not_a_microphone(tmp_path, monkey
     """The fault, stated as the property that fixes it."""
     opened: list[str] = []
     monkeypatch.setattr(
-        "app.services.session.manager.MonitorSource",
+        "app.services.session.sources.MonitorSource",
         lambda **_kwargs: opened.append("monitor") or object(),
     )
     monkeypatch.setattr(
-        "app.services.session.manager.DeviceSource",
+        "app.services.session.sources.DeviceSource",
         lambda **_kwargs: opened.append("device") or object(),
     )
     manager, config = _manager(tmp_path)
@@ -181,11 +181,11 @@ def test_the_other_modes_still_open_a_microphone(tmp_path, monkeypatch) -> None:
     """Live and recorded sessions are someone speaking into a microphone. Nothing changes there."""
     opened: list[str] = []
     monkeypatch.setattr(
-        "app.services.session.manager.MonitorSource",
+        "app.services.session.sources.MonitorSource",
         lambda **_kwargs: opened.append("monitor") or object(),
     )
     monkeypatch.setattr(
-        "app.services.session.manager.DeviceSource",
+        "app.services.session.sources.DeviceSource",
         lambda **_kwargs: opened.append("device") or object(),
     )
     manager, config = _manager(tmp_path)
@@ -200,11 +200,11 @@ def test_a_window_session_can_be_asked_for_the_microphone_instead(tmp_path, monk
     """Someone recording a window *and* their own commentary is a legitimate thing to want."""
     opened: list[str] = []
     monkeypatch.setattr(
-        "app.services.session.manager.MonitorSource",
+        "app.services.session.sources.MonitorSource",
         lambda **_kwargs: opened.append("monitor") or object(),
     )
     monkeypatch.setattr(
-        "app.services.session.manager.DeviceSource",
+        "app.services.session.sources.DeviceSource",
         lambda **_kwargs: opened.append("device") or object(),
     )
     manager, config = _manager(tmp_path, **{"capture.audio_source": "microphone"})
@@ -222,11 +222,11 @@ def test_the_file_source_still_wins_in_window_mode(tmp_path, monkeypatch) -> Non
     """
     opened: list[str] = []
     monkeypatch.setattr(
-        "app.services.session.manager.MonitorSource",
+        "app.services.session.sources.MonitorSource",
         lambda **_kwargs: opened.append("monitor") or object(),
     )
     monkeypatch.setattr(
-        "app.services.session.manager.WavFileSource",
+        "app.services.session.sources.WavFileSource",
         lambda *_a, **_k: opened.append("file") or object(),
     )
     wav = tmp_path / "talk.wav"
@@ -249,7 +249,7 @@ def test_an_unavailable_monitor_is_named_rather_than_swapped_for_a_microphone(
     def unavailable(**_kwargs):
         raise MonitorUnavailable("This machine exposes no audio monitor.")
 
-    monkeypatch.setattr("app.services.session.manager.MonitorSource", unavailable)
+    monkeypatch.setattr("app.services.session.sources.MonitorSource", unavailable)
     manager, config = _manager(tmp_path)
 
     with pytest.raises(SessionError, match="no audio monitor"):
@@ -275,11 +275,11 @@ def _with_options(tmp_path, choice, monkeypatch):
 
     opened: list[str] = []
     monkeypatch.setattr(
-        "app.services.session.manager.MonitorSource",
+        "app.services.session.sources.MonitorSource",
         lambda **_kwargs: opened.append("monitor") or object(),
     )
     monkeypatch.setattr(
-        "app.services.session.manager.DeviceSource",
+        "app.services.session.sources.DeviceSource",
         lambda **_kwargs: opened.append("device") or object(),
     )
     manager, config = _manager(tmp_path)
@@ -308,11 +308,11 @@ def test_the_per_run_choice_overrides_the_configured_one(tmp_path, monkeypatch) 
 
     opened: list[str] = []
     monkeypatch.setattr(
-        "app.services.session.manager.MonitorSource",
+        "app.services.session.sources.MonitorSource",
         lambda **_kwargs: opened.append("monitor") or object(),
     )
     monkeypatch.setattr(
-        "app.services.session.manager.DeviceSource",
+        "app.services.session.sources.DeviceSource",
         lambda **_kwargs: opened.append("device") or object(),
     )
     # Configuration says microphone; the run says the window's sound.
@@ -328,11 +328,11 @@ def test_without_a_per_run_choice_the_configured_one_applies(tmp_path, monkeypat
     """`live` and `recorded` sessions carry no options at all, and must not break on that."""
     opened: list[str] = []
     monkeypatch.setattr(
-        "app.services.session.manager.MonitorSource",
+        "app.services.session.sources.MonitorSource",
         lambda **_kwargs: opened.append("monitor") or object(),
     )
     monkeypatch.setattr(
-        "app.services.session.manager.DeviceSource",
+        "app.services.session.sources.DeviceSource",
         lambda **_kwargs: opened.append("device") or object(),
     )
     manager, config = _manager(tmp_path, **{"capture.audio_source": "microphone"})
@@ -370,7 +370,7 @@ def test_speech_opens_the_loopback_gate_and_ambience_does_not() -> None:
     −57 to −21 dBFS, a 35 dB range; the video's ambience sat between −42.6 and −37.4, a 5 dB band.
     Speech has dynamics and ambience at conversational volume does not.
     """
-    from app.services.session.manager import LOOPBACK_SPEECH_RMS
+    from app.services.session.shapes import LOOPBACK_SPEECH_RMS
 
     size = frame_samples(32)
     t = np.arange(size * 120) / SAMPLE_RATE
@@ -533,8 +533,8 @@ def _stream(state: str = "running"):
 
 def _manager_with_tap(tmp_path, monkeypatch, links: int):
     tap = _Tap(links)
-    monkeypatch.setattr("app.services.session.manager.ApplicationTap", lambda *_a, **_k: tap)
-    monkeypatch.setattr("app.services.session.manager.tap_streams", lambda: [_stream()])
+    monkeypatch.setattr("app.services.session.sources.ApplicationTap", lambda *_a, **_k: tap)
+    monkeypatch.setattr("app.services.session.sources.tap_streams", lambda: [_stream()])
     manager, config = _manager(tmp_path)
     return manager, config, tap
 
@@ -602,7 +602,7 @@ def test_new_playback_nodes_are_linked_after_recording_starts(tmp_path, monkeypa
             return 2
 
     tap = Growing(links=2)
-    monkeypatch.setattr("app.services.session.manager.tap_streams", lambda: [_stream()])
+    monkeypatch.setattr("app.services.session.sources.tap_streams", lambda: [_stream()])
     manager, _config = _manager(tmp_path)
     manager._tap = tap
     manager._tap_match = False
@@ -637,7 +637,7 @@ def test_the_application_choice_narrows_to_the_matching_streams(tmp_path, monkey
         media_name="Some Song",
         state="running",
     )
-    monkeypatch.setattr("app.services.session.manager.tap_streams", lambda: [other, wanted])
+    monkeypatch.setattr("app.services.session.sources.tap_streams", lambda: [other, wanted])
     manager, _config = _manager(tmp_path)
     manager._options = _window_options("application", app_id="librewolf")
 
@@ -650,7 +650,7 @@ def test_a_window_that_matches_nothing_taps_everything(tmp_path, monkeypatch) ->
 
     It must not be the thing that decides a recording captures no audio at all.
     """
-    monkeypatch.setattr("app.services.session.manager.tap_streams", lambda: [_stream()])
+    monkeypatch.setattr("app.services.session.sources.tap_streams", lambda: [_stream()])
     manager, _config = _manager(tmp_path)
     manager._options = _window_options("application", app_id="nothing-like-this")
 
@@ -698,8 +698,8 @@ def _probes(monkeypatch, *, tap: float, whole_output: float = 0.0) -> list[str]:
         assert not device_sink, "the tap is a null sink and keeps the stricter property set"
         return tap
 
-    monkeypatch.setattr("app.services.session.manager.probe_peak", fake_probe)
-    monkeypatch.setattr("app.services.session.manager.default_sink", lambda: THE_SPEAKERS)
+    monkeypatch.setattr("app.services.session.sources.probe_peak", fake_probe)
+    monkeypatch.setattr("app.services.session.sources.default_sink", lambda: THE_SPEAKERS)
     return asked
 
 
@@ -768,8 +768,8 @@ def test_widening_says_so_rather_than_absorbing_it(tmp_path, monkeypatch) -> Non
     _probes(monkeypatch, tap=0.0, whole_output=0.4)
     events: list[tuple[str, dict]] = []
     tap = _Tap(2)
-    monkeypatch.setattr("app.services.session.manager.ApplicationTap", lambda *_a, **_k: tap)
-    monkeypatch.setattr("app.services.session.manager.tap_streams", lambda: [_stream()])
+    monkeypatch.setattr("app.services.session.sources.ApplicationTap", lambda *_a, **_k: tap)
+    monkeypatch.setattr("app.services.session.sources.tap_streams", lambda: [_stream()])
     store = ConfigStore(config_path=tmp_path / "config.json")
     store.update({"audio.source_type": "microphone"})
     manager = SessionManager(

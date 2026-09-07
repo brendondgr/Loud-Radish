@@ -306,11 +306,9 @@ Two things measured along the way, recorded so they are not re-litigated:
   id alike with `defined target not found`, so it cannot be the thing that makes a bad target
   visible. Verifying the achieved capture replaces it.
 
-- [ ] **`services/session/manager.py` is 1334 lines, against a cap of 800.** It was already 1265
-      before this repair and this added 73. The new logic went into the audio modules wherever it
-      could, but the decision about which source a session opens belongs to the manager and had
-      nowhere else to go. It wants splitting — the source-selection and capture-wiring halves are
-      the obvious seam — and that is a refactor, not a repair, so it was not smuggled into one.
+- [x] **`services/session/manager.py` is 1334 lines, against a cap of 800 — split at 1782.** It
+      kept growing after this was written. The seam named here, source-selection against
+      capture-wiring, is two of the six files it became; see Part 3l and **D-039**.
 
 Still open, and deliberately not guessed at:
 
@@ -617,9 +615,14 @@ close are left in place rather than moved, so nothing is lost by reading this fi
       audio, not test leavings, and the prune's criterion is no segments *and* no media. Step 2.
 - [ ] **Pause, resume and cancel** — for a live or recorded capture, for a window recording's video,
       and for a transcription pass whose checkpoint survives a server restart. Steps 6-9.
-- [ ] **`services/session/manager.py` has reached 1782 lines** against a cap of 800, up from the
-      1334 recorded in Part 3f. Every one of the four items above edits it, so Step 1 splits it
-      along the seams Part 3f already named before any of them lands.
+- [x] **`services/session/manager.py` has reached 1782 lines — split, and now 672.** Six files:
+      `shapes.py` (the dataclasses and tuning constants, importing no sibling so nothing cycles),
+      `frames.py`, `background.py`, `window_capture.py`, `passes.py`, `sources.py`. Every file in
+      the package is now under 500. Mixins rather than collaborators, and **D-039** says why and
+      what that costs. No behaviour changed — 1671 passed / 12 skipped, identical to before — but
+      about thirty test patch sites had to follow the code, including the four autouse guards that
+      keep the suite out of the developer's PipeWire graph; those were re-verified by making every
+      real call raise and diffing the failure set, which came back identical at 24 each side.
 
 ---
 

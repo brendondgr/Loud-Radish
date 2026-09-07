@@ -1,6 +1,6 @@
 # Repository Structure
 
-*Last updated: 2026-08-29 (one folder per recording, and the web-app export)*
+*Last updated: 2026-09-07 (the session manager split across six files)*
 
 Canonical map of Loud Radish. This file documents **purpose**, not source code. Update it in
 the same change that adds, moves, renames, or removes a directory or significant file.
@@ -133,7 +133,16 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   │   │       ├── workers.py     # Drop-oldest queue and the threads draining it
 │   │   │       ├── metrics.py     # Pipeline health, gathered in one place
 │   │   │       ├── degradation.py # What each failure means and what to do
-│   │   │       └── manager.py     # capture → VAD → engine → store → transport
+│   │   │       ├── shapes.py      # The small shapes and tuning numbers the rest of it shares.
+│   │   │                          #   A leaf: imports no sibling, so nothing here forms a cycle
+│   │   │       ├── frames.py      # What happens to one captured frame, on both threads
+│   │   │       ├── background.py  # The status ticker, the context worker, the polish worker
+│   │   │       ├── window_capture.py  # The portal, the recorder, the resume, the join
+│   │   │       ├── passes.py      # Starting a pass over a finished recording; store retention
+│   │   │       ├── sources.py     # What a session listens to, and proving it is listening
+│   │   │       └── manager.py     # capture → VAD → engine → store → transport. Owns the
+│   │   │                          #   lifecycle; the five modules above are the rest of this one
+│   │   │                          #   class, split across files (D-039)
 │   │   │   └── llm/               # SEAM B — the pluggable language model
 │   │   │       ├── contract.py    # Interface, streaming chunks, capabilities
 │   │   │       ├── openai_compatible.py  # Ollama, LM Studio, llama.cpp, vLLM, OpenAI

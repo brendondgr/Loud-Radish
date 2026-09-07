@@ -18,8 +18,14 @@ from pathlib import Path
 
 import numpy as np
 from app.services.audio.formats import SAMPLE_RATE
-from app.services.capture import CaptureSupport, PortalDeclined, RecorderError, WindowStream
-from app.services.session import manager as manager_module
+from app.services.capture import (
+    CaptureSupport,
+    PortalDeclined,
+    RecorderError,
+    RecorderState,
+    WindowStream,
+)
+from app.services.session import window_capture
 
 
 class Recorder:
@@ -65,9 +71,7 @@ class FakeRecorder:
         self.started = False
         self.stopped = False
         self.fail_on_start = False
-        self.state = manager_module.RecorderState(
-            video_path=spec.video_path, preview_path=spec.preview_path
-        )
+        self.state = RecorderState(video_path=spec.video_path, preview_path=spec.preview_path)
         FakeRecorder.instances.append(self)
 
     def start(self) -> None:
@@ -141,7 +145,7 @@ def install(monkeypatch) -> None:
     FakePortal.behaviour = "grant"
 
     monkeypatch.setattr(
-        manager_module,
+        window_capture,
         "detect_capture",
         lambda **_kwargs: CaptureSupport(
             available=True,
@@ -153,5 +157,5 @@ def install(monkeypatch) -> None:
             preview=True,
         ),
     )
-    monkeypatch.setattr(manager_module, "PortalSession", FakePortal)
-    monkeypatch.setattr(manager_module, "WindowRecorder", FakeRecorder)
+    monkeypatch.setattr(window_capture, "PortalSession", FakePortal)
+    monkeypatch.setattr(window_capture, "WindowRecorder", FakeRecorder)
