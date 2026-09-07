@@ -620,7 +620,7 @@ fixtures, and five faults came out of that which no test would have found:
       live watcher, `GetAll` returning fifteen properties and a 22 x 22 icon, the picture animating
       between reads, an eleven-item menu — and on killing the server, the tooltip becoming "Loud
       Radish is not running", the menu collapsing to four items, and the picture becoming the fault
-      one. No `PySide6`. Start it with `uv run python -m app.companion.main` from `web/backend/`,
+      one. No `PySide6`. Start it with `uv run --no-sync python -m app.companion.main` from `web/backend/`,
       or `--no-tray` to run the shortcuts without one.
 - [x] **The last transcript after a restart — closed.** The newest session holding segments is
       reopened once at start-up, chosen by the timestamp in its filename rather than by mtime.
@@ -759,7 +759,10 @@ fixtures, and five faults came out of that which no test would have found:
       /api/config` was fixed first (D-046) — but Settings → Audio posts to `/api/audio/device`,
       which was still writing to the discarded runtime layer, so the reported fault was untouched
       until that route was fixed too.
-- [ ] **A native settings window.**
+- [x] **A native settings window.** Done (D-051). Tk, no new dependency, its own process,
+      launched from the tray's "Settings…" item. Three tabs: shortcuts with press-to-capture and
+      conflict checking, the microphone list, and the dictation options. Verified by clicking the
+      real menu item over D-Bus.
 
 ---
 
@@ -868,7 +871,9 @@ user's own machine, and none may be reported as passing until it has had one.
 
 ## Discovered work
 
-- [ ] **`uv run` outside `app.py` silently breaks GPU transcription.** `app.py` calls
+- [ ] **`uv run` outside `app.py` silently breaks GPU transcription.** *Partly mitigated:* the
+      documented companion command now passes `--no-sync`, because starting the tray icon was
+      swapping the wheel out from under the running server. `app.py` calls
       `acceleration.repair_kept_wheel()` on launch, which puts the ROCm CTranslate2 build back after
       `uv` has replaced it with the PyPI CPU/CUDA one — so starting the application normally
       self-heals. **Any other `uv run` does not.** A bare `uv run python some_script.py` re-syncs,

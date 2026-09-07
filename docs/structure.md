@@ -194,6 +194,10 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   │   │   │                      #   a way nothing else notices (D-047)
 │   │   │   ├── desktop_entry.py   # One .desktop file per shortcut — what the desktop binds to
 │   │   │   ├── shortcuts.py       # Registration through the desktop's own service
+│   │   │   ├── settings_form.py   # A keypress → a sequence string; conflicts; the patch body.
+│   │   │   │                      #   Pure functions, because Tk's loop cannot be tested (D-051)
+│   │   │   ├── settings_window.py # The Tk window itself: shortcuts, microphone, dictation
+│   │   │   ├── settings.py        # `python -m app.companion.settings` — its own process
 │   │   │   └── main.py            # Polls the server; killable and restartable at any moment
 │   │   ├── models/                # Persistence shape
 │   │   │   ├── segment.py         # The unit engine, store, and frontend all agree on

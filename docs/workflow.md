@@ -128,8 +128,15 @@ keybinds, and talks to the server over the same loopback HTTP the browser uses. 
 and can be killed and restarted at any moment without the server noticing.
 
 ```bash
-cd web/backend && uv run python -m app.companion.main
+cd web/backend && uv run --no-sync python -m app.companion.main
 ```
+
+**`--no-sync` is not optional on a machine with an AMD GPU.** A plain `uv run` synchronises the
+environment against the lockfile before Python starts, and the lockfile says PyPI — so it replaces
+the ROCm build of CTranslate2 with the CPU/CUDA one and the *server's* next model load fails.
+`app.py` repairs that on its own launch (`acceleration.repair_kept_wheel`), but starting the
+companion is not launching `app.py`, so nothing puts it back. The same applies to any script run
+with a bare `uv run`.
 
 | Flag | Effect |
 |---|---|

@@ -230,6 +230,26 @@ class Companion:
         with urllib.request.urlopen(request, timeout=TIMEOUT_S) as response:  # noqa: S310
             return json.loads(response.read().decode("utf-8"))
 
+    def _open_settings(self) -> str:
+        """Launch the native settings window in its own process (D-051).
+
+        Its own process because Tk's main loop must own the thread it runs on, and this one is
+        already answering D-Bus — and because a crash in a settings window must not take down the
+        tray icon that is the only way back to it.
+        """
+        import subprocess
+
+        host, _, port = self.base.removeprefix("http://").partition(":")
+        try:
+            subprocess.Popen(  # noqa: S603
+                [sys.executable, "-m", "app.companion.settings", "--host", host, "--port", port],
+                cwd=f"{self.repo_root}/web/backend",
+                start_new_session=True,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            return f"could not open settings: {exc}"
+        return "opened settings"
+
     def _choose_device(self, device_id: str) -> str:
         """Switch the microphone. Persisted by the route, not by us (D-046)."""
         if not device_id:
@@ -263,11 +283,13 @@ class Companion:
         if item_id == "quit":
             self.stop()
             return "quitting"
-        if item_id in ("open", "settings"):
+        if item_id == "open":
             import webbrowser
 
             webbrowser.open(self.base)
             return "opened the interface"
+        if item_id == "settings":
+            return self._open_settings()
 
         commands = {
             "stop": ["stop"],
