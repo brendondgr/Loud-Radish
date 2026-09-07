@@ -21,7 +21,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import paths
+from . import branding, paths
 from .branding import APP_TITLE
 from .config import ConfigStore, CredentialStore
 from .routes import build_router
@@ -168,6 +168,16 @@ def _build_templates() -> Jinja2Templates | None:
     templates = Jinja2Templates(directory=str(paths.TEMPLATES_DIR))
     templates.env.trim_blocks = True
     templates.env.lstrip_blocks = True
+    # The product name reaches every template as a global rather than through each route's context.
+    # Page routes render with an empty context on purpose — everything else they show arrives over
+    # the API — and threading a constant through them would undo that for no gain.
+    templates.env.globals.update(
+        app_name=branding.APP_NAME,
+        app_tagline=branding.APP_TAGLINE,
+        app_title=branding.APP_TITLE,
+        app_description=branding.APP_DESCRIPTION,
+        logo_path=branding.LOGO_PATH,
+    )
     return templates
 
 

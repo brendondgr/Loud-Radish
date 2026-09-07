@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Start the transcriber with your desktop session, and remove it again (Plan 5).
+"""Start Loud Radish with your desktop session, and remove it again (Plan 5).
 
     uv run scripts/install_autostart.py
     uv run scripts/install_autostart.py --uninstall
@@ -28,7 +28,7 @@ UNIT_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "s
 
 UNIT_TEMPLATE = """\
 [Unit]
-Description=Live Seminar Transcriber
+Description=Loud Radish — Live Audio & Video Transcriber
 Documentation=file://{repo}/docs/documentation.md
 # The graphical session, not the machine: window capture needs a compositor and a portal, and
 # audio capture needs the user's own PipeWire.
@@ -99,7 +99,7 @@ def uninstall() -> int:
     systemctl("daemon-reload")
 
     print(f"  {'removed ' + str(unit_path) if removed else 'nothing was installed'}")
-    print("  The transcriber no longer starts with your session.\n")
+    print("  Loud Radish no longer starts with your session.\n")
     return 0
 
 

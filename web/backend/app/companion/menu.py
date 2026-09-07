@@ -15,6 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from .. import branding
 from ..services.session import modes
 from .animation import Snapshot
 
@@ -53,7 +54,7 @@ def build(snapshot: Snapshot, *, listening: bool) -> list[MenuItem]:
         # Nothing else is worth offering: every other item would fail at the moment it was clicked,
         # and a menu full of items that do not work is worse than a short one that says why.
         return [
-            MenuItem("status", "The transcriber is not running", enabled=False),
+            MenuItem("status", f"{branding.APP_NAME} is not running", enabled=False),
             MenuItem("sep", "", kind="separator"),
             MenuItem("open", "Open the interface"),
             MenuItem("quit", "Quit this tray icon"),

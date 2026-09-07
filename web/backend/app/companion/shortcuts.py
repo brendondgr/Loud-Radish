@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
+from .. import branding
+
 logger = logging.getLogger(__name__)
 
 KGLOBALACCEL_BUS: Final = "org.kde.kglobalaccel"
@@ -25,7 +27,7 @@ KGLOBALACCEL_PATH: Final = "/kglobalaccel"
 KGLOBALACCEL_IFACE: Final = "org.kde.KGlobalAccel"
 
 COMPONENT: Final = "transcriber"
-COMPONENT_LABEL: Final = "Live Seminar Transcriber"
+COMPONENT_LABEL: Final = branding.APP_TITLE
 
 #: Action name → (human label, `transcriber_ctl.py` arguments).
 ACTIONS: Final[dict[str, tuple[str, list[str]]]] = {
@@ -35,7 +37,7 @@ ACTIONS: Final[dict[str, tuple[str, list[str]]]] = {
     # captured, so the key opens the sheet rather than starting a recording.
     "arm_window": ("Record a window…", ["arm", "--mode", "window"]),
     "stop": ("Stop recording", ["stop"]),
-    "open_app": ("Open the transcriber", ["arm", "--mode", "live"]),
+    "open_app": (f"Open {branding.APP_NAME}", ["arm", "--mode", "live"]),
 }
 
 

@@ -11,6 +11,8 @@ from app.companion.animation import Snapshot
 from app.companion.menu import build
 from app.services.session import modes
 
+from app import branding
+
 
 def ids(items) -> list[str]:
     return [item.id for item in items]
@@ -24,7 +26,7 @@ def test_an_unreachable_server_offers_almost_nothing() -> None:
     """Every other item would fail at the moment it was clicked."""
     items = build(Snapshot(reachable=False), listening=True)
     assert "start-live" not in ids(items)
-    assert "The transcriber is not running" in item(items, "status").label
+    assert f"{branding.APP_NAME} is not running" in item(items, "status").label
     # Still quittable and still openable — those are the only two that can work.
     assert {"open", "quit"} <= set(ids(items))
 

@@ -31,6 +31,7 @@ from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
 
+from ... import branding
 from ...config.schema import AppConfig
 from ...models.session import SessionMetadata
 from ..recording.layout import RecordingLayout
@@ -213,7 +214,7 @@ def _readme(key: str, transcript: dict[str, Any]) -> str:
     return f"""{session["title"]}
 {"=" * max(3, len(session["title"]))}
 
-A self-contained web application for this recording, exported from the Live Seminar Transcriber.
+A self-contained web application for this recording, exported from {branding.APP_TITLE}.
 
 To open it
 ----------
