@@ -172,6 +172,8 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   │   ├── companion/             # The desktop presence — a remote control, not a rewrite (D-024)
 │   │   │   ├── visual_states.py   # (capture mode, run state) → which picture the instrument shows
 │   │   │   ├── aperture.py        # Draws one frame of it, from docs/motion-spec.md
+│   │   │   ├── raster.py         # The same frame as ARGB32 pixels, for the tray's D-Bus
+│   │   │   │                     #   icon property. numpy only — no rasteriser (D-042)
 │   │   │   ├── animation.py       # The frame clock, and the hold-still setting
 │   │   │   ├── menu.py            # The tray menu's structure, as data
 │   │   │   ├── shortcuts.py       # Registration through the desktop's own service

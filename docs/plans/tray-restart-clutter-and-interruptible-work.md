@@ -1,6 +1,6 @@
 # The Tray Icon, the Transcript After a Restart, the Clutter, and Work That Can Be Interrupted
 
-*Written 2026-09-06. Status: **In progress (3 / 10 steps)**. Branch: `interruptible-work`.*
+*Written 2026-09-06. Status: **In progress (4 / 10 steps)**. Branch: `interruptible-work`.*
 
 > **Rebased onto the Loud Radish rebrand.** This plan was written against `main` at `97de92e` and the
 > rebrand (D-038) landed while it was being written. It has been re-based rather than re-planned:
@@ -265,7 +265,7 @@ needed to choose between those two if the picker proves unavoidable.**
   commit stating: `Interruptible Work (3 / 10) Complete: the last finished transcript is reopened at
   startup, so a restart no longer empties the main page.`
 
-### Step 4 — Draw the Aperture as pixels, with no new dependency
+### Step 4 — Draw the Aperture as pixels, with no new dependency ✅ **Done**
 
 - **Locations.** New `web/backend/app/companion/raster.py`. Reads `VisualState` from
   `companion/visual_states.py` and the amplitudes from `companion/aperture.py`'s `Frame`, and
@@ -592,6 +592,21 @@ segments, the empty state is `display: none`, and `POST /api/chat/send` returns 
 position. Off: `/api/transcript/revisions` reports no session open and the assistant gives D-031's
 honest refusal word for word — which that decision explicitly required retention must not convert
 into an answer invented from nothing.
+
+**Step 4 — as planned, and it was looked at rather than only counted.**
+
+`companion/raster.py`, 342 lines, no new dependency. The one thing worth recording beyond the plan:
+pixel counts and buffer lengths are a weak test of a *picture*, so every state was rendered to a PNG
+(with `zlib` and `struct` — still no image library) and inspected at 22 px against a dark panel and
+again at 128 px. The instrument reads as a microphone on a stand at tray size, and the six states are
+distinguishable: grey flat grille, teal waveform with expanding rings, red pulsing body, neutral
+grille with an amber read head, purple orbiting arcs, and four stubs under a slash.
+
+Two things the drawing needed that the plan did not mention. Colour has to be averaged
+**premultiplied** or transparent pixels drag every edge toward their arbitrary colour, which at this
+size is a visible dark halo. And the specification's hues are `oklch()` strings, so the module needs
+an OKLab conversion rather than a hex table — a table would be a second source of truth against
+`motion-spec.md`. Recorded as **D-042**. 33 tests.
 
 *Two tests fail on this machine for reasons that predate the split.*
 `test_a_real_tap_reports_its_links_without_listening_to_them` and
