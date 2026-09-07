@@ -2,6 +2,11 @@
 
 {% block body %}
 <div class="app">
+  {# A page needs one top-level heading, and this one had none — every heading on it was an h2 or
+     lower, so a screen reader's "list the headings" gave a set of sections with nothing above them.
+     Visually hidden rather than drawn, because the header already says the name in the mark and a
+     second copy in text is noise on a screen where every pixel is transcript (D-054). #}
+  <h1 class="visually-hidden">{{ app_title }}</h1>
   {% include "partials/header.html" %}
   {% include "partials/banners.html" %}
 

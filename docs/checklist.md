@@ -705,17 +705,30 @@ fixtures, and five faults came out of that which no test would have found:
       contrast corrections, and the rule about compositing translucent backgrounds before measuring.
 - [x] **Component map.** Done. `docs/component-map.md` describes the template-and-module tree, the
       three ownership rules, and every component and store.
-- [ ] **Automated accessibility tooling.** Not selected. Manual keyboard, contrast, and 320 px passes
-      are specified per phase in the plan; an automated check would complement them.
+- [x] **Automated accessibility tooling.** Done, and deliberately not axe. Every browser-driving
+      option assumes a build step this project does not have, so the check is two test modules over
+      what the server already renders: `tests/frontend/test_rendered_accessibility.py` asserts the
+      structural rules (one `h1`, `lang`, accessible names on buttons, a label of some kind on every
+      field, `alt` on images, the transcript's polite live region) using `html.parser` from the
+      standard library, and `tests/frontend/test_token_contrast.py` computes WCAG ratios over the
+      design tokens with no dependency at all.
+
+      It found two real faults on its first run, which is the argument for it: the application page
+      had **no `h1` at all** — every heading on it was an `h2` or lower — and it caught its own
+      author's parser bug reporting two named buttons as unnamed. Both are fixed. This does not
+      replace the manual keyboard, contrast-in-context and 320 px passes; it catches the regressions
+      that can be stated as rules.
 - [ ] **Embeddings-based retrieval.** Deferred. Keyword search over FTS5 is expected to suffice for
       single-talk sessions; revisit only if retrieval quality proves inadequate.
 - [ ] **Speaker diarisation.** Out of scope for v1. The segment model reserves an optional `speaker`
       field so adding it later is not a schema migration.
 - [ ] **Hosted ASR backends.** Deferred to v2. Seam A accommodates them; none is implemented.
-- [ ] **A per-page control for the polish view.** Settings → Context turns the pass on and off, but
-      there is no way to see the raw segments for a stretch that has been polished without turning
-      it off entirely. Worth adding once the pass has been used against a real model and it is
-      clear how often anyone wants to.
+- [x] **A per-page control for the polish view.** Done. A **Show raw** toggle in the transcript
+      toolbar, next to the revision switch it copies, appears only once a polished block exists.
+      Turning it on renders the segments under the prose rather than instead of it, and it is not
+      persisted: somebody who wants raw text permanently wants the pass off, and Settings → Context
+      already does that. Verified in the browser against a session holding a real polished block —
+      three segments with it off, six with it on, the prose untouched throughout.
 - [ ] **Tuning `polish.min_retained_ratio`.** *The measurement it needs now exists.* `ContentCheck`
       always carried the ratio and its docstring said it was "logged, so a threshold can be tuned
       from real runs" — and the caller dropped it. Every discard now logs the ratio, the floor it
@@ -727,11 +740,28 @@ fixtures, and five faults came out of that which no test would have found:
       come from watching what a real model actually returns. Writing out spoken code references now
       shortens a rewrite legitimately ("guard dot py" is three words and `guard.py` is one), which
       pushes in the same direction as a summary would — another reason the floor needs real data.
-- [ ] **Whether the assistant should answer from polished text.** It currently assembles context
-      from raw segments, which are the verbatim record. Now that polished text carries the same
-      `[MM:SS]` markers the assistant cites, feeding it the polished version instead would give it
-      cleaner input — but it is a decision about what the assistant is allowed to read, not a
-      refactor, and it was deliberately not smuggled into the polish work.
+- [x] **Whether the assistant should answer from polished text.** **Decided: no — it keeps reading
+      the raw segments.** This was flagged for the user and they asked for the whole list to be
+      worked through, so it is answered rather than left open.
+
+      The argument for polished text is that it is cleaner input. The argument against is what the
+      assistant is *for*: it answers with citations, and a citation is a claim that the speaker said
+      something. The polish pass is checked by `preserves_content`, which compares **word counts** —
+      it is a length check, not a meaning check, and its own threshold is still an untuned guess.
+      Feeding the assistant a rewrite means it can quote, with a timestamp, words the speaker did
+      not use; feeding it the raw segments means it sometimes quotes clumsy speech, which is what
+      was actually said. The second failure is much better than the first.
+
+      Two mechanical costs would also be paid for the worse of the two: citations are segment ids
+      and a polished block has a different id space, and `offered_seconds` — which gates citation
+      validation — would have to be derived from the `[MM:SS]` markers inside the prose rather than
+      from segment starts. If the decision is ever reversed, that is where the work is: the
+      `TranscriptSource` protocol in `services/context/assembler.py`, its verbatim block, and
+      `resolve_citations`. **Reversing it should require a reason about accuracy, not tidiness.**
+
+      The reader-facing half of the same question is now answered the other way: Show raw (below)
+      lets a person see the segments under any polished stretch, which is where wanting the raw
+      text actually bites.
 - [ ] **Tuning the invented-speech thresholds against real audio.** *The measurement it needs now
       exists.* The filter logged its verdict but never the two numbers the thresholds are compared
       against, so there was nothing to tune from; `no_speech_prob` and `avg_logprob` are now in the

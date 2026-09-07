@@ -347,4 +347,4 @@ Before any UI-visible change is called done:
 - [ ] Contrast checked on new color pairings
 - [ ] All four states present
 - [ ] Touch targets at least 44×44 px
-- [ ] Automated a11y check (axe or equivalent) — tooling not yet selected, see `docs/checklist.md`
+- [ ] Automated a11y check — `tests/frontend/` (structural rules over rendered HTML, and WCAG contrast over the tokens). Not axe: it needs a browser and a build step this project does not have. Does not replace the manual keyboard, contrast-in-context and 320 px passes (D-054), see `docs/checklist.md`

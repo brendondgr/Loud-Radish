@@ -132,6 +132,16 @@ export class TranscriptPane {
     this.column = $(".transcript__column", root);
     this.list = $(".transcript__segments", root);
     this.polishedList = $("[data-transcript-polished]", root);
+    this.rawToggle = $("[data-toggle-raw]", root);
+    /**
+     * Whether the segments under a polished stretch are shown as well as the prose.
+     *
+     * **Per page, and not persisted.** Settings → Context can turn the polish pass off entirely,
+     * which is a different thing: this is for reading one passage as it was actually transcribed
+     * without giving up the tidied version of everything else. Somebody who wants it permanently
+     * wants the pass off, and there is already a setting for that.
+     */
+    this.showRaw = false;
     this.emptyState = $(".transcript-empty", root);
     this.emptyTitle = $("[data-empty-title]", root);
     this.emptyBody = $("[data-empty-body]", root);
@@ -168,6 +178,7 @@ export class TranscriptPane {
       button.addEventListener("click", () => this.showRevision(Number(button.dataset.revision)));
     }
 
+    this.rawToggle?.addEventListener("click", () => this._toggleRaw());
     on(TRANSCRIPT_CHANGED, (payload) => this._onTranscriptChanged(payload));
     on(POLISH_CHANGED, (payload) => this._onPolishChanged(payload));
     on(HYPOTHESIS_CHANGED_TOPIC, (payload) => this._renderHypothesis(payload));
@@ -217,7 +228,7 @@ export class TranscriptPane {
     // two regions independent of arrival order: on a page reload the blocks and the segments are
     // fetched separately, and either can land first without duplicating a minute of text.
     const incoming = (batch ?? (added ? [added] : [])).filter(
-      (segment) => !polish.coversSegment(segment.id)
+      (segment) => this.showRaw || !polish.coversSegment(segment.id)
     );
     setText(this.countLabel, pluralise(segments.length, "segment"));
     // Before the early return, not after it. Every segment loaded on a reload can already be
@@ -258,13 +269,38 @@ export class TranscriptPane {
     const restore = this.scroll.beginUpdate();
     for (const block of incoming) {
       this._insertBlock(block);
-      for (const id of block.source_ids ?? []) {
-        this.list.querySelector(`[data-segment-id="${id}"]`)?.remove();
+      // Left in place while "Show raw" is on. Removing them and re-fetching on every toggle would
+      // mean the raw view depended on the network, and the segments are already in the store.
+      if (!this.showRaw) {
+        for (const id of block.source_ids ?? []) {
+          this.list.querySelector(`[data-segment-id="${id}"]`)?.remove();
+        }
       }
     }
     this._trimBlocks();
     restore();
+    this._updateRawToggle();
     this._renderEmptyState();
+  }
+
+  /**
+   * Show or hide the raw segments under the polished prose.
+   *
+   * Re-renders from the stores rather than fetching: the segments were never deleted from
+   * `transcript`, only filtered out of the DOM, so both views are already in memory.
+   */
+  _toggleRaw() {
+    this.showRaw = !this.showRaw;
+    setAttr(this.rawToggle, "aria-pressed", String(this.showRaw));
+    setText(this.rawToggle, this.showRaw ? "Hide raw" : "Show raw");
+    this.list.replaceChildren();
+    this.lastTimestampShown = -Infinity;
+    this._onTranscriptChanged({ segments: transcript.segments, batch: transcript.segments });
+  }
+
+  /** Offer the toggle only once there is something to toggle. */
+  _updateRawToggle() {
+    toggle(this.rawToggle, polish.blocks.length > 0);
   }
 
   /** Insert a block in time order, which the replay can deliver out of. */
