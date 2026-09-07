@@ -274,6 +274,7 @@ listed them has been removed rather than left describing work that has landed.
 | `web/backend/app/routes/` | HTTP endpoint definitions only. Thin — they delegate to services. |
 | `web/backend/app/transport/` | The WebSocket hub and its event envelopes. Separate from `routes/` because it is a push channel with its own reconnection semantics. |
 | `web/backend/app/services/` | The pipeline. One sub-package per stage, so each is independently testable. |
+| `scripts/benchmark_asr.py` | Every model, device and precision measured on *this* machine, each in its own process. Exists because the default cannot be chosen from published benchmarks (D-053). |
 | `web/backend/app/companion/` | The tray icon and the global shortcuts — the two things a browser page cannot do. Deliberately a *remote control*: it polls the HTTP API, holds no state, and can be killed and restarted without the server noticing. |
 | `web/backend/app/services/capture/` | Recording a window's picture. Separate from `recording/` because they solve unrelated problems: one negotiates with a compositor for pixels, the other writes and transcribes audio. |
 | `web/backend/app/services/recording/` | Capturing audio to a file and transcribing it once whole. Separate from `streaming/` because the two answer opposite questions: `streaming/` decides what is safe to show while audio is still arriving, and this runs only when it has stopped. |

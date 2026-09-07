@@ -79,6 +79,9 @@ class PolishWorker:
         silence_provider: Callable[[], float],
     ) -> None:
         self._store = store
+        #: Rewrites thrown away for losing too much of what was said. Counted so
+        #: `polish.min_retained_ratio` can be tuned from real runs (D-053).
+        self._discarded = 0
         #: A provider rather than a snapshot, unlike :class:`..context.ContextWorker`. These
         #: settings are ones a user adjusts while listening — "do this more often", "stop doing
         #: it" — and a snapshot would defer that to the next session.
@@ -173,7 +176,22 @@ class PolishWorker:
             # Not retried: a model that summarised when told to tidy will do it again, and a
             # second call costs the same as the first. The raw segments stay on the page, which
             # is the correct outcome — worse-looking, still true.
-            logger.info("Discarded a rewrite of %.1f–%.1f s: %s", start, end, check.reason)
+            # **The ratio, not just the reason.** `ContentCheck.ratio` says in its own docstring
+            # that it is "logged, so a threshold can be tuned from real runs" — and this caller
+            # dropped it, which is why `polish.min_retained_ratio` has sat at its guessed 0.6 with
+            # nothing to tune it against. The floor is printed alongside so the two can be compared
+            # without going to look the setting up.
+            self._discarded += 1
+            logger.info(
+                "Discarded a rewrite of %.1f–%.1f s: %s (kept %.2f of the words, floor %.2f; "
+                "%d discarded so far)",
+                start,
+                end,
+                check.reason,
+                check.ratio,
+                config.polish.min_retained_ratio,
+                self._discarded,
+            )
             self._advance(end)
             return False
 

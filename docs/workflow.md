@@ -176,6 +176,13 @@ Replay faster than real time for a long recording:
 uv run python scripts/run_file_session.py talk.wav --speed 10
 ```
 
+Measure the speech models on *this* machine, so a default can be chosen from data rather than from
+published benchmarks — every combination of model, device and precision, each in its own process:
+
+```bash
+uv run --no-sync python scripts/benchmark_asr.py data/audio/seminar-speech-real.wav
+```
+
 ## Regenerating the shared contracts
 
 Run this whenever a route or a WebSocket event changes, and commit the result:

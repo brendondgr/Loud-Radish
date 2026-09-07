@@ -84,6 +84,8 @@ class AsrLifecycle:
         #: How many passes have been discarded as invented. Published with pipeline health, because
         #: a filter that deletes speech invisibly is a worse bug than the one it fixes.
         self._suppressed = 0
+        #: Per-code totals, so a climbing count can be attributed rather than merely noticed.
+        self._suppressed_by_code: dict[str, int] = {}
 
     # -- state ---------------------------------------------------------------------
 
@@ -96,6 +98,13 @@ class AsrLifecycle:
     def suppressed(self) -> int:
         """How many passes have been discarded as invented text."""
         return self._suppressed
+
+    @property
+    def suppressed_by_code(self) -> dict[str, int]:
+        """How many suppressions of each kind. A climbing total is only actionable once it can be
+        attributed: `no-speech` climbing means the thresholds are tight, `known-phrase` climbing
+        means the room is quiet and the model is filling silence."""
+        return dict(self._suppressed_by_code)
 
     @property
     def backend(self) -> AsrBackend | None:
@@ -234,8 +243,21 @@ class AsrLifecycle:
         self._suppressed += 1
         # Logged at debug with the text, because a wrongly-suppressed passage must be recoverable
         # by someone diagnosing it. Transcript content never goes to a higher level (BE §18).
+        self._suppressed_by_code[suppression.code] = (
+            self._suppressed_by_code.get(suppression.code, 0) + 1
+        )
+        # **The numbers, as well as the verdict.** The thresholds these are compared against were
+        # calibrated on synthetic fixtures — `no_speech_certain` is 0.85 because one measured
+        # hallucination scored 0.901, a sample of one — and they could not be re-tuned from real
+        # audio because the values that produced each verdict were never written down.
         logger.debug(
-            "Suppressed %s: %s (%r)", suppression.code, suppression.reason, suppression.text
+            "Suppressed %s: %s (no_speech=%.3f avg_logprob=%.3f, %.2fs) (%r)",
+            suppression.code,
+            suppression.reason,
+            result.no_speech_prob if result.no_speech_prob is not None else float("nan"),
+            result.avg_logprob if result.avg_logprob is not None else float("nan"),
+            audio.size / SAMPLE_RATE,
+            suppression.text,
         )
         return AsrResult(
             words=[],

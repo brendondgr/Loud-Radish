@@ -130,6 +130,7 @@ class FasterWhisperBackend(AsrBackend):
         if self._model is not None:
             return
 
+        self._refuse_unsafe()
         factory = self._model_factory or self._import_model_class()
         started = time.monotonic()
         try:
@@ -267,6 +268,19 @@ class FasterWhisperBackend(AsrBackend):
         if self._device != "auto":
             return self._device
         return "cuda" if _cuda_available() else "cpu"
+
+    def _refuse_unsafe(self) -> None:
+        """Stop before a combination that faults the GPU rather than failing.
+
+        The only place this can be caught is *before* the load — a GPU memory fault aborts the
+        process, so there is no exception to handle afterwards. See
+        `acceleration.unsafe_combination`.
+        """
+        from .acceleration import unsafe_combination
+
+        reason = unsafe_combination(self._resolved_device(), self._precision, self._model_name)
+        if reason:
+            raise AsrLoadError(reason)
 
     @staticmethod
     def _import_model_class() -> Any:

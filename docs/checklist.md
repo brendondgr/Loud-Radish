@@ -675,9 +675,28 @@ fixtures, and five faults came out of that which no test would have found:
 
 ## Part 4 — Still Open
 
-- [ ] **Default ASR model and compute device.** Depends entirely on the user's hardware. A
-      conservative default ships (`small`, `int8`, auto device); benchmark locally and re-tune. The
-      architecture document is explicit that this cannot be decided from published benchmarks.
+- [x] **Default ASR model and compute device.** Done, by measurement — `scripts/benchmark_asr.py`
+      now exists and runs every combination of model, device and precision in its own process, after
+      a warm pass, reporting speed alongside how far each transcript diverges from the others.
+
+      What it found was not a tuning answer but a fault. **The shipped default crashes on this
+      hardware**: `small` at `int8` with `device="auto"` resolves to the GPU on any AMD machine and
+      aborts the *process* with "Memory access fault by GPU node-1" — no exception, nothing to
+      catch, the server and any recording in progress gone. That combination is now refused before
+      the load, with an override for hardware where it is not broken (D-053).
+
+      The CPU figures are stable and repeatable: `base`/`int8` measured 37.2×, 37.9×, 38.9× and
+      40.2× across four runs; `small`/`int8` 14.5–15.6×. This machine's own configuration is now
+      `base` on the CPU — about 2.2× real time through the streaming pipeline, against roughly 1.3×
+      on the GPU, and without the fault.
+
+- [ ] **The GPU path on this machine no longer produces coherent output.** Discovered while doing
+      the benchmark above, and left open because it needs someone who can bisect the ROCm stack.
+      With each combination isolated in its own process and warmed first, `large-v3-turbo` at
+      float16 returned **99 words for a 54-word clip**, `base` at float16 returned **none**, and the
+      same combination that transcribed correctly through the running server minutes earlier
+      returned zero words under the benchmark. It is not simply slow; it is wrong, and differently
+      wrong each time. `docs/deployment.md` now marks its GPU column unverified.
 - [ ] **Desktop packaging.** Whether this stays a browser-plus-local-server application or is packaged
       into a Tauri/Electron/Qt shell. The chosen contract keeps both open, so nothing is blocked.
 - [x] **Deployment documentation.** Done. `docs/deployment.md` now describes installing and running
@@ -697,7 +716,13 @@ fixtures, and five faults came out of that which no test would have found:
       there is no way to see the raw segments for a stretch that has been polished without turning
       it off entirely. Worth adding once the pass has been used against a real model and it is
       clear how often anyone wants to.
-- [ ] **Tuning `polish.min_retained_ratio`.** The 0.6 default is a starting point chosen without a
+- [ ] **Tuning `polish.min_retained_ratio`.** *The measurement it needs now exists.* `ContentCheck`
+      always carried the ratio and its docstring said it was "logged, so a threshold can be tuned
+      from real runs" — and the caller dropped it. Every discard now logs the ratio, the floor it
+      was compared against, and a running count, so the number can be gathered from real use. The
+      value itself still needs that use before it is changed.
+
+      *Original note:* The 0.6 default is a starting point chosen without a
       real model behind it. It is a length check, not a meaning check, and the right value can only
       come from watching what a real model actually returns. Writing out spoken code references now
       shortens a rewrite legitimately ("guard dot py" is three words and `guard.py` is one), which
@@ -707,7 +732,13 @@ fixtures, and five faults came out of that which no test would have found:
       `[MM:SS]` markers the assistant cites, feeding it the polished version instead would give it
       cleaner input — but it is a decision about what the assistant is allowed to read, not a
       refactor, and it was deliberately not smuggled into the polish work.
-- [ ] **Tuning the invented-speech thresholds against real audio.** The defaults were calibrated
+- [ ] **Tuning the invented-speech thresholds against real audio.** *The measurement it needs now
+      exists.* The filter logged its verdict but never the two numbers the thresholds are compared
+      against, so there was nothing to tune from; `no_speech_prob` and `avg_logprob` are now in the
+      debug record alongside the clip length, and suppressions are counted per code so a climbing
+      total can be attributed rather than merely noticed.
+
+      *Original note:* The defaults were calibrated
       against `tiny` on synthetic fixtures, which is not the same thing as a real room. The number
       to watch is `suppressed` in the status bar: climbing while someone is talking means the
       thresholds are too tight and real speech is being deleted, which is the one failure this
