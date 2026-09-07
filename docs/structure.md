@@ -2,7 +2,7 @@
 
 *Last updated: 2026-08-29 (one folder per recording, and the web-app export)*
 
-Canonical map of TranscriberPrototype. This file documents **purpose**, not source code. Update it in
+Canonical map of Loud Radish. This file documents **purpose**, not source code. Update it in
 the same change that adds, moves, renames, or removes a directory or significant file.
 
 The layout follows **Mode G — API plus separate frontend** from
@@ -48,6 +48,8 @@ TranscriberPrototype/
 ├── web/                           # ALL web application code
 │   ├── backend/app/
 │   │   ├── main.py                # FastAPI factory, lifespan, template and static mounting
+│   │   ├── branding.py            # The product name, and every identifier derived from it —
+│   │   │                          #   each paired with the legacy value it migrates from (D-038)
 │   │   ├── paths.py               # Filesystem locations, resolved in one place
 │   │   ├── config/                # Layered configuration system
 │   │   │   ├── schema.py          # Pydantic models, one per configuration area
@@ -230,6 +232,7 @@ listed them has been removed rather than left describing work that has landed.
 | `docs/skills/` | Canonical skill definitions. The three agent-tool folders point here rather than carrying copies. |
 | `web/` | All web application code and assets. Keeps application code out of the repository root. |
 | `web/backend/` | The Python side: the pipeline, the HTTP API, and the WebSocket stream. |
+| `web/backend/app/branding.py` | The product name and every machine identifier built from it, each beside the legacy value it replaces. One file, so the next rename is one diff rather than a hunt through eleven — and so the migration policy is readable in one place instead of scattered across six subsystems. |
 | `web/backend/app/config/` | The layered configuration system. Isolated because every stage reads it and nothing else should own it. |
 | `web/backend/app/routes/` | HTTP endpoint definitions only. Thin — they delegate to services. |
 | `web/backend/app/transport/` | The WebSocket hub and its event envelopes. Separate from `routes/` because it is a push channel with its own reconnection semantics. |

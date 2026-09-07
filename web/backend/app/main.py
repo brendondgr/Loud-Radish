@@ -22,6 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from . import paths
+from .branding import APP_TITLE
 from .config import ConfigStore, CredentialStore
 from .routes import build_router
 from .services.chat import ChatService
@@ -35,7 +36,6 @@ from .transport import EventHub, ws_router
 
 logger = logging.getLogger(__name__)
 
-APP_TITLE = "Live Seminar Transcriber"
 APP_VERSION = "0.1.0"
 
 
