@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{% block title %}{{ app_title }}{% endblock %}</title>
     <meta name="color-scheme" content="dark" />
+
+    {# Without this every tab shows a blank glyph, and with the app and the sessions page usually
+       both open they are indistinguishable. #}
+    <link rel="icon" type="image/svg+xml" href="/static/{{ logo_path }}" />
     <meta
       name="description"
       content="{{ app_description }}"

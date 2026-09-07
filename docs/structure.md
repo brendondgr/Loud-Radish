@@ -180,6 +180,7 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   │   │   └── partials/          # header, status_bar, banners, preflight,
 │   │   │                          #   transcript/, chat/, monitor/, settings/
 │   │   └── static/
+│   │       ├── brand/radish.svg   # The mark — tab icon, header, export, desktop entry (D-038)
 │   │       ├── css/               # tokens, base, layout + one file per component
 │   │       └── js/                # main + core/, transport/, stores/, components/, a11y/
 │   │           └── core/modes.js  # Mirror of services/session/modes.py; kept identical by test
@@ -246,6 +247,7 @@ listed them has been removed rather than left describing work that has landed.
 | `web/backend/app/models/` | Persistence shape, separated so storage concerns do not leak into routes. |
 | `web/backend/app/schemas/` | Request and response validation — the runtime enforcement of `docs/api-contract.md`. |
 | `web/frontend/templates/` | Jinja2 templates, split into many small partials rather than a few large pages. One partial per region of the interface. |
+| `web/frontend/static/brand/` | The logo, in one place. The application header, the browser tab, the desktop entry and every export reference this single file rather than carrying copies. |
 | `web/frontend/static/css/` | Design tokens plus one stylesheet per component. No inline styles. |
 | `web/frontend/static/js/` | ES modules: core utilities, transport, the client stores, one controller per component. No bundler. |
 | `web/shared/contracts/` | The generated OpenAPI spec and the hand-authored WebSocket event schema, which OpenAPI cannot express. Prevents the two sides drifting apart. |

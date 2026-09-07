@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Recorded talk</title>
+    <link rel="icon" type="image/svg+xml" href="radish.svg" />
     <link rel="stylesheet" href="theme.css" />
     <link rel="stylesheet" href="app.css" />
   </head>
@@ -17,8 +18,13 @@
          layout is a matter of which column a panel is appended to and nothing else. -->
     <header class="topbar">
       <div class="topbar__identity">
-        <h1 class="topbar__title" data-title>Recorded talk</h1>
-        <p class="topbar__meta" data-meta></p>
+        <!-- Decorative: the title beside it names the recording, and the footer names the
+             application that produced it. -->
+        <img class="topbar__mark" src="radish.svg" alt="" width="26" height="26" />
+        <div class="topbar__names">
+          <h1 class="topbar__title" data-title>Recorded talk</h1>
+          <p class="topbar__meta" data-meta></p>
+        </div>
       </div>
 
       <!-- Reopening a closed panel. Buttons appear here only for panels that are closed, so the

@@ -31,7 +31,7 @@ from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
 
-from ... import branding
+from ... import branding, paths
 from ...config.schema import AppConfig
 from ...models.session import SessionMetadata
 from ..recording.layout import RecordingLayout
@@ -54,6 +54,11 @@ TEMPLATE_FILES = (
     "assistant.js",
     "app.js",
 )
+
+#: The mark, copied in beside the page. Read as bytes rather than text: it is the one asset here
+#: that is not source, and an export has to open from `file://` with no network at all.
+LOGO_FILENAME = "radish.svg"
+LOGO_SOURCE = paths.STATIC_DIR / branding.LOGO_PATH
 
 #: Container extension to the MIME type a `<video>` element needs. Anything unrecognised is handed
 #: over without a type, which makes the browser sniff it — worse than a correct type and much
@@ -137,6 +142,7 @@ def build_webapp(
     with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for name in TEMPLATE_FILES:
             archive.writestr(f"{key}/{name}", (TEMPLATE_DIR / name).read_text(encoding="utf-8"))
+        archive.writestr(f"{key}/{LOGO_FILENAME}", LOGO_SOURCE.read_bytes())
         settings = settings_payload(config)
         archive.writestr(f"{key}/{DATA_DIR}/transcript.json", _json(transcript))
         archive.writestr(f"{key}/{DATA_DIR}/settings.json", _json(settings))
@@ -224,6 +230,7 @@ needs is in this folder.
 What is here
 ------------
 index.html            The application. Open this.
+radish.svg            The mark, shown in the tab and beside the title.
 theme.css, app.css    Its stylesheets.
 util.js … app.js      Its scripts, loaded in the order index.html lists them.
 media/                The video, exactly as it was recorded.

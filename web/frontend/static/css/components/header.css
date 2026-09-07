@@ -19,6 +19,25 @@
   min-width: 0;
 }
 
+/* -- the mark -----------------------------------------------------------------------------
+ * Fixed box so the header height cannot depend on how the SVG scales, and no shrinking: this is
+ * the first thing in a wrapping flex row and it must not be the thing that gets squashed.
+ */
+
+.header__mark {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  display: block;
+  /* The logo is drawn for a light ground: its outline and the character's legs are near-black, and
+   * on this chrome they disappear, leaving a crimson smudge. The disc is the logo's own cream, so
+   * the mark reads as drawn rather than as a colour accident. Padding because the megaphone reaches
+   * the edge of the viewBox and would otherwise sit flush against the rim. */
+  padding: 2px;
+  border-radius: 50%;
+  background: var(--brand-cream);
+}
+
 /* -- recording state ----------------------------------------------------------------------
  * Unambiguous at a glance, and never colour alone: the dot is paired with a word (FE §13).
  */
@@ -152,6 +171,12 @@
     flex-wrap: wrap;
     gap: var(--space-5);
     min-width: 0;
+  }
+
+  /* Below 700px the header wraps and every pixel of the row is spoken for by controls. The mark
+   * is identity, not function, and the tab icon still carries it. */
+  .header__mark {
+    display: none;
   }
 
   .model-identity {

@@ -13,6 +13,9 @@
 
 <header class="header">
   <div class="header__group">
+    {# The mark is decorative: the page title already carries the name, and a screen reader
+       announcing it again at the top of every view is noise rather than identity. #}
+    <img class="header__mark" src="/static/{{ logo_path }}" alt="" width="28" height="28" />
     {# Every mode is always present. An unavailable one is disabled and carries the reason, because
        a feature that vanishes when its dependency is missing is indistinguishable from one that
        does not exist. #}

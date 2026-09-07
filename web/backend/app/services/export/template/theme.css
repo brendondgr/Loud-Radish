@@ -122,6 +122,29 @@ body {
 
 .topbar__identity {
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Fixed box, and never the thing that shrinks: the title beside it is what may ellipsise. */
+.topbar__mark {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: block;
+  /* Same reason as the application's header: the logo is drawn for a light ground and vanishes
+     into dark chrome without one. The colour is the logo's own cream, hard-coded here because an
+     export carries no design tokens beyond this file. */
+  padding: 2px;
+  border-radius: 50%;
+  background: #f6f2e8;
+}
+
+/* The identity block was a plain stack; making it a row means the title and the meta line under it
+   need a column of their own so the mark sits beside both rather than between them. */
+.topbar__names {
+  min-width: 0;
 }
 
 .topbar__title {

@@ -134,6 +134,21 @@ def test_the_page_only_references_files_that_are_in_the_archive(client, dirs) ->
         assert f"{KEY}/{reference}" in names, reference
 
 
+def test_the_mark_travels_with_the_export(client, dirs) -> None:
+    """The one asset in the bundle that is not source. It is read as bytes and written verbatim, so
+    the failure to guard against is an empty or truncated file rather than a missing reference —
+    the reference is already covered above."""
+    sessions, recordings = dirs
+    write_session(sessions)
+    write_recording(recordings)
+
+    zipped = archive_of(client.get(f"/api/sessions/{KEY}/webapp"))
+    mark = zipped.read(f"{KEY}/radish.svg")
+
+    assert mark.startswith(b"<svg"), "the mark must be the SVG itself, not a placeholder"
+    assert b"</svg>" in mark[-200:], "a truncated SVG renders as nothing at all"
+
+
 def test_the_transcript_document_carries_the_talk(client, dirs) -> None:
     sessions, recordings = dirs
     write_session(sessions, segments=4)
