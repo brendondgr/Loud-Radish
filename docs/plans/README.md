@@ -33,6 +33,9 @@ conventions in [../skills/planner/SKILL.md](../skills/planner/SKILL.md).
 | [recording-folders-and-web-export.md](recording-folders-and-web-export.md) | One folder per recording, a transcription pass that leaves the interface usable, a labelled Recordings button with media indicators, and a self-contained HTML web-app export | **Complete (6 / 6)** |
 | [five-recording-faults.md](five-recording-faults.md) | Five faults reported against one recording: a stopped session calling itself live, an Audio chip that read false when all was well, doubled counts, a transcript the page never asked for, two copies of every video, and sound running ahead of the picture | **Complete (5 / 5)** |
 | [capture-resilience-and-export.md](capture-resilience-and-export.md) | A Zoom seminar that stopped recording partway through: stall detection, portal resume and segment stitching, the mux that stops destroying audio, the user's conversation split out of the shared export, and a post-recording export window with quality options, projected sizes, and staged progress | **Complete (9 / 9)** |
+| [silent-recordings-and-quality.md](silent-recordings-and-quality.md) | Recordings that came back silent, and the encoder quality that produced them | **Complete (4 / 4)** |
+| [loud-radish-rebrand.md](loud-radish-rebrand.md) | Rebranding the project as **Loud Radish — Live Audio & Video Transcriber**: one module owns the name, and every identifier it put on the machine is renamed with a path that adopts the old one | Not started (0 / 8) |
+| [tray-restart-clutter-and-interruptible-work.md](tray-restart-clutter-and-interruptible-work.md) | The tray icon exported to D-Bus, the last transcript reopened after a restart, 706 empty session databases pruned safely, and pausing, resuming and cancelling both a recording and a transcription pass | Not started (0 / 10) |
 
 ## The multi-mode expansion
 
