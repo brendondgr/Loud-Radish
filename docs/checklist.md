@@ -593,10 +593,25 @@ says `max_height: 720` against a recording made at **2560 × 1532**.
 
 ## Part 3l — The Tray, the Restart, the Clutter, and Work That Can Be Interrupted
 
-Four things asked for together on 2026-09-06 and planned in
-[plans/tray-restart-clutter-and-interruptible-work.md](plans/tray-restart-clutter-and-interruptible-work.md).
-Three of them are open items already carried above; the fourth is new capability. The items they
-close are left in place rather than moved, so nothing is lost by reading this file top to bottom.
+Four things asked for together on 2026-09-06, planned in
+[plans/tray-restart-clutter-and-interruptible-work.md](plans/tray-restart-clutter-and-interruptible-work.md)
+and closed (10 / 10). Recorded as **D-039** to **D-045**. Three of them were open items already
+carried above; the fourth is new capability. The items they close are left in place rather than
+moved, so nothing is lost by reading this file top to bottom.
+
+Every step that could be run *was* run, against the real desktop and real recordings rather than
+fixtures, and five faults came out of that which no test would have found:
+
+- **"Nothing recorded yet" stood over a pane full of prose.** The empty state ignored polished
+  blocks and was not re-rendered when every segment was already covered by one. Reachable before
+  this work and never looked at.
+- **A `setAttr` used without importing it took the whole page down**, so nothing on it wired up.
+- **The pass's progress bar hid itself** after its first window, because it lived inside the empty
+  state — a fault present since D-021 — and its new controls went with it. Both moved out and made
+  sticky, after finding them scrolled off-screen at 8000 px.
+- **A held pass refused its own resumption**, because `is_busy` counted waiting as working.
+- **A held pass reported itself 100 % complete**, because the tail flush reports the whole file's
+  length whether the loop finished or was cut short.
 
 - [x] **The tray icon's D-Bus export — done, and the icon appears.** `companion/raster.py` draws
       the instrument as ARGB32 with `numpy` alone (**D-042**), and `companion/tray.py` serves one
@@ -640,7 +655,14 @@ close are left in place rather than moved, so nothing is lost by reading this fi
       resume snaps back to the window boundary at or before the point asked for, so trimming at the
       requested second and transcribing from the earlier one duplicated eighteen seconds. Fixed, and
       the regression test was confirmed failing against the old behaviour.
-- [x] **`services/session/manager.py` has reached 1782 lines — split, and now 672.** Six files:
+- [ ] **`services/session/manager.py` is back to 782 lines and the cap is 800.** Split from 1782,
+      then grown again by pause, resume and cancel. It is inside the limit and has roughly twenty
+      lines of headroom, which is not much: the next thing added to a session's lifecycle will need
+      another seam rather than another method. The frame path, the background workers, the window
+      capture, the passes and the source selection have already gone; what is left is genuinely the
+      lifecycle and the state machine, so the next split is a real design decision rather than a
+      move.
+- [x] **`services/session/manager.py` had reached 1782 lines — split, and was 672.** Six files:
       `shapes.py` (the dataclasses and tuning constants, importing no sibling so nothing cycles),
       `frames.py`, `background.py`, `window_capture.py`, `passes.py`, `sources.py`. Every file in
       the package is now under 500. Mixins rather than collaborators, and **D-039** says why and
@@ -783,6 +805,22 @@ user's own machine, and none may be reported as passing until it has had one.
       `uv run scripts/calibrate_export_estimate.py data/recordings/<key>/video-with-audio.webm`
       against a recording of a *different* kind — one that cuts between cameras rather than sitting
       on a slide — and see whether the measurement still lands inside the range.
+- [ ] **The tray icon on a desktop that is not KDE.** The `StatusNotifierItem` export is verified
+      against the real `org.kde.StatusNotifierWatcher` on this machine, end to end: registered,
+      fifteen properties read back, the picture animating, an eleven-item menu, and the whole thing
+      following the server as it was killed. What has **not** been tried is GNOME (which needs an
+      extension for SNI at all), or a panel that reads `IconName` and ignores `IconPixmap`. The
+      failure mode there is no icon rather than a wrong one, and the companion says so once and
+      carries on.
+- [ ] **Pausing a `window` recording on a real portal stream.** The video is stopped with the audio
+      and the pieces rejoin on the audio clock, which is covered against a stubbed portal and a real
+      `ffmpeg`. What is owed is the whole thing on a real desktop: pause a window capture, wait,
+      resume, and confirm both that **the portal picker does not appear** — the open question this
+      plan flagged for the user and could not answer headlessly — and that the joined video plays
+      continuously with the sound still in step.
+- [ ] **A paused capture over a long talk.** Verified at nine seconds of wall clock across a
+      three-second hold. Nobody has yet held a capture for twenty minutes mid-seminar and read the
+      result back, which is the case the feature exists for.
 - [ ] **A genuine 90-minute soak** — the accelerated soak in `tests/transcription/test_soak.py`
       drives ninety minutes of transcript through the engine in seconds and holds bounded memory,
       contiguous segment ids, and a clock that has not drifted. It is not the same as ninety

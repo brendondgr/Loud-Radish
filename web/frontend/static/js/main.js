@@ -31,6 +31,8 @@ import {
   CAPTURE_STATE,
   RECORDING_PROGRESS,
   SESSION_PAUSED,
+  TRANSCRIPTION_CANCELLED,
+  TRANSCRIPTION_PAUSED,
   SESSION_RESUMED,
   SESSION_STARTED,
   SESSION_STATE,
@@ -67,6 +69,8 @@ function boot() {
   // Swapping which transcription pass is on screen is a fetch plus a reset, and the pane does not
   // own either — it is handed a callback, which is what keeps the dependency one-way.
   pane.onRevisionChange = (revision) => showRevision(pane, revision);
+  pane.onHoldTranscription = (pausing) => holdTranscription(pausing, banners);
+  pane.onCancelTranscription = () => cancelTranscription(banners);
   new StatusBar($("[data-status-bar]"));
 
   const settings = new SettingsModal($("[data-settings]"));
@@ -224,6 +228,17 @@ function wireRecording(banners) {
   on(TRANSCRIPTION_PROGRESS, (payload) => {
     recording.setTranscription(payload);
     mode.setState(PROCESSING);
+  });
+
+  on(TRANSCRIPTION_PAUSED, (payload) => {
+    // The run state stays `processing`: the pass still owns the session and the model, and
+    // returning the interface to idle would offer to start a recording that cannot start.
+    recording.setTranscription(payload);
+  });
+
+  on(TRANSCRIPTION_CANCELLED, (payload) => {
+    recording.setTranscription(payload);
+    mode.setState(IDLE);
   });
 
   on(TRANSCRIPTION_DONE, (payload) => {
@@ -660,6 +675,43 @@ async function hold(pausing, banners) {
     else session.pause();
     banners.show({
       code: error.code ?? "hold-failed",
+      severity: "warning",
+      message: error.message,
+    });
+  }
+}
+
+/**
+ * Hold or continue the transcription pass (D-045).
+ *
+ * Resuming goes to the *session*, not the recording, because that is where the checkpoint lives —
+ * and it is the same call whether the pass was held a minute ago or by a process that no longer
+ * exists.
+ */
+async function holdTranscription(pausing, banners) {
+  try {
+    if (pausing) {
+      await api.pauseTranscription();
+      return;
+    }
+    const key = recording.sessionKey || session.sessionId;
+    if (!key) throw new Error("There is no held transcription to continue.");
+    await api.resumeTranscription(key);
+  } catch (error) {
+    banners.show({
+      code: error.code ?? "transcription-hold-failed",
+      severity: "warning",
+      message: error.message,
+    });
+  }
+}
+
+async function cancelTranscription(banners) {
+  try {
+    await api.cancelTranscription();
+  } catch (error) {
+    banners.show({
+      code: error.code ?? "transcription-cancel-failed",
       severity: "warning",
       message: error.message,
     });

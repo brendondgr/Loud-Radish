@@ -58,6 +58,11 @@ class TranscriptionJob:
     #: What the audio actually is, measured before the pass runs (`characterise.py`). Carried on
     #: the event so the interface can explain an empty transcript without a second request.
     audio: dict[str, Any] = field(default_factory=dict)
+    #: The *archive key* of the transcript this pass writes into — the session file's stem,
+    #: `<stamp>-<id>`. **Not the same string as `session_id`**, and the difference matters: every
+    #: read path (`/api/sessions/{key}/...`, including the resume) is addressed by the key, while
+    #: this job knows the id. Carrying both is cheaper than making a client join them.
+    key: str = ""
     #: Where a resume would begin, in seconds of audio. Always a window boundary.
     next_start_s: float = 0.0
     #: The id the next segment will take, so a resumed pass continues the numbering rather than
@@ -138,6 +143,7 @@ class TranscriptionJob:
         """The payload for ``transcription.progress`` / ``.done`` / ``.failed``."""
         return {
             "session_id": self.session_id,
+            "key": self.key,
             "state": str(self.state),
             "progress": round(self.progress, 4),
             "transcribed_seconds": round(self.transcribed_seconds, 2),
@@ -171,19 +177,30 @@ class JobRegistry:
 
     @property
     def is_busy(self) -> bool:
-        with self._lock:
-            return self._current is not None and self._current.is_resumable
+        """Whether the slot is taken by a pass that is **actually working**.
 
-    def claim(self, job: TranscriptionJob) -> bool:
+        A *held* pass keeps the slot — nothing else may start over the same model — but it is not
+        busy in the sense callers mean when they ask, which is "would starting something now
+        collide". Conflating the two made a held pass refuse its own resumption with "a
+        transcription is already running", found by pressing Resume in the browser (D-045).
+        """
+        with self._lock:
+            return self._current is not None and self._current.is_running
+
+    def claim(self, job: TranscriptionJob, *, resuming: bool = False) -> bool:
         """Take the slot for ``job``. Returns False when a pass is already running or held.
 
-        A *held* pass still owns the slot. Starting a second one over the same model while the
-        first is waiting to be resumed would make both slower and the progress figure meaningless,
-        which is the same reason there is only ever one.
+        A *held* pass still owns the slot: starting a second one over the same model while the
+        first waits would make both slower and the progress figure meaningless, which is the same
+        reason there is only ever one.
+
+        ``resuming`` is how a held pass gets picked up again — it replaces a held predecessor, and
+        only a held one. A pass that is genuinely running is never displaced, whoever asks.
         """
         with self._lock:
             if self._current is not None and self._current.is_resumable:
-                return False
+                if not (resuming and self._current.is_paused):
+                    return False
             self._current = job
             return True
 

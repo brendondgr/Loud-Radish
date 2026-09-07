@@ -251,7 +251,32 @@ def test_a_held_pass_still_owns_the_slot() -> None:
     second = TranscriptionJob(session_id="b", source_path="/tmp/b.wav", total_seconds=60.0)
 
     assert registry.claim(second) is False
+
+
+def test_a_held_pass_is_not_reported_as_busy() -> None:
+    """Found by pressing Resume in the browser (D-045). `is_busy` guards "would starting something
+    now collide", and a held pass answering yes made it refuse its own resumption with "a
+    transcription is already running"."""
+    registry = JobRegistry()
+    job = TranscriptionJob(session_id="a", source_path="/tmp/a.wav", total_seconds=60.0)
+    registry.claim(job)
+
     assert registry.is_busy is True
+    job.pause()
+    assert registry.is_busy is False, "a held pass is not working, it is waiting"
+
+
+def test_only_a_held_pass_can_be_displaced_by_a_resume() -> None:
+    """A pass that is genuinely running is never displaced, whoever asks."""
+    registry = JobRegistry()
+    running = TranscriptionJob(session_id="a", source_path="/tmp/a.wav", total_seconds=60.0)
+    registry.claim(running)
+    replacement = TranscriptionJob(session_id="a", source_path="/tmp/a.wav", total_seconds=60.0)
+
+    assert registry.claim(replacement, resuming=True) is False
+
+    running.pause()
+    assert registry.claim(replacement, resuming=True) is True
 
 
 def test_a_cancelled_pass_releases_the_slot() -> None:
@@ -431,3 +456,37 @@ def test_a_resume_trims_at_the_real_boundary_not_the_requested_one(tmp_path: Pat
         )
     finally:
         reopened.close()
+
+
+def test_a_pass_stopped_early_does_not_report_itself_complete(tmp_path: Path) -> None:
+    """Found by pressing Pause and reading the label (D-045).
+
+    The tail is flushed whether the loop finished or was stopped — partial transcript beats none —
+    but reporting the whole file's length as the position walked progress to 100 % for a pass that
+    had been *held*, which read as "Held at 00:39:11 of 00:39:11 — 100 %" over a pass at 65 %.
+    """
+    path = write_wav(tmp_path / "talk.wav", 200.0)
+    positions: list[float] = []
+
+    def unterminated(samples, prompt=None):  # noqa: ANN001, ANN202
+        # No full stop, so the segmenter holds these words and the tail flush below actually runs.
+        # With punctuation there is no tail, and the reporting path this test exists for is never
+        # reached — which is how the first version of this test passed against the bug.
+        duration = max(0.5, samples.size / SAMPLE_RATE)
+        return Result(
+            [Word("and then", 0.0, duration / 2), Word("he said", duration / 2, duration)]
+        )
+
+    transcribe_file(
+        path,
+        transcribe=unterminated,
+        window_s=30.0,
+        overlap_s=1.0,
+        should_stop=_after_windows(2),
+        on_progress=lambda seconds, _segments: positions.append(seconds),
+    )
+
+    assert positions, "progress must be reported at least once"
+    assert max(positions) < 200.0, (
+        f"a held pass reported the whole file as transcribed: {max(positions)}"
+    )

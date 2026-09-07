@@ -100,7 +100,9 @@ class TranscriptionRunner:
     ) -> bool:
         """Pick a held pass up from its checkpoint."""
         job.resume()
-        return self.start(job=job, store=store, retain_audio=retain_audio, prompt=prompt)
+        return self.start(
+            job=job, store=store, retain_audio=retain_audio, prompt=prompt, resuming=True
+        )
 
     def cancel(self) -> None:
         """End the pass for good. What was transcribed stays committed; the audio stays on disk."""
@@ -114,16 +116,20 @@ class TranscriptionRunner:
         store: TranscriptStore,
         retain_audio: bool,
         prompt: str | None = None,
+        resuming: bool = False,
     ) -> bool:
         """Begin the pass. Returns False when another is already running.
 
         ``store`` is **handed over**: the runner closes it when the pass ends.
         """
-        if not self._registry.claim(job):
+        if not self._registry.claim(job, resuming=resuming):
             logger.warning("A transcription pass is already running; %s refused.", job.session_id)
             self._release(store)
             return False
 
+        # The key is a fact about the store, and only the runner sees both. A client needs it to
+        # address the resume, which goes to the session rather than the recording.
+        job.key = job.key or store.path.stem
         self._stop.clear()
         self._hold.clear()
         self._cancel.clear()

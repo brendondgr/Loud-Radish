@@ -1,6 +1,6 @@
 # The Tray Icon, the Transcript After a Restart, the Clutter, and Work That Can Be Interrupted
 
-*Written 2026-09-06. Status: **In progress (9 / 10 steps)**. Branch: `interruptible-work`.*
+*Written 2026-09-06. Status: **Complete (10 / 10 steps)**. Recorded as D-039 to D-045.*
 
 > **Rebased onto the Loud Radish rebrand.** This plan was written against `main` at `97de92e` and the
 > rebrand (D-038) landed while it was being written. It has been re-based rather than re-planned:
@@ -466,7 +466,7 @@ needed to choose between those two if the picker proves unavoidable.**
   commit stating: `Interruptible Work (9 / 10) Complete: a transcription pass can be paused,
   cancelled, and resumed from its checkpoint across a server restart.`
 
-### Step 10 — Write down what was done, and what is still owed
+### Step 10 — Write down what was done, and what is still owed ✅ **Done**
 
 - **Locations.** `docs/checklist.md` — close the four items this plan addresses, and add what it
   discovered; every real-world check above that could not be run goes into **Part 5, Verification
@@ -689,6 +689,31 @@ it up from the checkpoint the dead process left. The joined transcript came back
 increasing ids, non-decreasing timestamps, and a seam reading continuously from 1885.2 s to 1886.2 s.
 The one repeated line in it sits at 1931 s and 1937 s, six seconds apart and well past the seam —
 the speaker, not the join.
+
+**Step 9 also needed its own interface, which the plan had listed and the first commit of it missed.**
+
+The backend landed with routes and events but no controls, which would have shipped an API-only
+feature. Adding them found three more things, all of them only visible by running it:
+
+* **A JavaScript error took the whole page down.** `setAttr` was used in `transcript-pane.js` without
+  being imported, so `boot()` threw and *nothing* on the page wired up — no socket handlers, no
+  stores. A unit test of the module would not have noticed; the page simply did not work.
+* **The controls were in the wrong place.** They went inside the empty state, beside the progress
+  bar — and a pass commits segments as it goes, so the pane stops being empty after its first
+  window and took the bar and the controls with it. That was a pre-existing fault in the progress
+  bar too, present since D-021 and never noticed because nobody had watched a long pass with text
+  already on screen. Both now live outside the empty state and **stick to the top of the scroller**,
+  because at 8000 px of scroll they were off-screen exactly when wanted.
+* **A held pass refused its own resumption.** `JobRegistry.is_busy` counted a paused pass as busy,
+  so the resume route's guard rejected it with "a transcription is already running". `is_busy` now
+  answers the question callers actually ask — would starting something now collide — and a held pass
+  is not working, it is waiting.
+
+And one more from reading the label rather than the code: a pass stopped early reported **100 %
+complete**, because the tail flush reports the whole file's length as its position whether the loop
+finished or was cut short. "Held at 00:39:11 of 00:39:11 — 100 %" over a pass at 65 %. The first
+regression test written for it passed against the bug, because the mock's text ended in a full stop
+so there was no tail to flush; it needed unterminated text to reach the path at all.
 
 *The documented SQLite flake fired once during this step and was left alone.*
 `test_session_toggle.py::test_stopping_ignores_the_mode` failed on one full-suite run, passed five

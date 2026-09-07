@@ -186,9 +186,16 @@ def transcribe_file(
         logger.info("Recording %s contains no audio; nothing to transcribe.", path)
         return produced
 
+    #: The end of the last window actually transcribed, and whether the loop was cut short. Both
+    #: exist for the tail flush below, which otherwise reports the whole file's length as the
+    #: position — walking a *held* pass to 100 % complete.
+    reached = start_s
+    stopped_early = False
+
     for window in plan_windows(samples, window_s=window_s, overlap_s=overlap_s, start_s=start_s):
         if should_stop is not None and should_stop():
             logger.info("Transcription of %s stopped early at %.1f s.", path, window.start_s)
+            stopped_early = True
             break
 
         # Before the window, not after it: a checkpoint written afterwards names a position whose
@@ -207,6 +214,7 @@ def transcribe_file(
         # about this function's caller, and the segmenter is shared with the live path.
         segments = [replace(segment, revision=revision) for segment in segments]
         produced.extend(segments)
+        reached = window.end_s
         if on_progress is not None:
             on_progress(window.end_s, segments)
 
@@ -217,7 +225,12 @@ def transcribe_file(
         tail = replace(tail, revision=revision)
         produced.append(tail)
         if on_progress is not None:
-            on_progress(duration, [tail])
+            # **`reached`, not `duration`, when the loop was stopped.** The tail is flushed either
+            # way — partial transcript beats none — but reporting the whole file's length as the
+            # position walks progress to 100 % for a pass that has been *held*, which showed in the
+            # browser as "Held at 00:39:11 of 00:39:11 — 100 %" over a pass that had reached 65 %.
+            # Found by pressing Pause and reading the label (D-045).
+            on_progress(duration if not stopped_early else reached, [tail])
 
     logger.info("Transcribed %s: %.1f s of audio into %d segments.", path, duration, len(produced))
     return produced

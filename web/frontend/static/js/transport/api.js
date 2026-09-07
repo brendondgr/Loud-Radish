@@ -93,6 +93,9 @@ export const api = {
   pauseSession: () => post("/api/session/pause"),
   resumeSession: () => post("/api/session/resume"),
   cancelSession: () => post("/api/session/cancel"),
+  pauseTranscription: () => post("/api/recordings/transcription/pause"),
+  cancelTranscription: () => post("/api/recordings/transcription/cancel"),
+  resumeTranscription: (key) => post(`/api/sessions/${encodeURIComponent(key)}/transcribe/resume`),
 
   devices: () => get("/api/audio/devices"),
   selectDevice: (body) => post("/api/audio/device", body),

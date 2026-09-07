@@ -270,11 +270,23 @@
  * total as text rather than only a width.
  */
 
-.transcript-empty__progress {
-  margin-top: var(--space-8);
+/* The pass's progress, which lives beside the transcript rather than inside the empty state:
+ * a pass commits as it goes, so the pane stops being empty after its first window (D-045).
+ *
+ * Sticky, because it sits at the top of the scrolling column and a pass over a long recording
+ * fills that column with text — which scrolled the bar and its own Pause button out of sight
+ * exactly when they were wanted. Seen in the browser, not reasoned about. */
+.transcript-progress {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: 0 0 var(--space-8);
+  padding: var(--space-4) 0 var(--space-6);
+  background: var(--surface-document);
+  border-bottom: 1px solid var(--surface-control);
 }
 
-.transcript-empty__progress[hidden] {
+.transcript-progress[hidden] {
   display: none;
 }
 
@@ -293,11 +305,24 @@
   transition: width var(--duration) var(--ease);
 }
 
-.transcript-empty__progress-label {
+.transcript-progress__label {
   margin: var(--space-4) 0 0;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   color: var(--text-faint);
+}
+
+/* Pause and cancel for the pass itself (D-045). Wraps, because at 320 px the pane is narrower than
+ * two buttons and a label. */
+.transcript-progress__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+}
+
+.transcript-progress__controls[hidden] {
+  display: none;
 }
 
 /* -- selection menu ---------------------------------------------------------------------------
