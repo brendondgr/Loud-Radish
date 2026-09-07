@@ -15,7 +15,7 @@ from pathlib import Path
 from ...config import AppConfig
 from ...models.session import SessionMetadata
 from ..recording import SinkError, TranscriptionJob, TranscriptionRunner
-from ..transcript import TranscriptStore
+from ..transcript import TranscriptStore, archive
 from . import degradation
 
 logger = logging.getLogger(__name__)
@@ -103,6 +103,47 @@ class TranscriptionPassMixin:
             self._retain(TranscriptStore(store.path))
         except Exception:  # noqa: BLE001 - a session that has already ended must still end cleanly
             logger.debug("Could not reopen %s for reading", store.path.name, exc_info=True)
+
+    def reopen_last_session(self) -> bool:
+        """Hold the most recent finished transcript open for reading. Returns whether one was.
+
+        **D-031 across a process boundary (D-041).** That decision keeps a finished session's store
+        open until the next one starts, so the page and the assistant can still read the talk that
+        just ended. It holds the store in an attribute, though, so a restart loses it: the database
+        is still on disk and nothing reopens it, and the main page comes up empty while Recordings
+        shows the talk perfectly well.
+
+        Called once from the application's lifespan, never during a session. It reads through
+        ``archive`` rather than scanning the directory itself, so there is one definition of what
+        the sessions on disk are and which of them is newest.
+
+        **Never fatal.** A session directory that cannot be read, or a database that cannot be
+        opened, costs the convenience and nothing else — an application that refuses to start
+        because of an old file is worse than one that starts with an empty page.
+        """
+        if self._store is not None or self._last_store is not None:
+            return False
+
+        config = self._config.resolve()
+        if not config.storage.reopen_last_session:
+            return False
+
+        try:
+            path = archive.newest_with_segments(config)
+        except Exception:
+            logger.debug("Could not look for a session to reopen", exc_info=True)
+            return False
+        if path is None:
+            return False
+
+        try:
+            self._retain(TranscriptStore(path))
+        except Exception:
+            logger.info("Could not reopen %s for reading", path.name, exc_info=True)
+            return False
+
+        logger.info("Reopened %s, so the last transcript is still readable", path.name)
+        return True
 
     def _retain(self, store: TranscriptStore) -> None:
         """Hold a finished session's store open for reading, replacing any already held."""

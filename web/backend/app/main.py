@@ -67,6 +67,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # the only place asyncio and the audio path meet.
     app.state.hub.bind_loop(asyncio.get_running_loop())
 
+    # The last talk stays on the page across a restart (D-041). D-031 keeps a finished session
+    # readable until the next one starts, but it holds it in an attribute, so a new process began
+    # with nothing and the main page came up empty while Recordings showed the talk fine.
+    session = getattr(app.state, "session_manager", None)
+    if session is not None:
+        session.reopen_last_session()
+
     try:
         yield
     finally:

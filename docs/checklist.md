@@ -490,11 +490,9 @@ passes, and a muxed file with sound in it.
 - [ ] **The offset is logged, not stored.** It goes to the log at INFO when a recording is
       combined. Giving it a file of its own was rejected: the same report asked for *fewer* files
       in a recording folder.
-- [ ] **A restart still hides the last transcript from the live page.** The finished store is held
-      only until the next session starts, and not across a process restart — so after restarting
-      the application the last talk is reachable through Recordings but not on the main page. That
-      is the documented bound of D-031 rather than a regression, and closing it would mean deciding
-      what "the current session" means to a process that has just started.
+- [x] **A restart still hides the last transcript from the live page — closed (D-041).** The
+      question it raised, what "the current session" means to a process that has just started, is
+      answered: the newest session that actually holds segments, by the timestamp in its name.
 
 ## Part 3k — A Seminar That Stopped Recording, and the Export Window
 
@@ -607,8 +605,15 @@ close are left in place rather than moved, so nothing is lost by reading this fi
 
 - [ ] **The tray icon's D-Bus export** — the outstanding hop from Plan 5, with the `jeepney`
       question above now answered in its favour. Steps 4-5.
-- [ ] **The last transcript after a restart** — the documented bound of D-031, closed by reopening
-      the newest session that holds segments at startup. Step 3.
+- [x] **The last transcript after a restart — closed.** The newest session holding segments is
+      reopened once at start-up, chosen by the timestamp in its filename rather than by mtime.
+      `storage.reopen_last_session` turns it off. Verified against a real server both ways: on, the
+      page hydrates 4 segments and the assistant answers with a `context_timestamp` of 16.5 rather
+      than zero; off, `/api/transcript/revisions` says no session is open and the assistant gives
+      D-031's honest refusal. **Running it found a second fault**: with a transcript restored the
+      pane showed "Nothing recorded yet" over the prose, because the empty state ignored polished
+      blocks and was not re-rendered when every segment was already covered by one. Both halves
+      fixed. Recorded as **D-041**.
 - [x] **The empty session databases — cleared, 970 files down to 291.** `scripts/prune_empty_sessions.py`
       reports by default and needs `--apply` to delete. Run against the real directory: 679 removed,
       47.1 MB reclaimed, `data/sessions` 103 MB → 58 MB, and the Recordings page now opens on a real

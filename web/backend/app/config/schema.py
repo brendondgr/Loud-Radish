@@ -199,6 +199,12 @@ class StorageConfig(_Base):
     """Where sessions are written, and what is retained (BE §17)."""
 
     session_dir: str = "./data/sessions"
+    #: Reopen the last finished transcript when the application starts, so the talk that just
+    #: happened is still on the page after a restart (D-041). D-031 keeps a finished session
+    #: readable until the next one begins, but that lives in a process, and a restart ends it.
+    #: Off means the page comes up empty and the talk is reached through Recordings, which is
+    #: where it always was.
+    reopen_last_session: bool = True
     retain_audio: bool = False
     retention_days: int | None = None
     autosave_interval_s: float = Field(default=5.0, ge=0.5, le=120.0)

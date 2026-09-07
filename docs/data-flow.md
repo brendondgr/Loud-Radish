@@ -113,6 +113,12 @@ Three differences from the live flow, each deliberate:
   reaches the same store the live ones did, and a reload still finds segments to re-fetch. Asking
   after the fact is the ordinary case rather than the edge one, and closing the store on stop broke
   it three separate ways (**D-031**).
+- **And it outlives the process.** That store is held in an attribute, so a restart lost it: the
+  database sat on disk and nothing reopened it, and the main page came up empty while Recordings
+  showed the same talk. The application now reopens the newest session that holds segments, once,
+  at start-up — chosen by the timestamp in the filename rather than by mtime, because a polish pass
+  or an export writes into a database long after its talk ended. `storage.reopen_last_session`
+  turns it off (**D-041**).
 
 ## Where a recording's pieces end up (D-032)
 

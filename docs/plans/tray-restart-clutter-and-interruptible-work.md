@@ -1,6 +1,6 @@
 # The Tray Icon, the Transcript After a Restart, the Clutter, and Work That Can Be Interrupted
 
-*Written 2026-09-06. Status: **In progress (2 / 10 steps)**. Branch: `interruptible-work`.*
+*Written 2026-09-06. Status: **In progress (3 / 10 steps)**. Branch: `interruptible-work`.*
 
 > **Rebased onto the Loud Radish rebrand.** This plan was written against `main` at `97de92e` and the
 > rebrand (D-038) landed while it was being written. It has been re-based rather than re-planned:
@@ -237,7 +237,7 @@ needed to choose between those two if the picker proves unavoidable.**
   commit stating: `Interruptible Work (2 / 10) Complete: a prune script that removes empty session
   databases and refuses to touch the ones that own a recording.`
 
-### Step 3 — The last transcript survives a restart
+### Step 3 — The last transcript survives a restart ✅ **Done**
 
 - **Locations.** `services/session/manager.py` — a `reopen_last_session()` called from the lifespan
   in `web/backend/app/main.py`, setting `_last_store` through the existing `_retain()`.
@@ -568,6 +568,30 @@ segments, and the reported seminar (692 segments, 8609 words) was correctly kept
 
 Recorded as **D-040**, which the plan had not allocated a number to. Decision numbers are assigned
 as steps land from here on.
+
+**Step 3 — running it found a bug in the interface, which is why the step included running it.**
+
+The server half went as planned. With a transcript restored, though, the pane showed **"Nothing
+recorded yet" standing over a pane full of prose**. Two causes, both in
+`components/transcript-pane.js` and neither reachable from a unit test of the server:
+
+* `hydrate` fills the polish store *before* the transcript store, and the empty state asked only
+  `transcript.count > 0` — so it was evaluated at the one moment when the prose had been rendered
+  and no segments had arrived yet.
+* The re-render after the segments do arrive sits **after** an early return taken when every
+  incoming segment is already covered by a polished block. For a talk long enough to have been
+  rewritten, that is not an edge case; it is every segment.
+
+Both fixed: polished blocks count as content, and the state is re-rendered before the early return.
+This was reachable before this step — any reload of a fully polished session hits it — and had
+simply never been looked at. Recorded in **D-041**.
+
+Verified against a real server rather than a fixture, in both directions. On: the page hydrates four
+segments, the empty state is `display: none`, and `POST /api/chat/send` returns a
+`context_timestamp` of 16.5 rather than zero, so "the last ten minutes" resolves against a real
+position. Off: `/api/transcript/revisions` reports no session open and the assistant gives D-031's
+honest refusal word for word — which that decision explicitly required retention must not convert
+into an answer invented from nothing.
 
 *Two tests fail on this machine for reasons that predate the split.*
 `test_a_real_tap_reports_its_links_without_listening_to_them` and

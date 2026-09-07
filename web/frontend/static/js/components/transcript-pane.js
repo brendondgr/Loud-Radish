@@ -209,6 +209,11 @@ export class TranscriptPane {
       (segment) => !polish.coversSegment(segment.id)
     );
     setText(this.countLabel, pluralise(segments.length, "segment"));
+    // Before the early return, not after it. Every segment loaded on a reload can already be
+    // covered by a polished block — which is the ordinary case for a talk long enough to have been
+    // rewritten — and returning here without re-rendering left "Nothing recorded yet" standing over
+    // a pane full of prose. Found by reloading a real session, not by reading (D-041).
+    this._renderEmptyState();
     if (!incoming.length) return;
 
     const restore = this.scroll.beginUpdate();
@@ -236,6 +241,7 @@ export class TranscriptPane {
     }
 
     const incoming = batch ?? (added ? [added] : []);
+    this._renderEmptyState();
     if (!incoming.length) return;
 
     const restore = this.scroll.beginUpdate();
@@ -322,7 +328,10 @@ export class TranscriptPane {
   }
 
   _renderEmptyState() {
-    const hasContent = transcript.count > 0;
+    // **Polished blocks are content too.** `hydrate` fills the polish store before the transcript
+    // store, so asking only about segments answers "empty" at the moment the prose has just been
+    // rendered, and nothing asks again if every segment turns out to be covered.
+    const hasContent = transcript.count > 0 || polish.blocks.length > 0;
     toggle(this.emptyState, !hasContent);
     toggle(this.list, hasContent);
     if (!hasContent) this._renderEmptyCopy();
