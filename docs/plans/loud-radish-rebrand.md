@@ -1,6 +1,6 @@
 # Loud Radish — The Rebrand
 
-*Status: **Not started (0 / 8 steps)*** · Created 2026-09-06
+*Status: **Complete (8 / 8 steps)*** · Created and executed 2026-09-06
 
 ## 1. Introduction
 
@@ -181,6 +181,11 @@ eleven files; after this it is a constant, and the eleven files ask for it.
 
 ### Step 5 — The files and the package
 
+> **Deviation as executed.** The control script and its test were renamed in **Step 4**, not here.
+> `branding.CONTROL_SCRIPT` already named the new path, so committing the two apart would have
+> shipped a printed shortcut command pointing at a file that did not exist yet. Step 5 as committed
+> covers the desktop entry, the systemd unit, the distribution name and the launch config.
+
 - **Locations**: `utils/transcriber_ctl.py` → `utils/loud_radish_ctl.py` (with its `argparse` prog
   becoming `loud-radish-ctl` and its usage docstring updated);
   `tests/utils/test_transcriber_ctl.py` → `tests/utils/test_loud_radish_ctl.py` and its import;
@@ -299,3 +304,33 @@ eleven files; after this it is a constant, and the eleven files ask for it.
 | Renamed CLI tests | The control-script tests, following their subject | `tests/utils/test_loud_radish_ctl.py` |
 | Regenerated contract | OpenAPI spec carrying the new title, produced rather than edited | `web/shared/contracts/openapi.json` |
 | Decision record | **D-038** — the rebrand, why the name is centralised, and the recognise-but-never-write migration policy | `docs/documentation.md` |
+
+
+## 5. What Was Actually Verified
+
+Recorded here rather than implied, because the difference matters to whoever picks this up next.
+
+**Proven on this machine, end to end.** The application starts, the banner reads *Loud Radish — Live
+Audio & Video Transcriber*, and the log line is `Configuration resolved from
+data/loud-radish-config.json` — **the config migration ran for real**: the user's actual settings
+(Samson GoMic, `faster-whisper` `base`/`int8`, a local LLM on `localhost:9090`) survived the rename,
+and `data/transcriber-config.json` is gone rather than duplicated. A live session was started,
+transcribed real speech through `faster-whisper` on ROCm, and stopped in 7 ms with 4 segments and 29
+words; the transcript persisted, appeared at the top of the Recordings page, and exported as
+Markdown. A real 129 MB web-app export was built and unpacked: 15 files, the mark intact at 75 338
+bytes, `README.txt` reading "exported from Loud Radish — Live Audio & Video Transcriber", and the
+`localStorage` prefix changed. `uv run scripts/generate_contracts.py` leaves no diff.
+
+**Proven by test, not by observation.** The keyring move, the systemd unit removal, and the shortcut
+re-registration. None of the three was installed on this machine — no unit, no desktop entry, no
+registered component, and no credential under either service — so there was nothing here to migrate.
+This is carried in `docs/checklist.md` as open rather than reported as done.
+
+**Not verified: the exported page opened from `file://`.** The browser tooling available refused to
+navigate to a `file://` URL, so the export's markup and stylesheet were read directly instead. The
+reference-integrity test already fails if the page names a file the archive lacks.
+
+**Two pre-existing faults found and recorded, not fixed** — both in `docs/checklist.md`:
+`tests/assistant/test_llm_live.py` hangs the suite against the live relay on this machine (every run
+here used `--ignore`), and `test_the_container_is_raw` passes or fails depending on what is playing
+through the speakers.
