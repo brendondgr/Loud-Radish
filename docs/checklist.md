@@ -675,6 +675,11 @@ fixtures, and five faults came out of that which no test would have found:
 
 ## Part 4 — Still Open
 
+Everything here is work somebody still owes. Entries that were *decisions* — deferrals with a
+reason, not tasks nobody got to — moved to **Part 4c — Deferred by decision** below, because a list
+that mixes the two reads as a debt pile and stops being read at all.
+
+
 - [x] **Default ASR model and compute device.** Done, by measurement — `scripts/benchmark_asr.py`
       now exists and runs every combination of model, device and precision in its own process, after
       a warm pass, reporting speed alongside how far each transcript diverges from the others.
@@ -697,8 +702,7 @@ fixtures, and five faults came out of that which no test would have found:
       same combination that transcribed correctly through the running server minutes earlier
       returned zero words under the benchmark. It is not simply slow; it is wrong, and differently
       wrong each time. `docs/deployment.md` now marks its GPU column unverified.
-- [ ] **Desktop packaging.** Whether this stays a browser-plus-local-server application or is packaged
-      into a Tauri/Electron/Qt shell. The chosen contract keeps both open, so nothing is blocked.
+
 - [x] **Deployment documentation.** Done. `docs/deployment.md` now describes installing and running
       it locally, what ends up on disk, and measured hardware expectations.
 - [x] **Design tokens.** Done. `docs/design-system.md` documents every token group, the two
@@ -718,11 +722,9 @@ fixtures, and five faults came out of that which no test would have found:
       author's parser bug reporting two named buttons as unnamed. Both are fixed. This does not
       replace the manual keyboard, contrast-in-context and 320 px passes; it catches the regressions
       that can be stated as rules.
-- [ ] **Embeddings-based retrieval.** Deferred. Keyword search over FTS5 is expected to suffice for
-      single-talk sessions; revisit only if retrieval quality proves inadequate.
-- [ ] **Speaker diarisation.** Out of scope for v1. The segment model reserves an optional `speaker`
-      field so adding it later is not a schema migration.
-- [ ] **Hosted ASR backends.** Deferred to v2. Seam A accommodates them; none is implemented.
+
+
+
 - [x] **A per-page control for the polish view.** Done. A **Show raw** toggle in the transcript
       toolbar, next to the revision switch it copies, appears only once a polished block exists.
       Turning it on renders the segments under the prose rather than instead of it, and it is not
@@ -791,19 +793,51 @@ fixtures, and five faults came out of that which no test would have found:
 
 
 - [ ] **`tests/api/test_session_toggle.py::test_stopping_ignores_the_mode` fails roughly
-      one full-suite run in three, with a SQLite error.** It passes in isolation every time,
-      and passed in the two full runs either side of the one that failed, so it is timing and
-      not ordering. The test stops a `recorded` session, which is what *starts* a post-capture
-      pass and hands that pass the transcript store (D-021) — so the suspicion is the runner's
-      thread and the store's close racing under load. `TranscriptionRunner.stop` joins with a
-      five-second timeout and then returns regardless, by deliberate design: a server that
-      takes half an hour to exit is one nobody will let start automatically. That trade is
-      probably right and the abandoned thread is probably the race.
+      one full-suite run in three, with a SQLite error.** **It did not fail once while this plan was
+      executed, and it was deliberately provoked.** Recorded as evidence rather than as a fix,
+      because "I could not make it happen" is not "it cannot happen":
 
-      **Deliberately not fixed by guessing.** A concurrency change made on a hunch is how the
-      original "Cannot operate on a closed database" fault was introduced. Reproduce it under
-      `pytest -p no:randomly --count` or with the store instrumented to log its close, get the
-      full traceback rather than the truncated summary line, and fix what it actually names.
+      - **18 full-suite runs** across the ten steps, including five consecutive runs at the end.
+      - **40 consecutive runs** of `tests/api/test_session_toggle.py` in isolation.
+      - **Three full `tests/api` + `tests/transcription` suites running concurrently**, to reproduce
+        the load the original diagnosis blamed. No SQLite error appeared in any of the three.
+
+      That last attempt did produce two failures, and they are worth naming so nobody repeats the
+      experiment and misreads them: `test_audio_tap.py::test_a_tap_opens_and_closes_without_leaving_a_sink_behind`
+      counts null sinks in the developer's live PipeWire graph, and three suites running at once
+      each see the others' taps. That is an artifact of the provocation, not a fault — and the test
+      is right to be strict, because a leaked sink is what made an afternoon of recordings silent
+      (see the second lesson in `tests/conftest.py`).
+
+      **Something changed.** The likeliest candidates are the transcription runner's terminal paths,
+      which D-045 reworked, and `pytest-timeout`, which alters when a slow test gives up. Neither is
+      a diagnosis. The entry stays open; the next person to see it should reproduce first and
+      instrument the store's `close`, and if it stays quiet for another few months it can be closed
+      as gone rather than as fixed.
+
+---
+
+## Part 4c — Deferred by decision
+
+**Not open work.** Each of these was decided, with a reason, and none is waiting on anyone. They sat
+under "Still Open" for months, which made the list longer than the actual debt and easier to ignore.
+
+- **Desktop packaging.** Whether this stays a browser-plus-local-server application or is packaged
+  into a Tauri/Electron/Qt shell. Undecided *deliberately*: the chosen contract keeps both open, so
+  nothing is blocked either way, and the native settings window (D-051) removed the main reason to
+  want a shell — the application can now be configured without a browser tab. Revisit when there is
+  a concrete reason, not on a schedule.
+
+- **Embeddings-based retrieval.** Keyword search over FTS5 is expected to suffice for single-talk
+  sessions; revisit only if retrieval quality proves inadequate.
+
+- **Speaker diarisation.** Out of scope for v1. The segment model reserves an optional `speaker`
+  field, so adding it later is not a schema migration.
+
+- **Hosted ASR backends.** Deferred to v2. Seam A accommodates them; none is implemented.
+
+---
+
 ## Part 4b — Shortcuts, dictation, and the tray's own settings
 
 - [x] **Global shortcuts are registered and fire.** Done. `register_all` had never been called by
@@ -938,6 +972,12 @@ user's own machine, and none may be reported as passing until it has had one.
       build on it, that is the one to try.
 
 ## Discovered work
+
+- [x] **Two settings that configured nothing.** Done (D-055). `.env.example` listed eleven
+      environment variables no Python reads, and `storage.retention_days` drew a control saying
+      "Delete sessions after N days" that deleted nothing. The variables are gone from the file and
+      the control is replaced by a pointer to `scripts/prune_empty_sessions.py` — deleting
+      recordings on a timer is not something this application should do quietly.
 
 - [ ] **`uv run` outside `app.py` silently breaks GPU transcription.** *Partly mitigated:* the
       documented companion command now passes `--no-sync`, because starting the tray icon was

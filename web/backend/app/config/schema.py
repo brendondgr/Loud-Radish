@@ -211,7 +211,6 @@ class StorageConfig(_Base):
     #: where it always was.
     reopen_last_session: bool = True
     retain_audio: bool = False
-    retention_days: int | None = None
     autosave_interval_s: float = Field(default=5.0, ge=0.5, le=120.0)
     default_export_format: ExportFormat = "markdown"
 

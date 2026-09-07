@@ -78,8 +78,13 @@ so a missing capability is visible at startup rather than as a confusing failure
 | `logs/` | Application logs | Never transcript content (BE §18) |
 | `~/.cache/huggingface/` | Whisper model weights | Downloaded once, ~75 MB to 3 GB by model |
 
-Audio is **not** retained by default. Sessions are kept until deleted, from the `/sessions` page or
-by removing the file; `storage.retention_days` sets an expiry if you want one.
+Audio is **not** retained by default. **Nothing is deleted automatically** — sessions are kept until
+you delete them, from the `/sessions` page or by removing the file. There was a
+`storage.retention_days` setting here that appeared to set an expiry and was read by no code at all;
+it is gone rather than implemented, because deleting somebody's recordings on a timer is not
+something this should do quietly (D-055). To clear out sessions holding no transcript and no
+recording, `scripts/prune_empty_sessions.py` reports what it would remove and deletes only with
+`--apply`.
 
 ## Backing up
 

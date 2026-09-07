@@ -1,6 +1,6 @@
 # Shortcuts That Fire, Dictation to the Clipboard, and Closing the Open List
 
-**Status: Planned (0 / 10)**
+**Status: Complete (10 / 10)** — D-046 to D-055.
 
 Branch: `shortcuts-dictation-and-the-open-list`, cut from `main` at `6ddd428`.
 Predecessor: [tray-restart-clutter-and-interruptible-work.md](tray-restart-clutter-and-interruptible-work.md).
@@ -405,4 +405,78 @@ Step 2 ships a fallback rather than a hope.
 
 ## 5. What Changed From the Plan
 
-*Filled in as the work lands. Every departure from the above gets a line here, with the reason.*
+Every departure, with the reason. Most of these are things the plan could not have known, because
+they were found by running the code rather than by reading it.
+
+### The plan's one named risk evaporated, and it was my arithmetic
+
+The plan said an in-process shortcut listener might be unreachable, because our KGlobalAccel
+component reported `isActive=False` where KDE's own reported `True`, and it shipped a fallback for
+that. **The `isActive` reading was a red herring.** The real fault was in the probe: Qt marks every
+non-printing key with a `0x01000000` prefix, so `Qt::Key_F9` is `0x01000038` — and dropping it binds
+`Ctrl+Alt+Shift+8`. I had been *binding* the digit 8 and *pressing* F9 for an hour. KDE accepted the
+binding, stored it, reported it bound, resolved it by key and reported the component active; nothing
+in the round trip disagreed. Reading `~/.config/kglobalshortcutsrc` and seeing `Ctrl+Alt+Shift+8`
+written where F9 was meant is what showed it. Both routes work with the correct encoding.
+
+The **route still changed**, for a better reason than the plan's: the in-process listener only works
+while the companion is running, so the desktop-entry route ships instead — it survives a crash, a
+reboot, and the companion not being started at all.
+
+The XDG GlobalShortcuts portal, which the plan did not consider, was tried first and refuses this
+application outright: `CreateSession` returns *"An app id is required"*, and an app id comes from a
+sandbox we do not have.
+
+### Steps that grew
+
+- **Step 1** was three test fixes and became four: a third test in `test_window_audio.py` was
+  failing on *every* full-module run and had not been reported. It threw away the count `link_all`
+  returns and asserted `live_links > 0` regardless. Confirmed identical on the untouched baseline,
+  three runs each side, before touching it.
+- **Step 2** gained a fifth `conftest.py` lesson: the first test run that reached `register_all`
+  left a `.desktop` file in the developer's real applications menu.
+- **Step 5** was a menu change and turned into the fix for the user's *actual* reported fault. D-046
+  had made `PATCH /api/config` persist a device choice, but Settings → Audio does not use that
+  route — it posts to `/api/audio/device`, which was still writing to the discarded runtime layer.
+  The reported symptom was untouched by the first fix.
+- **Step 7** was "decide whether Silero should be the default" and was not a decision at all. Silero
+  had **never run**: the model file existed on no machine, and the factory fell back to the energy
+  detector with a warning nobody reads. The comparison the checklist had been asking for was
+  impossible until that was fixed, because it was comparing energy against energy.
+- **Step 8** was "benchmark and re-tune" and found that **the shipped defaults crash the process**
+  on AMD hardware — a GPU memory fault, not an exception. The step gained a guard.
+
+### Things the plan asked for that were done differently
+
+- **Dictation is not "a `recorded` session with a delivery target"** as the plan proposed. It is its
+  own small service. Routing it through `SessionManager` would have meant a transcript store, a
+  polish worker, a WebSocket fan-out and a session folder for a fifteen-second clip, in a file with
+  eighteen lines of headroom.
+- **`beautifulsoup4` was not added.** The accessibility checks use `html.parser` from the standard
+  library, which is enough for the rules that can be stated and keeps the dependency count where it
+  was.
+- **The assistant still reads raw segments.** The plan flagged this for the user; asked to work
+  through the list, it is answered *no*, with the reasoning in D-054. The short version: a citation
+  is a claim that the speaker said something, and the polish guard checks word counts rather than
+  meaning.
+- **`storage.retention_days` was removed rather than wired up.** The plan said "wire or delete". Its
+  control read "Delete sessions after N days" and deleted nothing; implementing it would have meant
+  this application deleting recordings on a timer, which it should not do quietly.
+
+### Measurements that changed a decision
+
+- **The LLM tidy is 0.9 s, not the 8–10 s the plan budgeted for.** Sending `enable_thinking: false`
+  did that. The plan's timeout and raw-text fallback are kept — they are what make a *slow* model
+  survivable — but cleanup is affordable by default because of this.
+- **CPU beats the GPU on this machine**, repeatably: `base`/`int8` at 37–40× against the GPU's ~22×,
+  and the GPU's output is currently incoherent rather than merely slow. Recorded as open work.
+- **Silero beats the energy detector on both axes at once** — 83% against 62% on real speech, 1%
+  against 62% on a fixture containing no speech.
+
+### Two faults introduced and fixed within the plan
+
+- The benchmark timed the *first* pass, so every GPU row included kernel compilation, and then
+  measured everything in one process, which contaminated the results outright — the same
+  combination reported 55 words on one run and 0 on the next.
+- The accessibility parser unwound its whole element stack on a self-closing `<path/>`, reporting
+  two properly-named buttons as unnamed.
