@@ -1,6 +1,6 @@
 # The Tray Icon, the Transcript After a Restart, the Clutter, and Work That Can Be Interrupted
 
-*Written 2026-09-06. Status: **In progress (8 / 10 steps)**. Branch: `interruptible-work`.*
+*Written 2026-09-06. Status: **In progress (9 / 10 steps)**. Branch: `interruptible-work`.*
 
 > **Rebased onto the Loud Radish rebrand.** This plan was written against `main` at `97de92e` and the
 > rebrand (D-038) landed while it was being written. It has been re-based rather than re-planned:
@@ -417,7 +417,7 @@ needed to choose between those two if the picker proves unavoidable.**
   commit stating: `Interruptible Work (8 / 10) Complete: pausing a window recording stops the video
   with the audio, and the pieces rejoin with no gap.`
 
-### Step 9 — A transcription pass that can be paused, cancelled, and picked up after a restart
+### Step 9 — A transcription pass that can be paused, cancelled, and picked up after a restart ✅ **Done**
 
 - **Locations.**
   - `services/recording/batch.py` — `plan_windows` gains a `start_s`; `transcribe_file` gains
@@ -661,6 +661,34 @@ because a hold that could only be lifted five times would be a strange thing to 
 Verified at 320 px (no horizontal overflow, both controls inside the viewport) and by keyboard (in
 the tab order, focus ring present, activation flips the label and `aria-pressed`). 17 tests, and the
 two that carry the claim were confirmed failing with the pause gate removed.
+
+**Step 9 — running it against a real recording found the defect that reading did not.**
+
+The plan's shape was right: `plan_windows` gains a `start_s`, the runner gains a hold distinct from
+a shutdown, and the checkpoint goes in a `transcription_passes` table in the session's own database.
+Two things it did not anticipate.
+
+*The resume point and the trim point are not the same number.* `plan_windows` snaps a resume back to
+the window boundary **at or before** the second asked for, so a resume requested at 540 s genuinely
+begins at 522 s. The plan had the runner trim already-committed segments at the requested point and
+then start transcribing from the earlier one — which re-derived eighteen seconds on top of segments
+that had been kept. On the live run that produced overlapping timestamps and one line transcribed
+twice, and it is invisible in a unit test that resumes on a boundary. The trim now happens at the
+**first window**, which is the first moment the real boundary is known, and the segment id is read
+back from the store rather than the checkpoint so it cannot collide. The regression test was
+confirmed failing against the old behaviour.
+
+*The API's `session_id` and the archive's `key` are different strings.* `POST /transcribe` returns
+the former; `archive.find` wants the latter (the file stem, `<stamp>-<id>`). It does not bite,
+because pause and cancel act on the one running pass and need no key while resume is reached from
+the listing, which carries keys — but it is a trap and is written down here rather than discovered.
+
+**Verified end to end on a real 39-minute recording**, not a fixture: a pass killed with `SIGKILL`
+at 1885 s, the process restarted from nothing, `POST /api/sessions/{key}/transcribe/resume` picking
+it up from the checkpoint the dead process left. The joined transcript came back with unique
+increasing ids, non-decreasing timestamps, and a seam reading continuously from 1885.2 s to 1886.2 s.
+The one repeated line in it sits at 1931 s and 1937 s, six seconds apart and well past the seam —
+the speaker, not the join.
 
 *The documented SQLite flake fired once during this step and was left alone.*
 `test_session_toggle.py::test_stopping_ignores_the_mode` failed on one full-suite run, passed five

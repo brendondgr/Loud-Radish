@@ -34,6 +34,11 @@ export const TRANSCRIPTION_PROGRESS = "transcription.progress";
 export const TRANSCRIPTION_DONE = "transcription.done";
 /** The pass failed, and the recording is still on disk. The payload names the file it survives in. */
 export const TRANSCRIPTION_FAILED = "transcription.failed";
+/** The pass is held at a window boundary and can be picked up again, even after a restart (D-045).
+ *  Retracts the progress frame, which would otherwise replay as a bar moving over a held pass. */
+export const TRANSCRIPTION_PAUSED = "transcription.paused";
+/** The pass will not continue. The transcript so far is committed and the audio is kept. */
+export const TRANSCRIPTION_CANCELLED = "transcription.cancelled";
 
 /** The window capture started, stopped, or failed (D-022). Never dropped: a missed window-closed
  *  frame leaves a live preview showing for a capture that ended. */

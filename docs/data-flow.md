@@ -108,6 +108,11 @@ Three differences from the live flow, each deliberate:
 - **The pass outlives the session.** The transcript store is handed to the runner, which alone
   closes it; the manager keeps a read-only reference so `/api/transcript/...` still serves during
   the pass, and reopens it for reading when the runner says the store is gone.
+- **And the pass outlives the process.** It writes where it has got to into the session's own
+  database on every window, so a pause — or a `SIGKILL` — leaves enough to pick it up again: which
+  file, how far in, which segment id comes next, what prompt it was started with. A resume trims
+  everything at or after the window it actually restarts on and re-derives it from the audio, which
+  makes it idempotent whatever the process was doing when it stopped (**D-045**).
 - **The transcript outlives the session too.** The store stays open for reading until the next
   session starts, so a question asked *after* a talk — a summary, a definition, what was missed —
   reaches the same store the live ones did, and a reload still finds segments to re-fetch. Asking

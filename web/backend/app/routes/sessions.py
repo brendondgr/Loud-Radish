@@ -12,6 +12,7 @@ same key names the recording's folder, which is what lets the web-app export her
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +25,7 @@ from ..services.export import by_id as by_preset_id
 from ..services.export import estimate as estimate_export
 from ..services.export import probe as probe_media
 from ..services.export.webapp import video_type as video_mime
-from ..services.recording import resolve_recording
+from ..services.recording import TranscriptionJob, TranscriptionRunner, resolve_recording
 from ..services.transcript import archive
 from ..services.transcript import export as render_export
 from ..services.transcript import export_chat as render_chat_export
@@ -33,8 +34,17 @@ from ..services.transcript.store import TranscriptStore
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
 
 
+logger = logging.getLogger(__name__)
+
+
 def _config(request: Request):  # noqa: ANN202 - returns AppConfig
     return request.app.state.config.resolve()
+
+
+def _error(code: str, message: str, severity: str = "warning") -> dict[str, Any]:
+    """The error envelope this API uses everywhere. Written out inline above this line, which is
+    fine for two call sites and not for ten."""
+    return {"error": {"code": code, "message": message, "severity": severity}}
 
 
 def _open(request: Request, key: str) -> TranscriptStore:
@@ -471,6 +481,105 @@ async def export_webapp(request: Request, key: str, include_chat: bool = Query(F
         media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{key}-webapp.zip"'},
     )
+
+
+@router.post("/{key}/transcribe/resume")
+async def resume_transcription(request: Request, key: str) -> dict[str, Any]:
+    """Pick up a transcription pass that was held, or that a restart interrupted (D-045).
+
+    **This is the half a user cannot ask for by pressing a button.** A pass held on purpose could be
+    resumed from memory; one interrupted by the process ending cannot, and that is the case worth
+    building for — a forty-minute recording is twenty-seven minutes of CPU, and losing it to a
+    restart was the reason D-021's "deliberately not persisted" stopped being the right call.
+
+    The checkpoint lives in the session's own transcript database, so everything this needs — which
+    file, how far in, which segment id comes next, what prompt it was started with — is in the one
+    place that cannot be separated from the transcript it belongs to.
+    """
+    manager = getattr(request.app.state, "session_manager", None)
+    if manager is None:
+        raise HTTPException(status_code=503, detail=_error("no-manager", "The pipeline is not up."))
+    if manager.is_running:
+        raise HTTPException(
+            status_code=409,
+            detail=_error(
+                "session-running",
+                "Stop the current recording first — transcription and capture cannot share "
+                "the speech model.",
+            ),
+        )
+    if manager.jobs.is_busy:
+        raise HTTPException(
+            status_code=409,
+            detail=_error("transcription-running", "A transcription is already running."),
+        )
+    if not manager.asr.is_ready:
+        raise HTTPException(
+            status_code=409,
+            detail=_error(
+                "no-model",
+                "No speech model is loaded. Load one in Settings → Speech model first.",
+                "critical",
+            ),
+        )
+
+    path = archive.find(_config(request), key)
+    if path is None:
+        raise HTTPException(status_code=404, detail=_error("not-found", "No such session."))
+
+    # Opened for writing, because this is going to append to it. Closed by the runner.
+    store = TranscriptStore(path)
+    checkpoint = store.resumable_pass()
+    if checkpoint is None:
+        store.close()
+        raise HTTPException(
+            status_code=409,
+            detail=_error("nothing-to-resume", "This session has no transcription to continue."),
+        )
+
+    source = Path(checkpoint["source_path"])
+    if not source.is_file():
+        store.close()
+        raise HTTPException(
+            status_code=410,
+            detail=_error(
+                "audio-gone",
+                f"The audio this pass was reading, {source.name}, is no longer on disk.",
+            ),
+        )
+
+    config = _config(request)
+    runner = TranscriptionRunner(
+        registry=manager.jobs,
+        emit=manager.emit,
+        transcribe=manager.asr.transcribe,
+        window_s=config.recording.batch_window_s,
+        overlap_s=config.recording.batch_overlap_s,
+        max_segment_s=config.streaming.max_segment_s,
+        revision=int(checkpoint["revision"]),
+    )
+    job = TranscriptionJob(
+        session_id=key,
+        source_path=str(source),
+        total_seconds=float(checkpoint["total_seconds"]),
+        next_start_s=float(checkpoint["next_start_s"]),
+        next_segment_id=int(checkpoint["last_segment_id"]),
+        transcribed_seconds=float(checkpoint["next_start_s"]),
+    )
+    # Retention forced on, for the same reason a re-run forces it: this audio has already survived
+    # one interruption, and deleting it after a second attempt that may also stop is how a talk is
+    # lost.
+    if not runner.resume(
+        job=job, store=store, retain_audio=True, prompt=checkpoint.get("prompt") or None
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail=_error("transcription-running", "A transcription is already running."),
+        )
+    manager.attach_runner(runner)
+
+    logger.info("Resuming %s from %.1f s", key, job.next_start_s)
+    return {"resumed": True, "from_seconds": job.next_start_s, "job": job.as_event()}
 
 
 @router.delete("/{key}")

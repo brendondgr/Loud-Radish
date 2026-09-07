@@ -66,11 +66,46 @@ class TranscriptionRunner:
 
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
+        # **Distinct from `_stop`, and that distinction is the whole feature.** Shutdown and pause
+        # both end the loop at a window boundary, but they mean opposite things afterwards: a
+        # shutdown leaves a pass to be resumed by the next process, a pause leaves one to be
+        # resumed by the user, and a cancel leaves one that must not be resumed at all. One flag
+        # could not tell the runner which terminal state to write (D-045).
+        self._hold = threading.Event()
+        self._cancel = threading.Event()
         self._last_progress = 0.0
+        #: Set while a resumed pass has not yet reached its first window, so the trim can happen at
+        #: the real boundary rather than the requested one.
+        self._resumed_from: float | None = None
 
     @property
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive()
+
+    def pause(self) -> None:
+        """Ask the pass to hold at the next window boundary. Returns immediately.
+
+        The thread finishes the window it is inside — windows are atomic, and abandoning one
+        mid-decode would lose its work without recording that it had been started.
+        """
+        self._hold.set()
+
+    def resume(
+        self,
+        *,
+        job: TranscriptionJob,
+        store: TranscriptStore,
+        retain_audio: bool,
+        prompt: str | None = None,
+    ) -> bool:
+        """Pick a held pass up from its checkpoint."""
+        job.resume()
+        return self.start(job=job, store=store, retain_audio=retain_audio, prompt=prompt)
+
+    def cancel(self) -> None:
+        """End the pass for good. What was transcribed stays committed; the audio stays on disk."""
+        self._cancel.set()
+        self._hold.set()
 
     def start(
         self,
@@ -90,6 +125,8 @@ class TranscriptionRunner:
             return False
 
         self._stop.clear()
+        self._hold.clear()
+        self._cancel.clear()
         self._last_progress = 0.0
         self._thread = threading.Thread(
             target=self._run,
@@ -100,6 +137,10 @@ class TranscriptionRunner:
         self._thread.start()
         self._emit("transcription.progress", job.as_event())
         return True
+
+    def _should_stop(self) -> bool:
+        """Consulted between windows. Any of the three reasons ends the loop the same way."""
+        return self._stop.is_set() or self._hold.is_set() or self._cancel.is_set()
 
     def stop(self, timeout: float = 5.0) -> None:
         """Ask the pass to end at the next window boundary and wait briefly for it.
@@ -122,6 +163,15 @@ class TranscriptionRunner:
         retain_audio: bool,
         prompt: str | None,
     ) -> None:
+        # **The trim happens at the first window, not here**, because *here* does not yet know
+        # where the first window actually is: `plan_windows` snaps a resume back to the boundary at
+        # or before the requested second, so asking to resume at 540 s can genuinely begin at 522 s.
+        # Trimming at 540 and then transcribing from 522 re-derives 522-540 on top of segments that
+        # were kept — which is exactly the duplication the trim exists to prevent, and it is what a
+        # real interrupted pass produced before this was moved.
+        self._resumed_from = job.next_start_s if job.next_start_s > 0 else None
+        first_id = store.last_segment_id() + 1
+        self._checkpoint(job, store, prompt, state="running")
         try:
             transcribe_file(
                 job.source_path,
@@ -129,13 +179,17 @@ class TranscriptionRunner:
                 window_s=self._window_s,
                 overlap_s=self._overlap_s,
                 max_segment_s=self._max_segment_s,
-                first_segment_id=store.last_segment_id() + 1,
+                first_segment_id=first_id,
                 revision=self._revision,
                 prompt=prompt,
                 on_progress=lambda seconds, segments: self._on_window(
                     job, store, seconds, segments
                 ),
-                should_stop=self._stop.is_set,
+                should_stop=self._should_stop,
+                start_s=job.next_start_s,
+                on_window_start=lambda start_s, next_id: self._on_window_start(
+                    job, store, prompt, start_s, next_id
+                ),
             )
         except BatchError as exc:
             self._fail(job, store, str(exc))
@@ -145,6 +199,33 @@ class TranscriptionRunner:
             self._fail(job, store, f"The transcription pass failed: {exc}")
             return
 
+        # The three ways a pass can end early, before the ways it can end well.
+        if self._cancel.is_set():
+            job.cancel()
+            self._checkpoint(job, store, prompt, state="cancelled")
+            self._release(store)
+            self._emit("transcription.cancelled", job.as_event())
+            logger.info(
+                "Transcription of %s cancelled at %.1f s", job.source_path, job.next_start_s
+            )
+            return
+        if self._hold.is_set():
+            job.pause()
+            self._checkpoint(job, store, prompt, state="paused")
+            self._release(store)
+            self._emit("transcription.paused", job.as_event())
+            logger.info("Transcription of %s held at %.1f s", job.source_path, job.next_start_s)
+            return
+        if self._stop.is_set():
+            # Shutdown. The checkpoint is already on disk from the last window, and the state stays
+            # `running` on purpose: that is what the next process reads as "this was interrupted",
+            # which is exactly what happened.
+            self._release(store)
+            logger.info(
+                "Transcription of %s interrupted at %.1f s", job.source_path, job.next_start_s
+            )
+            return
+
         # **Measured before the outcome is named.** "322 seconds processed, 2 segments" is
         # unfalsifiable from outside — it is what a broken transcriber looks like *and* what an
         # accurate one looks like on music. The sidecar and the terminal state together make it
@@ -152,6 +233,7 @@ class TranscriptionRunner:
         job.audio = self._characterise(job)
         found_speech = job.segments_written > 0
         job.finish(found_speech=found_speech)
+        self._checkpoint(job, store, prompt, state="done")
         self._write_sidecar(job)
         store.mark_ended()
         self._release(store)
@@ -224,6 +306,47 @@ class TranscriptionRunner:
             self._last_progress = now
             self._emit("transcription.progress", job.as_event())
 
+    def _on_window_start(
+        self,
+        job: TranscriptionJob,
+        store: TranscriptStore,
+        prompt: str | None,
+        start_s: float,
+        next_id: int,
+    ) -> None:
+        """Record where a resume would begin, before the window is decoded.
+
+        The first call of a resumed pass also trims: this is the first moment the *real* first
+        window is known, and everything from it onward is about to be re-derived from audio that is
+        still on disk. Nothing before it is touched, so the transcript already read does not change.
+        """
+        if self._resumed_from is not None:
+            self._resumed_from = None
+            store.trim_from(self._revision, start_s)
+        job.checkpoint(start_s, next_id)
+        self._checkpoint(job, store, prompt, state="running")
+
+    def _checkpoint(
+        self, job: TranscriptionJob, store: TranscriptStore, prompt: str | None, *, state: str
+    ) -> None:
+        """Write the pass's position into its own transcript database. Never fatal.
+
+        A checkpoint that cannot be written costs the ability to resume; raising here would cost
+        the pass itself, which is the more expensive of the two by a wide margin.
+        """
+        try:
+            store.record_pass(
+                revision=self._revision,
+                source_path=job.source_path,
+                total_seconds=job.total_seconds,
+                state=state,
+                next_start_s=job.next_start_s,
+                last_segment_id=job.next_segment_id,
+                prompt=prompt or "",
+            )
+        except Exception:  # noqa: BLE001 - a lost checkpoint must not lose the transcription
+            logger.debug("Could not write the transcription checkpoint", exc_info=True)
+
     def _release(self, store: TranscriptStore) -> None:
         """Close the store and tell its previous owner it is gone.
 
@@ -241,6 +364,7 @@ class TranscriptionRunner:
 
     def _fail(self, job: TranscriptionJob, store: TranscriptStore, message: str) -> None:
         job.fail(message)
+        self._checkpoint(job, store, None, state="failed")
         self._release(store)
 
         # **The audio is kept, whatever the retention setting says.** It is now the only copy of

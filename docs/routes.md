@@ -77,6 +77,8 @@ is on — a successful pass deletes its own audio (D-021).
 |---|---|---|---|
 | `GET` | `/api/recordings` | Every recording whose audio is still on disk, newest first | **Implemented** |
 | `POST` | `/api/recordings/{key}/transcribe` | Run or re-run a pass, into a **new** session | **Implemented** |
+| `POST` | `/api/recordings/transcription/pause` | Hold the running pass at the next window boundary (D-045). Not on a recording's own path: there is only ever one pass, and naming a recording would imply a choice that does not exist | **Implemented** |
+| `POST` | `/api/recordings/transcription/cancel` | End the pass. The transcript so far stays committed and the audio stays on disk | **Implemented** |
 | `DELETE` | `/api/recordings/{key}` | Delete one recording's audio. The video beside it is kept. | **Implemented** |
 
 `{key}` is a **recording folder key** — `20260829-174113-d60b37a9e3c4` — not a file name (D-032).
@@ -100,6 +102,7 @@ minutes ago.
 | `GET` | `/api/sessions/{key}/chat?fmt=` | The conversation on its own — Markdown or JSON | **Implemented** |
 | `GET` | `/api/sessions/{key}/webapp?include_chat=` | The recording as a self-contained web application, as a ZIP. `include_chat` defaults to **false** | **Implemented** |
 | `GET` | `/api/sessions/{key}/media` | The recording itself, with range support, for the export window's preview | **Implemented** |
+| `POST` | `/api/sessions/{key}/transcribe/resume` | Pick up a transcription pass this session was in the middle of — held on purpose, or interrupted by the process ending (D-045). Everything it needs is in the session's own checkpoint | **Implemented** |
 | `GET` | `/api/sessions/{key}/export/options` | What this recording measurably is, and what each preset would turn it into | **Implemented** |
 | `POST` | `/api/sessions/{key}/export/start?preset=&include_chat=` | Begin a staged export. Returns the job, not the file | **Implemented** |
 | `GET` | `/api/sessions/{key}/export/status` | The current or most recent export — the reconciliation path after a reload | **Implemented** |

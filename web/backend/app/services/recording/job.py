@@ -23,6 +23,12 @@ class JobState(StrEnum):
     """Where a transcription pass has got to."""
 
     RUNNING = "running"
+    #: Held at a window boundary, with a checkpoint written. Resumable, including after a restart
+    #: of the whole application (D-045).
+    PAUSED = "paused"
+    #: The user said they did not want it. **The recording is kept**, and stays listed as
+    #: transcribable — cancelling declines the CPU, not the audio.
+    CANCELLED = "cancelled"
     DONE = "done"
     #: Finished, correctly, and found nothing to transcribe. **Distinct from `done` on purpose.**
     #: "322 seconds processed, 2 segments" is what a broken transcriber looks like and what an
@@ -52,6 +58,11 @@ class TranscriptionJob:
     #: What the audio actually is, measured before the pass runs (`characterise.py`). Carried on
     #: the event so the interface can explain an empty transcript without a second request.
     audio: dict[str, Any] = field(default_factory=dict)
+    #: Where a resume would begin, in seconds of audio. Always a window boundary.
+    next_start_s: float = 0.0
+    #: The id the next segment will take, so a resumed pass continues the numbering rather than
+    #: colliding with what is already committed.
+    next_segment_id: int = 0
     started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     finished_at: datetime | None = None
 
@@ -67,6 +78,19 @@ class TranscriptionJob:
         return self.state is JobState.RUNNING
 
     @property
+    def is_paused(self) -> bool:
+        return self.state is JobState.PAUSED
+
+    @property
+    def is_resumable(self) -> bool:
+        """Whether this pass could be picked up again.
+
+        A pass still marked `running` counts, because that is what a killed process leaves behind:
+        nothing wrote a terminal state because nothing got the chance.
+        """
+        return self.state in (JobState.RUNNING, JobState.PAUSED)
+
+    @property
     def succeeded(self) -> bool:
         """Whether the pass completed, with or without finding speech."""
         return self.state in (JobState.DONE, JobState.DONE_NO_SPEECH)
@@ -76,6 +100,28 @@ class TranscriptionJob:
         # figure backwards, which reads as the pass losing ground.
         self.transcribed_seconds = max(self.transcribed_seconds, transcribed_seconds)
         self.segments_written += segments
+
+    def checkpoint(self, next_start_s: float, next_segment_id: int) -> None:
+        """Note where a resume would begin. Monotonic, for the same reason `advance` is."""
+        self.next_start_s = max(self.next_start_s, float(next_start_s))
+        self.next_segment_id = max(self.next_segment_id, int(next_segment_id))
+
+    def pause(self) -> None:
+        """Hold at the last window boundary. The transcript so far is already committed."""
+        if self.state is JobState.RUNNING:
+            self.state = JobState.PAUSED
+
+    def resume(self) -> None:
+        if self.state is JobState.PAUSED:
+            self.state = JobState.RUNNING
+            self.finished_at = None
+
+    def cancel(self) -> None:
+        """Stop for good. **Distinct from `fail`**: nothing went wrong, and an interface that
+        showed a red error for a button the user pressed on purpose would be lying to them."""
+        if self.state in (JobState.RUNNING, JobState.PAUSED):
+            self.state = JobState.CANCELLED
+            self.finished_at = datetime.now(UTC)
 
     def finish(self, *, found_speech: bool = True) -> None:
         """End the pass. ``found_speech`` decides which of the two success states applies."""
@@ -97,6 +143,10 @@ class TranscriptionJob:
             "transcribed_seconds": round(self.transcribed_seconds, 2),
             "total_seconds": round(self.total_seconds, 2),
             "segments": self.segments_written,
+            # Where a resume would begin. Carried on the event so the interface can offer to pick
+            # up a pass without a second request, and can say how much would be redone.
+            "next_start_s": round(self.next_start_s, 2),
+            "resumable": self.is_resumable,
             "error": self.error,
             "audio": dict(self.audio),
         }
@@ -122,12 +172,17 @@ class JobRegistry:
     @property
     def is_busy(self) -> bool:
         with self._lock:
-            return self._current is not None and self._current.is_running
+            return self._current is not None and self._current.is_resumable
 
     def claim(self, job: TranscriptionJob) -> bool:
-        """Take the slot for ``job``. Returns False when a pass is already running."""
+        """Take the slot for ``job``. Returns False when a pass is already running or held.
+
+        A *held* pass still owns the slot. Starting a second one over the same model while the
+        first is waiting to be resumed would make both slower and the progress figure meaningless,
+        which is the same reason there is only ever one.
+        """
         with self._lock:
-            if self._current is not None and self._current.is_running:
+            if self._current is not None and self._current.is_resumable:
                 return False
             self._current = job
             return True
@@ -135,5 +190,5 @@ class JobRegistry:
     def clear(self) -> None:
         """Forget a finished pass. The last one is otherwise kept, so a reload can still see it."""
         with self._lock:
-            if self._current is not None and not self._current.is_running:
+            if self._current is not None and not self._current.is_resumable:
                 self._current = None

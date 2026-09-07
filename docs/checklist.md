@@ -170,11 +170,10 @@ each was invisible to reading and obvious to using, which is the argument for th
       starts. See Part 3h and **D-031** — the same line was refusing every question the assistant
       was asked after a stop, which is how it came to be fixed.
 
-- [ ] **The transcription pass is neither resumable nor cancellable.** It runs whole or fails whole.
-      A forty-minute recording at RTF ≈ 1.5 takes around twenty-seven minutes, which is long enough
-      that resumption is worth wanting — but the right design for it cannot be guessed before anyone
-      has watched a real one run. A server restart mid-pass keeps the recording and loses the job;
-      the recording then appears in Settings → Storage with a button to run it again.
+- [x] **The transcription pass is neither resumable nor cancellable — it is both now (D-045).**
+      The item said the right design "cannot be guessed before anyone has watched a real one run",
+      and that turned out to be exactly right: watching one run is what found the window-boundary
+      defect. A server restart mid-pass now keeps the recording *and* the job.
 - [ ] **`recording.batch_window_s` has not been tuned against a real model.** The 30-second default
       matches Whisper's own window, but whether a longer window measurably improves a recorded
       transcript over a live one is the question the mode exists to exploit, and it is unmeasured.
@@ -631,8 +630,16 @@ close are left in place rather than moved, so nothing is lost by reading this fi
       6.02 s of recorded audio, with the header clock frozen throughout the hold. `window` mode
       stops its video with the audio so the two cannot drift. Cancel keeps every artefact and runs
       no pass. 320 px and keyboard passes done.
-- [ ] **Pause, resume and cancel a transcription pass**, with a checkpoint that survives a server
-      restart. Step 9.
+- [x] **Pause, resume and cancel a transcription pass — done (D-045).** The checkpoint lives in
+      the session's own transcript database and is written on every window, so an interruption the
+      user did not choose is recoverable too. **Verified against a real 39-minute recording**: the
+      pass was killed with `SIGKILL` at 1885 s, the process restarted, and
+      `POST /api/sessions/{key}/transcribe/resume` picked it up from its checkpoint — unique
+      increasing ids, non-decreasing timestamps, and a seam that reads continuously from 1885.2 s to
+      1886.2 s with no gap and no overlap. Running it found a defect reading would not have: a
+      resume snaps back to the window boundary at or before the point asked for, so trimming at the
+      requested second and transcribing from the earlier one duplicated eighteen seconds. Fixed, and
+      the regression test was confirmed failing against the old behaviour.
 - [x] **`services/session/manager.py` has reached 1782 lines — split, and now 672.** Six files:
       `shapes.py` (the dataclasses and tuning constants, importing no sibling so nothing cycles),
       `frames.py`, `background.py`, `window_capture.py`, `passes.py`, `sources.py`. Every file in

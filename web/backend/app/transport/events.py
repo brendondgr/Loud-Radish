@@ -50,6 +50,11 @@ TRANSCRIPTION_DONE: Final = "transcription.done"
 #: The pass failed, and the recording is still on disk. Critical for the same reason, and because
 #: the message names the file the audio survives in.
 TRANSCRIPTION_FAILED: Final = "transcription.failed"
+#: The pass is held at a window boundary, with a checkpoint written (D-045). Resumable, including
+#: after a restart of the whole application.
+TRANSCRIPTION_PAUSED: Final = "transcription.paused"
+#: The pass will not continue. The transcript so far is committed and the audio is kept.
+TRANSCRIPTION_CANCELLED: Final = "transcription.cancelled"
 
 #: The window capture started, stopped, stalled, or failed (D-022, D-036). Critical: a client that
 #: missed the window-closed frame would keep showing a live preview of a capture that ended.
@@ -143,6 +148,8 @@ CRITICAL_EVENTS: Final[frozenset[str]] = frozenset(
         SESSION_CAPTURE_ENDED,
         # A transcription that ended and never said so leaves a progress bar running forever.
         TRANSCRIPTION_DONE,
+        TRANSCRIPTION_PAUSED,
+        TRANSCRIPTION_CANCELLED,
         TRANSCRIPTION_FAILED,
         CAPTURE_STATE,
         # An export that finished and never said so leaves a window watching an encode that ended,
@@ -172,6 +179,12 @@ CRITICAL_EVENTS: Final[frozenset[str]] = frozenset(
 INVALIDATES: Final[dict[str, frozenset[str]]] = {
     TRANSCRIPTION_DONE: frozenset({TRANSCRIPTION_PROGRESS}),
     TRANSCRIPTION_FAILED: frozenset({TRANSCRIPTION_PROGRESS}),
+    # **These two retract, where `session.paused` does not, and the difference is real.** A held
+    # *capture* is still capturing nothing but still true; a held *pass* has a last progress frame
+    # that says `running`, and replaying that to a window opened afterwards puts a moving progress
+    # bar over a pass that is not moving. That is the bug D-033 fixed twice and D-037 a third time.
+    TRANSCRIPTION_PAUSED: frozenset({TRANSCRIPTION_PROGRESS}),
+    TRANSCRIPTION_CANCELLED: frozenset({TRANSCRIPTION_PROGRESS}),
     # Capture has ended, so how much of it had been written is no longer a live figure either.
     SESSION_STOPPED: frozenset({RECORDING_PROGRESS, TRANSCRIPT_HYPOTHESIS}),
     # **A pause retracts nothing, and that is deliberate.** It was written the other way first, by

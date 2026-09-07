@@ -96,6 +96,7 @@ def plan_windows(
     *,
     window_s: float,
     overlap_s: float,
+    start_s: float = 0.0,
 ) -> Iterator[Window]:
     """Slice the recording into overlapping windows, in order.
 
@@ -116,8 +117,19 @@ def plan_windows(
     overlap = max(0, min(int(overlap_s * SAMPLE_RATE), window // 2))
     step = max(1, window - overlap)
 
+    # **A resume begins on a window boundary, not mid-window (D-045).** Windows are the unit the
+    # model sees and the unit a checkpoint records, so starting between two would either re-decode
+    # audio already committed or skip the part of it the previous window had not reached. Snapping
+    # to the step grid keeps the overlap doing its job — a resumed window still sees the second of
+    # context before it — and costs at most one window of work.
     index = 0
     start = 0
+    if start_s > 0:
+        offset = max(0, int(start_s * SAMPLE_RATE))
+        index = max(0, offset // step)
+        start = index * step
+        if start >= total:
+            return
     while start < total:
         end = min(start + window, total)
         yield Window(
@@ -147,6 +159,8 @@ def transcribe_file(
     prompt: str | None = None,
     on_progress: ProgressFn | None = None,
     should_stop: Callable[[], bool] | None = None,
+    start_s: float = 0.0,
+    on_window_start: Callable[[float, int], None] | None = None,
 ) -> list[Segment]:
     """Transcribe a finished recording and return its segments, in order.
 
@@ -157,6 +171,12 @@ def transcribe_file(
         should_stop: consulted between windows so a server shutdown does not have to wait for a
             forty-minute pass. Stopping returns what was produced so far rather than raising —
             partial transcript beats none.
+        start_s: where to begin. Snapped to a window boundary, so a resumed pass never re-decodes
+            audio it already committed nor skips audio it did not (D-045).
+        on_window_start: called with the second the next window begins at and the id the next
+            segment will take, *before* that window is transcribed. This is the checkpoint, and it
+            is written on every window rather than only on a pause: a pause can write its own, and
+            a killed process cannot.
     """
     samples, duration = read_wav(path)
     segmenter = Segmenter(max_segment_s=max_segment_s, first_id=first_segment_id)
@@ -166,10 +186,15 @@ def transcribe_file(
         logger.info("Recording %s contains no audio; nothing to transcribe.", path)
         return produced
 
-    for window in plan_windows(samples, window_s=window_s, overlap_s=overlap_s):
+    for window in plan_windows(samples, window_s=window_s, overlap_s=overlap_s, start_s=start_s):
         if should_stop is not None and should_stop():
             logger.info("Transcription of %s stopped early at %.1f s.", path, window.start_s)
             break
+
+        # Before the window, not after it: a checkpoint written afterwards names a position whose
+        # work may not have been committed if the process died between the two.
+        if on_window_start is not None:
+            on_window_start(window.start_s, segmenter.next_id)
 
         result = transcribe(window.samples, prompt)
         words = _absolute_words(result, window)

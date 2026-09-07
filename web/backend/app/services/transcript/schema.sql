@@ -114,3 +114,34 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     -- JSON: cited timestamps, quoted selection, which context tiers were used.
     meta_json           TEXT
 );
+
+-- Where a transcription pass over a finished recording has got to (D-045).
+--
+-- D-021 said deliberately that a pass is *not* persisted: a server restart loses the job, keeps
+-- the recording, and the next start lists it as untranscribed with a button to run it again. That
+-- reasoning was about crash recovery and it does not survive a user who pressed pause on purpose:
+-- re-running a forty-minute recording costs twenty-seven minutes of CPU to recover work that had
+-- already been done.
+--
+-- Here rather than in a file beside the audio, for two reasons. D-037's report asked for *fewer*
+-- files in a recording folder; and a checkpoint that travels with the transcript it is a
+-- checkpoint of cannot be separated from it by a move or a partial copy.
+--
+-- One row per (revision), because one pass produces one revision (D-022): the live pass is 0 and
+-- the post-capture pass is 1, and a recording never has two passes at the same revision.
+CREATE TABLE IF NOT EXISTS transcription_passes (
+    revision            INTEGER PRIMARY KEY,
+    -- The audio being transcribed. Named so a resume can find it after a restart, and because on
+    -- a failure it is the only remaining copy of what was said.
+    source_path         TEXT    NOT NULL,
+    total_seconds       REAL    NOT NULL,
+    -- running | paused | done | cancelled | failed
+    state               TEXT    NOT NULL,
+    -- Where the next window starts. Windows are atomic, so this is always a window boundary and a
+    -- resume loses at most one window of work.
+    next_start_s        REAL    NOT NULL DEFAULT 0,
+    last_segment_id     INTEGER NOT NULL DEFAULT 0,
+    -- The biasing prompt the pass was started with, so a resume produces comparable text.
+    prompt              TEXT    NOT NULL DEFAULT '',
+    updated_at          TEXT    NOT NULL
+);

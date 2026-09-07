@@ -125,7 +125,8 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   │   │       ├── prompts.py     # The instruction list, and the no-reasoning hints
 │   │   │       └── worker.py      # The background loop and every failure path
 │   │   │   └── transcript/        # The durable record
-│   │   │       ├── schema.sql     # SQLite tables, FTS5 index, and its triggers
+│   │   │       ├── schema.sql     # SQLite tables, FTS5 index, its triggers, and where a
+│   │   │                          #   transcription pass got to (D-045)
 │   │   │       ├── store.py       # Append-only writes, the four queries, search
 │   │   │       └── export.py      # Text, Markdown, SRT, VTT, JSON
 │   │   │   └── session/           # Wiring, workers, health, degradation

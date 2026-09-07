@@ -112,6 +112,20 @@ class TranscriptionPassMixin:
         except Exception:  # noqa: BLE001 - a session that has already ended must still end cleanly
             logger.debug("Could not reopen %s for reading", store.path.name, exc_info=True)
 
+    @property
+    def transcription_runner(self):  # noqa: ANN201 - TranscriptionRunner | None
+        """The runner driving the current pass, whoever started it.
+
+        A pass can be started by a session ending, or by `POST /api/recordings/{name}/transcribe`
+        re-running one from the library. Both hand the runner here, so that pausing a pass does not
+        have to know which of the two produced it (D-045).
+        """
+        return self._runner
+
+    def attach_runner(self, runner) -> None:  # noqa: ANN001 - TranscriptionRunner
+        """Take ownership of a pass started elsewhere, so it can be paused and shut down."""
+        self._runner = runner
+
     def reopen_last_session(self) -> bool:
         """Hold the most recent finished transcript open for reading. Returns whether one was.
 

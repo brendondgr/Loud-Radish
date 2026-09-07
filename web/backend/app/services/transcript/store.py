@@ -471,6 +471,112 @@ class TranscriptStore:
             self._connection.execute("DELETE FROM chat_messages")
             self._connection.commit()
 
+    # -- transcription passes (D-045) ----------------------------------------------
+
+    def record_pass(
+        self,
+        *,
+        revision: int,
+        source_path: str,
+        total_seconds: float,
+        state: str,
+        next_start_s: float = 0.0,
+        last_segment_id: int = 0,
+        prompt: str = "",
+    ) -> None:
+        """Write where a transcription pass has got to, so it can be resumed.
+
+        Called on **every window**, not only when a pass is paused. A pause can write its own
+        checkpoint; a killed process cannot, and recovering the twenty-seven minutes of CPU that a
+        forty-minute recording costs is the whole point. One row per revision, replaced in place.
+        """
+        with self._lock:
+            self._connection.execute(
+                """
+                INSERT INTO transcription_passes
+                    (revision, source_path, total_seconds, state, next_start_s,
+                     last_segment_id, prompt, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(revision) DO UPDATE SET
+                    source_path = excluded.source_path,
+                    total_seconds = excluded.total_seconds,
+                    state = excluded.state,
+                    next_start_s = excluded.next_start_s,
+                    last_segment_id = excluded.last_segment_id,
+                    prompt = excluded.prompt,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    revision,
+                    source_path,
+                    float(total_seconds),
+                    state,
+                    float(next_start_s),
+                    int(last_segment_id),
+                    prompt or "",
+                    datetime.now(UTC).isoformat(),
+                ),
+            )
+            self._connection.commit()
+
+    def trim_from(self, revision: int, start_s: float) -> int:
+        """Delete segments of ``revision`` that begin at or after ``start_s``. Returns how many.
+
+        **This is what makes a resume idempotent, and it is not optional.** The checkpoint is
+        written before a window is decoded, so a process killed *after* that window committed but
+        *before* the next checkpoint leaves a database holding work the checkpoint does not know
+        about. Resuming from the checkpoint would then transcribe that window a second time —
+        duplicating its text, and colliding with segment ids that already exist.
+
+        Trimming first makes the seam exact whatever the process was doing when it died: everything
+        from the resume point onward is re-derived from the audio, which is still on disk. Nothing
+        before the resume point is touched, so the transcript the user has already read does not
+        change under them.
+        """
+        with self._lock:
+            cursor = self._connection.execute(
+                "DELETE FROM segments WHERE revision = ? AND start >= ?",
+                (int(revision), float(start_s)),
+            )
+            self._connection.commit()
+            removed = cursor.rowcount or 0
+        if removed:
+            logger.info(
+                "Trimmed %d segments at or after %.1f s before resuming %s",
+                removed,
+                start_s,
+                self._path.name,
+            )
+        return removed
+
+    def passes(self) -> list[dict[str, Any]]:
+        """Every recorded pass over this session, newest revision first."""
+        rows = self._query("SELECT * FROM transcription_passes ORDER BY revision DESC")
+        return [dict(row) for row in rows]
+
+    def resumable_pass(self) -> dict[str, Any] | None:
+        """The pass that could be picked up again, if there is one.
+
+        **A pass that was `running` when the process died counts.** That is precisely the case this
+        table exists for: nothing wrote a terminal state because nothing got the chance. A pass the
+        user *cancelled* does not count — they said they did not want it, and offering to resume it
+        would be the application arguing.
+        """
+        for row in self.passes():
+            if row.get("state") in ("running", "paused"):
+                return row
+        return None
+
+    def finish_pass(self, revision: int, state: str) -> None:
+        """Mark a pass terminal. Nothing is deleted: what it was, and where it stopped, is a fact
+        about this recording worth keeping."""
+        with self._lock:
+            self._connection.execute(
+                "UPDATE transcription_passes SET state = ?, updated_at = ? WHERE revision = ?",
+                (state, datetime.now(UTC).isoformat(), revision),
+            )
+            self._connection.commit()
+
     # -- totals --------------------------------------------------------------------
 
     def stats(self) -> SessionStats:
