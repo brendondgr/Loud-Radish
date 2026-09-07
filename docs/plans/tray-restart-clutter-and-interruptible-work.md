@@ -1,10 +1,11 @@
 # The Tray Icon, the Transcript After a Restart, the Clutter, and Work That Can Be Interrupted
 
-*Written 2026-09-06. Status: **In progress (1 / 10 steps)**. Branch: `interruptible-work`.*
+*Written 2026-09-06. Status: **In progress (2 / 10 steps)**. Branch: `interruptible-work`.*
 
 > **Rebased onto the Loud Radish rebrand.** This plan was written against `main` at `97de92e` and the
 > rebrand (D-038) landed while it was being written. It has been re-based rather than re-planned:
-> decision numbers moved up to start at **D-039**, `utils/transcriber_ctl.py` is now
+> decision numbers start at **D-039** and are assigned as each step lands rather than
+> pre-allocated, because two steps the plan gave none to turned out to make real decisions, `utils/transcriber_ctl.py` is now
 > `utils/loud_radish_ctl.py`, and every user-visible name a new module needs comes from
 > `web/backend/app/branding.py` rather than a literal — `tests/utils/test_no_legacy_brand.py` fails
 > the build otherwise, and it is right to. The measurements in §1 were taken before that merge and
@@ -206,7 +207,7 @@ needed to choose between those two if the picker proves unavoidable.**
   commit stating: `Interruptible Work (1 / 10) Complete: split the session manager into
   source-selection, window-capture and transcription-pass modules, with no behaviour change.`
 
-### Step 2 — Remove the clutter, without removing anything real
+### Step 2 — Remove the clutter, without removing anything real ✅ **Done**
 
 - **Locations.** New `scripts/prune_empty_sessions.py`. Reads through
   `services/transcript/archive.py` (`list_sessions`, `describe`) and
@@ -257,7 +258,7 @@ needed to choose between those two if the picker proves unavoidable.**
   sessions reopens the newest with segments and not the newest empty one; an empty directory
   reopens nothing and does not raise; the flag off reopens nothing; a corrupt database is skipped
   with a log line rather than preventing startup. Full suite, ruff.
-- **Docs.** `docs/documentation.md` (**D-040**, extending D-031 across a process boundary),
+- **Docs.** `docs/documentation.md` (a decision entry, extending D-031 across a process boundary),
   `docs/architecture.md`, `docs/data-flow.md`, `.env.example` if a variable is added,
   `docs/checklist.md`.
 - **Action.** Undergo the verification/tests/validation process for this phase. Once validated,
@@ -323,7 +324,7 @@ needed to choose between those two if the picker proves unavoidable.**
   registers, `GetAll` returns the properties an SNI host requires, the pixmap has the shape from
   Step 4, `NewIcon` is emitted on a visual change and **not** on an identical frame, and a bus that
   refuses the connection leaves the companion running rather than crashing it. Full suite, ruff.
-- **Docs.** `docs/documentation.md` (**D-041**), `docs/structure.md`, `docs/deployment.md`,
+- **Docs.** `docs/documentation.md` (a decision entry), `docs/structure.md`, `docs/deployment.md`,
   `docs/checklist.md` (close the two tray items, or record precisely what the spike found).
 - **Action.** Undergo the verification/tests/validation process for this phase. Once validated,
   commit stating: `Interruptible Work (5 / 10) Complete: the tray icon is exported over D-Bus and
@@ -382,7 +383,7 @@ needed to choose between those two if the picker proves unavoidable.**
   committed segments, marks the metadata cancelled and starts **no** transcription pass. Full suite,
   ruff. `uv run python scripts/generate_contracts.py` and commit the regenerated contracts.
 - **Docs.** `docs/api-contract.md`, `docs/routes.md`, `docs/data-flow.md`, `docs/architecture.md`,
-  `docs/documentation.md` (**D-042** — pause removes time, and why).
+  `docs/documentation.md` (a decision entry — pause removes time, and why).
 - **Action.** Undergo the verification/tests/validation process for this phase. Once validated,
   commit stating: `Interruptible Work (7 / 10) Complete: a live or recorded capture can be paused,
   resumed and cancelled, with the clock and the recording stopping together.`
@@ -410,7 +411,7 @@ needed to choose between those two if the picker proves unavoidable.**
   real `ffmpeg` (following the existing D-036 tests): two pieces separated by a pause stitch into
   one file whose duration is the sum of the pieces, not the sum plus the pause; a reopen that fails
   leaves the session recording audio and raises a banner rather than ending it. Full suite, ruff.
-- **Docs.** `docs/architecture.md`, `docs/data-flow.md`, `docs/documentation.md` (**D-043**),
+- **Docs.** `docs/architecture.md`, `docs/data-flow.md`, `docs/documentation.md` (a decision entry),
   `docs/checklist.md` — including the picker's real behaviour, whatever it turns out to be.
 - **Action.** Undergo the verification/tests/validation process for this phase. Once validated,
   commit stating: `Interruptible Work (8 / 10) Complete: pausing a window recording stops the video
@@ -459,7 +460,7 @@ needed to choose between those two if the picker proves unavoidable.**
   Full suite, ruff, `scripts/generate_contracts.py`. Note explicitly whether
   `test_stopping_ignores_the_mode` still flakes, with evidence either way.
 - **Docs.** `docs/api-contract.md`, `docs/routes.md`, `docs/data-flow.md`,
-  `docs/component-map.md`, `docs/documentation.md` (**D-044**, and an amendment to D-021 recording
+  `docs/component-map.md`, `docs/documentation.md` (a decision entry, and an amendment to D-021 recording
   that "deliberately not persisted" no longer holds and why), `docs/checklist.md`.
 - **Action.** Undergo the verification/tests/validation process for this phase. Once validated,
   commit stating: `Interruptible Work (9 / 10) Complete: a transcription pass can be paused,
@@ -549,6 +550,24 @@ raise, and the resulting failure set compared before the split against after. **
 failures on each side**, all of them tests that legitimately construct those objects themselves. The
 one extra failure on the "after" side is `test_stopping_ignores_the_mode`, the SQLite flake Part 4 of
 the checklist already documents, and it is left alone.
+
+**Step 2 — the rule needed a third clause, and the measured numbers moved.**
+
+The plan's criterion was "no segments and no media". Two more refusals were added while writing it,
+both because the script runs against a *user* directory rather than a fixture: a database that
+**cannot be read** reports zero segments because it is unreadable, not because it is empty, and a
+database **written in the last ten minutes** may belong to a session recording right now — the
+application holds its SQLite file open for the whole of a talk, and mtime is the only sign of that
+from outside the process. Neither is hypothetical; both are one bad afternoon.
+
+The figures also moved, because the rebrand's own test runs added two files between the plan and the
+execution: **970 files, 679 removed, 291 kept, 47.1 MB reclaimed**, `data/sessions` 103 MB → 58 MB.
+The 28 protected files were exactly as predicted. Every candidate was re-checked straight from
+SQLite, outside the archive code that selected it, before anything was deleted: 679 of 679 held zero
+segments, and the reported seminar (692 segments, 8609 words) was correctly kept.
+
+Recorded as **D-040**, which the plan had not allocated a number to. Decision numbers are assigned
+as steps land from here on.
 
 *Two tests fail on this machine for reasons that predate the split.*
 `test_a_real_tap_reports_its_links_without_listening_to_them` and

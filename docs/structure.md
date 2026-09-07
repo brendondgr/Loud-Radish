@@ -208,6 +208,8 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   ├── loud-radish.desktop.in     # Desktop entry template, filled in by install_autostart.py
 │   ├── make_fixture_wav.py        # Generates synthetic WAV fixtures for pipeline tests
 │   ├── measure_capture_cost.py    # Encoding vs. inference contention (D-022)
+│   ├── prune_empty_sessions.py    # Clears session databases that hold nothing, and
+│   │                              #   refuses the ones that own a recording (D-040)
 │   ├── run_file_session.py        # Console-only pipeline run over a WAV file (BE M4)
 │   └── generate_contracts.py      # Writes openapi.json and ws-events.json
 ├── data/                          # Sessions, config file, audio, recordings (gitignored)

@@ -444,11 +444,10 @@ Five reported problems, planned in
 - [x] **No credential leaves in the archive.** `llm.api_key` ships present and empty; the page keeps
       what the user types in that browser alone.
 
-- [ ] **The developer's `data/sessions` still holds the suite's leavings.** The cause is fixed and
-      the files are harmless, but roughly 690 empty databases from before the fix are still in the
-      user's own directory and still at the top of the recordings page. Deleting another person's
-      data is their call, not ours; the list can be pruned by removing session files whose database
-      holds no segments.
+- [x] **The developer's `data/sessions` still holds the suite's leavings — cleared on request.**
+      679 removed, 291 kept. The rule turned out to need a second clause: 28 of the empty databases
+      own a recording folder and are failed transcriptions rather than leavings. See Part 3l and
+      `scripts/prune_empty_sessions.py`.
 - [ ] **The export cannot be scoped to a revision.** It ships the latest pass, like every other
       export. Same gap as the one recorded in Part 3g, and the same remedy — a revision control on
       the recordings page.
@@ -610,9 +609,13 @@ close are left in place rather than moved, so nothing is lost by reading this fi
       question above now answered in its favour. Steps 4-5.
 - [ ] **The last transcript after a restart** — the documented bound of D-031, closed by reopening
       the newest session that holds segments at startup. Step 3.
-- [ ] **The empty session databases** — measured at 968 files, 69.6 MB, of which 706 hold no
-      segments. **28 of those 706 own a recording folder**: they are failed transcriptions of real
-      audio, not test leavings, and the prune's criterion is no segments *and* no media. Step 2.
+- [x] **The empty session databases — cleared, 970 files down to 291.** `scripts/prune_empty_sessions.py`
+      reports by default and needs `--apply` to delete. Run against the real directory: 679 removed,
+      47.1 MB reclaimed, `data/sessions` 103 MB → 58 MB, and the Recordings page now opens on a real
+      talk instead of a wall of empty rows. **28 empty databases were kept**, every one of them
+      owning a recording folder — failed transcriptions of real audio, whose empty database is the
+      only thing naming the audio. Every candidate was re-checked straight from SQLite before
+      deleting: 679 of 679 genuinely held zero segments.
 - [ ] **Pause, resume and cancel** — for a live or recorded capture, for a window recording's video,
       and for a transcription pass whose checkpoint survives a server restart. Steps 6-9.
 - [x] **`services/session/manager.py` has reached 1782 lines — split, and now 672.** Six files:
