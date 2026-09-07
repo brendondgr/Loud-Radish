@@ -383,7 +383,13 @@ class SessionManager(
         # and the speaking indicator, so the interface stays informative while no text is produced.
         # Skipping silence at *capture* time would produce a file whose timestamps no longer match
         # the clock, and the timestamps are what the transcript is indexed by.
-        self._gate = build_gate(config.vad, frame_ms=config.audio.frame_ms)
+        self._gate = build_gate(
+            config.vad,
+            frame_ms=config.audio.frame_ms,
+            # Announced, not merely logged: this application ran the energy detector while
+            # reporting Silero for months because nobody reads a warning (D-052).
+            on_fallback=lambda why: self._emit_failure(degradation.voice_detector_fell_back(why)),
+        )
 
         # The engine is what makes a session transcribe as it goes, so `recorded` mode simply does
         # not build one. That is the mode: no inference while capturing, which is what makes it

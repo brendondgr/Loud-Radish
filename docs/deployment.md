@@ -44,12 +44,14 @@ work. For real use:
 uv sync
 ```
 
-| Extra | Adds | Without it |
-|---|---|---|
-| `asr-whisper` | Real transcription via `faster-whisper` | Only the scripted mock backend is offered |
-| `audio-device` | Microphone and system loopback capture | Only the file source is available |
-| `vad-silero` | Neural voice-activity detection | The energy detector is used, which is fine in a quiet room |
-| `credentials` | Storing API keys in the OS credential store | Keys must come from environment variables |
+**There are no optional groups** — D-023 removed them, because a second install step nobody runs is
+a feature nobody has. `uv sync` installs everything: real transcription (`faster-whisper`),
+microphone and loopback capture (`sounddevice`), the neural voice detector (`onnxruntime`, with the
+model itself carried inside `faster-whisper`), and the OS credential store (`keyring`).
+
+This table described those groups long after they stopped existing, and one of its rows was actively
+harmful: the Silero detector's own error message told users to install a `vad-silero` group that was
+not there, so following the instruction could not help. See D-052.
 
 Everything the extras enable is then selectable **inside the application** — Settings → Audio for
 the device, Settings → Transcription for the model. Nothing needs a config file edited by hand.

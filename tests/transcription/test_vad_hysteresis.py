@@ -193,9 +193,17 @@ class TestGateLifecycle:
 
 
 class TestFactory:
-    def test_build_gate_defaults_to_the_energy_detector(self) -> None:
-        assert build_gate(VadConfig()).detector_name == "energy"
+    def test_build_gate_uses_the_configured_detector(self) -> None:
+        assert build_gate(VadConfig(detector="energy")).detector_name == "energy"
+        assert build_gate(VadConfig(detector="silero")).detector_name == "silero"
 
-    def test_silero_falls_back_to_energy_when_unavailable(self) -> None:
-        """A missing optional dependency degrades the detector; it must not stop the session."""
-        assert build_gate(VadConfig(detector="silero")).detector_name == "energy"
+    def test_silero_falls_back_to_energy_when_no_model_can_be_found(self, monkeypatch) -> None:
+        """A missing model degrades the detector; it must not stop the session. This used to pass
+        unconditionally, because no machine had the model (D-052)."""
+        from app.services.vad import silero as module
+
+        monkeypatch.setattr(module, "bundled_model", lambda: None)
+
+        gate = build_gate(VadConfig(detector="silero", model_path="nope.onnx"))
+
+        assert gate.detector_name == "energy"

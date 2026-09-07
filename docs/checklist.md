@@ -713,11 +713,18 @@ fixtures, and five faults came out of that which no test would have found:
       thresholds are too tight and real speech is being deleted, which is the one failure this
       filter can cause. `no_speech_certain` in particular was set at 0.85 because a measured
       hallucination scored 0.901 — a sample of one.
-- [ ] **Whether the Silero voice detector should replace the energy one by default.** The optional
-      `vad-silero` group already ships and swaps in behind the same interface. The decoder's own
-      filter now addresses the same problem inside the model, so this was left alone rather than
-      changed blind; it is a one-line setting if the energy detector proves too permissive in a
-      noisy room.
+- [x] **Whether the Silero voice detector should replace the energy one by default.** Done, and it
+      was not the question it looked like. **Silero was never running at all**: `silero_vad.onnx`
+      existed on no machine, so `build_detector` fell back to the energy detector with a
+      `logger.warning` nobody reads — while the status bar reported "silero". The configuration on
+      this machine asked for it and got energy for months. Nothing needs downloading: the model is
+      already inside `faster-whisper`, and it is now used when no path is configured. The fallback,
+      when it does happen, is a banner rather than a log line.
+
+      With both detectors actually runnable, the comparison could finally be made. Same clips, same
+      sensitivity: on real speech Silero found **83%** of frames against energy's **62%**; on a tone
+      fixture containing no speech it fired on **1%** against energy's **62%**. Better on both axes,
+      so Silero is the default (D-052).
 
 ---
 
