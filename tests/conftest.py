@@ -37,6 +37,27 @@ came back as bit-exact digital silence, and the cause was the test suite that re
 A unique name per tap now makes the silence impossible; this makes the leak impossible, which is
 the fault underneath it. The double below records what was asked of it and touches nothing.
 
+## No test may *read* the developer's audio graph either
+
+The same lesson a fourth time, and the guard above is what makes it visible. Creating a sink was
+stopped; querying the graph was not. `_open_application_tap` asks `playback_streams()` what is
+currently playing before it builds anything, so four tests in `test_window_audio.py` passed on a
+machine with a video open and failed on a quiet one — with `MonitorUnavailable: Nothing is playing
+any audio`, raised from a code path they were not written to reach at all.
+
+**They were not written to reach it because they predate D-030.** Window mode's "system output"
+choice used to open a `MonitorSource` directly; D-030 measured that `pw-record` against a sink's
+monitor silently records the *microphone* when the target does not resolve, and routed that choice
+through the tap as well. The four tests kept patching `MonitorSource`, which is still where the
+path ends — so what they assert is still true — but the graph query in front of it was suddenly
+real, and whether they passed came to depend on what the developer happened to be listening to.
+
+So the doubles below answer the three questions that reach PipeWire, with the ordinary healthy
+answer: something is playing, the tap carries it, and there is an output to widen to. A test that
+needs a different answer — a dead tap, a silent machine, a stream that matches a window — patches
+the same name itself, and a later `monkeypatch.setattr` wins over an autouse one. Several in
+`test_window_audio.py` already did, which is what made the hole obvious once it was looked for.
+
 ## No test may write into the developer's data directory
 
 The same lesson a third time, and this one had been running for months. A test that constructs
@@ -143,6 +164,47 @@ def no_real_audio_tap(monkeypatch):
     from app.services.session import manager as manager_module
 
     monkeypatch.setattr(manager_module, "ApplicationTap", NoTapInTests)
+
+
+#: The one stream the suite's audio graph is playing. A `PlaybackStream` rather than a bare object,
+#: so the `rank`/`score` heuristic `_tap_candidates` applies to it runs for real.
+def _one_playing_stream():  # noqa: ANN202 - returns list[PlaybackStream]
+    from app.services.audio.tap import PlaybackStream
+
+    return [
+        PlaybackStream(
+            node_id=1,
+            serial=1,
+            node_name="a-test",
+            application="a-test",
+            binary="a-test",
+            media_name="something playing",
+            state="running",
+        )
+    ]
+
+
+@pytest.fixture(autouse=True)
+def no_real_audio_graph(monkeypatch):
+    """Keep every test from *reading* the developer's PipeWire graph.
+
+    The companion to `no_real_audio_tap`, which stopped tests writing to it. Three names on the
+    session manager query the live daemon — what is playing, whether a node is carrying audio, and
+    which sink is the default — and any one of them makes a test's result depend on what the
+    developer happens to be listening to.
+
+    The answers are the ordinary healthy ones: something is playing, and it is audible. That is the
+    path most tests mean to be on, and the ones that mean to be on another patch these names
+    themselves.
+    """
+    from app.services.session import manager as manager_module
+
+    monkeypatch.setattr(manager_module, "tap_streams", _one_playing_stream)
+    # Non-zero: the tap is delivering, so the "widen to the whole output" path (D-030) stays shut
+    # unless a test opens it deliberately. Zero would mean silence and -1.0 would mean unmeasurable,
+    # and both are states a test should have to ask for.
+    monkeypatch.setattr(manager_module, "probe_peak", lambda *_a, **_k: 0.5)
+    monkeypatch.setattr(manager_module, "default_sink", lambda: "a-test-sink")
 
 
 @pytest.fixture(autouse=True)

@@ -139,6 +139,16 @@ def test_the_resolved_node_is_a_monitor() -> None:
 
 
 # -- what the session manager opens ------------------------------------------------------------
+#
+# These assert the **routing decision** — which kind of source a mode and a choice end up with —
+# rather than how any of them is built.
+#
+# `MonitorSource` is still the end of the "window's sound" path, but since D-030 it is no longer the
+# start of it: targeting a sink's monitor directly was measured to record the *microphone* whenever
+# the target failed to resolve, so that choice now goes through the application tap as well and
+# arrives at a `MonitorSource` reading the tap. What sits in front of it — the query for what is
+# playing, the tap itself, the delivery probe — is answered suite-wide by `tests/conftest.py`, which
+# is what stops these tests depending on whether the developer happens to have a video open.
 
 
 def _manager(tmp_path, **overrides) -> tuple[SessionManager, AppConfig]:

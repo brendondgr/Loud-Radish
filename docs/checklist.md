@@ -579,12 +579,17 @@ says `max_height: 720` against a recording made at **2560 × 1532**.
       `_write_log` writes only when stderr was non-empty and this run produced none — `gst-launch`
       is invoked with `-q`. Step 2 drops `-q` so the next occurrence is diagnosable.
 
-- [ ] **Four tests in `tests/transcription/test_window_audio.py` fail on a quiet machine.**
-      `test_window_mode_opens_the_machines_output_not_a_microphone` and three beside it reach the
-      real PipeWire graph and raise `MonitorUnavailable` when nothing is playing. Pre-existing and
-      unrelated to this plan — confirmed by running them against a clean tree — but they make
-      `uv run pytest` red for anyone who is not playing audio, which is most runs. They need either
-      a stubbed graph or a skip guard.
+- [x] **Four tests in `tests/transcription/test_window_audio.py` failed on a quiet machine.** Fixed
+      in `tests/conftest.py`, which is where it belonged: the suite-wide guard stopped tests
+      *creating* a sink in the developer's PipeWire graph and never stopped them *reading* it, so
+      `_open_application_tap`'s query for what is currently playing was live. The four had also been
+      left behind by D-030 — they patch `MonitorSource`, which is still where the "window's sound"
+      path ends but is no longer where it starts, so the graph query in front of it was suddenly
+      real and whether they passed depended on what the developer happened to have open. Three names
+      on the session manager are now answered suite-wide with the ordinary healthy answer, and a
+      test wanting a different one overrides them as several already did. Verified by making every
+      real PipeWire call raise: the only tests that reach the graph are the two `@pipewire`-gated
+      ones written to.
 
 ---
 
