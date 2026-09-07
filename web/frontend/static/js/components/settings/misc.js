@@ -172,7 +172,7 @@ export class StorageSettings {
     const optional = health.optional ?? {};
     const rows = [
       ["Version", health.version ?? "—"],
-      ["Config file", config.get("__path") ?? health.config_path ?? "data/transcriber-config.json"],
+      ["Config file", config.get("__path") ?? health.config_path ?? "data/loud-radish-config.json"],
       ["Real transcription", optional.asr_whisper ? "installed" : "not installed"],
       ["Device capture", optional.audio_device ? "installed" : "not installed"],
       ["Silero detection", optional.vad_silero ? "installed" : "not installed"],

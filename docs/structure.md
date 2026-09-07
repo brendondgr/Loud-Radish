@@ -13,7 +13,7 @@ static assets rather than a separately built Node application. There is no npm t
 ## Tree — what exists today
 
 ```text
-TranscriberPrototype/
+TranscriberPrototype/                # the checkout keeps its old name; the product does not (D-038)
 ├── docs/                          # Source of truth for all repository documentation
 │   ├── plans/
 │   │   ├── README.md              # Plan conventions and index

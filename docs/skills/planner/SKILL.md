@@ -1,6 +1,6 @@
 ---
 name: planner
-description: Use this skill when asked to create, refine, or evaluate an implementation plan, roadmap, migration plan, or structured sequence of work before writing code — including any multi-step or multi-session task in TranscriberPrototype that needs a written handoff artifact.
+description: Use this skill when asked to create, refine, or evaluate an implementation plan, roadmap, migration plan, or structured sequence of work before writing code — including any multi-step or multi-session task in Loud Radish that needs a written handoff artifact.
 ---
 
 # Plan Creation
@@ -23,7 +23,7 @@ Deliverables Table.
 
 ## Project Conventions
 
-These conventions are specific to TranscriberPrototype and take precedence over the generic examples
+These conventions are specific to Loud Radish and take precedence over the generic examples
 in `planner.md` where they conflict.
 
 - **Granularity:** full phase-by-phase implementation plans. Each phase must be independently

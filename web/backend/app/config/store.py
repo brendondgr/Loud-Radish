@@ -43,7 +43,7 @@ LEGACY_CONFIG_PATH_ENV = branding.legacy_env_var("CONFIG_PATH")
 def default_config_path() -> Path:
     """Resolve the user config file location.
 
-    Honours ``LOUD_RADISH_CONFIG_PATH``, then the deprecated ``TRANSCRIBER_CONFIG_PATH`` (D-038).
+    Honours :data:`CONFIG_PATH_ENV`, then the deprecated :data:`LEGACY_CONFIG_PATH_ENV` (D-038).
     With neither set, the file lives in the data directory — and if only the pre-rename name is
     there, :func:`adopt_legacy_config` moves it before anything reads it.
     """

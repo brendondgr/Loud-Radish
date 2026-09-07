@@ -1,7 +1,9 @@
-# Live Seminar Transcriber
+<img src="web/frontend/static/brand/radish.svg" alt="" width="120" align="right" />
 
-A single-user local application that transcribes a talk as it happens, and lets you ask a language
-model questions about what has been said.
+# Loud Radish
+
+**Live Audio & Video Transcriber.** A single-user local application that transcribes a talk as it
+happens, and lets you ask a language model questions about what has been said.
 
 It captures audio from a microphone, from system playback, or from a recording; transcribes it in
 near-real-time through a pluggable speech model; keeps a growing timestamped transcript; and serves
@@ -43,8 +45,12 @@ input before the transcript comes back empty.
 Run the checks:
 
 ```bash
-uv run pytest && uv run ruff check .
+uv run pytest --ignore=tests/assistant/test_llm_live.py && uv run ruff check .
 ```
+
+`tests/assistant/test_llm_live.py` skips itself when nothing answers at `LLM_TEST_ENDPOINT`, but
+runs for real against a server that does — and a full model generation has no timeout, so it is
+excluded above. Drop the flag to include it.
 
 ## How it fits together
 
@@ -83,6 +89,16 @@ bug this design exists to prevent.
 | [docs/data-flow.md](docs/data-flow.md) | How data moves through the pipeline |
 | [docs/component-map.md](docs/component-map.md) · [docs/design-system.md](docs/design-system.md) | Frontend ownership, design tokens, the accessibility baseline |
 | [docs/deployment.md](docs/deployment.md) | Installing, what lands on disk, hardware expectations |
+
+### Upgrading from a pre-rename install
+
+This was two names before it was one: `TranscriberPrototype` in the documentation and *Live Seminar
+Transcriber* in the interface. Everything migrates on first start — the settings file is renamed,
+stored credentials move to the new keyring service, and the old `TRANSCRIBER_*` environment
+variables are still read, with a warning. Re-run `uv run scripts/install_autostart.py` if you use
+autostart or global shortcuts, and re-copy any shortcut you bound by hand: the control script is now
+`utils/loud_radish_ctl.py`. See **D-038** in
+[docs/documentation.md](docs/documentation.md).
 
 ## Privacy
 
