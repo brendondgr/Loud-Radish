@@ -121,6 +121,28 @@ Any Python command runs inside the project environment via `uv run`:
 uv run python -c "import sys; print(sys.version)"
 ```
 
+## The tray icon and the global shortcuts
+
+The companion is a second, small process. It places an icon in the system tray, holds the global
+keybinds, and talks to the server over the same loopback HTTP the browser uses. It holds no state
+and can be killed and restarted at any moment without the server noticing.
+
+```bash
+cd web/backend && uv run python -m app.companion.main
+```
+
+| Flag | Effect |
+|---|---|
+| `--no-tray` | Keep the shortcuts, place no icon. Also what a desktop with no tray gets automatically. |
+| `--hold-still` | Do not animate. There is no `prefers-reduced-motion` in a tray, so this is it. |
+| `--once` | Print the current state and exit. |
+| `--port N` | The server to watch (default 8395). |
+
+The icon is drawn from `docs/motion-spec.md` and served as a `StatusNotifierItem` over the session
+bus (**D-043**). A desktop with no `org.kde.StatusNotifierWatcher` gets the shortcuts and no icon,
+which is reported once and is not an error. `scripts/install_autostart.py` starts the server at
+login; the companion is started the same way.
+
 ## Running the pipeline without a UI
 
 The streaming engine can be driven end to end over a recorded file, with console output only. This
@@ -175,6 +197,25 @@ one built with a config path that overrides only *some* of the directories — s
 sessions and recordings into `tmp_path`. This is not a nicety: before it existed the suite had left
 949 session files in the developer's `data/sessions`, 690 of them empty, and the past-sessions page
 lists that directory newest first. `tests/utils/test_data_isolation.py` is what keeps it true.
+
+## Clearing empty sessions
+
+Before the suite was isolated from `data/`, every test run wrote a real session database into the
+developer's own session directory, and the past-recordings page lists that directory newest first.
+The cause is fixed; this clears what it left.
+
+```bash
+uv run scripts/prune_empty_sessions.py
+```
+
+It reports and deletes nothing. Add `--apply` to remove what it found, `--before YYYY-MM-DD` to
+narrow it, and `--list-kept` to see every file it is keeping and why.
+
+**A database with no segments is not automatically a leaving**, and the script will not treat it as
+one. A transcription that failed leaves exactly the same thing next to a folder holding the only
+copy of the talk — 28 of them in the directory this was written for — so a file goes only when it
+holds no segments, its recording folder is absent or completely empty, and it has not been written
+to in the last ten minutes. Recording folders are never touched.
 
 ## Lint and Format
 

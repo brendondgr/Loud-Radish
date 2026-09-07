@@ -29,6 +29,7 @@ from typing import Any, Final
 
 from .. import branding
 from .animation import FrameClock, Snapshot
+from .tray import TrayIcon
 
 logger = logging.getLogger(__name__)
 
@@ -77,13 +78,23 @@ class Companion:
     """Polls the server, drives the frame clock, and answers menu activations."""
 
     def __init__(
-        self, *, host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, hold_still: bool = False
+        self,
+        *,
+        host: str = DEFAULT_HOST,
+        port: int = DEFAULT_PORT,
+        hold_still: bool = False,
+        tray: bool = True,
     ) -> None:
         self.base = f"http://{host}:{port}"
         self.listening = True
         self.clock = FrameClock(self._on_frame, hold_still=hold_still)
         self._stop = threading.Event()
         self._latest_svg = ""
+        # The tray is optional at construction so the state tests, which drive the clock directly,
+        # never touch a session bus. `--no-tray` is the same switch from the command line.
+        self.tray = (
+            TrayIcon(on_activate=self.activate, listening=lambda: self.listening) if tray else None
+        )
 
     @property
     def latest_svg(self) -> str:
@@ -92,15 +103,24 @@ class Companion:
 
     def _on_frame(self, frame, visual) -> None:  # noqa: ANN001
         self._latest_svg = frame.svg
+        if self.tray is not None:
+            self.tray.update(frame, visual)
 
     # -- the loop --------------------------------------------------------------------
 
     def poll_once(self) -> Snapshot:
         snapshot = read_state(self.base)
         self.clock.update(snapshot)
+        # The menu is rebuilt from this, and only when it has actually changed — a poll every half
+        # second that signalled `LayoutUpdated` each time would have the host re-reading a menu
+        # nobody has opened.
+        if self.tray is not None:
+            self.tray.set_snapshot(snapshot)
         return snapshot
 
     def run(self) -> int:
+        if self.tray is not None and not self.tray.start():
+            logger.info("Running without a tray icon; shortcuts and the menu are unaffected")
         self.clock.start()
         logger.info("Companion watching %s", self.base)
         try:
@@ -110,6 +130,8 @@ class Companion:
             pass
         finally:
             self.clock.stop()
+            if self.tray is not None:
+                self.tray.stop()
         return 0
 
     def stop(self) -> None:
@@ -163,11 +185,21 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Do not animate. There is no prefers-reduced-motion in a tray, so this is it.",
     )
+    parser.add_argument(
+        "--no-tray",
+        action="store_true",
+        help="Do not place an icon in the system tray. Shortcuts still work.",
+    )
     parser.add_argument("--once", action="store_true", help="Poll once and print the state.")
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
-    companion = Companion(host=args.host, port=args.port, hold_still=args.hold_still)
+    companion = Companion(
+        host=args.host,
+        port=args.port,
+        hold_still=args.hold_still,
+        tray=not (args.no_tray or args.once),
+    )
 
     if args.once:
         snapshot = companion.poll_once()

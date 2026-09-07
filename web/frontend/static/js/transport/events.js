@@ -11,6 +11,12 @@ export const SESSION_STOPPED = "session.stopped";
 /** The microphone or monitor has been released. Emitted immediately on stop, ahead of finalising
  *  the video, remuxing, and any post-capture pass — all of which can take tens of seconds. */
 export const SESSION_CAPTURE_ENDED = "session.capture_ended";
+/** Capture is held. The recording and the clock stop together; neither advances (D-044). */
+export const SESSION_PAUSED = "session.paused";
+/** Capture continues, in the same session, the same file and the same store. */
+export const SESSION_RESUMED = "session.resumed";
+/** The session ended and nothing will be transcribed. Every artefact it produced is kept. */
+export const SESSION_CANCELLED = "session.cancelled";
 export const SESSION_STATE = "session.state";
 
 export const TRANSCRIPT_COMMITTED = "transcript.committed";
@@ -28,6 +34,11 @@ export const TRANSCRIPTION_PROGRESS = "transcription.progress";
 export const TRANSCRIPTION_DONE = "transcription.done";
 /** The pass failed, and the recording is still on disk. The payload names the file it survives in. */
 export const TRANSCRIPTION_FAILED = "transcription.failed";
+/** The pass is held at a window boundary and can be picked up again, even after a restart (D-045).
+ *  Retracts the progress frame, which would otherwise replay as a bar moving over a held pass. */
+export const TRANSCRIPTION_PAUSED = "transcription.paused";
+/** The pass will not continue. The transcript so far is committed and the audio is kept. */
+export const TRANSCRIPTION_CANCELLED = "transcription.cancelled";
 
 /** The window capture started, stopped, or failed (D-022). Never dropped: a missed window-closed
  *  frame leaves a live preview showing for a capture that ended. */

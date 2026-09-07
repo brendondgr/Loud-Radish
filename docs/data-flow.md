@@ -108,11 +108,22 @@ Three differences from the live flow, each deliberate:
 - **The pass outlives the session.** The transcript store is handed to the runner, which alone
   closes it; the manager keeps a read-only reference so `/api/transcript/...` still serves during
   the pass, and reopens it for reading when the runner says the store is gone.
+- **And the pass outlives the process.** It writes where it has got to into the session's own
+  database on every window, so a pause — or a `SIGKILL` — leaves enough to pick it up again: which
+  file, how far in, which segment id comes next, what prompt it was started with. A resume trims
+  everything at or after the window it actually restarts on and re-derives it from the audio, which
+  makes it idempotent whatever the process was doing when it stopped (**D-045**).
 - **The transcript outlives the session too.** The store stays open for reading until the next
   session starts, so a question asked *after* a talk — a summary, a definition, what was missed —
   reaches the same store the live ones did, and a reload still finds segments to re-fetch. Asking
   after the fact is the ordinary case rather than the edge one, and closing the store on stop broke
   it three separate ways (**D-031**).
+- **And it outlives the process.** That store is held in an attribute, so a restart lost it: the
+  database sat on disk and nothing reopened it, and the main page came up empty while Recordings
+  showed the same talk. The application now reopens the newest session that holds segments, once,
+  at start-up — chosen by the timestamp in the filename rather than by mtime, because a polish pass
+  or an export writes into a database long after its talk ended. `storage.reopen_last_session`
+  turns it off (**D-041**).
 
 ## Where a recording's pieces end up (D-032)
 

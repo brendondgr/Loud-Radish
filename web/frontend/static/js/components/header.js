@@ -13,7 +13,7 @@
 import { on } from "../core/bus.js";
 import { $, setAttr, setText } from "../core/dom.js";
 import { timestamp } from "../core/format.js";
-import { ARMING, ERROR, IDLE, PROCESSING, RECORDING, STOPPING } from "../core/modes.js";
+import { ARMING, ERROR, IDLE, PAUSED, PROCESSING, RECORDING, STOPPING } from "../core/modes.js";
 import { HEALTH_CHANGED, health } from "../stores/health.js";
 import { MODE_CHANGED, mode as modeStore } from "../stores/mode.js";
 import { RECORDING_CHANGED, recording } from "../stores/recording.js";
@@ -29,28 +29,33 @@ const PRESENTATION = {
   [IDLE]: { label: "Not recording", button: "Start recording", state: "idle", enabled: true },
   [ARMING]: { label: "Choosing a window…", button: "Cancel", state: "arming", enabled: true },
   [RECORDING]: { label: "Recording", button: "Stop", state: "recording", enabled: true },
+  [PAUSED]: { label: "Paused", button: "Stop", state: "paused", enabled: true },
   [STOPPING]: { label: "Stopping…", button: "Stopping…", state: "stopping", enabled: false },
   [PROCESSING]: { label: "Transcribing…", button: "Transcribing…", state: "busy", enabled: false },
   [ERROR]: { label: "Recording failed", button: "Start recording", state: "error", enabled: true },
 };
 
 export class Header {
-  constructor(root, { onStart, onArm, onStop, onOpenSettings }) {
+  constructor(root, { onStart, onArm, onStop, onPause, onResume, onOpenSettings }) {
     this.root = root;
     this.onStart = onStart;
     this.onArm = onArm;
     this.onStop = onStop;
+    this.onPause = onPause;
+    this.onResume = onResume;
 
     this.state = $("[data-record-state]", root);
     this.stateLabel = $("[data-record-label]", root);
     this.clock = $("[data-clock]", root);
     this.toggle = $("[data-session-toggle]", root);
+    this.hold = $("[data-session-hold]", root);
     this.privacy = $("[data-privacy]", root);
     this.privacyLabel = $("[data-privacy-label]", root);
     this.modelName = $("[data-model-name]", root);
     this.llmName = $("[data-llm-name]", root);
 
     this.toggle?.addEventListener("click", () => this._onToggle());
+    this.hold?.addEventListener("click", () => this._onHold());
     for (const button of root.querySelectorAll("[data-open-settings]")) {
       button.addEventListener("click", () => onOpenSettings?.(button.dataset.openSettings));
     }
@@ -98,8 +103,25 @@ export class Header {
       this.toggle.classList.toggle("button--danger", modeStore.state === RECORDING);
     }
 
+    this._renderHold();
     this.renderClock();
     this.renderIdentity();
+  }
+
+  /**
+   * The pause control, which exists only while there is a capture to hold.
+   *
+   * Hidden rather than disabled outside those two states: a disabled control invites the question
+   * "why can I not press this", and the answer — there is no recording — is already the whole of
+   * what the rest of the header says.
+   */
+  _renderHold() {
+    if (!this.hold) return;
+    const held = modeStore.state === PAUSED;
+    const available = held || modeStore.state === RECORDING;
+    this.hold.hidden = !available;
+    setText(this.hold, held ? "Resume" : "Pause");
+    setAttr(this.hold, "aria-pressed", String(held));
   }
 
   renderClock() {
@@ -129,6 +151,15 @@ export class Header {
   /**
    * One control, six states. What pressing it means comes from the store, not from a boolean here.
    */
+  /** Pause holds the capture; resume continues the same session, file and store. */
+  async _onHold() {
+    if (modeStore.state === PAUSED) {
+      await this.onResume?.();
+      return;
+    }
+    if (modeStore.state === RECORDING) await this.onPause?.();
+  }
+
   async _onToggle() {
     switch (modeStore.action) {
       case "arm":

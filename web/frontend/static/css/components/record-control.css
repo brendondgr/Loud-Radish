@@ -93,6 +93,23 @@
   color: var(--accent-bright);
 }
 
+/* Paused takes the warning hue rather than the recording red, because it is the one state where
+ * what the user needs to know is that nothing is being captured *while a session is open*. Red
+ * would read as recording; grey would read as idle; and idle is the misreading that costs a talk.
+ * Nothing pulses here either, for the reason above. */
+.record-state[data-state="paused"] {
+  border-color: var(--warning-border);
+  background: var(--warning-wash);
+}
+
+.record-state[data-state="paused"] .record-state__dot {
+  background: var(--warning);
+}
+
+.record-state[data-state="paused"] .record-state__label {
+  color: var(--warning-text);
+}
+
 /* Stopping is the recording states dimmed rather than a fourth colour: the recording has not ended
  * yet, and changing the colour would say it had. */
 .record-state[data-state="stopping"] {

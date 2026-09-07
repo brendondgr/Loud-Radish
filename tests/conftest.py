@@ -95,7 +95,7 @@ class NoPortalInTests:
 
         raise PortalUnavailable(
             "The screen-sharing portal is not reachable from the test suite. A test that needs a "
-            "granted window must patch app.services.session.manager.PortalSession itself."
+            "granted window must patch app.services.session.window_capture.PortalSession itself."
         )
 
     def close(self) -> None:
@@ -147,9 +147,9 @@ def no_real_portal(monkeypatch):
     Autouse and suite-wide on purpose. "Remember to stub the portal" is a habit, and this was
     already forgotten once in a file whose author had no reason to think it captured anything.
     """
-    from app.services.session import manager as manager_module
+    from app.services.session import window_capture
 
-    monkeypatch.setattr(manager_module, "PortalSession", NoPortalInTests)
+    monkeypatch.setattr(window_capture, "PortalSession", NoPortalInTests)
 
 
 @pytest.fixture(autouse=True)
@@ -161,9 +161,9 @@ def no_real_audio_tap(monkeypatch):
     still do. The double reports its own `live_links`, so the session's verification runs for real
     against it rather than being stubbed out separately.
     """
-    from app.services.session import manager as manager_module
+    from app.services.session import sources
 
-    monkeypatch.setattr(manager_module, "ApplicationTap", NoTapInTests)
+    monkeypatch.setattr(sources, "ApplicationTap", NoTapInTests)
 
 
 #: The one stream the suite's audio graph is playing. A `PlaybackStream` rather than a bare object,
@@ -197,14 +197,31 @@ def no_real_audio_graph(monkeypatch):
     path most tests mean to be on, and the ones that mean to be on another patch these names
     themselves.
     """
-    from app.services.session import manager as manager_module
+    from app.services.session import sources
 
-    monkeypatch.setattr(manager_module, "tap_streams", _one_playing_stream)
+    monkeypatch.setattr(sources, "tap_streams", _one_playing_stream)
     # Non-zero: the tap is delivering, so the "widen to the whole output" path (D-030) stays shut
     # unless a test opens it deliberately. Zero would mean silence and -1.0 would mean unmeasurable,
     # and both are states a test should have to ask for.
-    monkeypatch.setattr(manager_module, "probe_peak", lambda *_a, **_k: 0.5)
-    monkeypatch.setattr(manager_module, "default_sink", lambda: "a-test-sink")
+    monkeypatch.setattr(sources, "probe_peak", lambda *_a, **_k: 0.5)
+    monkeypatch.setattr(sources, "default_sink", lambda: "a-test-sink")
+
+
+@pytest.fixture(autouse=True)
+def no_real_tray_icon(monkeypatch):
+    """Keep every test out of the developer's system tray.
+
+    The companion to `no_real_portal`. Nothing calls `Companion.run()` today, but the tray is the
+    one part of this package with a visible side effect on the desktop, and "remember not to start
+    the tray" is a habit — which is exactly the argument the portal guard was written on. A test
+    that means to exercise the D-Bus side calls `TrayIcon.answer` directly, which needs no bus.
+    """
+    from app.companion import tray as tray_module
+
+    def refuse(self):  # noqa: ANN001, ANN202
+        raise AssertionError("a test tried to place a real icon in the system tray")
+
+    monkeypatch.setattr(tray_module.TrayIcon, "start", refuse)
 
 
 @pytest.fixture(autouse=True)

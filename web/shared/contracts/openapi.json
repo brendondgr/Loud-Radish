@@ -158,6 +158,72 @@
         }
       }
     },
+    "/api/session/pause": {
+      "post": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Pause Session",
+        "description": "Hold the capture. The recording stops growing and the clock stops with it (D-044).\n\nIdempotent: pausing a session that is already held is not an error, because a second click on\na control whose label has not repainted yet is a user's mistake to make and not worth a banner.",
+        "operationId": "pause_session_api_session_pause_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/session/resume": {
+      "post": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Resume Session",
+        "description": "Continue a held capture, in the same session, the same file and the same store.",
+        "operationId": "resume_session_api_session_resume_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/session/cancel": {
+      "post": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Cancel Session",
+        "description": "End the session and transcribe nothing. Every artefact it produced is kept (D-044).\n\nThe difference from `/session/stop` is exactly one thing: the post-capture pass does not run.\nThe audio, the video and any committed segments stay where they are, and the recording remains\nlisted as transcribable, so changing your mind costs one click rather than the talk.",
+        "operationId": "cancel_session_api_session_cancel_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionStoppedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/audio/devices": {
       "get": {
         "tags": [
@@ -1951,6 +2017,51 @@
         }
       }
     },
+    "/api/sessions/{key}/transcribe/resume": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Resume Transcription",
+        "description": "Pick up a transcription pass that was held, or that a restart interrupted (D-045).\n\n**This is the half a user cannot ask for by pressing a button.** A pass held on purpose could be\nresumed from memory; one interrupted by the process ending cannot, and that is the case worth\nbuilding for \u2014 a forty-minute recording is twenty-seven minutes of CPU, and losing it to a\nrestart was the reason D-021's \"deliberately not persisted\" stopped being the right call.\n\nThe checkpoint lives in the session's own transcript database, so everything this needs \u2014 which\nfile, how far in, which segment id comes next, what prompt it was started with \u2014 is in the one\nplace that cannot be separated from the transcript it belongs to.",
+        "operationId": "resume_transcription_api_sessions__key__transcribe_resume_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Resume Transcription Api Sessions  Key  Transcribe Resume Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/recordings": {
       "get": {
         "tags": [
@@ -2013,6 +2124,54 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recordings/transcription/pause": {
+      "post": {
+        "tags": [
+          "recordings"
+        ],
+        "summary": "Pause Transcription",
+        "description": "Hold the running pass at the next window boundary (D-045).\n\nNot on a recording's own path, because there is only ever one pass: a second would contend for\nthe same model on the same device, and two half-speed transcriptions finish later than two run\nin sequence. Naming a recording would imply a choice that does not exist.",
+        "operationId": "pause_transcription_api_recordings_transcription_pause_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Pause Transcription Api Recordings Transcription Pause Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/recordings/transcription/cancel": {
+      "post": {
+        "tags": [
+          "recordings"
+        ],
+        "summary": "Cancel Transcription",
+        "description": "End the pass. What was transcribed stays committed and the audio stays on disk.",
+        "operationId": "cancel_transcription_api_recordings_transcription_cancel_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Cancel Transcription Api Recordings Transcription Cancel Post"
                 }
               }
             }
@@ -2780,6 +2939,16 @@
           "running": {
             "type": "boolean",
             "title": "Running"
+          },
+          "paused": {
+            "type": "boolean",
+            "title": "Paused",
+            "default": false
+          },
+          "recorded_seconds": {
+            "type": "number",
+            "title": "Recorded Seconds",
+            "default": 0.0
           },
           "session": {
             "anyOf": [

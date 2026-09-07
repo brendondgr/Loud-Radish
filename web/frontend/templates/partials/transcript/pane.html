@@ -11,6 +11,34 @@
         <div class="transcript__column">
           {% include "partials/transcript/empty_state.html" %}
 
+          {# **Outside the empty state, and that is the point.** A post-capture pass commits
+             segments as it goes, so the pane stops being empty after the first window — which used
+             to take the progress bar with it, exactly when a pass over a long recording most needs
+             one (D-021). It shows whenever a pass is running or held, whatever else is on screen. #}
+          <div class="transcript-progress" data-empty-progress hidden>
+            <div class="progress-bar">
+              <div class="progress-bar__fill" data-progress-fill style="width: 0%"></div>
+            </div>
+            <p class="transcript-progress__label" data-progress-label aria-live="polite">
+              Transcribing…
+            </p>
+
+            {# A pass over a long recording can run longer than the recording did, which is long
+               enough that a user may want the processor back. Holding it keeps every second
+               already transcribed and writes down where to continue, so resuming costs nothing
+               even across a restart (D-045). Cancel keeps the audio: it declines the CPU, not the
+               recording. #}
+            <div class="transcript-progress__controls" data-transcription-controls hidden>
+              <button type="button" class="button button--hold" data-transcription-hold>
+                Pause
+              </button>
+              <button type="button" class="button button--quiet" data-transcription-cancel>
+                Cancel
+              </button>
+            </div>
+          </div>
+
+
           {# Finished minutes, rewritten for reading. Deliberately OUTSIDE the live region below:
              a polished block restates text a screen reader has already announced, and announcing
              a whole minute a second time would make the page unusable. It stays fully readable —

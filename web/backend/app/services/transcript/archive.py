@@ -156,6 +156,41 @@ def list_sessions(config: AppConfig) -> list[ArchivedSession]:
     return [describe(path, recordings) for path in files]
 
 
+def newest_with_segments(config: AppConfig) -> Path | None:
+    """The most recent session that actually holds a transcript, or ``None``.
+
+    What the application reopens at start-up so the last talk is still on the page (D-041).
+
+    **Ordered by the timestamp in the filename, not by mtime.** `list_sessions` sorts by mtime
+    because that is what a *listing* wants — a file touched recently is one the user was recently
+    doing something with. This question is different: it asks which talk happened last, and a
+    polish pass, an export or a post-capture transcription all write into a database days after the
+    talk it holds ended. The stem is `YYYYMMDD-HHMMSS-<id>`, so sorting it as text sorts it by time.
+
+    **Sessions with no segments are skipped.** Reopening one puts an empty transcript on the page,
+    which is indistinguishable from the fault this exists to fix. Unreadable files are skipped for
+    the same reason plus a better one: this opens the file for writing afterwards, and a database
+    that could not be read is not one to open that way.
+    """
+    directory = session_dir(config)
+    try:
+        paths = sorted(
+            (path for path in directory.iterdir() if path.suffix == SESSION_SUFFIX),
+            key=lambda path: path.stem,
+            reverse=True,
+        )
+    except OSError:
+        return None
+
+    for path in paths:
+        session = describe(path)
+        if session.problem:
+            continue
+        if session.segments > 0:
+            return path
+    return None
+
+
 def describe(path: Path, recordings: Path | None = None) -> ArchivedSession:
     """Read one session file's summary without loading its transcript.
 

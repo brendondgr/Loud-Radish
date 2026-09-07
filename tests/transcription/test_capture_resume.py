@@ -37,8 +37,7 @@ from app.config import ConfigStore
 from app.models.session import SessionMetadata
 from app.services.capture import stitch as stitch_module
 from app.services.capture.stitch import CaptureSegment, stitch
-from app.services.session import CaptureOptions, SessionManager, modes
-from app.services.session import manager as manager_module
+from app.services.session import CaptureOptions, SessionManager, modes, window_capture
 
 from .capture_doubles import (
     Credentials,
@@ -186,15 +185,15 @@ async def test_a_portal_that_refuses_to_reopen_ends_the_video_and_says_so(manage
 async def test_reopening_is_bounded(manager, monkeypatch) -> None:
     """A portal that has failed five times is not coming back, and a loop that keeps asking it
     fills the recording folder with empty segments."""
-    monkeypatch.setattr(manager_module, "RESUME_BACKOFF_S", 0.0)
+    monkeypatch.setattr(window_capture, "RESUME_BACKOFF_S", 0.0)
     session, _store, _events = manager
     session.credentials = Credentials()
     await session.start(window(), options=CaptureOptions())
     try:
-        for _ in range(manager_module.MAX_CAPTURE_RESUMES + 3):
+        for _ in range(window_capture.MAX_CAPTURE_RESUMES + 3):
             end_recorder(FakeRecorder.instances[-1])
 
-        assert len(FakeRecorder.instances) == manager_module.MAX_CAPTURE_RESUMES + 1
+        assert len(FakeRecorder.instances) == window_capture.MAX_CAPTURE_RESUMES + 1
     finally:
         await session.stop()
 

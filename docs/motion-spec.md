@@ -193,6 +193,11 @@ identical, and the differences are informative rather than accidental.
 - **Plan 5, the tray companion** ([plans/system-integration.md](plans/system-integration.md)). This
   file is what step 5 of that plan was blocked on. The tray draws frames rather than running a
   stylesheet, which is why §3's closed-form amplitudes matter as much as the keyframes.
+  **There are now two renderers of those amplitudes**, and §1's geometry plus §3's closed forms are
+  what keep them from drifting: `companion/aperture.py` produces SVG text, and
+  `companion/raster.py` produces ARGB32 pixels for the D-Bus icon property, because no SVG
+  rasteriser can be installed without a system library or a GUI toolkit (D-042). Both import the
+  same constants and the same `amplitude()`; only the ink differs.
 - **The header's record indicator**, potentially. The current indicator is a dot and a word, and
   D-020's motion rule deliberately forbids anything that loops in an interface on screen for two
   hours. Replacing it with a breathing thirteen-bar capsule would contradict that rule, so it is

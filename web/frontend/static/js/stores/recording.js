@@ -20,13 +20,20 @@ class RecordingStore {
     this.duration = 0;
     /** Size on disk, in bytes. */
     this.bytes = 0;
-    /** `running` | `done` | `failed`, or null when no pass has run this session. */
+    /** `running` | `paused` | `cancelled` | `done` | `done_no_speech` | `failed`, or null when
+     *  no pass has run this session. */
     this.state = null;
     this.progress = 0;
     this.transcribedSeconds = 0;
     this.totalSeconds = 0;
     this.segments = 0;
     this.error = "";
+    /** Where a resume would begin, in seconds of audio (D-045). */
+    this.nextStartSeconds = 0;
+    /** Whether this pass can be picked up again. */
+    this.resumable = false;
+    /** The archive key of the transcript this pass writes into — what addresses a resume. */
+    this.sessionKey = "";
   }
 
   /** A recording is being written. */
@@ -45,6 +52,13 @@ class RecordingStore {
     this.totalSeconds = payload.total_seconds ?? 0;
     this.segments = payload.segments ?? 0;
     this.error = payload.error ?? "";
+    // Where a resume would begin, and whether one is possible at all (D-045). Carried on the same
+    // payload so the controls do not need a second request to know what to offer.
+    this.nextStartSeconds = payload.next_start_s ?? 0;
+    this.resumable = Boolean(payload.resumable);
+    // The archive key, which is what addresses a resume. Deliberately not `session_id`: the two
+    // are different strings, and joining them in the browser would be a second request.
+    this.sessionKey = payload.key || this.sessionKey || "";
     // The measured character of the audio, carried on the same payload so an empty transcript can
     // explain itself without the interface making a second request to find out why.
     this.audio = payload.audio ?? null;
@@ -75,11 +89,24 @@ class RecordingStore {
     this.segments = 0;
     this.error = "";
     this.audio = null;
+    this.nextStartSeconds = 0;
+    this.resumable = false;
+    this.sessionKey = "";
     emit(RECORDING_CHANGED, this);
   }
 
   get isTranscribing() {
     return this.state === "running";
+  }
+
+  /** The pass is held at a window boundary and can be picked up again (D-045). */
+  get isTranscriptionPaused() {
+    return this.state === "paused";
+  }
+
+  /** The pass will not continue, and was stopped on purpose rather than by a failure. */
+  get isTranscriptionCancelled() {
+    return this.state === "cancelled";
   }
 
   /**

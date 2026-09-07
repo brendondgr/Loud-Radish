@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-09-06 (the Loud Radish rebrand — D-038)*
+*Last updated: 2026-09-06 (the tray, the restart, the clutter, and work that can be interrupted)*
 
 The active work list for Loud Radish. Update it whenever a task is finished or new work is
 discovered.
@@ -170,11 +170,10 @@ each was invisible to reading and obvious to using, which is the argument for th
       starts. See Part 3h and **D-031** — the same line was refusing every question the assistant
       was asked after a stop, which is how it came to be fixed.
 
-- [ ] **The transcription pass is neither resumable nor cancellable.** It runs whole or fails whole.
-      A forty-minute recording at RTF ≈ 1.5 takes around twenty-seven minutes, which is long enough
-      that resumption is worth wanting — but the right design for it cannot be guessed before anyone
-      has watched a real one run. A server restart mid-pass keeps the recording and loses the job;
-      the recording then appears in Settings → Storage with a button to run it again.
+- [x] **The transcription pass is neither resumable nor cancellable — it is both now (D-045).**
+      The item said the right design "cannot be guessed before anyone has watched a real one run",
+      and that turned out to be exactly right: watching one run is what found the window-boundary
+      defect. A server restart mid-pass now keeps the recording *and* the job.
 - [ ] **`recording.batch_window_s` has not been tuned against a real model.** The 30-second default
       matches Whisper's own window, but whether a longer window measurably improves a recorded
       transcript over a live one is the question the mode exists to exploit, and it is unmeasured.
@@ -188,17 +187,19 @@ each was invisible to reading and obvious to using, which is the argument for th
       `uv run app.py` is the whole story. GStreamer and a desktop portal are still system packages
       and are named in `docs/workflow.md`.
 
-- [ ] **The tray icon is not yet exported to D-Bus.** Everything behind it is built and tested: the
-      Aperture renderer, the frame clock, the (mode, run state) → picture map, the menu model, and
-      shortcut registration verified against the real KGlobalAccel. What is missing is the final
-      hop — one `org.kde.StatusNotifierItem` object with its icon properties and a `NewIcon` signal,
-      so a picture actually appears in the Plasma tray. `Companion.latest_svg` already produces a
-      frame per tick; it needs rasterising to ARGB32 and publishing. Recorded here rather than
-      claimed, because a tray icon that does not appear is the one part of Plan 5 a user would
-      notice immediately.
-- [ ] **Whether `jeepney` can export SNI pixmaps at all.** The reason the hop above is separate. If
-      it proves unworkable the documented fallback is `PySide6`'s `QSystemTrayIcon`, which speaks
-      the same protocol through Qt — decided by trying, not by arguing.
+- [x] **The tray icon is not yet exported to D-Bus — it is now.** The final hop is written and
+      verified against the real Plasma watcher: `Companion.latest_svg` still produces a frame per
+      tick, and beside it `companion/raster.py` produces the same frame as ARGB32 for the icon
+      property. See Part 3l, **D-042** and **D-043**.
+- [x] **Whether `jeepney` can export SNI pixmaps at all — it can.** Measured 2026-09-06 rather than
+      argued, which is what this item asked for. `jeepney` 0.9.0 serialises a 22 x 22 ARGB32 buffer
+      into a `Properties.Get` reply of signature `a(iiay)` and parses it back **byte-identical**; it
+      builds `NewIcon` signals and `GetAll` replies; and `DBusConnection` exposes
+      `receive`/`send`/`filter` beside `new_method_return` and `new_error`, which is every primitive
+      a served object needs. This machine is already running an `org.kde.StatusNotifierWatcher` with
+      a host registered. **`PySide6` is therefore very unlikely to be needed**, and the remaining
+      unknown is only the dispatch loop, not the protocol. Planned in
+      [plans/tray-restart-clutter-and-interruptible-work.md](plans/tray-restart-clutter-and-interruptible-work.md).
 
 Known blockers and open questions carried by these plans:
 
@@ -224,10 +225,10 @@ Known blockers and open questions carried by these plans:
       Do that with a real recording on the machine you will use. Encoding alone measured 13× real
       time at 720p15 with VP8, which is the one half that *is* answered — the encoder has ample
       headroom on its own; what is unknown is what it does to inference running beside it.
-- [ ] **Whether the StatusNotifierItem protocol can be spoken directly with `jeepney`.** Plan 5
-      avoids pulling a GUI toolkit into the virtualenv for one tray icon. Exporting icon pixmaps as
-      D-Bus properties is the part that may not be worth it; the fallback is `PySide6`'s
-      `QSystemTrayIcon` behind the same optional group, decided by trying rather than by arguing.
+- [x] **Whether the StatusNotifierItem protocol can be spoken directly with `jeepney` — yes.**
+      The same measurement as above, recorded twice because the question was asked twice. Pixmap
+      marshalling was the part feared not worth it and it is a non-issue; what is left is a dispatch
+      loop, which Step 5 of the plan builds.
 - [ ] **Per-window audio is not available.** The KDE ScreenCast portal carries video only, so window
       capture records the machine's audio, not that window's. Plan 4 says so at the moment of arming
       rather than letting a user discover it in the recording.
@@ -300,11 +301,9 @@ Two things measured along the way, recorded so they are not re-litigated:
   id alike with `defined target not found`, so it cannot be the thing that makes a bad target
   visible. Verifying the achieved capture replaces it.
 
-- [ ] **`services/session/manager.py` is 1334 lines, against a cap of 800.** It was already 1265
-      before this repair and this added 73. The new logic went into the audio modules wherever it
-      could, but the decision about which source a session opens belongs to the manager and had
-      nowhere else to go. It wants splitting — the source-selection and capture-wiring halves are
-      the obvious seam — and that is a refactor, not a repair, so it was not smuggled into one.
+- [x] **`services/session/manager.py` is 1334 lines, against a cap of 800 — split at 1782.** It
+      kept growing after this was written. The seam named here, source-selection against
+      capture-wiring, is two of the six files it became; see Part 3l and **D-039**.
 
 Still open, and deliberately not guessed at:
 
@@ -440,11 +439,10 @@ Five reported problems, planned in
 - [x] **No credential leaves in the archive.** `llm.api_key` ships present and empty; the page keeps
       what the user types in that browser alone.
 
-- [ ] **The developer's `data/sessions` still holds the suite's leavings.** The cause is fixed and
-      the files are harmless, but roughly 690 empty databases from before the fix are still in the
-      user's own directory and still at the top of the recordings page. Deleting another person's
-      data is their call, not ours; the list can be pruned by removing session files whose database
-      holds no segments.
+- [x] **The developer's `data/sessions` still holds the suite's leavings — cleared on request.**
+      679 removed, 291 kept. The rule turned out to need a second clause: 28 of the empty databases
+      own a recording folder and are failed transcriptions rather than leavings. See Part 3l and
+      `scripts/prune_empty_sessions.py`.
 - [ ] **The export cannot be scoped to a revision.** It ships the latest pass, like every other
       export. Same gap as the one recorded in Part 3g, and the same remedy — a revision control on
       the recordings page.
@@ -487,11 +485,9 @@ passes, and a muxed file with sound in it.
 - [ ] **The offset is logged, not stored.** It goes to the log at INFO when a recording is
       combined. Giving it a file of its own was rejected: the same report asked for *fewer* files
       in a recording folder.
-- [ ] **A restart still hides the last transcript from the live page.** The finished store is held
-      only until the next session starts, and not across a process restart — so after restarting
-      the application the last talk is reachable through Recordings but not on the main page. That
-      is the documented bound of D-031 rather than a regression, and closing it would mean deciding
-      what "the current session" means to a process that has just started.
+- [x] **A restart still hides the last transcript from the live page — closed (D-041).** The
+      question it raised, what "the current session" means to a process that has just started, is
+      answered: the newest session that actually holds segments, by the timestamp in its name.
 
 ## Part 3k — A Seminar That Stopped Recording, and the Export Window
 
@@ -592,6 +588,88 @@ says `max_height: 720` against a recording made at **2560 × 1532**.
       ones written to.
 
 ---
+
+---
+
+## Part 3l — The Tray, the Restart, the Clutter, and Work That Can Be Interrupted
+
+Four things asked for together on 2026-09-06, planned in
+[plans/tray-restart-clutter-and-interruptible-work.md](plans/tray-restart-clutter-and-interruptible-work.md)
+and closed (10 / 10). Recorded as **D-039** to **D-045**. Three of them were open items already
+carried above; the fourth is new capability. The items they close are left in place rather than
+moved, so nothing is lost by reading this file top to bottom.
+
+Every step that could be run *was* run, against the real desktop and real recordings rather than
+fixtures, and five faults came out of that which no test would have found:
+
+- **"Nothing recorded yet" stood over a pane full of prose.** The empty state ignored polished
+  blocks and was not re-rendered when every segment was already covered by one. Reachable before
+  this work and never looked at.
+- **A `setAttr` used without importing it took the whole page down**, so nothing on it wired up.
+- **The pass's progress bar hid itself** after its first window, because it lived inside the empty
+  state — a fault present since D-021 — and its new controls went with it. Both moved out and made
+  sticky, after finding them scrolled off-screen at 8000 px.
+- **A held pass refused its own resumption**, because `is_busy` counted waiting as working.
+- **A held pass reported itself 100 % complete**, because the tail flush reports the whole file's
+  length whether the loop finished or was cut short.
+
+- [x] **The tray icon's D-Bus export — done, and the icon appears.** `companion/raster.py` draws
+      the instrument as ARGB32 with `numpy` alone (**D-042**), and `companion/tray.py` serves one
+      `org.kde.StatusNotifierItem` plus its `com.canonical.dbusmenu` from a dispatch loop over
+      `jeepney`'s primitives (**D-043**). Verified against the real desktop: registered with the
+      live watcher, `GetAll` returning fifteen properties and a 22 x 22 icon, the picture animating
+      between reads, an eleven-item menu — and on killing the server, the tooltip becoming "Loud
+      Radish is not running", the menu collapsing to four items, and the picture becoming the fault
+      one. No `PySide6`. Start it with `uv run python -m app.companion.main` from `web/backend/`,
+      or `--no-tray` to run the shortcuts without one.
+- [x] **The last transcript after a restart — closed.** The newest session holding segments is
+      reopened once at start-up, chosen by the timestamp in its filename rather than by mtime.
+      `storage.reopen_last_session` turns it off. Verified against a real server both ways: on, the
+      page hydrates 4 segments and the assistant answers with a `context_timestamp` of 16.5 rather
+      than zero; off, `/api/transcript/revisions` says no session is open and the assistant gives
+      D-031's honest refusal. **Running it found a second fault**: with a transcript restored the
+      pane showed "Nothing recorded yet" over the prose, because the empty state ignored polished
+      blocks and was not re-rendered when every segment was already covered by one. Both halves
+      fixed. Recorded as **D-041**.
+- [x] **The empty session databases — cleared, 970 files down to 291.** `scripts/prune_empty_sessions.py`
+      reports by default and needs `--apply` to delete. Run against the real directory: 679 removed,
+      47.1 MB reclaimed, `data/sessions` 103 MB → 58 MB, and the Recordings page now opens on a real
+      talk instead of a wall of empty rows. **28 empty databases were kept**, every one of them
+      owning a recording folder — failed transcriptions of real audio, whose empty database is the
+      only thing naming the audio. Every candidate was re-checked straight from SQLite before
+      deleting: 679 of 679 genuinely held zero segments.
+- [x] **Pause, resume and cancel a capture — done (D-044).** `paused` is in the run-state
+      vocabulary on both sides of the wire, with its own control in the header beside the primary
+      one. A pause **removes time from the recording**: verified in the browser against a real
+      server, nine seconds of wall clock across a three-second hold produced 3.01 s → 3.01 s →
+      6.02 s of recorded audio, with the header clock frozen throughout the hold. `window` mode
+      stops its video with the audio so the two cannot drift. Cancel keeps every artefact and runs
+      no pass. 320 px and keyboard passes done.
+- [x] **Pause, resume and cancel a transcription pass — done (D-045).** The checkpoint lives in
+      the session's own transcript database and is written on every window, so an interruption the
+      user did not choose is recoverable too. **Verified against a real 39-minute recording**: the
+      pass was killed with `SIGKILL` at 1885 s, the process restarted, and
+      `POST /api/sessions/{key}/transcribe/resume` picked it up from its checkpoint — unique
+      increasing ids, non-decreasing timestamps, and a seam that reads continuously from 1885.2 s to
+      1886.2 s with no gap and no overlap. Running it found a defect reading would not have: a
+      resume snaps back to the window boundary at or before the point asked for, so trimming at the
+      requested second and transcribing from the earlier one duplicated eighteen seconds. Fixed, and
+      the regression test was confirmed failing against the old behaviour.
+- [ ] **`services/session/manager.py` is back to 782 lines and the cap is 800.** Split from 1782,
+      then grown again by pause, resume and cancel. It is inside the limit and has roughly twenty
+      lines of headroom, which is not much: the next thing added to a session's lifecycle will need
+      another seam rather than another method. The frame path, the background workers, the window
+      capture, the passes and the source selection have already gone; what is left is genuinely the
+      lifecycle and the state machine, so the next split is a real design decision rather than a
+      move.
+- [x] **`services/session/manager.py` had reached 1782 lines — split, and was 672.** Six files:
+      `shapes.py` (the dataclasses and tuning constants, importing no sibling so nothing cycles),
+      `frames.py`, `background.py`, `window_capture.py`, `passes.py`, `sources.py`. Every file in
+      the package is now under 500. Mixins rather than collaborators, and **D-039** says why and
+      what that costs. No behaviour changed — 1671 passed / 12 skipped, identical to before — but
+      about thirty test patch sites had to follow the code, including the four autouse guards that
+      keep the suite out of the developer's PipeWire graph; those were re-verified by making every
+      real call raise and diffing the failure set, which came back identical at 24 each side.
 
 ---
 
@@ -727,12 +805,28 @@ user's own machine, and none may be reported as passing until it has had one.
       `uv run scripts/calibrate_export_estimate.py data/recordings/<key>/video-with-audio.webm`
       against a recording of a *different* kind — one that cuts between cameras rather than sitting
       on a slide — and see whether the measurement still lands inside the range.
+- [ ] **The tray icon on a desktop that is not KDE.** The `StatusNotifierItem` export is verified
+      against the real `org.kde.StatusNotifierWatcher` on this machine, end to end: registered,
+      fifteen properties read back, the picture animating, an eleven-item menu, and the whole thing
+      following the server as it was killed. What has **not** been tried is GNOME (which needs an
+      extension for SNI at all), or a panel that reads `IconName` and ignores `IconPixmap`. The
+      failure mode there is no icon rather than a wrong one, and the companion says so once and
+      carries on.
+- [ ] **Pausing a `window` recording on a real portal stream.** The video is stopped with the audio
+      and the pieces rejoin on the audio clock, which is covered against a stubbed portal and a real
+      `ffmpeg`. What is owed is the whole thing on a real desktop: pause a window capture, wait,
+      resume, and confirm both that **the portal picker does not appear** — the open question this
+      plan flagged for the user and could not answer headlessly — and that the joined video plays
+      continuously with the sound still in step.
+- [ ] **A paused capture over a long talk.** Verified at nine seconds of wall clock across a
+      three-second hold. Nobody has yet held a capture for twenty minutes mid-seminar and read the
+      result back, which is the case the feature exists for.
 - [ ] **A genuine 90-minute soak** — the accelerated soak in `tests/transcription/test_soak.py`
       drives ninety minutes of transcript through the engine in seconds and holds bounded memory,
       contiguous segment ids, and a clock that has not drifted. It is not the same as ninety
       wall-clock minutes with a real model and a real device, which remains yours to run.
 
-## Part 4 — After the Loud Radish rebrand (D-038)
+## Part 6 — After the Loud Radish rebrand (D-038)
 
 - [x] **The rebrand itself.** The name lives in `web/backend/app/branding.py`; every user-visible
       string, every machine identifier, the documentation, the three agent pointer sets, and the

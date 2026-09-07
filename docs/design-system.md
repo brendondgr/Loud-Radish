@@ -121,13 +121,14 @@ would mean rebuilding the pipeline underneath a transcript that is still accumul
 no user need for it. Changing mode while idle does **not** clear the transcript: the transcript is
 cleared on `session.started` and nowhere else.
 
-### The record control's six states
+### The record control's seven states
 
 | State | Label | Dot | Enabled | Announced |
 |---|---|---|---|---|
 | `idle` | *Start recording* | `--text-dim` | Yes | — |
 | `arming` | *Choose a window…* | `--accent` | Yes — cancels | "Waiting for a window to be chosen" |
 | `recording` | *Stop* | `--danger` | Yes | "Recording" |
+| `paused` | *Stop* | `--warning` | Yes | "Paused" |
 | `stopping` | *Stopping…* | `--danger`, dimmed | **No** | "Stopping" |
 | `processing` | *Transcribing… NN%* | `--accent` | **No** | "Transcribing, NN percent" |
 | `error` | *Start recording* | `--warning` | Yes | The failure, in plain language |
@@ -136,9 +137,20 @@ Rules that fall out of the table:
 
 - **`stopping` and `processing` disable the control rather than hiding it.** A hidden control makes
   the header reflow mid-recording; a disabled one keeps the layout still and says why.
-- **`processing` is not a cancel button.** Cancelling a transcription pass after a forty-minute
-  recording discards the only transcript of audio that is about to be deleted. The honest recoveries
-  are to let it finish or to stop the server, and the audio is on disk in the meantime.
+- **Pause is a second control, not a seventh meaning for this one (D-044).** This control already
+  serves seven states by asking the store what pressing it means; giving it "stop, and you will be
+  asked to confirm" and "pause, which is free" as two meanings that differ only by current state
+  puts two different consequences under one finger. The pause control is hidden outside `recording`
+  and `paused` rather than disabled — a disabled button invites "why can I not press this", and the
+  answer, that there is no recording, is already the whole of what the rest of the header says.
+- **`paused` takes `--warning`, not `--danger` and not grey.** It is the one state where what the
+  user needs to know is that *nothing is being captured while a session is open*. Red reads as
+  recording; grey reads as idle; and idle is the misreading that costs a talk.
+- **`processing` is not a cancel button, and the pass's own controls are elsewhere (D-045).**
+  Cancelling from the header would sit one pixel from Stop during the most expensive operation the
+  application performs. The pass carries its own Pause and Cancel beside its progress bar in the
+  transcript pane, where the figure they act on is visible — and that bar **sticks to the top of the
+  scroller**, because a pass commits as it goes and used to scroll its own controls out of sight.
 - **`error` returns the control to its idle affordance** and puts the message in the banner region,
   which already exists and is already announced. The dot stays warning-coloured so the previous run's
   failure is still visible next to a button that says *Start recording*.

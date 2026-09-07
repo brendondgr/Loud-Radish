@@ -47,15 +47,21 @@ STOPPING: Final = "stopping"
 #: Capture has finished and a transcription pass is running over what it produced. Can last longer
 #: than the recording did.
 PROCESSING: Final = "processing"
+#: Capture is held. **The recording does not advance while it is** — frames are dropped rather than
+#: buffered, so the audio file, the engine's clock and the transcript's timestamps stay in step, and
+#: a talk paused for five minutes is five minutes shorter rather than five minutes of silence
+#: (D-044). Resuming continues the same session, the same file and the same store.
+PAUSED: Final = "paused"
 #: Something failed in a way the user has to see. Carries a message; leaves by returning to idle.
 ERROR: Final = "error"
 
-RecordState = Literal["idle", "arming", "recording", "stopping", "processing", "error"]
+RecordState = Literal["idle", "arming", "recording", "paused", "stopping", "processing", "error"]
 
 RECORD_STATES: Final[tuple[RecordState, ...]] = (
     IDLE,
     ARMING,
     RECORDING,
+    PAUSED,
     STOPPING,
     PROCESSING,
     ERROR,
@@ -68,13 +74,17 @@ RECORD_STATES: Final[tuple[RecordState, ...]] = (
 #: the whole mode. ``window`` may or may not, depending on whether post-process transcription was
 #: switched on, so the state is listed as reachable and simply never entered when it is not.
 MODE_STATES: Final[dict[CaptureMode, tuple[RecordState, ...]]] = {
-    LIVE: (IDLE, RECORDING, STOPPING, ERROR),
-    RECORDED: (IDLE, RECORDING, STOPPING, PROCESSING, ERROR),
-    WINDOW: (IDLE, ARMING, RECORDING, STOPPING, PROCESSING, ERROR),
+    LIVE: (IDLE, RECORDING, PAUSED, STOPPING, ERROR),
+    RECORDED: (IDLE, RECORDING, PAUSED, STOPPING, PROCESSING, ERROR),
+    WINDOW: (IDLE, ARMING, RECORDING, PAUSED, STOPPING, PROCESSING, ERROR),
 }
 
 #: States in which a session is doing something and the mode may not be changed.
-BUSY_STATES: Final[frozenset[str]] = frozenset({ARMING, RECORDING, STOPPING, PROCESSING})
+#:
+#: **`paused` belongs here.** A paused session still owns its capture device, its audio file and its
+#: transcript store; it is held, not finished. Changing the mode under it would mean the session
+#: that resumes is not the session that was paused.
+BUSY_STATES: Final[frozenset[str]] = frozenset({ARMING, RECORDING, PAUSED, STOPPING, PROCESSING})
 
 #: What each mode needs beyond a plain ``uv sync``, as the key reported by ``GET /api/health``.
 #:

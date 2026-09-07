@@ -54,6 +54,20 @@
   border-color: var(--danger-border);
 }
 
+/* The pause control. Quieter than the primary one on purpose: pausing is free and reversible, and
+ * a second emphatic button beside "Stop" would compete with the one that has a consequence. */
+.button--hold {
+  color: var(--warning-text);
+  background: var(--warning-wash);
+  border-color: var(--warning-border);
+}
+
+.button--hold[aria-pressed="true"] {
+  color: var(--accent-bright);
+  background: var(--accent-wash);
+  border-color: var(--accent-border);
+}
+
 .button--quiet {
   background: none;
   border-color: transparent;

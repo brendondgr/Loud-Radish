@@ -13,136 +13,79 @@ from __future__ import annotations
 
 import logging
 import threading
-import time
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Final
-
-import numpy as np
+from typing import Any
 
 from ...config import AppConfig, ConfigStore
-from ...models.segment import Segment
 from ...models.session import SessionMetadata, SessionStats
 from ..asr import AsrLifecycle, LoadProgress, PromptBuilder
 from ..asr.contract import AsrLoadError
-from ..audio import LevelMeter, WavFileSource
-from ..audio.monitor import MonitorUnavailable, default_sink
-from ..audio.sources import AudioSource, DeviceSource, MonitorSource, SourceInfo, probe_peak
-from ..audio.tap import ApplicationTap, TapError
-from ..audio.tap import playback_streams as tap_streams
-from ..audio.tap import score as tap_score
+from ..audio import LevelMeter
+from ..audio.sources import AudioSource, SourceInfo
+from ..audio.tap import ApplicationTap
 from ..capture import (
-    CaptureSegment,
     CaptureSupport,
-    MuxResult,
     PortalDeclined,
     PortalError,
     PortalSession,
     RecorderError,
-    RecorderState,
     WindowRecorder,
-    build_pipeline,
-    mux_audio_video,
-    probe_video_duration,
-    stitch_segments,
 )
-from ..capture import detect as detect_capture
 from ..recording import (
     JobRegistry,
     RecordingLayout,
     SinkError,
-    TranscriptionJob,
     TranscriptionRunner,
     WavSink,
     layout_for,
 )
-from ..recording.layout import key_for as layout_key_for
-from ..streaming.events import CommittedSegment, EngineNotice, HypothesisUpdate
 from ..streaming.guards import Severity
-from ..streaming.passthrough import build_engine
 from ..transcript import TranscriptStore
 from ..vad import SpeechGate, build_gate
 from . import degradation, modes
+from .background import BackgroundWorkMixin
+from .frames import FramePathMixin
 from .metrics import PipelineMetrics
+from .passes import TranscriptionPassMixin
+from .shapes import (
+    QUEUE_CAPACITY,
+    CapturedFrame,
+    CaptureOptions,
+    EmitFn,
+    SessionError,
+)
+from .sources import AudioSourceMixin
+from .window_capture import WindowCaptureMixin
 from .workers import DropOldestQueue, Worker
 
 logger = logging.getLogger(__name__)
 
-#: How many times one session's video capture may be reopened after dying (D-036). Above this the
-#: video ends with a message: a portal that has failed five times is not coming back, and a loop
-#: that keeps asking it is one that fills the recording folder with empty segments.
-MAX_CAPTURE_RESUMES: Final = 5
 
-#: The shortest interval between two attempts. A capture that dies the instant it starts would
-#: otherwise burn the whole allowance in a second, and report a permanent failure for what was a
-#: transient one.
-RESUME_BACKOFF_S: Final = 5.0
+class SessionManager(
+    FramePathMixin,
+    BackgroundWorkMixin,
+    WindowCaptureMixin,
+    TranscriptionPassMixin,
+    AudioSourceMixin,
+):
+    """Owns the running session and everything it is made of.
 
-#: Emits one transport event. Called from worker threads.
-EmitFn = Callable[[str, dict[str, Any]], None]
+    **The five bases are this class, split across files, not five collaborators.** ``manager.py``
+    had reached 1782 lines against an 800-line cap, and every feature in
+    ``docs/plans/tray-restart-clutter-and-interruptible-work.md`` edits it. The methods moved out
+    read and write this object's attributes exactly as they did when they were written here; the
+    move changed no behaviour, which is what the suite passing untouched demonstrates.
 
-#: Roughly four level updates a second is plenty; more just drives the frontend's render loop.
-LEVEL_INTERVAL_S = 0.25
-
-#: How often health telemetry is published.
-STATUS_INTERVAL_S = 1.0
-
-#: Absolute level a monitored frame must reach to count as worth transcribing, as linear RMS.
-#: −33 dBFS, chosen from measurement rather than taste: seminar speech has a 35 dB dynamic range
-#: and peaks well above this, while a video's background music measured a flat 5 dB band from
-#: −42.6 to −37.4 dBFS and stays below it. Speech has dynamics; ambience does not.
-LOOPBACK_SPEECH_RMS = 0.022
-
-#: How long each side of the dead-tap comparison listens. One second is ample: the question is
-#: whether anything at all arrives, not what it sounds like, and both probes run before the
-#: session starts — so this is time the user waits at the moment they press record.
-TAP_PROBE_S = 1.0
-
-#: Capture queue depth, in frames. At 32 ms a frame this is about six seconds of slack — enough to
-#: absorb a slow inference pass, short enough that a sustained problem surfaces quickly.
-QUEUE_CAPACITY = 200
-
-
-@dataclass(frozen=True)
-class CaptureOptions:
-    """The three per-run switches a `window` session was armed with (D-020).
-
-    A plain dataclass rather than the request schema: `services/` must not import `schemas/`, which
-    is a validation boundary for HTTP and not a vocabulary for the pipeline.
+    Mixins were chosen over real collaborator objects deliberately and with a known cost. Real
+    objects would need their own state, their own lifetimes and their own teardown ordering — a
+    refactor with genuine risk, in the file where a concurrency mistake once produced "Cannot
+    operate on a closed database". Splitting by file first is the cheap half of that change and
+    leaves the expensive half available. What it does not do is reduce the coupling: these methods
+    still know everything about this object, and the seam is a filename rather than an interface.
     """
-
-    live_transcription: bool = True
-    post_transcription: bool = True
-    video: bool = True
-    #: Which audio this run records: `system` (everything the machine plays), `application` (only
-    #: the matched application, tapped additively), or `microphone`. Per-run, and it **overrides**
-    #: `capture.audio_source` — the sheet in front of the user at the moment they press record is
-    #: more authoritative than a setting they configured once and forgot.
-    audio_source: str = "system"
-
-    @property
-    def records_nothing(self) -> bool:
-        return not (self.live_transcription or self.post_transcription or self.video)
-
-
-@dataclass
-class CapturedFrame:
-    """One frame, with what the VAD made of it."""
-
-    audio: np.ndarray
-    speaking: bool
-    pause: bool
-
-
-class SessionError(RuntimeError):
-    """Raised when a session operation cannot proceed."""
-
-
-class SessionManager:
-    """Owns the running session and everything it is made of."""
 
     def __init__(
         self,
@@ -231,6 +174,15 @@ class SessionManager:
         #: The store of the session that has just finished, kept **open for reading** until the
         #: next one starts. See the :attr:`store` property for why.
         self._last_store: TranscriptStore | None = None
+        # **Pause is a flag on the capture thread, not a stopped device.** Releasing the microphone
+        # and reopening it would give the resumed session a different stream, a different clock
+        # origin and — on a monitor source — possibly a different sink; and the portal would ask
+        # again. Holding the device and dropping its frames costs an idle callback every 32 ms and
+        # keeps everything else identical (D-044).
+        self._paused = False
+        #: Set when a session was ended by `cancel()` rather than by `stop()`. Read at teardown to
+        #: skip the post-capture pass — the only difference between the two.
+        self._cancelled = False
 
     # -- state ---------------------------------------------------------------------
 
@@ -297,6 +249,11 @@ class SessionManager:
         return store.stats().duration_seconds if store is not None else 0.0
 
     @property
+    def is_paused(self) -> bool:
+        """Whether a running session is being held. False when nothing is running."""
+        return self._paused and self.is_running
+
+    @property
     def silence_seconds(self) -> float:
         """How long the speaker has currently been silent, from the VAD gate.
 
@@ -317,6 +274,15 @@ class SessionManager:
         stats = store.stats() if store else None
         return {
             "running": self.is_running,
+            # Separate from `running`, because a paused session *is* running: it holds its device,
+            # its file and its store. A client that only read `running` would show a recording that
+            # is not advancing as one that is, which is the misreading that costs a talk.
+            "paused": self.is_paused,
+            # How much audio this session has actually consumed, which is *not* wall-clock elapsed
+            # once it has been paused (D-044). The page's clock is derived from the start time, so
+            # on a reload it has no way to know how long the session was held; this is the figure it
+            # reconciles against, and it is the same one every transcript timestamp comes from.
+            "recorded_seconds": round(self.session_seconds, 2),
             "session": self._metadata.as_dict() if self._metadata else None,
             "asr": self._asr.status(),
             "stats": stats.as_dict() if stats else None,
@@ -375,6 +341,8 @@ class SessionManager:
                 raise SessionError(
                     "A session is already recording. Stop it before starting another."
                 )
+            self._paused = False
+            self._cancelled = False
             self._claimed = True
 
         try:
@@ -500,6 +468,91 @@ class SessionManager:
         )
         return session
 
+    def pause(self) -> None:
+        """Hold the capture. The recording stops growing and the clock stops with it.
+
+        **Pause removes time from the recording rather than recording silence (D-044).** Frames are
+        dropped at `_on_frame`, so the WAV stops growing, the engine consumes nothing and its
+        `session_seconds` — which is where every transcript timestamp comes from — stops advancing.
+        A ten-minute talk held for five minutes produces ten minutes of audio whose last timestamp
+        is 10:00.
+
+        The alternative, writing silence, was rejected twice over: it makes the transcript claim
+        time in which nothing was said, and it makes pausing cost exactly as much disk and exactly
+        as much inference as not pausing, which is not what the word means. What is given up is that
+        timestamps no longer correspond to time of day once a session has been paused — and nothing
+        reads them that way. The polish pass, the assistant's citations and the exported page's
+        video sync are all recording-relative.
+
+        The device stays open. Closing and reopening it would change the stream, the clock origin
+        and possibly the sink, and in `window` mode would ask the portal again.
+
+        Raises:
+            SessionError: if nothing is recording.
+        """
+        if not self.is_running:
+            raise SessionError("No session is recording.")
+        if self._paused:
+            return
+
+        self._paused = True
+        self._pause_window_capture()
+        self._emit(
+            "session.paused",
+            {
+                "session_id": self._metadata.session_id if self._metadata else "",
+                "at_seconds": round(self.session_seconds, 2),
+            },
+        )
+        logger.info("Session held at %.1f s", self.session_seconds)
+
+    def resume(self) -> None:
+        """Continue a held capture, in the same session, file and store.
+
+        Raises:
+            SessionError: if nothing is recording.
+        """
+        if not self.is_running:
+            raise SessionError("No session is recording.")
+        if not self._paused:
+            return
+
+        self._paused = False
+        self._resume_window_capture_after_pause()
+        self._emit(
+            "session.resumed",
+            {
+                "session_id": self._metadata.session_id if self._metadata else "",
+                "at_seconds": round(self.session_seconds, 2),
+            },
+        )
+        logger.info("Session resumed at %.1f s", self.session_seconds)
+
+    async def cancel(self) -> SessionStats:
+        """End the session and transcribe nothing. Keeps every artefact it produced.
+
+        **Cancel keeps everything (D-044).** It stops capture, skips the post-capture pass, and
+        leaves the audio, the video and whatever segments were already committed exactly where they
+        are. Deleting is a separate and explicit act from the Recordings page.
+
+        A control that discards a recording is one that will eventually discard the wrong one, and
+        the whole disposition of this application is against that — D-027 refused to move a stream
+        the user was listening to, and D-036 made `mux.py` delete a source only once the output
+        demonstrably contains it. The difference between stopping and cancelling is therefore
+        exactly one thing: whether the transcription pass runs.
+        """
+        if not self.is_running:
+            raise SessionError("No session is recording.")
+
+        self._cancelled = True
+        self._paused = False
+        stats = await self.stop()
+        self._emit(
+            "session.cancelled",
+            {"session_id": stats.session_id if hasattr(stats, "session_id") else "", "kept": True},
+        )
+        return stats
+
     async def stop(self) -> SessionStats:
         """End the session, flushing anything pending so the last words are not lost."""
         if not self.is_running:
@@ -624,696 +677,6 @@ class SessionManager:
         self._release_retained()
         await self._asr.unload()
 
-    # -- capture path --------------------------------------------------------------
-
-    def _on_frame(self, frame: np.ndarray) -> None:
-        """Called on the capture thread. Must return quickly and must never block."""
-        gate = self._gate
-        if gate is None:
-            return
-
-        result = gate.process(frame)
-
-        # Written here, on the capture thread, rather than through the queue. The queue is
-        # drop-oldest by design — it protects inference latency by discarding audio — and audio
-        # discarded from a *recording* is a hole in the only copy of the talk. A buffered write of
-        # a kilobyte is several orders of magnitude cheaper than the inference pass the queue
-        # exists to decouple from, so this does not reintroduce the blocking it guards against.
-        sink = self._sink
-        if sink is not None and sink.write(frame) and not sink.is_closed:
-            self._emit_failure(degradation.recording_capped(sink.duration_s / 60.0))
-
-        # **A monitor source is gated on an absolute level, not an adaptive one**, and getting this
-        # wrong in either direction produces a different visible fault.
-        #
-        # `EnergyVad` compares each frame against an *adaptive noise floor*. That is right for a
-        # microphone in a room: speech spikes above a floor that settles into the gaps between
-        # phrases. System output has no gaps — the floor rises to meet continuous content and
-        # nothing ever clears it. Measured: **61% of frames from microphone speech pass, against 8%
-        # from the system's own output**, and with three-frame hysteresis 8% scattered frames never
-        # open the gate. Window recordings therefore consumed audio and committed nothing.
-        #
-        # Bypassing the gate entirely was tried and is worse. Whisper *invents* text on non-speech,
-        # and submitting every buffer produced a transcript of disjointed fragments — "my other
-        # children", "yeah it happens father" — from a gaming video's background music. A wrong
-        # transcript is worse than an empty one, because it is read as real.
-        #
-        # An absolute threshold separates them, because a digital output has *true* silence where a
-        # room only has a noise floor. Measured over one-frame RMS: seminar speech runs from −57 to
-        # −21 dBFS, a 35 dB range; a video's background music sat between −42.6 and −37.4, a 5 dB
-        # range. Speech has dynamics and music at conversational volume does not.
-        speaking = result.speaking or self._loopback_has_content(frame)
-
-        dropped = self._queue.put(
-            CapturedFrame(audio=frame, speaking=speaking, pause=result.pause_event)
-        )
-        if dropped and not self._warned_backpressure:
-            self._warned_backpressure = True
-            self._emit_failure(
-                degradation.dropped_audio(self._queue.dropped, self._config.resolve().asr.model)
-            )
-
-        self._emit_level(frame, result.state_changed, result.speaking)
-
-    def _loopback_has_content(self, frame: np.ndarray) -> bool:
-        """Whether a monitor frame is loud enough to be worth transcribing.
-
-        Only ever true for a loopback source; a microphone keeps the adaptive gate, which earns its
-        place there by stopping inference running on an empty room.
-        """
-        if not self._source_is_loopback:
-            return False
-        rms = float(np.sqrt(np.mean(np.square(frame, dtype=np.float64))))
-        return rms >= LOOPBACK_SPEECH_RMS
-
-    @property
-    def _source_is_loopback(self) -> bool:
-        """Whether the open source is a monitor of the machine's own output.
-
-        Read from the source rather than from configuration, because the file source and the
-        application tap both resolve to something the configuration does not name directly.
-        """
-        info = self._source_info
-        return info is not None and info.kind == "loopback"
-
-    def _emit_level(self, frame: np.ndarray, state_changed: bool, speaking: bool) -> None:
-        """Publish the level meter, throttled, and the VAD state only when it changes."""
-        if state_changed:
-            self._emit("vad.state", {"speaking": speaking})
-
-        now = time.monotonic()
-        if now - self._last_level_emit < LEVEL_INTERVAL_S:
-            return
-        self._last_level_emit = now
-        self._emit("audio.level", self._meter.update(frame).as_event())
-
-    def _handle_frame(self, frame: CapturedFrame) -> None:
-        """Called on the ASR worker thread. This is the expensive one, and it may block."""
-        engine = self._engine
-        if engine is None:
-            return
-        try:
-            events = engine.add_audio(frame.audio, speaking=frame.speaking, pause=frame.pause)
-        except AsrLoadError as exc:
-            self._emit_failure(degradation.model_load_failed(self._asr.model_id, str(exc)))
-            return
-        self._dispatch(events)
-
-    def _dispatch(self, events: list[Any]) -> None:
-        """Persist and publish whatever the engine produced."""
-        for event in events:
-            if isinstance(event, CommittedSegment):
-                self._persist(event.segment)
-                self._emit("transcript.committed", event.segment.as_event())
-            elif isinstance(event, HypothesisUpdate):
-                self._emit("transcript.hypothesis", {"text": event.text, "start": event.start})
-            elif isinstance(event, EngineNotice):
-                self._emit("error", event.as_event()["data"])
-
-    def _persist(self, segment: Segment) -> None:
-        """Write a segment through to disk, surviving a write failure.
-
-        A full disk must not end the session: the transcript stays in memory and is still on screen,
-        and freeing space resumes saving. Stopping here would guarantee losing what might be saved.
-        """
-        if self._store is None:
-            return
-        try:
-            self._store.append_segment(segment)
-        except Exception as exc:  # noqa: BLE001 - any storage error, not just OSError
-            logger.exception("Could not persist segment %s", segment.id)
-            self._emit_failure(degradation.disk_full(type(exc).__name__))
-
-    def _on_source_error(self, error: Exception | None) -> None:
-        """The audio source stopped. ``None`` means it reached the end of its input."""
-        if error is None:
-            return
-        name = self._source_info.name if self._source_info else "The audio device"
-        self._emit_failure(degradation.device_lost(name))
-
-    # -- status ticker -------------------------------------------------------------
-
-    def _start_status_thread(self) -> None:
-        self._status_stop.clear()
-        self._status_thread = threading.Thread(
-            target=self._status_loop, name="status-ticker", daemon=True
-        )
-        self._status_thread.start()
-
-    def _status_loop(self) -> None:
-        while not self._status_stop.wait(STATUS_INTERVAL_S):
-            metrics = self.metrics()
-            self._emit("status", metrics.as_event())
-
-            # In `recorded` mode this is the *only* sign the application is doing anything: no
-            # transcript is being produced, so a figure that climbs is what distinguishes recording
-            # from having silently stopped (D-021).
-            sink = self._sink
-            if sink is not None and not sink.is_closed:
-                self._emit(
-                    "recording.progress",
-                    {"duration_s": round(sink.duration_s, 2), "bytes": sink.bytes_written},
-                )
-
-            # **A heartbeat, not just an announcement.** `capture.state` used to be emitted exactly
-            # once, when capture started — a fact broadcast into a lossy channel with no
-            # reconciliation. Four ordinary events lost it permanently: a page loaded after the
-            # emit, a socket reconnect, a second tab, or the emit racing the recorder into
-            # existence. In every one of those the monitor pane never learned there was anything to
-            # show, and nothing ever corrected it. Re-sent every second, a missed emit costs a
-            # second instead of the whole recording.
-            if self._recorder is not None:
-                self._emit("capture.state", self.capture_state())
-
-            # An application creates playback nodes as media starts, so the set the tap was
-            # built from goes stale within seconds of pressing record.
-            self._relink_tap()
-
-            # Only warn once the model has actually run: a factor of zero before the speaker starts
-            # is not the system falling behind.
-            if metrics.engine.inference_passes > 3 and 0.0 < metrics.real_time_factor < 1.0:
-                self._emit_failure(
-                    degradation.falling_behind(
-                        metrics.real_time_factor, self._config.resolve().asr.model
-                    )
-                )
-
-    # -- construction --------------------------------------------------------------
-
-    def _start_context_worker(self, config: AppConfig) -> None:
-        """Start rolling summarisation, if anything is configured to do it.
-
-        Wrapped: a failure to build the worker must not prevent a session from starting. The
-        assistant is a tool, the transcript is the document.
-        """
-        if self.context_worker_factory is None or self._store is None:
-            return
-        try:
-            self._context_worker = self.context_worker_factory(self._store, config)
-            self._context_worker.start()
-        except Exception:  # noqa: BLE001 - never fatal to a recording
-            logger.warning("Rolling summaries are unavailable this session", exc_info=True)
-            self._context_worker = None
-
-    async def _stop_context_worker(self) -> None:
-        worker, self._context_worker = self._context_worker, None
-        if worker is None:
-            return
-        try:
-            await worker.stop()
-        except Exception:  # noqa: BLE001 - a failed final summary must not fail the stop
-            logger.warning("Final summary failed", exc_info=True)
-
-    def _start_polish_worker(self) -> None:
-        """Start the minute-by-minute polish pass, if anything is configured to do it.
-
-        Wrapped for the same reason as the context worker: the transcript is the document and the
-        polish is a reading aid, so a failure to build one must not stop a recording.
-        """
-        if self.polish_worker_factory is None or self._store is None:
-            return
-        try:
-            self._polish_worker = self.polish_worker_factory(self._store)
-            self._polish_worker.start()
-        except Exception:  # noqa: BLE001 - never fatal to a recording
-            logger.warning("The transcript polish pass is unavailable this session", exc_info=True)
-            self._polish_worker = None
-
-    async def _stop_polish_worker(self) -> None:
-        worker, self._polish_worker = self._polish_worker, None
-        if worker is None:
-            return
-        try:
-            await worker.stop()
-        except Exception:  # noqa: BLE001 - a failed final pass must not fail the stop
-            logger.warning("The final polish pass failed", exc_info=True)
-
-    def _build_engine(self, config: AppConfig) -> Any:
-        """The streaming engine, which is what makes a session transcribe as it goes."""
-        assert self._store is not None
-        return build_engine(
-            config=config.streaming,
-            transcribe=self._asr.transcribe,
-            capabilities=self._asr.backend.capabilities if self._asr.backend else None,  # type: ignore[arg-type]
-            model_id=self._asr.model_id,
-            prompt_builder=self._prompts,
-            first_segment_id=self._store.last_segment_id() + 1,
-        )
-
-    def _start_window_capture(self, config: AppConfig, session: SessionMetadata) -> None:
-        """Ask for a window and start recording it. Only called when video was requested.
-
-        **A failure here does not fail the session.** The audio is already capturing and its
-        transcript is the part that cannot be recreated; losing the video is a disappointment,
-        losing the talk is not recoverable. The one exception is the user declining, which ends the
-        whole run — they said no, and starting an audio recording they did not ask for would be
-        taking the refusal as a yes.
-        """
-        support = detect_capture(prefer_hardware=config.capture.encoder == "hardware")
-        if not support.available:
-            self._emit_failure(degradation.capture_unavailable(support.reason))
-            return
-        self._capture_support = support
-        self._capture_segments = []
-        self._capture_resumes = 0
-
-        token = ""
-        credentials = getattr(self, "credentials", None)
-        if config.capture.reuse_consent and credentials is not None:
-            token = credentials.get("capture-restore-token") or ""
-
-        self._portal = PortalSession(cursor_mode=config.capture.cursor_mode, restore_token=token)
-        stream = self._portal.open()
-
-        # **The token is single-use**, and persisting the new one is not optional. Passing
-        # `restore_token` to `SelectSources` invalidates it the moment it is used, and a fresh one
-        # comes back on `Start`. An implementation that saved a token once and replayed it would
-        # get a picker dialog on every recording after the first — which is precisely the symptom
-        # that was diagnosed and fixed as a concurrency fault, and would have looked identical.
-        if stream.restore_token and credentials is not None:
-            # Stored where credentials go, never in the config file: it is a granted capability
-            # and D-017 governs those.
-            credentials.set("capture-restore-token", stream.restore_token)
-
-        # Which path the portal took, so a re-prompt is diagnosable from the log rather than from
-        # a user noticing. KDE restores a *window* session by matching appId and then fuzzy-matching
-        # the saved title, so a browser whose tab changed will legitimately fail to match and
-        # re-prompt. That is correct behaviour, not a fault to hunt.
-        logger.info(
-            "Portal granted a window: %s",
-            "restored from a stored token"
-            if token
-            else "chosen fresh (no stored consent to restore)",
-        )
-
-        # One directory per recording, shared with the audio sink and named for the moment the
-        # session started — which is also the transcript database's stem, and how the two are
-        # joined without moving an open SQLite file.
-        layout = layout_for(config.recording.recording_dir, session.started_at, session.session_id)
-        layout.ensure()
-        self._capture_layout = layout
-        spec = build_pipeline(
-            support,
-            node_id=stream.node_id,
-            fd=stream.fd,
-            video_path=str(layout.video_segment(1, support.extension)),
-            preview_path=str(layout.preview),
-            frame_rate=config.capture.frame_rate,
-            max_height=config.capture.max_height,
-            want_preview=config.capture.preview,
-            # What the compositor says it is handing over. Without it the pipeline can only give
-            # the scaler a range to satisfy, and a range is how a recording ended up 480x16.
-            source_width=stream.width,
-            source_height=stream.height,
-            quality=config.capture.quality,
-        )
-        # The source size is worth a line of its own: when a capture records the wrong thing, this
-        # is what says whether the compositor handed over the wrong node or the pipeline mangled a
-        # correct one, and the two have nothing in common as faults.
-        logger.info(
-            "Recording PipeWire node %s, source %sx%s: %s",
-            stream.node_id,
-            stream.width,
-            stream.height,
-            spec.command,
-        )
-
-        self._recorder = WindowRecorder(
-            spec,
-            portal_fd=stream.fd,
-            on_stopped=self._on_recorder_stopped,
-            on_health=self._on_recorder_health,
-            log_dir=Path("logs"),
-        )
-        self._recorder.start()
-        self._emit("capture.state", self.capture_state())
-
-    # -- resuming a capture that died mid-session (D-036) ------------------------------
-
-    def _resume_window_capture(self) -> bool:
-        """Reopen the portal and start recording again, into the next segment.
-
-        **The user's own request, and the machinery was already all there.** The restore token is
-        persisted on every start precisely so a later recording skips the picker; using it to
-        reopen *within* a session is the same call. What was missing is anyone making it: a video
-        that ended mid-talk simply stayed ended, which cost a seminar its last thirty-nine minutes.
-
-        Returns whether a new recorder is running. Every refusal is quiet and bounded — a portal
-        that will never come back should produce one message and not a restart loop.
-        """
-        config = self._config.resolve()
-        support = self._capture_support
-        layout = self._capture_layout
-        session = self._metadata
-        if support is None or layout is None or session is None or not self.is_running:
-            return False
-
-        now = time.monotonic()
-        if self._capture_resumes >= MAX_CAPTURE_RESUMES:
-            logger.info(
-                "Not reopening the capture again: %d attempts is the limit.",
-                self._capture_resumes,
-            )
-            return False
-        if self._last_resume_at and now - self._last_resume_at < RESUME_BACKOFF_S:
-            return False
-
-        self._capture_resumes += 1
-        self._last_resume_at = now
-
-        # **Silently, or not at all.** KDE restores a window session by fuzzy-matching the saved
-        # title, so a token can legitimately fail to match — and the compositor's answer to that is
-        # to put its picker on screen, over the talk being recorded, un-asked-for. A capture that
-        # ends with a banner is a disappointment; a dialog thrown across a live seminar is worse.
-        credentials = getattr(self, "credentials", None)
-        token = ""
-        if credentials is not None:
-            token = credentials.get("capture-restore-token") or ""
-        if not token:
-            logger.info("Not reopening the capture: no stored consent to restore it with.")
-            return False
-
-        self._release_portal()
-        try:
-            self._portal = PortalSession(
-                cursor_mode=config.capture.cursor_mode, restore_token=token
-            )
-            stream = self._portal.open()
-        except (PortalDeclined, PortalError) as exc:
-            logger.info("Could not reopen the capture: %s", exc)
-            self._release_portal()
-            return False
-
-        if stream.restore_token and credentials is not None:
-            credentials.set("capture-restore-token", stream.restore_token)
-
-        index = len(self._capture_segments) + 1
-        video_path = layout.video_segment(index, support.extension)
-        spec = build_pipeline(
-            support,
-            node_id=stream.node_id,
-            fd=stream.fd,
-            video_path=str(video_path),
-            preview_path=str(layout.preview),
-            frame_rate=config.capture.frame_rate,
-            max_height=config.capture.max_height,
-            want_preview=config.capture.preview,
-            source_width=stream.width,
-            source_height=stream.height,
-            quality=config.capture.quality,
-        )
-        try:
-            self._recorder = WindowRecorder(
-                spec,
-                portal_fd=stream.fd,
-                on_stopped=self._on_recorder_stopped,
-                on_health=self._on_recorder_health,
-                log_dir=Path("logs"),
-                log_name=f"capture-{index:03d}.log",
-            )
-            self._recorder.start()
-        except RecorderError as exc:
-            logger.info("Could not restart the video recorder: %s", exc)
-            self._recorder = None
-            self._release_portal()
-            return False
-
-        logger.info("Video capture resumed into %s (attempt %d).", video_path.name, index)
-        self._emit_failure(degradation.capture_resumed())
-        self._emit("capture.state", self.capture_state())
-        return True
-
-    def _retire_recorder(self, recorder: WindowRecorder) -> None:
-        """Record where a finished piece landed and when it stopped.
-
-        Those two facts are what put it on the session's timeline: a segment's first frame is *the
-        moment it was told to stop, minus its own encoded duration* — the same derivation the mux's
-        offset has always used, because the near end is not observable either way.
-        """
-        path = recorder.state.video_path
-        if not path:
-            return
-        stopped_at = recorder.state.stopped_at or time.monotonic()
-        if any(existing == path for existing, _ in self._capture_segments):
-            return
-        self._capture_segments.append((path, stopped_at))
-
-    def _release_portal(self) -> None:
-        portal, self._portal = self._portal, None
-        if portal is None:
-            return
-        try:
-            portal.close()
-        except Exception:  # noqa: BLE001 - releasing consent must not fail a recording
-            logger.debug("Could not close the portal session", exc_info=True)
-
-    def _stop_window_capture(self) -> None:
-        """Finalise the video and release the portal. Safe in any mode and at any point."""
-        recorder, self._recorder = self._recorder, None
-        if recorder is not None:
-            try:
-                recorder.stop()
-                self._retire_recorder(recorder)
-            except Exception:  # noqa: BLE001 - a failed teardown must not fail the stop
-                logger.exception("The video recorder did not stop cleanly")
-
-        # Closing the portal session is what makes the compositor's sharing indicator go away.
-        # Leaving it open shows the user they are still sharing a window when they are not.
-        self._release_portal()
-        self._join_capture_segments()
-
-    def _join_capture_segments(self) -> None:
-        """Put a capture that had to be restarted back onto one timeline (D-036).
-
-        Each piece's first frame is derived the same way the mux's offset is — the moment it was
-        told to stop, minus its own encoded duration — because that is the only end of a GStreamer
-        pipeline this process can observe. The gaps between the pieces are then known rather than
-        guessed, and `stitch` holds a frame across each one so nothing after a gap slides out of
-        sync with the transcript.
-
-        **A failure keeps the pieces and takes the first one.** They all play; combining them
-        wrongly would be worse than not combining them, and the first is the one the mux and the
-        alignment measurement were already built around.
-        """
-        segments = self._capture_segments
-        if not segments:
-            self._video_path = ""
-            self._video_stopped_at = 0.0
-            return
-
-        # Kept for the mux, which needs it and the file's own duration to work out when the video
-        # *started* — the one moment in this sequence nothing observes directly. It is the *first*
-        # piece's, not the last: a stitched file opens on the first piece's first frame.
-        first_path, first_stopped_at = segments[0]
-        self._video_path = first_path
-        self._video_stopped_at = first_stopped_at
-
-        if len(segments) == 1:
-            return
-
-        pieces: list[CaptureSegment] = []
-        for path, stopped_at in segments:
-            duration = probe_video_duration(path)
-            if duration <= 0.0:
-                logger.warning("Cannot place %s on the timeline; keeping the pieces apart.", path)
-                return
-            pieces.append(CaptureSegment(Path(path), stopped_at - duration))
-
-        output = Path(first_path)
-        joined = output.with_name(f"{output.stem}.joined{output.suffix}")
-        result = stitch_segments(pieces, joined)
-        if not result.ok:
-            logger.warning("Could not join the recorded pieces: %s", result.reason)
-            self._emit_failure(degradation.capture_pieces_kept(len(segments)))
-            return
-
-        # The joined file takes the plain name, so nothing downstream — the export, the media
-        # indicators, the recordings listing — has to learn that segments exist.
-        for path, _stopped_at in segments:
-            Path(path).unlink(missing_ok=True)
-        joined.replace(output)
-        self._video_path = str(output)
-        self._emit_failure(degradation.capture_pieces_joined(len(segments), result.filled_s))
-
-    def _mux_if_wanted(self) -> None:
-        """Combine the video with the session's audio, when there is both and it was asked for.
-
-        Never fatal. Failing costs one convenience — two files instead of one — and both are
-        playable on their own, so a mux must not be able to fail a recording.
-        """
-        video, self._video_path = self._video_path, ""
-        sink = self._sink
-        if not video or sink is None or sink.samples == 0:
-            return
-        if not self._config.resolve().capture.mux_audio:
-            return
-
-        # The sink has to be closed before ffmpeg reads it, and closing it here rather than leaving
-        # it to `_start_transcription` is safe: `close()` is idempotent.
-        try:
-            audio = sink.close()
-        except SinkError:
-            return
-
-        result: MuxResult = mux_audio_video(
-            video, audio, video_lag_s=self._measure_video_lag(video, sink)
-        )
-        if not result.ok:
-            logger.warning("Could not combine audio and video: %s", result.reason)
-            return
-        self._audio_shortfall_s = result.audio_shortfall_s
-        logger.info(
-            "Recording saved with audio: %s (video delayed %.3fs; silent original %s)",
-            result.path,
-            result.video_lag_s,
-            "removed" if result.removed_source else "kept",
-        )
-        if result.audio_shortfall_s:
-            # Said out loud rather than absorbed. The combined file is short because the picture
-            # stopped, and the user is about to be told the video ended early anyway; what this
-            # adds is that the sound did not, and where the whole of it still is.
-            self._emit_failure(
-                degradation.video_ended_early(result.audio_shortfall_s, Path(audio).name)
-            )
-
-    def _measure_video_lag(self, video: str, sink: WavSink) -> float:
-        """How much later than the audio the video began, in seconds.
-
-        **Both capture paths start on purpose at different moments**, and this is the cost of that
-        decision rather than a fault in it: audio begins before the screen-cast portal is asked, so
-        the first words of a talk are not lost while someone chooses a window from a dialog. The
-        video then starts whenever the portal is answered and GStreamer has warmed up — a fraction
-        of a second at best, and however long the dialog was on screen at worst.
-
-        Derived rather than observed at the near end. Nothing marks the arrival of the first
-        encoded frame, so the video's start is taken as *the moment it was told to stop, minus its
-        own encoded duration* — two quantities that are both measurable, and whose error is a frame
-        or two rather than the seconds the direct route would carry.
-
-        Returns 0.0 whenever any input is missing, which leaves the mux doing exactly what it did
-        before. An unmeasurable offset must never become a guessed one.
-        """
-        stopped_at = self._video_stopped_at
-        audio_started_at = sink.first_write_monotonic
-        if not stopped_at or not audio_started_at:
-            return 0.0
-
-        duration = probe_video_duration(video)
-        if duration <= 0.0:
-            logger.info("Could not read the video's duration; leaving the two tracks as captured.")
-            return 0.0
-
-        lag = (stopped_at - duration) - audio_started_at
-        logger.info(
-            "Capture offset: audio began %.3fs before the video (video %.2fs, audio %.2fs).",
-            lag,
-            duration,
-            sink.duration_s,
-        )
-        return lag
-
-    def _on_recorder_health(self, state: RecorderState) -> None:
-        """The video started or stopped writing while the process stayed alive (D-036).
-
-        Reported both ways round. A stall banner left standing after the capture recovered is the
-        same class of fault as no banner at all — it says something untrue about a recording in
-        progress — so the recovery gets its own message rather than a silent clearance.
-        """
-        if not state.stalled:
-            self._emit_failure(degradation.capture_resumed())
-            self._emit("capture.state", self.capture_state())
-            return
-
-        self._emit_failure(degradation.capture_stalled(state.stalled_seconds))
-        self._emit("capture.state", self.capture_state())
-
-        # **A stall is acted on, not only reported.** The stream that produced this recording's
-        # frames stopped at 14 m 43 s and the process stayed alive until 29 m 25 s: waiting for it
-        # to end on its own cost fifteen minutes of picture that a reopened portal would have had.
-        # Ending it here is what turns the detection into a recovery.
-        recorder = self._recorder
-        if recorder is None:
-            return
-        threading.Thread(
-            target=self._restart_stalled_capture,
-            args=(recorder,),
-            name="capture-restart",
-            daemon=True,
-        ).start()
-
-    def _restart_stalled_capture(self, recorder: WindowRecorder) -> None:
-        """End a stalled capture and open its successor. Runs off the watcher's own thread.
-
-        `stop()` joins the watcher, and the watcher is what called us — so doing this inline would
-        have the supervisor waiting for itself.
-        """
-        if self._recorder is not recorder:
-            return
-        try:
-            recorder.stop()
-        except Exception:  # noqa: BLE001 - a stalled recorder that will not stop must not raise here
-            logger.exception("A stalled video recorder did not stop cleanly")
-        self._retire_recorder(recorder)
-        self._recorder = None
-        if not self._resume_window_capture():
-            self._emit_failure(degradation.capture_failed("the window stopped sending pictures."))
-            self._emit("capture.state", self.capture_state())
-
-    def _on_recorder_stopped(self, state: RecorderState) -> None:
-        """The video ended without being asked to. Usually the window was closed.
-
-        **And now it is a reason to try again.** "The window was closed" and "the stream went away"
-        are indistinguishable from here — a Zoom call that drops its connection and rebuilds its
-        surface produces exactly the clean end that a person closing a window does — so both are
-        treated as resumable while the session is still running. If the portal restores, the talk
-        keeps being recorded; if it does not, the message is the one that was always shown.
-        """
-        recorder = self._recorder
-        if recorder is not None and recorder.state is state:
-            self._retire_recorder(recorder)
-            self._recorder = None
-            if self._resume_window_capture():
-                return
-
-        if state.window_closed:
-            self._emit_failure(degradation.capture_window_closed())
-        elif state.failed:
-            self._emit_failure(degradation.capture_failed(state.error))
-        self._emit("capture.state", self.capture_state())
-
-    def _session_key(self) -> str:
-        """This session's key: the transcript database's stem, and its recording folder's name."""
-        metadata = self._metadata
-        if metadata is None:
-            return ""
-        return layout_key_for(metadata.started_at, metadata.session_id)
-
-    def capture_state(self) -> dict[str, Any]:
-        """What the monitor pane draws. Empty outside `window` mode."""
-        recorder = self._recorder
-        options = self._options
-        return {
-            "recording": bool(recorder and recorder.is_running),
-            "window_closed": bool(recorder and recorder.state.window_closed),
-            "failed": bool(recorder and recorder.state.failed),
-            # Alive and writing nothing — the state that had no name, and the reason a seminar
-            # recorded fourteen minutes and then reported itself healthy for another fifteen.
-            "stalled": bool(recorder and recorder.state.stalled),
-            "stalled_seconds": round(recorder.state.stalled_seconds, 1) if recorder else 0.0,
-            "error": recorder.state.error if recorder else "",
-            "video_path": recorder.state.video_path if recorder else "",
-            "bytes": recorder.state.bytes_written if recorder else 0,
-            "duration_s": round(recorder.state.duration_s, 1) if recorder else 0.0,
-            "preview": bool(recorder and recorder.state.preview_path),
-            "options": {
-                "live_transcription": bool(options and options.live_transcription),
-                "post_transcription": bool(options and options.post_transcription),
-                "video": bool(options and options.video),
-            }
-            if options
-            else None,
-        }
-
     def _open_sink(self, config: AppConfig, session: SessionMetadata) -> WavSink:
         """Open the file this session records into.
 
@@ -1329,369 +692,6 @@ class SessionManager:
             )
         except SinkError as exc:
             raise SessionError(str(exc)) from exc
-
-    def _start_transcription(self, session: SessionMetadata) -> bool:
-        """Begin the post-capture pass, if this session produced a recording.
-
-        Returns whether the store was handed to the runner, which then owns closing it.
-        """
-        sink, self._sink = self._sink, None
-        if sink is None or self._store is None:
-            return False
-
-        try:
-            path = sink.close()
-        except SinkError as exc:
-            logger.error("Could not finalise the recording: %s", exc)
-            self._emit_failure(degradation.disk_full(str(exc)))
-            return False
-
-        if sink.samples == 0:
-            # A session that captured nothing has nothing to transcribe, and an empty file left on
-            # disk is only ever confusing.
-            path.unlink(missing_ok=True)
-            logger.info("Session %s captured no audio; nothing to transcribe.", session.session_id)
-            return False
-
-        config = self._config.resolve()
-        job = TranscriptionJob(
-            session_id=session.session_id,
-            source_path=str(path),
-            total_seconds=sink.duration_s,
-        )
-        # A session that also transcribed live already holds revision 0, so the post-capture pass
-        # writes revision 1 and both are kept (D-022). A `recorded` session has no live pass, so
-        # its only transcript is revision 0 and a switch would have nothing to switch between.
-        revision = 1 if self._engine is not None else 0
-
-        self._runner = TranscriptionRunner(
-            registry=self.jobs,
-            emit=self._emit,
-            transcribe=self._asr.transcribe,
-            window_s=config.recording.batch_window_s,
-            overlap_s=config.recording.batch_overlap_s,
-            max_segment_s=config.streaming.max_segment_s,
-            revision=revision,
-            on_released=self._on_transcription_released,
-        )
-        started = self._runner.start(
-            job=job,
-            store=self._store,
-            # **Retention is not a setting when the video came up short.** The combined file is
-            # then the only other copy of the sound and it does not hold all of it, so deleting
-            # the WAV would destroy the part no other file contains.
-            retain_audio=config.storage.retain_audio or bool(self._audio_shortfall_s),
-            prompt=self._prompts.build() if self._prompts else None,
-        )
-        # The reference is deliberately *kept*, unlike ownership. `GET /api/transcript/...` serves
-        # from it, and a reload during a half-hour pass must still show the segments already
-        # committed rather than an empty page. The runner alone closes it, and tells us when.
-        return started
-
-    def _on_transcription_released(self) -> None:
-        """The pass has closed the store. Reopen it for reading, and reclaim ownership.
-
-        **This is the path `recorded` and `window` sessions take, and the fault was reported
-        against one of them.** Those modes hand the store to `TranscriptionRunner`, which closes it
-        itself when the batch pass finishes — so retaining it in `_teardown` cannot help here, and
-        without this the assistant would go back to answering "there is no transcript to ask about
-        yet" at precisely the moment the transcript becomes *complete* and most worth asking about.
-
-        Reopened from the path rather than kept, because the object the runner closed is spent.
-        `TranscriptStore(path)` opens an existing database — the same call `routes/sessions.py`
-        makes for any past session — so this costs one connection and no special case.
-        """
-        store, self._store = self._store, None
-        self._store_handed_over = False
-        if store is None:
-            return
-        try:
-            self._retain(TranscriptStore(store.path))
-        except Exception:  # noqa: BLE001 - a session that has already ended must still end cleanly
-            logger.debug("Could not reopen %s for reading", store.path.name, exc_info=True)
-
-    def _retain(self, store: TranscriptStore) -> None:
-        """Hold a finished session's store open for reading, replacing any already held."""
-        if store is self._last_store:
-            return
-        self._release_retained()
-        self._last_store = store
-        logger.debug("Holding %s open for reading", store.path.name)
-
-    def _release_retained(self) -> None:
-        """Close the retained store, if there is one. Safe to call more than once."""
-        store, self._last_store = self._last_store, None
-        if store is None:
-            return
-        try:
-            store.close()
-        except Exception:  # noqa: BLE001 - a store we are done with must not break a new session
-            logger.debug("The retained transcript store did not close cleanly", exc_info=True)
-
-    def _open_store(self, config: AppConfig, session: SessionMetadata) -> TranscriptStore:
-        directory = self._session_dir or Path(config.storage.session_dir)
-        path = directory / f"{session.started_at.strftime('%Y%m%d-%H%M%S')}-{session.session_id}.db"
-        return TranscriptStore(path, metadata=session)
-
-    def _audio_choice(self, config: AppConfig) -> str:
-        """Which audio this run should capture.
-
-        The per-run choice wins. It is the one in front of the user at the moment they press
-        record, and the whole reason the pre-flight sheet exists is that this decision changes from
-        recording to recording — a talk playing in a window one minute, narration over it the next.
-        """
-        options = self._options
-        if options is not None and options.audio_source:
-            return options.audio_source
-        return config.capture.audio_source
-
-    def _open_source(self, config: AppConfig, mode: str = modes.LIVE) -> AudioSource:
-        """Build the audio source this session should capture from.
-
-        **`window` mode reads the machine's output, not the microphone.** The point of the mode is
-        the window's sound; recording the person watching it was the reported fault. The portal
-        carries video only (D-022) so this was always a separate capture — it was simply capturing
-        the wrong thing. `capture.audio_source` moves it back to the microphone for anyone who
-        wants both a window and their own commentary.
-
-        The file source still wins outright in every mode: it is the reproducible input the whole
-        pipeline is developed against, and a window session that silently ignored it would make the
-        mode untestable.
-        """
-        if config.audio.source_type == "file":
-            if not config.audio.file_path:
-                raise SessionError(
-                    "The file source is selected but no file is set. "
-                    "Choose a WAV file, or switch to a microphone."
-                )
-            return WavFileSource(
-                config.audio.file_path,
-                frame_ms=config.audio.frame_ms,
-                speed=config.audio.file_speed,
-            )
-        choice = self._audio_choice(config)
-        if mode == modes.WINDOW and choice == "application":
-            return self._open_application_tap(config)
-
-        if mode == modes.WINDOW and choice == "system":
-            # **Also through a tap.** Recording the default sink's monitor directly is the obvious
-            # implementation and it does not work here: `pw-record --target=<sink>.monitor` failed
-            # to resolve against this machine's Bluetooth sink and, because an unresolved target
-            # falls back to the *default source*, silently recorded the microphone instead —
-            # measured at 0.97 correlation with it. Tapping every playing stream reaches the same
-            # audio by the route that demonstrably works, and one mechanism is easier to keep
-            # correct than two.
-            try:
-                return self._open_application_tap(config, match=False)
-            except MonitorUnavailable as exc:
-                # The microphone is not a silent substitute here — it records the wrong thing, and
-                # the whole point of the mode is that it does not. Naming the remedy is better than
-                # quietly capturing a voice the user did not want recorded.
-                raise SessionError(str(exc)) from exc
-
-        return DeviceSource(device_id=config.audio.device_id, frame_ms=config.audio.frame_ms)
-
-    def _open_application_tap(self, config: AppConfig, *, match: bool = True) -> AudioSource:
-        """Tap the chosen window's own audio, leaving it playing on the user's speakers.
-
-        Used for both audio choices. `match=False` links every stream that is playing — the
-        "system output" case — and `match=True` narrows to the ones that look like the window's.
-        Both go through a tap because tapping is the route that works on this machine: targeting a
-        sink's monitor directly silently recorded the microphone instead.
-
-        Raises:
-            MonitorUnavailable: when there is nothing to tap or the tap cannot be built. **Not
-                downgraded to the microphone**, ever. Falling back to a device that records the
-                person watching, in a mode whose purpose is recording the window, is the fault this
-                whole path exists to fix — and it is the one that produced a transcript of the
-                user's own speech over a video they were trying to record.
-        """
-        streams = self._tap_candidates(match)
-        if not streams:
-            raise MonitorUnavailable(
-                "Nothing is playing any audio, so there is no window sound to record. Start the "
-                "video first, or choose 'My microphone' if you meant to narrate."
-            )
-
-        tap = ApplicationTap()
-        try:
-            tap.open()
-            # The *set*, not the best one: a browser owns a playback node per media element, and
-            # linking only the top-ranked node records only whichever tab happened to be first.
-            if tap.link_all(streams) == 0:
-                raise TapError("no audio ports could be linked into the capture sink")
-        except TapError as exc:
-            tap.close()
-            raise MonitorUnavailable(
-                f"The window's audio could not be captured ({exc}). Choose 'My microphone' if you "
-                "meant to record yourself."
-            ) from exc
-
-        self._verify_tap(tap)
-
-        wider = self._whole_output_if_the_tap_is_dead(tap, config)
-        if wider is not None:
-            return wider
-
-        self._tap = tap
-        self._tap_match = match
-        return MonitorSource(frame_ms=config.audio.frame_ms, tap=tap)
-
-    def _whole_output_if_the_tap_is_dead(
-        self, tap: ApplicationTap, config: AppConfig
-    ) -> AudioSource | None:
-        """Record the machine's whole output when the tap is built correctly and carries nothing.
-
-        **The third question, after two that could not answer this on their own.** Listening to the
-        tap alone cannot tell a dead graph from a paused video — both are bit-exact zeros, and
-        refusing on that basis rejected working recordings within a day. Counting links cannot tell
-        a link that carries audio from one that merely exists — which is this fault exactly: the
-        sink created, the browser's ports linked, every link ``active``, every node ``running``,
-        every gain 1.0, and zeros for the length of a talk.
-
-        Asking both at once separates them, because the machine's own output is the ground truth
-        neither question had:
-
-        =============  =============  ==================================  ==================
-        tap            whole output   what that means                     what happens
-        =============  =============  ==================================  ==================
-        silent         silent         nothing is playing yet              keep the tap
-        anything       —              the tap is delivering               keep the tap
-        silent         audible        the tap cannot carry this stream    record the output
-        unknown        anything       the probe did not run               keep the tap
-        =============  =============  ==================================  ==================
-
-        The last row is not a formality. A probe that cannot run knows nothing, and must never be
-        the thing that changes what a recording captures.
-
-        Widening rather than refusing is the deliberate trade. What the user asked for is a
-        transcript of the thing they are watching; a wider recording still contains it, and an empty
-        one contains nothing. The cost — every other sound on the machine lands in the transcript —
-        is real, so it is said out loud rather than absorbed silently.
-        """
-        sink = tap.monitor.removesuffix(".monitor")
-        if probe_peak(sink, capture_sink=True, seconds=TAP_PROBE_S) != 0.0:
-            # Delivering, or unmeasurable. Either way, not the fault this exists for.
-            return None
-
-        try:
-            whole_output = default_sink()
-        except MonitorUnavailable:
-            # No output to widen to. The tap is the only route there is, so it stays.
-            return None
-
-        # **`capture_sink=True` here too, and it is load-bearing.** Widening through
-        # `<name>.monitor` was this repair's own worst bug: that target does not resolve on either
-        # sink on this machine, and an unresolved target falls back to the *default source* — so
-        # the widened capture recorded the **microphone**, correlating with it at +1.000. It went
-        # unnoticed because a microphone hears the speakers, which makes the level look right.
-        # A window recording that transcribes the room is the exact fault D-028 exists to prevent,
-        # and widening must not be the thing that reintroduces it.
-        if (
-            probe_peak(whole_output, capture_sink=True, device_sink=True, seconds=TAP_PROBE_S)
-            <= 0.0
-        ):
-            # The machine is not playing anything, so the tap's silence is the ordinary kind —
-            # someone who pressed record before pressing play. Leave it alone; it will fill.
-            return None
-
-        logger.warning(
-            "The tap on %s is linked (%d ports) and delivering digital silence while the machine "
-            "is playing audio. Recording the whole output instead.",
-            sink,
-            tap.live_links,
-        )
-        tap.close()
-        self._tap = None
-        self._emit_failure(degradation.window_audio_not_delivering())
-        return MonitorSource(node=whole_output, frame_ms=config.audio.frame_ms, capture_sink=True)
-
-    def _tap_candidates(self, match: bool) -> list:
-        """The playback streams this run should tap.
-
-        **`match` used to be documented and ignored.** Both audio choices linked every stream that
-        was playing, so "record this window's audio" quietly recorded the machine's, and a second
-        application making noise landed in the transcript of the first. It now narrows using the
-        same `rank`/`score` heuristic the interface already presents — keeping *every* stream that
-        scores rather than the single best one, because a browser owns a playback node per media
-        element and picking one records whichever tab happened to be first.
-
-        A window that matches nothing falls back to everything rather than to nothing. The match is
-        a heuristic over properties PipeWire's own documentation warns are not authoritative
-        (D-027), so it must not be the thing that decides a recording captures no audio at all.
-        """
-        streams = tap_streams()
-        if not match or not streams:
-            return streams
-
-        options = self._options
-        app_id = getattr(options, "window_app_id", "") or ""
-        title = getattr(options, "window_title", "") or ""
-        if not app_id and not title:
-            return streams
-
-        scored = [s for s in streams if tap_score(s, app_id=app_id, title=title) > 0]
-        if not scored:
-            logger.info("No playing stream matched the chosen window; tapping everything instead.")
-            return streams
-        logger.info(
-            "Tapping %d of %d playing streams matched to the window", len(scored), len(streams)
-        )
-        return scored
-
-    def _verify_tap(self, tap: ApplicationTap) -> None:
-        """Confirm the graph is routing something into the tap, before the session commits.
-
-        **This asked the wrong question for a day, and refused working recordings for it.** The
-        first version listened to the tap and treated a run of bit-exact zeros as proof the graph
-        was not delivering. That premise holds for a microphone, which always carries a noise floor,
-        and is false for an application — a media player between sounds, a paused video whose stream
-        is still open, or a clip with a silent lead-in all write literal zeros. Someone who pressed
-        record a moment before the audio started was told the capture would be silent, and it would
-        not have been.
-
-        Whether anything is *linked* cannot be confused with whether anything is *audible*, so that
-        is what is asked. It still catches the fault the check exists for — a tap nothing is routed
-        into records silence for the length of a talk — and it cannot fire on a quiet moment.
-        """
-        if tap.live_links > 0:
-            return
-
-        tap.close()
-        raise MonitorUnavailable(
-            "The window's audio could not be routed into the capture — nothing is connected to it, "
-            "so the recording would be silent throughout. Try starting the recording again, or "
-            "choose 'My microphone' if you meant to record yourself."
-        )
-
-    def _relink_tap(self) -> None:
-        """Join playback nodes that appeared after the recording started.
-
-        **Linking once is linking too early.** `tap.py`'s own module docstring says the set has to
-        be watched, because "an application creates and destroys playback nodes as the user opens
-        tabs and starts media" — and the session linked once, at open, and never again. So pressing
-        record and *then* pressing play produced a recording of nothing: the node carrying the video
-        did not exist at the moment the tap was built. Runs from the status tick, which already
-        fires once a second for the monitor pane.
-        """
-        tap = self._tap
-        if tap is None or not tap.is_open:
-            return
-        try:
-            added = tap.link_all(self._tap_candidates(self._tap_match))
-        except TapError as exc:
-            logger.debug("Could not refresh the audio tap: %s", exc)
-            return
-        if added:
-            logger.info("Linked %d newly playing port(s) into the audio tap", added)
-
-        # **Reported, never fatal.** If everything the tap was carrying goes away mid-recording —
-        # the browser tab closed, the player quit — the rest of the session records silence, and the
-        # user should hear that from the application rather than from an empty transcript
-        # afterwards. Said once: repeating it every second would bury the notices that matter.
-        if tap.live_links == 0 and not self._warned_tap_silent:
-            self._warned_tap_silent = True
-            self._emit_failure(degradation.window_audio_stopped())
 
     async def _load_model(self, config: AppConfig) -> None:
         """Load the ASR model, translating a failure into a remedy the user can act on."""

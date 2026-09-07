@@ -27,7 +27,7 @@
 
 import { on } from "../core/bus.js";
 import { parseTimestamp } from "../core/citations.js";
-import { $, $$, el, setText, toggle } from "../core/dom.js";
+import { $, $$, el, setAttr, setText, toggle } from "../core/dom.js";
 import { pluralise, timestamp, wallClock } from "../core/format.js";
 import { IDLE, LIVE, PROCESSING, RECORDED, RECORDING, WINDOW } from "../core/modes.js";
 import { MODE_CHANGED, mode as modeStore } from "../stores/mode.js";
@@ -137,6 +137,17 @@ export class TranscriptPane {
     this.emptyBody = $("[data-empty-body]", root);
     this.emptyHint = $("[data-empty-hint]", root);
     this.emptyProgress = $("[data-empty-progress]", root);
+    this.transcriptionControls = $("[data-transcription-controls]", root);
+    this.transcriptionHold = $("[data-transcription-hold]", root);
+    this.transcriptionCancel = $("[data-transcription-cancel]", root);
+    // Assigned by `main.js`, the same way `onRevisionChange` is: holding a pass is a request the
+    // pane does not own, and handing it a callback keeps the dependency one-way.
+    this.onHoldTranscription = null;
+    this.onCancelTranscription = null;
+    this.transcriptionHold?.addEventListener("click", () =>
+      this.onHoldTranscription?.(!recording.isTranscriptionPaused)
+    );
+    this.transcriptionCancel?.addEventListener("click", () => this.onCancelTranscription?.());
     this.progressFill = $("[data-progress-fill]", root);
     this.progressLabel = $("[data-progress-label]", root);
     this.hypothesisWrap = $(".hypothesis", root);
@@ -209,6 +220,11 @@ export class TranscriptPane {
       (segment) => !polish.coversSegment(segment.id)
     );
     setText(this.countLabel, pluralise(segments.length, "segment"));
+    // Before the early return, not after it. Every segment loaded on a reload can already be
+    // covered by a polished block — which is the ordinary case for a talk long enough to have been
+    // rewritten — and returning here without re-rendering left "Nothing recorded yet" standing over
+    // a pane full of prose. Found by reloading a real session, not by reading (D-041).
+    this._renderEmptyState();
     if (!incoming.length) return;
 
     const restore = this.scroll.beginUpdate();
@@ -236,6 +252,7 @@ export class TranscriptPane {
     }
 
     const incoming = batch ?? (added ? [added] : []);
+    this._renderEmptyState();
     if (!incoming.length) return;
 
     const restore = this.scroll.beginUpdate();
@@ -322,7 +339,14 @@ export class TranscriptPane {
   }
 
   _renderEmptyState() {
-    const hasContent = transcript.count > 0;
+    // The pass's progress is not part of the empty state any more: it shows whether or not there
+    // is text on screen, because a pass commits as it goes and used to hide its own progress bar
+    // after the first window.
+    this._renderProgress();
+    // **Polished blocks are content too.** `hydrate` fills the polish store before the transcript
+    // store, so asking only about segments answers "empty" at the moment the prose has just been
+    // rendered, and nothing asks again if every segment turns out to be covered.
+    const hasContent = transcript.count > 0 || polish.blocks.length > 0;
     toggle(this.emptyState, !hasContent);
     toggle(this.list, hasContent);
     if (!hasContent) this._renderEmptyCopy();
@@ -348,18 +372,43 @@ export class TranscriptPane {
     setText(this.emptyHint, copy.hint ?? "");
     toggle(this.emptyHint, Boolean(copy.hint));
 
-    // The progress bar belongs to the pass, not to the mode: it shows whenever one is running,
-    // whichever mode produced the recording.
-    const transcribing = modeStore.state === PROCESSING && recording.totalSeconds > 0;
-    toggle(this.emptyProgress, transcribing);
-    if (transcribing) {
+  }
+
+  /**
+   * The pass's own progress and controls — running or held, whatever else is on screen.
+   *
+   * Keyed off the *pass*, not the mode: a re-run started from the Recordings page has no session
+   * run state at all, and one keyed off `processing` alone shows nothing for it.
+   */
+  _renderProgress() {
+    const held = recording.isTranscriptionPaused;
+    const active = (recording.isTranscribing || held) && recording.totalSeconds > 0;
+    toggle(this.emptyProgress, active);
+    if (active) {
       if (this.progressFill) this.progressFill.style.width = `${recording.percent}%`;
+      const position =
+        `${timestamp(recording.transcribedSeconds)} of ` +
+        `${timestamp(recording.totalSeconds)} — ${recording.percent}%`;
       setText(
         this.progressLabel,
-        `Transcribed ${timestamp(recording.transcribedSeconds)} of ` +
-          `${timestamp(recording.totalSeconds)} — ${recording.percent}%`
+        held ? `Held at ${position}. Nothing is lost.` : `Transcribed ${position}`
       );
     }
+    this._renderTranscriptionControls(active, held);
+  }
+
+  /**
+   * Pause and cancel, for a pass that can run longer than the recording did (D-045).
+   *
+   * Hidden rather than disabled when there is no pass, for the same reason the header's hold
+   * control is: a disabled button invites "why can I not press this", and the answer is already
+   * the whole of what the pane says.
+   */
+  _renderTranscriptionControls(transcribing, held) {
+    if (!this.transcriptionControls) return;
+    this.transcriptionControls.hidden = !transcribing;
+    setText(this.transcriptionHold, held ? "Resume" : "Pause");
+    setAttr(this.transcriptionHold, "aria-pressed", String(held));
   }
 
   /** Drop the oldest rendered segments once the list grows past the render budget. */

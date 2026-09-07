@@ -203,8 +203,50 @@ async def transcribe_recording(request: Request, name: str) -> dict[str, Any]:
             detail=_error("transcription-running", "A transcription is already running."),
         )
 
+    # Handed to the manager so it can be paused, resumed and shut down like any other pass — and
+    # so a server exiting mid-run stops it cleanly rather than abandoning the thread.
+    manager.attach_runner(runner)
+
     logger.info("Re-transcribing %s into session %s", path.name, session.session_id)
     return {"started": True, "session_id": session.session_id, "job": job.as_event()}
+
+
+# -- holding a pass that is already running (D-045) ------------------------------------
+
+
+def _running_job(manager):  # noqa: ANN001, ANN202
+    """The pass to act on, or a 409 naming why there is none."""
+    job = manager.jobs.current
+    runner = manager.transcription_runner
+    if job is None or runner is None or not job.is_resumable:
+        raise HTTPException(
+            status_code=409,
+            detail=_error("no-transcription", "No transcription is running."),
+        )
+    return job, runner
+
+
+@router.post("/transcription/pause")
+async def pause_transcription(request: Request) -> dict[str, Any]:
+    """Hold the running pass at the next window boundary (D-045).
+
+    Not on a recording's own path, because there is only ever one pass: a second would contend for
+    the same model on the same device, and two half-speed transcriptions finish later than two run
+    in sequence. Naming a recording would imply a choice that does not exist.
+    """
+    manager = _manager(request)
+    job, runner = _running_job(manager)
+    runner.pause()
+    return {"paused": True, "job": job.as_event()}
+
+
+@router.post("/transcription/cancel")
+async def cancel_transcription(request: Request) -> dict[str, Any]:
+    """End the pass. What was transcribed stays committed and the audio stays on disk."""
+    manager = _manager(request)
+    job, runner = _running_job(manager)
+    runner.cancel()
+    return {"cancelled": True, "job": job.as_event()}
 
 
 @router.delete("/{name}")

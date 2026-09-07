@@ -1,6 +1,6 @@
 # Repository Structure
 
-*Last updated: 2026-08-29 (one folder per recording, and the web-app export)*
+*Last updated: 2026-09-07 (the session manager split across six files)*
 
 Canonical map of Loud Radish. This file documents **purpose**, not source code. Update it in
 the same change that adds, moves, renames, or removes a directory or significant file.
@@ -125,7 +125,8 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   │   │       ├── prompts.py     # The instruction list, and the no-reasoning hints
 │   │   │       └── worker.py      # The background loop and every failure path
 │   │   │   └── transcript/        # The durable record
-│   │   │       ├── schema.sql     # SQLite tables, FTS5 index, and its triggers
+│   │   │       ├── schema.sql     # SQLite tables, FTS5 index, its triggers, and where a
+│   │   │                          #   transcription pass got to (D-045)
 │   │   │       ├── store.py       # Append-only writes, the four queries, search
 │   │   │       └── export.py      # Text, Markdown, SRT, VTT, JSON
 │   │   │   └── session/           # Wiring, workers, health, degradation
@@ -133,7 +134,16 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   │   │       ├── workers.py     # Drop-oldest queue and the threads draining it
 │   │   │       ├── metrics.py     # Pipeline health, gathered in one place
 │   │   │       ├── degradation.py # What each failure means and what to do
-│   │   │       └── manager.py     # capture → VAD → engine → store → transport
+│   │   │       ├── shapes.py      # The small shapes and tuning numbers the rest of it shares.
+│   │   │                          #   A leaf: imports no sibling, so nothing here forms a cycle
+│   │   │       ├── frames.py      # What happens to one captured frame, on both threads
+│   │   │       ├── background.py  # The status ticker, the context worker, the polish worker
+│   │   │       ├── window_capture.py  # The portal, the recorder, the resume, the join
+│   │   │       ├── passes.py      # Starting a pass over a finished recording; store retention
+│   │   │       ├── sources.py     # What a session listens to, and proving it is listening
+│   │   │       └── manager.py     # capture → VAD → engine → store → transport. Owns the
+│   │   │                          #   lifecycle; the five modules above are the rest of this one
+│   │   │                          #   class, split across files (D-039)
 │   │   │   └── llm/               # SEAM B — the pluggable language model
 │   │   │       ├── contract.py    # Interface, streaming chunks, capabilities
 │   │   │       ├── openai_compatible.py  # Ollama, LM Studio, llama.cpp, vLLM, OpenAI
@@ -163,8 +173,12 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   │   ├── companion/             # The desktop presence — a remote control, not a rewrite (D-024)
 │   │   │   ├── visual_states.py   # (capture mode, run state) → which picture the instrument shows
 │   │   │   ├── aperture.py        # Draws one frame of it, from docs/motion-spec.md
+│   │   │   ├── raster.py         # The same frame as ARGB32 pixels, for the tray's D-Bus
+│   │   │   │                     #   icon property. numpy only — no rasteriser (D-042)
 │   │   │   ├── animation.py       # The frame clock, and the hold-still setting
 │   │   │   ├── menu.py            # The tray menu's structure, as data
+│   │   │   ├── tray.py            # The StatusNotifierItem and its dbusmenu, served from a
+│   │   │   │                      #   dispatch loop over jeepney's primitives (D-043)
 │   │   │   ├── shortcuts.py       # Registration through the desktop's own service
 │   │   │   └── main.py            # Polls the server; killable and restartable at any moment
 │   │   ├── models/                # Persistence shape
@@ -199,6 +213,8 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   ├── loud-radish.desktop.in     # Desktop entry template, filled in by install_autostart.py
 │   ├── make_fixture_wav.py        # Generates synthetic WAV fixtures for pipeline tests
 │   ├── measure_capture_cost.py    # Encoding vs. inference contention (D-022)
+│   ├── prune_empty_sessions.py    # Clears session databases that hold nothing, and
+│   │                              #   refuses the ones that own a recording (D-040)
 │   ├── run_file_session.py        # Console-only pipeline run over a WAV file (BE M4)
 │   └── generate_contracts.py      # Writes openapi.json and ws-events.json
 ├── data/                          # Sessions, config file, audio, recordings (gitignored)
