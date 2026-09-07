@@ -49,7 +49,12 @@ class VadConfig(_Base):
     """Voice activity detection, its hysteresis, and its pause threshold (BE §5.2)."""
 
     enabled: bool = True
-    detector: VadDetector = "energy"
+    #: **Silero, chosen from a measurement rather than left at the safe option.** Both detectors
+    #: were run over the same clips at the same sensitivity: on real speech Silero found 83% of
+    #: frames against energy's 62%, and on a tone fixture that contains no speech at all it fired
+    #: on 1% of frames against energy's 62%. Better on both axes, which is unusual enough to be
+    #: worth writing down. It costs nothing to ship: the model comes with `faster-whisper`.
+    detector: VadDetector = "silero"
     #: Path to ``silero_vad.onnx``. Only consulted when ``detector`` is ``silero``.
     model_path: str | None = None
     sensitivity: float = Field(default=0.6, ge=0.0, le=1.0)
@@ -206,7 +211,6 @@ class StorageConfig(_Base):
     #: where it always was.
     reopen_last_session: bool = True
     retain_audio: bool = False
-    retention_days: int | None = None
     autosave_interval_s: float = Field(default=5.0, ge=0.5, le=120.0)
     default_export_format: ExportFormat = "markdown"
 
@@ -281,6 +285,50 @@ class CaptureConfig(_Base):
     quality: Literal["efficient", "balanced", "high"] = "balanced"
 
 
+class DictationConfig(_Base):
+    """Press a key, speak, press it again, and the words arrive where you were typing (D-049).
+
+    **The timings here come from measurement, not preference.** Transcribing fifteen seconds on a
+    warm model is a fraction of a second; running the result through the local language model was
+    measured at 8-10 seconds warm and 44 seconds cold. That gap is the whole design: the cleanup is
+    bounded and falls back to the raw transcript, and the text is pasted exactly once either way.
+    """
+
+    enabled: bool = True
+
+    #: ``off`` pastes what was said; ``llm`` tidies it first. Tidying costs the seconds above.
+    cleanup: Literal["off", "llm"] = "llm"
+
+    #: How long to wait for the tidy before giving up and pasting the raw transcript. Generous
+    #: against the 8-10 s measured here, tight enough that a stalled model does not eat the words.
+    cleanup_timeout_s: float = Field(default=20.0, ge=1.0, le=300.0)
+
+    #: Whether to press the paste chord afterwards. Off still leaves the text on the clipboard,
+    #: which is the right behaviour for anyone who wants to choose where it lands.
+    paste: bool = True
+
+    #: **A setting, not a detection.** In a terminal `Ctrl+V` quotes the next character and paste
+    #: is `Ctrl+Shift+V`; nothing can ask the compositor what kind of window has focus.
+    paste_chord: str = "ctrl+v"
+
+    #: A stop nobody pressed. Dictation is push-to-talk, so a recording still running after this
+    #: long is a key that was pressed once and forgotten.
+    max_seconds: float = Field(default=300.0, ge=5.0, le=3600.0)
+
+    #: Kept out of `data/recordings/`, which is for recordings someone means to keep. This
+    #: repository deleted 679 empty session databases one plan ago; fifty dictations a day would
+    #: rebuild that pile from the other end within a fortnight.
+    directory: str = "./data/dictations"
+
+    #: Audio is discarded once the words are delivered. Speech nobody asked to keep should not
+    #: accumulate on disk.
+    keep_audio: bool = False
+
+    #: How many past dictations to keep the text of, so one that pastes into the wrong window is
+    #: recoverable. Oldest are pruned on each new dictation.
+    keep_transcripts: int = Field(default=50, ge=0, le=1000)
+
+
 class ShortcutsConfig(_Base):
     """Global keyboard shortcuts, registered by the companion process (Plan 5).
 
@@ -295,11 +343,20 @@ class ShortcutsConfig(_Base):
     """
 
     enabled: bool = True
-    toggle_live: str = "Meta+Alt+L"
-    toggle_recorded: str = "Meta+Alt+R"
+    # **Checked against a real Plasma desktop, which the previous defaults were not.** Three of
+    # them collided with shortcuts KDE ships: `Meta+Alt+L` is the keyboard layout switcher,
+    # `Meta+Alt+R` is Spectacle's screen recorder, and `Meta+Alt+S` toggles the screen reader. A
+    # colliding default is not merely unavailable — it is registered against, refused, and reported
+    # as a conflict on every start, which is a fault report for something nobody chose.
+    #:
+    #: The letters are mnemonic where a free key allowed it: V for voice, C for capture, W for
+    #: window, D for dictate.
+    toggle_live: str = "Meta+Alt+V"
+    toggle_recorded: str = "Meta+Alt+C"
     arm_window: str = "Meta+Alt+W"
-    stop: str = "Meta+Alt+S"
+    stop: str = "Meta+Alt+X"
     open_app: str = "Meta+Alt+T"
+    dictate: str = "Meta+Alt+D"
 
 
 class QuickAction(_Base):
@@ -326,5 +383,6 @@ class AppConfig(_Base):
     recording: RecordingConfig = Field(default_factory=RecordingConfig)
     capture: CaptureConfig = Field(default_factory=CaptureConfig)
     shortcuts: ShortcutsConfig = Field(default_factory=ShortcutsConfig)
+    dictation: DictationConfig = Field(default_factory=DictationConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     quick_actions: list[QuickAction] = Field(default_factory=list)

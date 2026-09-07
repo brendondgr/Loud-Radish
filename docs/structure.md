@@ -170,6 +170,16 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   │   │       └── template/      # The exported page, copied verbatim: index.html, two
 │   │   │                          #   stylesheets, and five classic scripts (not modules —
 │   │   │                          #   `import` is refused across file:// URLs)
+│   │   ├── services/dictation/    # Press a key, speak, press again: the words arrive in
+│   │   │                          #   whatever window has focus (D-049)
+│   │   ├── desktop/               # Talking to the desktop the user is sitting in front of:
+│   │   │   │                      #   clipboard, a keystroke into the focused window, and a
+│   │   │   │                      #   notification. Ordered, probed backends (D-048)
+│   │   │   ├── outcome.py         # What was tried and what happened — never an exception
+│   │   │   ├── clipboard.py       # wl-copy → klipper → xclip
+│   │   │   ├── keystroke.py       # ydotool → wtype. That order was measured, not assumed
+│   │   │   └── notify.py          # org.freedesktop.Notifications, for when nobody is looking
+│   │   │                          #   at the browser
 │   │   ├── companion/             # The desktop presence — a remote control, not a rewrite (D-024)
 │   │   │   ├── visual_states.py   # (capture mode, run state) → which picture the instrument shows
 │   │   │   ├── aperture.py        # Draws one frame of it, from docs/motion-spec.md
@@ -179,7 +189,15 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   │   │   ├── menu.py            # The tray menu's structure, as data
 │   │   │   ├── tray.py            # The StatusNotifierItem and its dbusmenu, served from a
 │   │   │   │                      #   dispatch loop over jeepney's primitives (D-043)
+│   │   │   ├── keys.py            # "Meta+Alt+D" ↔ the integer KGlobalAccel speaks. Its own
+│   │   │   │                      #   module because the encoding is the part that is wrong in
+│   │   │   │                      #   a way nothing else notices (D-047)
+│   │   │   ├── desktop_entry.py   # One .desktop file per shortcut — what the desktop binds to
 │   │   │   ├── shortcuts.py       # Registration through the desktop's own service
+│   │   │   ├── settings_form.py   # A keypress → a sequence string; conflicts; the patch body.
+│   │   │   │                      #   Pure functions, because Tk's loop cannot be tested (D-051)
+│   │   │   ├── settings_window.py # The Tk window itself: shortcuts, microphone, dictation
+│   │   │   ├── settings.py        # `python -m app.companion.settings` — its own process
 │   │   │   └── main.py            # Polls the server; killable and restartable at any moment
 │   │   ├── models/                # Persistence shape
 │   │   │   ├── segment.py         # The unit engine, store, and frontend all agree on
@@ -256,6 +274,8 @@ listed them has been removed rather than left describing work that has landed.
 | `web/backend/app/routes/` | HTTP endpoint definitions only. Thin — they delegate to services. |
 | `web/backend/app/transport/` | The WebSocket hub and its event envelopes. Separate from `routes/` because it is a push channel with its own reconnection semantics. |
 | `web/backend/app/services/` | The pipeline. One sub-package per stage, so each is independently testable. |
+| `tests/frontend/` | Accessibility over what the server actually renders: structural rules via `html.parser`, and WCAG contrast over the design tokens. No browser, no build step, no dependency (D-054). |
+| `scripts/benchmark_asr.py` | Every model, device and precision measured on *this* machine, each in its own process. Exists because the default cannot be chosen from published benchmarks (D-053). |
 | `web/backend/app/companion/` | The tray icon and the global shortcuts — the two things a browser page cannot do. Deliberately a *remote control*: it polls the HTTP API, holds no state, and can be killed and restarted without the server noticing. |
 | `web/backend/app/services/capture/` | Recording a window's picture. Separate from `recording/` because they solve unrelated problems: one negotiates with a compositor for pixels, the other writes and transcribes audio. |
 | `web/backend/app/services/recording/` | Capturing audio to a file and transcribing it once whole. Separate from `streaming/` because the two answer opposite questions: `streaming/` decides what is safe to show while audio is still arriving, and this runs only when it has stopped. |

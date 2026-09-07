@@ -44,12 +44,14 @@ work. For real use:
 uv sync
 ```
 
-| Extra | Adds | Without it |
-|---|---|---|
-| `asr-whisper` | Real transcription via `faster-whisper` | Only the scripted mock backend is offered |
-| `audio-device` | Microphone and system loopback capture | Only the file source is available |
-| `vad-silero` | Neural voice-activity detection | The energy detector is used, which is fine in a quiet room |
-| `credentials` | Storing API keys in the OS credential store | Keys must come from environment variables |
+**There are no optional groups** — D-023 removed them, because a second install step nobody runs is
+a feature nobody has. `uv sync` installs everything: real transcription (`faster-whisper`),
+microphone and loopback capture (`sounddevice`), the neural voice detector (`onnxruntime`, with the
+model itself carried inside `faster-whisper`), and the OS credential store (`keyring`).
+
+This table described those groups long after they stopped existing, and one of its rows was actively
+harmful: the Silero detector's own error message told users to install a `vad-silero` group that was
+not there, so following the instruction could not help. See D-052.
 
 Everything the extras enable is then selectable **inside the application** — Settings → Audio for
 the device, Settings → Transcription for the model. Nothing needs a config file edited by hand.
@@ -76,8 +78,13 @@ so a missing capability is visible at startup rather than as a confusing failure
 | `logs/` | Application logs | Never transcript content (BE §18) |
 | `~/.cache/huggingface/` | Whisper model weights | Downloaded once, ~75 MB to 3 GB by model |
 
-Audio is **not** retained by default. Sessions are kept until deleted, from the `/sessions` page or
-by removing the file; `storage.retention_days` sets an expiry if you want one.
+Audio is **not** retained by default. **Nothing is deleted automatically** — sessions are kept until
+you delete them, from the `/sessions` page or by removing the file. There was a
+`storage.retention_days` setting here that appeared to set an expiry and was read by no code at all;
+it is gone rather than implemented, because deleting somebody's recordings on a timer is not
+something this should do quietly (D-055). To clear out sessions holding no transcript and no
+recording, `scripts/prune_empty_sessions.py` reports what it would remove and deletes only with
+`--apply`.
 
 ## Backing up
 
@@ -105,7 +112,21 @@ So: divide a published batch figure by about 18 to guess whether a model will ke
 
 ### Measured on this project's development machine
 
-AMD Ryzen AI Max+ 395 (32 cores) with a Radeon 8060S iGPU, on a 25-second clip:
+AMD Ryzen AI Max+ 395 (32 cores) with a Radeon 8060S iGPU, on a 25-second clip.
+
+> **The GPU rows below could not be reproduced in September 2026**, with the ROCm build of
+> CTranslate2 current at that date. Re-measured with `scripts/benchmark_asr.py`, each combination
+> in its own process and after a warm pass, the GPU gave results that were not merely slower but
+> *incoherent*: `large-v3-turbo` at float16 returned **99 words for a 54-word clip**, `base` at
+> float16 returned **none**, and `small` at int8 aborted the process with a GPU memory fault
+> (D-053). The CPU rows reproduce closely and repeatedly — `base` at int8 measured 37.2×, 37.9×,
+> 38.9× and 40.2× on four separate runs.
+>
+> The figures are kept rather than deleted because they were honestly measured at the time and the
+> hardware has not changed; what has changed is somewhere in the ROCm stack. Treat the GPU column
+> as unverified until someone reproduces it.
+
+
 
 | Model | CPU `int8` batch | GPU `float16` batch | Live, through the pipeline |
 |---|---|---|---|

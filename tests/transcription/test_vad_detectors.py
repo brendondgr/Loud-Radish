@@ -161,14 +161,16 @@ def _onnxruntime_installed() -> bool:
 
 
 class TestSileroAvailability:
-    """Two ways Silero can be unavailable, with two different remedies.
+    """When Silero can and cannot be built, and what is said about it (D-052).
 
-    Which branch runs depends on the environment, so each is guarded. The version of this test that
-    only covered the missing-*dependency* case passed for as long as the dependency was absent and
-    failed the moment it was installed — which is precisely when the other branch starts mattering.
+    **These tests used to assert the fault.** `test_the_factory_falls_back_rather_than_raising`
+    passed for months for the wrong reason: `silero_vad.onnx` was on nobody's machine, so the
+    factory always fell back, and a test asserting the fallback was really asserting that the
+    feature did not work. Silero is now built from the model `faster-whisper` already carries, so
+    the fallback has to be provoked to be tested at all.
     """
 
-    def test_a_missing_dependency_names_the_install_command_and_the_alternative(self) -> None:
+    def test_a_missing_dependency_names_what_is_needed_and_the_alternative(self) -> None:
         if _onnxruntime_installed():
             pytest.skip("onnxruntime is installed; this branch cannot be exercised")
 
@@ -176,27 +178,71 @@ class TestSileroAvailability:
             SileroVad(model_path="nonexistent.onnx")
 
         message = str(excinfo.value)
-        assert "vad-silero" in message
+        assert "onnxruntime" in message
         assert "energy" in message
+        assert "vad-silero" not in message, "naming a dependency group D-023 removed"
 
-    def test_a_missing_model_file_names_the_file_and_the_alternative(self) -> None:
-        """The branch a user with the extra installed actually hits: no ``silero_vad.onnx``."""
+    def test_a_configured_path_that_is_missing_falls_back_to_the_bundled_model(self) -> None:
+        """**Not an error.** A path that does not exist is a setting someone typed wrong, and
+        refusing to run Silero over it — when a perfectly good copy is installed — is how this
+        feature came to be switched off everywhere."""
         if not _onnxruntime_installed():
             pytest.skip("onnxruntime is absent; the dependency branch fires first")
+
+        detector = SileroVad(model_path="nonexistent.onnx")
+
+        assert detector.name == "silero"
+
+    def test_with_no_model_anywhere_the_message_names_the_setting_to_change(
+        self, monkeypatch
+    ) -> None:
+        if not _onnxruntime_installed():
+            pytest.skip("onnxruntime is absent; the dependency branch fires first")
+        from app.services.vad import silero as module
+
+        monkeypatch.setattr(module, "bundled_model", lambda: None)
 
         with pytest.raises(SileroUnavailableError) as excinfo:
             SileroVad(model_path="nonexistent.onnx")
 
         message = str(excinfo.value)
-        assert "silero_vad.onnx" in message
+        assert "vad.model_path" in message
         assert "energy" in message
 
-    def test_the_factory_falls_back_rather_than_raising(self) -> None:
+    def test_the_factory_falls_back_rather_than_raising(self, monkeypatch) -> None:
+        from app.services.vad import silero as module
+
+        monkeypatch.setattr(module, "bundled_model", lambda: None)
+
         detector = build_detector(VadConfig(detector="silero", model_path="nope.onnx"))
+
         assert detector.name == "energy"
 
+    def test_the_fallback_is_announced_and_not_only_logged(self, monkeypatch) -> None:
+        """**The fault underneath the fault.** A `logger.warning` and nothing else meant the
+        application reported "silero" in its status and ran the energy detector for months."""
+        from app.services.vad import silero as module
+
+        monkeypatch.setattr(module, "bundled_model", lambda: None)
+        told: list[str] = []
+
+        build_detector(VadConfig(detector="silero", model_path="nope.onnx"), told.append)
+
+        assert told, "the fallback happened silently"
+        assert "energy" in told[0].lower() or "silero" in told[0].lower()
+
+    def test_silero_is_built_when_a_model_is_available(self) -> None:
+        """The state this repository should have been in all along."""
+        if not _onnxruntime_installed():
+            pytest.skip("onnxruntime is absent")
+
+        assert build_detector(VadConfig(detector="silero")).name == "silero"
+
     def test_the_factory_passes_sensitivity_through(self) -> None:
-        detector = build_detector(VadConfig(sensitivity=0.9))
+        """Named explicitly rather than relying on the default, which is now Silero (D-052) — a
+        test about sensitivity should not also be a test about which detector ships."""
+        detector = build_detector(VadConfig(detector="energy", sensitivity=0.9))
+
         assert isinstance(detector, EnergyVad)
         assert settle(detector).is_speech(speech_frame(amplitude=0.02))
 

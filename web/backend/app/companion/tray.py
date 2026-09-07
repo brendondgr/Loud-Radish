@@ -108,6 +108,8 @@ class TrayIcon:
 
         self._lock = threading.Lock()
         self._snapshot = Snapshot()
+        self._devices: list[dict] | None = None
+        self._device_id: str | None = None
         self._pixmap = render_pixmap(VISUALS["server-down"], 0.0, size=size)
         self._items: list[MenuItem] = []
         self._menu_revision = 1
@@ -215,8 +217,18 @@ class TrayIcon:
             if snapshot == self._snapshot:
                 return
             self._snapshot = snapshot
+        self._menu_changed()
+
+    def _menu_changed(self) -> None:
+        """Tell the host the menu is different.
+
+        Only ever called when it really is: a poll every half second that signalled regardless
+        would have the host re-reading a menu nobody has opened.
+        """
+        with self._lock:
             self._menu_revision += 1
-        self._emit(MENU_PATH, MENU_IFACE, "LayoutUpdated", "ui", (self._menu_revision, 0))
+            revision = self._menu_revision
+        self._emit(MENU_PATH, MENU_IFACE, "LayoutUpdated", "ui", (revision, 0))
 
     def _emit(self, path: str, interface: str, signal: str, signature=None, body=()) -> None:
         connection = self._connection
@@ -358,7 +370,21 @@ class TrayIcon:
     def _current_items(self) -> list[MenuItem]:
         with self._lock:
             snapshot = self._snapshot
-        return build_menu(snapshot, listening=bool(self._listening()))
+            devices, device_id = self._devices, self._device_id
+        return build_menu(
+            snapshot,
+            listening=bool(self._listening()),
+            devices=devices,
+            device_id=device_id,
+        )
+
+    def set_devices(self, devices: list[dict] | None, device_id: str | None) -> None:
+        """What inputs exist and which is chosen. Signals a relayout only when it has changed."""
+        with self._lock:
+            if devices == self._devices and device_id == self._device_id:
+                return
+            self._devices, self._device_id = devices, device_id
+        self._menu_changed()
 
     def _menu_method(self, member: str, body: tuple):
         if member == "GetLayout":
@@ -394,43 +420,77 @@ class TrayIcon:
         event = str(body[1]) if len(body) > 1 else "clicked"
         if event != "clicked":
             return
-        items = self._current_items()
-        if 1 <= item_id <= len(items):
-            result = self._on_activate(items[item_id - 1].id)
-            logger.info("Tray: %s", result)
+        item = dict(self._numbered()).get(item_id)
+        if item is None:
+            logger.debug("Tray: no item numbered %d", item_id)
+            return
+        result = self._on_activate(item.id)
+        logger.info("Tray: %s", result)
+
+    def _numbered(self, items: list[MenuItem] | None = None) -> list[tuple[int, MenuItem]]:
+        """Every item in the tree, depth first, paired with its dbusmenu id.
+
+        **The ids are positions in a traversal, and `_handle_event` walks the same one.** The menu
+        used to be one level deep and a click was resolved as `items[id - 1]`, which nesting breaks
+        silently: the arithmetic still produces *an* item, just the wrong one, so an off-by-one
+        would switch to the wrong microphone rather than raising. Numbering and resolving through
+        the same function is what stops the two drifting apart.
+        """
+        numbered: list[tuple[int, MenuItem]] = []
+        counter = 1
+
+        def walk(items: list[MenuItem]) -> None:
+            nonlocal counter
+            for item in items:
+                numbered.append((counter, item))
+                counter += 1
+                if item.children:
+                    walk(item.children)
+
+        walk(self._current_items() if items is None else items)
+        return numbered
 
     def _layout(self):
         """The whole menu in one reply. `(revision, (id, properties, children))`.
 
-        Flat by construction: `menu.py` builds one level, and a submenu would be a second place
-        where an item's enabled state is decided.
+        One level of nesting, for the microphone list (D-050). Everything else stays flat.
         """
+        # **Built once and numbered in place.** Calling `_current_items` again to number it would
+        # produce a second, equal-but-distinct tree, and the identity lookup below would miss every
+        # item in it — which is exactly what happened the first time this was written.
         items = self._current_items()
-        children = [
-            (index, self._dbus_properties(item), []) for index, item in enumerate(items, start=1)
-        ]
+        identity = {id(item): number for number, item in self._numbered(items)}
+
+        def node(item: MenuItem):  # noqa: ANN202
+            properties = self._dbus_properties(item)
+            if item.children:
+                properties["children-display"] = ("s", "submenu")
+            return (
+                identity[id(item)],
+                properties,
+                [("(ia{sv}av)", node(child)) for child in item.children],
+            )
+
         with self._lock:
             revision = self._menu_revision
         root = (
             0,
             {"children-display": ("s", "submenu")},
-            [(("(ia{sv}av)"), child) for child in children],
+            [("(ia{sv}av)", node(item)) for item in items],
         )
         return ("u(ia{sv}av)", (revision, root))
 
     def _group_properties(self, ids):
-        items = self._current_items()
-        wanted = [int(i) for i in ids] if ids else list(range(1, len(items) + 1))
+        numbered = dict(self._numbered())
+        wanted = [int(i) for i in ids] if ids else list(numbered)
         return (
             "a(ia{sv})",
-            ([(i, self._properties_for(i)) for i in wanted if 1 <= i <= len(items)],),
+            ([(i, self._dbus_properties(numbered[i])) for i in wanted if i in numbered],),
         )
 
     def _properties_for(self, item_id: int) -> dict[str, tuple[str, Any]]:
-        items = self._current_items()
-        if not 1 <= item_id <= len(items):
-            return {}
-        return self._dbus_properties(items[item_id - 1])
+        item = dict(self._numbered()).get(item_id)
+        return self._dbus_properties(item) if item is not None else {}
 
     @staticmethod
     def _dbus_properties(item: MenuItem) -> dict[str, tuple[str, Any]]:

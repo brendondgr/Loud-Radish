@@ -42,6 +42,7 @@ dev = [
     "httpx2>=2.10.0",
     "pytest>=8.0",
     "pytest-asyncio>=1.4.0",
+    "pytest-timeout>=2.3.1",
     "ruff>=0.6",
 ]
 
@@ -62,3 +63,15 @@ pythonpath = ["web/backend"]
 # `importlib` rather than the default `prepend`, which inserts the rootdir at the front of sys.path
 # for each test module and would reintroduce that shadowing regardless of `pythonpath`.
 addopts = "--import-mode=importlib"
+# **A run must always end.** `tests/assistant/test_llm_live.py` drains a real model's stream, and
+# the only bound underneath it is httpx's 180-second *per-read* timeout — which a slow-drip stream
+# never trips. Two tests in `test_window_audio.py` block on an exact byte count from `pw-record`.
+# Neither is a hang the suite can detect for itself, so the suite is given a deadline instead. 120s
+# is roughly forty times the slowest honest test here (`--durations` puts that at ~3s).
+timeout = 120
+markers = [
+    # Opt-in, because reachability is not consent: the relay on localhost:9090 answers on this
+    # machine, so a skipif that only probes for a server *runs* these against a reasoning model
+    # every time anyone types `uv run pytest`. Pass `--run-live-llm` to mean it.
+    "live_llm: talks to a real OpenAI-compatible server; needs --run-live-llm",
+]

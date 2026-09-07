@@ -325,7 +325,15 @@ async def delete_audio_file(request: Request, path: str) -> dict[str, Any]:
 
 @router.post("/audio/device")
 async def select_device(request: Request, body: SelectDeviceRequest) -> dict[str, Any]:
-    """Choose the capture source. Takes effect when the next session starts."""
+    """Choose the capture source. Takes effect when the next session starts, and survives a restart.
+
+    **This is the endpoint the Settings → Audio dropdown calls**, and it used to write to the
+    runtime layer like every other setting — so choosing a microphone worked until the application
+    was restarted, at which point it reverted with no explanation. That is the reported fault, and
+    fixing `PATCH /api/config` alone did not fix it, because the dropdown does not go through that
+    route. All three paths written here are in `PERSISTENT_PATHS`; see D-046 for why a device is
+    not like a threshold.
+    """
     config = request.app.state.config
     changes: dict[str, Any] = {
         "audio.source_type": body.source_type,
@@ -334,7 +342,7 @@ async def select_device(request: Request, body: SelectDeviceRequest) -> dict[str
     if body.file_path is not None:
         changes["audio.file_path"] = body.file_path
 
-    hot_swap = config.update(changes)
+    hot_swap = config.persist(changes)
     return {"applied": True, "hot_swap": str(hot_swap)}
 
 

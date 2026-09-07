@@ -128,8 +128,15 @@ keybinds, and talks to the server over the same loopback HTTP the browser uses. 
 and can be killed and restarted at any moment without the server noticing.
 
 ```bash
-cd web/backend && uv run python -m app.companion.main
+cd web/backend && uv run --no-sync python -m app.companion.main
 ```
+
+**`--no-sync` is not optional on a machine with an AMD GPU.** A plain `uv run` synchronises the
+environment against the lockfile before Python starts, and the lockfile says PyPI — so it replaces
+the ROCm build of CTranslate2 with the CPU/CUDA one and the *server's* next model load fails.
+`app.py` repairs that on its own launch (`acceleration.repair_kept_wheel`), but starting the
+companion is not launching `app.py`, so nothing puts it back. The same applies to any script run
+with a bare `uv run`.
 
 | Flag | Effect |
 |---|---|
@@ -169,6 +176,13 @@ Replay faster than real time for a long recording:
 uv run python scripts/run_file_session.py talk.wav --speed 10
 ```
 
+Measure the speech models on *this* machine, so a default can be chosen from data rather than from
+published benchmarks — every combination of model, device and precision, each in its own process:
+
+```bash
+uv run --no-sync python scripts/benchmark_asr.py data/audio/seminar-speech-real.wav
+```
+
 ## Regenerating the shared contracts
 
 Run this whenever a route or a WebSocket event changes, and commit the result:
@@ -190,6 +204,23 @@ uv run pytest tests/transcription
 ```
 
 Tests live in `tests/<area>/test_<behavior>.py`. Add them alongside features, not afterwards.
+
+**A run always ends.** `[tool.pytest.ini_options]` sets `timeout = 120`, so a test that blocks fails
+with a traceback instead of stopping the suite. Two families used to do exactly that: the tests that
+talk to a real language model, and the two that read the machine's live audio graph through a
+blocking pipe read.
+
+**The live-model tests are opt-in by flag, not by reachability.** They talk to a real
+OpenAI-compatible server and are skipped unless asked for:
+
+```bash
+uv run pytest --run-live-llm
+```
+
+They were previously skipped only when nothing answered at `LLM_TEST_ENDPOINT` — which reads like an
+opt-in and is not. On a machine with a relay running they ran on every `uv run pytest`, draining a
+reasoning model's stream with nothing bounding it, and for a fortnight every full run was made with
+`--ignore`. Point them elsewhere with `LLM_TEST_ENDPOINT` and `LLM_TEST_MODEL`.
 
 **The suite never touches `data/`.** An autouse fixture in `tests/conftest.py` points the bottom
 configuration layer at a per-test temporary directory, so a store built with no config path — or

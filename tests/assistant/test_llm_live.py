@@ -1,7 +1,13 @@
 """Integration tests against a real OpenAI-compatible server.
 
-Skipped when no server is listening, so the suite still passes on a machine without one. That makes
-these tests opt-in by environment rather than by a flag nobody remembers to pass.
+**Opt-in by flag: run them with ``--run-live-llm``.** They were previously opt-in *by environment*
+— skipped when nothing answered at the endpoint — and that is not the same thing. A machine with a
+relay running answers, so they ran on every `uv run pytest`, draining a reasoning model's stream
+with no deadline under it; the suite stopped terminating and every full run needed ``--ignore``.
+Reachability is not consent.
+
+The reachability probe is kept underneath the flag, so asking for them on a machine with no server
+reports a skip rather than a wall of connection errors.
 
 They exist because the stubbed tests cannot prove the client works — a stub asserts the client
 handles the shapes *this repository imagines*. Only a live server proves it handles the shapes a
@@ -40,10 +46,18 @@ def _server_is_up() -> bool:
     return response.status_code == 200
 
 
-pytestmark = [
-    pytest.mark.anyio,
-    pytest.mark.skipif(not _server_is_up(), reason=f"No OpenAI-compatible server at {ENDPOINT}"),
-]
+pytestmark = [pytest.mark.anyio, pytest.mark.live_llm]
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _requires_a_server() -> None:
+    """Probe when the tests actually run, not when they are collected.
+
+    As a `skipif` this made a two-second HTTP request during collection of *every* run, including
+    the runs that go on to deselect these tests. Collection should not touch the network.
+    """
+    if not _server_is_up():
+        pytest.skip(f"No OpenAI-compatible server at {ENDPOINT}")
 
 
 @pytest.fixture
@@ -86,6 +100,7 @@ async def test_a_wrong_port_is_no_server_rather_than_a_hang() -> None:
     assert str(port) in result.message
 
 
+@pytest.mark.timeout(300)
 async def test_a_real_answer_streams_back_as_content(backend) -> None:
     """The end-to-end property: an answer arrives, in ``text``, not buried in reasoning.
 
@@ -93,7 +108,7 @@ async def test_a_real_answer_streams_back_as_content(backend) -> None:
     budget tuned for a plain model produces an empty answer — the exact failure this test would
     otherwise report as "streaming is broken".
     """
-    options = GenerationOptions(temperature=0.0, max_output_tokens=2000)
+    options = GenerationOptions(temperature=0.0, max_output_tokens=256)
     messages = [
         system("Answer in one short sentence."),
         user("What is the capital of France?"),
@@ -106,9 +121,10 @@ async def test_a_real_answer_streams_back_as_content(backend) -> None:
     assert chunks[-1].done is True
 
 
+@pytest.mark.timeout(300)
 async def test_cancelling_mid_stream_stops_the_request(backend) -> None:
     """The stop button depends on this: closing the iterator must end the request."""
-    options = GenerationOptions(temperature=0.0, max_output_tokens=2000)
+    options = GenerationOptions(temperature=0.0, max_output_tokens=256)
     stream = backend.stream([user("Count slowly from 1 to 200.")], options)
 
     received = 0

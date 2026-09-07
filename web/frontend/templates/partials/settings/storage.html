@@ -129,22 +129,20 @@
       </p>
     </div>
 
-    <div class="field field--inline">
-      <label class="field__label field__label--inline" for="storage-retention">Delete sessions after</label>
-      <input
-        class="field__control field__control--number"
-        id="storage-retention"
-        type="number"
-        min="1"
-        max="3650"
-        step="1"
-        placeholder="Never"
-        data-config="storage.retention_days"
-        data-config-nullable
-      />
-      <span class="field__value">days</span>
-      <p class="field__hint">Leave empty to keep everything.</p>
-    </div>
+    {# **"Delete sessions after N days" used to be here, and nothing implemented it.** The setting
+       was declared, the control was drawn, the value was saved, and no code ever read it — so
+       anyone who set it believed their old recordings were being cleaned up while they accumulated.
+       A control that promises to delete data and does not is worse than no control.
+
+       It is not replaced by a working version on purpose. Deleting somebody's recordings on a timer
+       is not a thing this application should do quietly, and there is already a considered tool for
+       it: `scripts/prune_empty_sessions.py`, which reports by default and only deletes when asked
+       with `--apply` (D-055). #}
+    <p class="field__hint">
+      Nothing is deleted automatically. To clear out sessions that hold no transcript and no
+      recording, run <code>uv run scripts/prune_empty_sessions.py</code> — it reports what it would
+      remove and deletes only when you add <code>--apply</code>.
+    </p>
   </div>
 
   <div class="settings__group">

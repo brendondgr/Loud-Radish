@@ -302,6 +302,21 @@ and responds with the **hot-swap class** of the change — `live`, `restart-stag
   "consequence": "Briefly interrupts transcription while that stage restarts." }
 ```
 
+A change lands in the `runtime` layer by default and is discarded on exit unless
+`POST /api/config/save` is called — that is what lets a setting be tried during a talk and got rid
+of by restarting. **Three paths are the exception** and are written straight to the user layer and
+to the config file whatever `layer` was asked for:
+
+| Path | Why |
+|---|---|
+| `audio.source_type` | Which kind of input to listen to is an identity, not a tuning value |
+| `audio.device_id` | Same; losing it means the next recording uses the wrong input, or none |
+| `audio.file_path` | Travels with the two above when the source is a file |
+
+The set lives in `web/backend/app/config/store.py` as `PERSISTENT_PATHS`, and the split happens on
+the route so that every client — the settings modal, the tray's device picker, the native settings
+window — inherits it rather than each remembering separately (D-046).
+
 ### Connection test
 
 `POST /api/llm/test` never returns generic failure text. The `result` field is one of

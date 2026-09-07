@@ -274,6 +274,25 @@ def capture_window_closed() -> Failure:
     )
 
 
+def voice_detector_fell_back(reason: str) -> Failure:
+    """Silero was asked for and could not be built, so the energy detector is running.
+
+    Reported rather than logged. The previous behaviour — a `logger.warning` and nothing else —
+    meant the application showed "silero" in its status while running the energy detector, on the
+    developer's own machine, for months.
+    """
+    return Failure(
+        code="voice-detector-fallback",
+        message=(
+            "The Silero voice detector could not be loaded, so the simpler energy detector is "
+            f"being used instead. {reason}"
+        ),
+        severity=Severity.WARNING,
+        remedy={"vad.detector": "energy"},
+        remedy_label="Use the energy detector and stop asking",
+    )
+
+
 def capture_failed(detail: str) -> Failure:
     """The video recorder died. The session continues on audio alone (D-022)."""
     return Failure(

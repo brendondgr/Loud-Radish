@@ -17,6 +17,19 @@
         Final
       </button>
     </div>
+
+    {# Shown only once a polished block exists. A toggle for a view nobody is looking at is chrome
+       that explains nothing — the same reasoning as the revision switch above. #}
+    <button
+      type="button"
+      class="button"
+      data-toggle-raw
+      aria-pressed="false"
+      title="Show the words exactly as they were transcribed, under the tidied prose"
+      hidden
+    >
+      Show raw
+    </button>
   </div>
 
   <div class="pane-header__group">

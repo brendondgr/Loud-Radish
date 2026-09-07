@@ -620,7 +620,7 @@ fixtures, and five faults came out of that which no test would have found:
       live watcher, `GetAll` returning fifteen properties and a 22 x 22 icon, the picture animating
       between reads, an eleven-item menu — and on killing the server, the tooltip becoming "Loud
       Radish is not running", the menu collapsing to four items, and the picture becoming the fault
-      one. No `PySide6`. Start it with `uv run python -m app.companion.main` from `web/backend/`,
+      one. No `PySide6`. Start it with `uv run --no-sync python -m app.companion.main` from `web/backend/`,
       or `--no-tray` to run the shortcuts without one.
 - [x] **The last transcript after a restart — closed.** The newest session holding segments is
       reopened once at start-up, chosen by the timestamp in its filename rather than by mtime.
@@ -675,67 +675,199 @@ fixtures, and five faults came out of that which no test would have found:
 
 ## Part 4 — Still Open
 
-- [ ] **Default ASR model and compute device.** Depends entirely on the user's hardware. A
-      conservative default ships (`small`, `int8`, auto device); benchmark locally and re-tune. The
-      architecture document is explicit that this cannot be decided from published benchmarks.
-- [ ] **Desktop packaging.** Whether this stays a browser-plus-local-server application or is packaged
-      into a Tauri/Electron/Qt shell. The chosen contract keeps both open, so nothing is blocked.
+Everything here is work somebody still owes. Entries that were *decisions* — deferrals with a
+reason, not tasks nobody got to — moved to **Part 4c — Deferred by decision** below, because a list
+that mixes the two reads as a debt pile and stops being read at all.
+
+
+- [x] **Default ASR model and compute device.** Done, by measurement — `scripts/benchmark_asr.py`
+      now exists and runs every combination of model, device and precision in its own process, after
+      a warm pass, reporting speed alongside how far each transcript diverges from the others.
+
+      What it found was not a tuning answer but a fault. **The shipped default crashes on this
+      hardware**: `small` at `int8` with `device="auto"` resolves to the GPU on any AMD machine and
+      aborts the *process* with "Memory access fault by GPU node-1" — no exception, nothing to
+      catch, the server and any recording in progress gone. That combination is now refused before
+      the load, with an override for hardware where it is not broken (D-053).
+
+      The CPU figures are stable and repeatable: `base`/`int8` measured 37.2×, 37.9×, 38.9× and
+      40.2× across four runs; `small`/`int8` 14.5–15.6×. This machine's own configuration is now
+      `base` on the CPU — about 2.2× real time through the streaming pipeline, against roughly 1.3×
+      on the GPU, and without the fault.
+
+- [ ] **The GPU path on this machine no longer produces coherent output.** Discovered while doing
+      the benchmark above, and left open because it needs someone who can bisect the ROCm stack.
+      With each combination isolated in its own process and warmed first, `large-v3-turbo` at
+      float16 returned **99 words for a 54-word clip**, `base` at float16 returned **none**, and the
+      same combination that transcribed correctly through the running server minutes earlier
+      returned zero words under the benchmark. It is not simply slow; it is wrong, and differently
+      wrong each time. `docs/deployment.md` now marks its GPU column unverified.
+
 - [x] **Deployment documentation.** Done. `docs/deployment.md` now describes installing and running
       it locally, what ends up on disk, and measured hardware expectations.
 - [x] **Design tokens.** Done. `docs/design-system.md` documents every token group, the two
       contrast corrections, and the rule about compositing translucent backgrounds before measuring.
 - [x] **Component map.** Done. `docs/component-map.md` describes the template-and-module tree, the
       three ownership rules, and every component and store.
-- [ ] **Automated accessibility tooling.** Not selected. Manual keyboard, contrast, and 320 px passes
-      are specified per phase in the plan; an automated check would complement them.
-- [ ] **Embeddings-based retrieval.** Deferred. Keyword search over FTS5 is expected to suffice for
-      single-talk sessions; revisit only if retrieval quality proves inadequate.
-- [ ] **Speaker diarisation.** Out of scope for v1. The segment model reserves an optional `speaker`
-      field so adding it later is not a schema migration.
-- [ ] **Hosted ASR backends.** Deferred to v2. Seam A accommodates them; none is implemented.
-- [ ] **A per-page control for the polish view.** Settings → Context turns the pass on and off, but
-      there is no way to see the raw segments for a stretch that has been polished without turning
-      it off entirely. Worth adding once the pass has been used against a real model and it is
-      clear how often anyone wants to.
-- [ ] **Tuning `polish.min_retained_ratio`.** The 0.6 default is a starting point chosen without a
+- [x] **Automated accessibility tooling.** Done, and deliberately not axe. Every browser-driving
+      option assumes a build step this project does not have, so the check is two test modules over
+      what the server already renders: `tests/frontend/test_rendered_accessibility.py` asserts the
+      structural rules (one `h1`, `lang`, accessible names on buttons, a label of some kind on every
+      field, `alt` on images, the transcript's polite live region) using `html.parser` from the
+      standard library, and `tests/frontend/test_token_contrast.py` computes WCAG ratios over the
+      design tokens with no dependency at all.
+
+      It found two real faults on its first run, which is the argument for it: the application page
+      had **no `h1` at all** — every heading on it was an `h2` or lower — and it caught its own
+      author's parser bug reporting two named buttons as unnamed. Both are fixed. This does not
+      replace the manual keyboard, contrast-in-context and 320 px passes; it catches the regressions
+      that can be stated as rules.
+
+
+
+- [x] **A per-page control for the polish view.** Done. A **Show raw** toggle in the transcript
+      toolbar, next to the revision switch it copies, appears only once a polished block exists.
+      Turning it on renders the segments under the prose rather than instead of it, and it is not
+      persisted: somebody who wants raw text permanently wants the pass off, and Settings → Context
+      already does that. Verified in the browser against a session holding a real polished block —
+      three segments with it off, six with it on, the prose untouched throughout.
+- [ ] **Tuning `polish.min_retained_ratio`.** *The measurement it needs now exists.* `ContentCheck`
+      always carried the ratio and its docstring said it was "logged, so a threshold can be tuned
+      from real runs" — and the caller dropped it. Every discard now logs the ratio, the floor it
+      was compared against, and a running count, so the number can be gathered from real use. The
+      value itself still needs that use before it is changed.
+
+      *Original note:* The 0.6 default is a starting point chosen without a
       real model behind it. It is a length check, not a meaning check, and the right value can only
       come from watching what a real model actually returns. Writing out spoken code references now
       shortens a rewrite legitimately ("guard dot py" is three words and `guard.py` is one), which
       pushes in the same direction as a summary would — another reason the floor needs real data.
-- [ ] **Whether the assistant should answer from polished text.** It currently assembles context
-      from raw segments, which are the verbatim record. Now that polished text carries the same
-      `[MM:SS]` markers the assistant cites, feeding it the polished version instead would give it
-      cleaner input — but it is a decision about what the assistant is allowed to read, not a
-      refactor, and it was deliberately not smuggled into the polish work.
-- [ ] **Tuning the invented-speech thresholds against real audio.** The defaults were calibrated
+- [x] **Whether the assistant should answer from polished text.** **Decided: no — it keeps reading
+      the raw segments.** This was flagged for the user and they asked for the whole list to be
+      worked through, so it is answered rather than left open.
+
+      The argument for polished text is that it is cleaner input. The argument against is what the
+      assistant is *for*: it answers with citations, and a citation is a claim that the speaker said
+      something. The polish pass is checked by `preserves_content`, which compares **word counts** —
+      it is a length check, not a meaning check, and its own threshold is still an untuned guess.
+      Feeding the assistant a rewrite means it can quote, with a timestamp, words the speaker did
+      not use; feeding it the raw segments means it sometimes quotes clumsy speech, which is what
+      was actually said. The second failure is much better than the first.
+
+      Two mechanical costs would also be paid for the worse of the two: citations are segment ids
+      and a polished block has a different id space, and `offered_seconds` — which gates citation
+      validation — would have to be derived from the `[MM:SS]` markers inside the prose rather than
+      from segment starts. If the decision is ever reversed, that is where the work is: the
+      `TranscriptSource` protocol in `services/context/assembler.py`, its verbatim block, and
+      `resolve_citations`. **Reversing it should require a reason about accuracy, not tidiness.**
+
+      The reader-facing half of the same question is now answered the other way: Show raw (below)
+      lets a person see the segments under any polished stretch, which is where wanting the raw
+      text actually bites.
+- [ ] **Tuning the invented-speech thresholds against real audio.** *The measurement it needs now
+      exists.* The filter logged its verdict but never the two numbers the thresholds are compared
+      against, so there was nothing to tune from; `no_speech_prob` and `avg_logprob` are now in the
+      debug record alongside the clip length, and suppressions are counted per code so a climbing
+      total can be attributed rather than merely noticed.
+
+      *Original note:* The defaults were calibrated
       against `tiny` on synthetic fixtures, which is not the same thing as a real room. The number
       to watch is `suppressed` in the status bar: climbing while someone is talking means the
       thresholds are too tight and real speech is being deleted, which is the one failure this
       filter can cause. `no_speech_certain` in particular was set at 0.85 because a measured
       hallucination scored 0.901 — a sample of one.
-- [ ] **Whether the Silero voice detector should replace the energy one by default.** The optional
-      `vad-silero` group already ships and swaps in behind the same interface. The decoder's own
-      filter now addresses the same problem inside the model, so this was left alone rather than
-      changed blind; it is a one-line setting if the energy detector proves too permissive in a
-      noisy room.
+- [x] **Whether the Silero voice detector should replace the energy one by default.** Done, and it
+      was not the question it looked like. **Silero was never running at all**: `silero_vad.onnx`
+      existed on no machine, so `build_detector` fell back to the energy detector with a
+      `logger.warning` nobody reads — while the status bar reported "silero". The configuration on
+      this machine asked for it and got energy for months. Nothing needs downloading: the model is
+      already inside `faster-whisper`, and it is now used when no path is configured. The fallback,
+      when it does happen, is a banner rather than a log line.
+
+      With both detectors actually runnable, the comparison could finally be made. Same clips, same
+      sensitivity: on real speech Silero found **83%** of frames against energy's **62%**; on a tone
+      fixture containing no speech it fired on **1%** against energy's **62%**. Better on both axes,
+      so Silero is the default (D-052).
 
 ---
 
 
 - [ ] **`tests/api/test_session_toggle.py::test_stopping_ignores_the_mode` fails roughly
-      one full-suite run in three, with a SQLite error.** It passes in isolation every time,
-      and passed in the two full runs either side of the one that failed, so it is timing and
-      not ordering. The test stops a `recorded` session, which is what *starts* a post-capture
-      pass and hands that pass the transcript store (D-021) — so the suspicion is the runner's
-      thread and the store's close racing under load. `TranscriptionRunner.stop` joins with a
-      five-second timeout and then returns regardless, by deliberate design: a server that
-      takes half an hour to exit is one nobody will let start automatically. That trade is
-      probably right and the abandoned thread is probably the race.
+      one full-suite run in three, with a SQLite error.** **It did not fail once while this plan was
+      executed, and it was deliberately provoked.** Recorded as evidence rather than as a fix,
+      because "I could not make it happen" is not "it cannot happen":
 
-      **Deliberately not fixed by guessing.** A concurrency change made on a hunch is how the
-      original "Cannot operate on a closed database" fault was introduced. Reproduce it under
-      `pytest -p no:randomly --count` or with the store instrumented to log its close, get the
-      full traceback rather than the truncated summary line, and fix what it actually names.
+      - **18 full-suite runs** across the ten steps, including five consecutive runs at the end.
+      - **40 consecutive runs** of `tests/api/test_session_toggle.py` in isolation.
+      - **Three full `tests/api` + `tests/transcription` suites running concurrently**, to reproduce
+        the load the original diagnosis blamed. No SQLite error appeared in any of the three.
+
+      That last attempt did produce two failures, and they are worth naming so nobody repeats the
+      experiment and misreads them: `test_audio_tap.py::test_a_tap_opens_and_closes_without_leaving_a_sink_behind`
+      counts null sinks in the developer's live PipeWire graph, and three suites running at once
+      each see the others' taps. That is an artifact of the provocation, not a fault — and the test
+      is right to be strict, because a leaked sink is what made an afternoon of recordings silent
+      (see the second lesson in `tests/conftest.py`).
+
+      **Something changed.** The likeliest candidates are the transcription runner's terminal paths,
+      which D-045 reworked, and `pytest-timeout`, which alters when a slow test gives up. Neither is
+      a diagnosis. The entry stays open; the next person to see it should reproduce first and
+      instrument the store's `close`, and if it stays quiet for another few months it can be closed
+      as gone rather than as fixed.
+
+---
+
+## Part 4c — Deferred by decision
+
+**Not open work.** Each of these was decided, with a reason, and none is waiting on anyone. They sat
+under "Still Open" for months, which made the list longer than the actual debt and easier to ignore.
+
+- **Desktop packaging.** Whether this stays a browser-plus-local-server application or is packaged
+  into a Tauri/Electron/Qt shell. Undecided *deliberately*: the chosen contract keeps both open, so
+  nothing is blocked either way, and the native settings window (D-051) removed the main reason to
+  want a shell — the application can now be configured without a browser tab. Revisit when there is
+  a concrete reason, not on a schedule.
+
+- **Embeddings-based retrieval.** Keyword search over FTS5 is expected to suffice for single-talk
+  sessions; revisit only if retrieval quality proves inadequate.
+
+- **Speaker diarisation.** Out of scope for v1. The segment model reserves an optional `speaker`
+  field, so adding it later is not a schema migration.
+
+- **Hosted ASR backends.** Deferred to v2. Seam A accommodates them; none is implemented.
+
+---
+
+## Part 4b — Shortcuts, dictation, and the tray's own settings
+
+- [x] **Global shortcuts are registered and fire.** Done. `register_all` had never been called by
+      anything; it now runs when the companion starts. The route is one `.desktop` entry per action
+      registered as a KGlobalAccel *service* — the portal refuses unsandboxed callers, and an
+      in-process component only works while the companion lives (D-047). Verified by pressing
+      `Meta+Alt+V` and watching a session start, and `Meta+Alt+X` and watching it stop.
+- [x] **The shipped shortcut defaults collided with KDE's own.** Done. `Meta+Alt+L`, `Meta+Alt+R`
+      and `Meta+Alt+S` were already taken by the keyboard layout switcher, Spectacle and the screen
+      reader. They had never been checked against a real desktop. The defaults are now
+      V/C/W/X/T/D, all verified free, and a conflict is reported rather than stolen.
+- [x] **Dictation.** Done, and verified twice on this machine. Press `Meta+Alt+D`, speak, press it
+      again: the words are transcribed, tidied, put on the clipboard and pasted into whatever window
+      has focus (D-049). Over 25 s of real speech: 2.0 s to transcribe on the GPU, 0.9 s to tidy.
+      In a silent room it says "nothing was said" and pastes nothing, which is the behaviour that
+      matters most.
+- [x] **A microphone picker in the tray menu.** Done (D-050). One level of nesting, the current
+      input ticked and named in the parent row, disabled while recording. Verified over D-Bus on the
+      real desktop: clicking a child switched the microphone and wrote it to the config file.
+- [x] **Choosing a microphone did not survive a restart.** Done, and it took two goes. `PATCH
+      /api/config` was fixed first (D-046) — but Settings → Audio posts to `/api/audio/device`,
+      which was still writing to the discarded runtime layer, so the reported fault was untouched
+      until that route was fixed too.
+- [x] **A native settings window.** Done (D-051). Tk, no new dependency, its own process,
+      launched from the tray's "Settings…" item. Three tabs: shortcuts with press-to-capture and
+      conflict checking, the microphone list, and the dictation options. Verified by clicking the
+      real menu item over D-Bus.
+
+---
+
 ## Part 5 — Verification Debt
 
 Things the plan's phases cannot verify in a headless environment. Each needs a manual pass on the
@@ -841,15 +973,40 @@ user's own machine, and none may be reported as passing until it has had one.
 
 ## Discovered work
 
-- [ ] **`tests/assistant/test_llm_live.py` can hang the suite.** It skips when nothing answers at
-      `LLM_TEST_ENDPOINT`, but the relay on `localhost:9090` *does* answer here — so it runs for
-      real, and `test_a_real_answer_streams_back_as_content` waits on a full model generation with
-      no timeout. `uv run pytest` therefore does not terminate on this machine; every run during
-      the rebrand used `--ignore=tests/assistant/test_llm_live.py`. Give those tests a deadline.
-- [ ] **`tests/transcription/test_window_audio.py::test_the_container_is_raw` is environment-
-      dependent.** It records from the real default monitor and asserts `|sample| <= 1.0`, so it
-      fails whenever what the developer happens to be playing clips above unity — observed failing
-      and then passing on consecutive runs with no code change. This is the same family as the
-      three lessons recorded at the top of `tests/conftest.py`: a test that reads the developer's
-      audio graph. Assert on the absence of NaN, which is the fault the test was written for, and
-      not on amplitude the test does not control.
+- [x] **Two settings that configured nothing.** Done (D-055). `.env.example` listed eleven
+      environment variables no Python reads, and `storage.retention_days` drew a control saying
+      "Delete sessions after N days" that deleted nothing. The variables are gone from the file and
+      the control is replaced by a pointer to `scripts/prune_empty_sessions.py` — deleting
+      recordings on a timer is not something this application should do quietly.
+
+- [ ] **`uv run` outside `app.py` silently breaks GPU transcription.** *Partly mitigated:* the
+      documented companion command now passes `--no-sync`, because starting the tray icon was
+      swapping the wheel out from under the running server. `app.py` calls
+      `acceleration.repair_kept_wheel()` on launch, which puts the ROCm CTranslate2 build back after
+      `uv` has replaced it with the PyPI CPU/CUDA one — so starting the application normally
+      self-heals. **Any other `uv run` does not.** A bare `uv run python some_script.py` re-syncs,
+      swaps the wheel, and the next model load fails with "the installed CTranslate2 cannot use it";
+      running the same script again through `uv run` re-breaks what a manual
+      `uv pip install --reinstall` just fixed. Encountered while testing dictation from a script.
+      Either the repair belongs somewhere every entry point passes through, or the scripts under
+      `scripts/` need the same call `app.py` makes.
+
+- [x] **`tests/assistant/test_llm_live.py` can hang the suite.** Done. The tests are now opt-in by
+      flag (`--run-live-llm`) rather than by reachability, which is what "skips when nothing
+      answers" was mistaken for. `pytest-timeout` gives the whole suite a 120-second per-test
+      deadline, the two draining tests get 300 seconds when deliberately asked for, and the server
+      probe moved into a fixture so collection no longer makes an HTTP request on every run.
+      `uv run pytest` completes unattended in about 95 seconds with no `--ignore`.
+- [x] **`tests/transcription/test_window_audio.py::test_the_container_is_raw` is environment-
+      dependent.** Done, and it was worse than reported. The amplitude assertion is gone from it and
+      from `test_a_capture_produces_finite_audio_at_the_canonical_rate`; both now assert that the
+      samples are finite, which is the fault the flag was added for. The blocking
+      `stdout.read(64000)` — which would never return on a machine whose default monitor is silent,
+      and so would never reach the `finally` that kills `pw-record` — is now a bounded read with a
+      ten-second deadline.
+
+      A **third** test in the same file was failing on every full-module run and had not been
+      reported: `test_a_real_tap_reports_its_links_without_listening_to_them` threw away the count
+      `link_all` returns and asserted `live_links > 0` regardless, so it failed whenever `pw-dump`
+      listed a node that could not actually be linked. It now skips on that, which is a fact about
+      the machine, and still asserts the counter whenever there is something to count.

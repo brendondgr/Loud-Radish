@@ -326,6 +326,43 @@ REPAIR_OFF = branding.env_var("NO_GPU_REPAIR")
 LEGACY_REPAIR_OFF = branding.legacy_env_var("NO_GPU_REPAIR")
 
 
+#: Models small enough to have been measured working with int8 on a ROCm GPU here.
+ROCM_INT8_SAFE_MODELS = frozenset({"tiny", "tiny.en", "base", "base.en"})
+
+#: Set to "1" to load a combination this refuses. For hardware where it is not actually broken.
+UNSAFE_OVERRIDE = branding.env_var("ALLOW_UNSAFE_COMPUTE")
+
+
+def unsafe_combination(device: str, precision: str, model: str) -> str:
+    """Why this (device, precision, model) must not be loaded here, or empty if it may be.
+
+    **There is one entry and it earned its place by killing the process.** On this machine — an AMD
+    gfx1151 through ROCm — `small` at `int8` on the GPU does not raise, does not return bad results
+    and does not fall back. It aborts the process with *"Memory access fault by GPU node-1"*, taking
+    the server and any recording in progress with it. `tiny` and `base` at int8 are fine, and
+    `small` at float16 is fine, so it is the combination rather than any one part.
+
+    A guard from a single machine would normally be too broad. Two things justify it. The failure is
+    not catchable — no `try` can recover a GPU fault — so the only place to stop it is before the
+    load. And it is reachable from the **shipped defaults**: `model="small"`, `device="auto"`,
+    `precision="int8"` resolves to exactly this on any AMD machine. Overridable by environment for
+    anyone whose hardware does not have the fault.
+    """
+    if os.environ.get(UNSAFE_OVERRIDE) == "1":
+        return ""
+    if precision != "int8" or device not in ("cuda", "auto"):
+        return ""
+    if _detect_hardware()[0] != "rocm":
+        return ""
+    if model.split("/")[-1].lower() in ROCM_INT8_SAFE_MODELS:
+        return ""
+    return (
+        f"Loading {model} at int8 on an AMD GPU crashes the process with a GPU memory fault "
+        "rather than failing cleanly, so it is refused here. Use float16 on the GPU, or int8 on "
+        "the CPU — which was measured faster on this hardware anyway."
+    )
+
+
 def repair_kept_wheel() -> str | None:
     """Reinstall the kept ROCm wheel when the environment manager has replaced it.
 

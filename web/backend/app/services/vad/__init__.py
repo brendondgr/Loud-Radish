@@ -13,6 +13,7 @@ implemented exactly once in :class:`SpeechGate`.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 
 from ...config.schema import VadConfig
 from ..audio.formats import SAMPLE_RATE
@@ -24,12 +25,18 @@ from .silero import SileroUnavailableError, SileroVad
 logger = logging.getLogger(__name__)
 
 
-def build_detector(config: VadConfig) -> VoiceActivityDetector:
+def build_detector(
+    config: VadConfig, on_fallback: Callable[[str], None] | None = None
+) -> VoiceActivityDetector:
     """Construct the configured detector.
 
-    Falls back to the energy detector when Silero is selected but unavailable, and says why. A
-    missing optional dependency should degrade the detector, not stop the session — losing the
-    transcript is far worse than losing detector quality.
+    Falls back to the energy detector when Silero is selected but unavailable — losing detector
+    quality is far better than losing the transcript.
+
+    **But the fallback is announced.** It used to be a `logger.warning` and nothing else, and the
+    result was an application that reported one detector in its status and ran another for months,
+    on the developer's own machine, without anyone noticing. `on_fallback` is how the session
+    manager turns that into something the user can see.
     """
     if config.detector == "silero":
         try:
@@ -39,6 +46,8 @@ def build_detector(config: VadConfig) -> VoiceActivityDetector:
             )
         except SileroUnavailableError as exc:
             logger.warning("Falling back to the energy detector: %s", exc)
+            if on_fallback is not None:
+                on_fallback(str(exc))
 
     return EnergyVad(sensitivity=config.sensitivity)
 
@@ -48,10 +57,11 @@ def build_gate(
     frame_ms: int = 32,
     sample_rate: int = SAMPLE_RATE,
     detector: VoiceActivityDetector | None = None,
+    on_fallback: Callable[[str], None] | None = None,
 ) -> SpeechGate:
     """Construct a debounced speech gate from configuration."""
     return SpeechGate(
-        detector=detector or build_detector(config),
+        detector=detector or build_detector(config, on_fallback),
         config=config,
         frame_ms=frame_ms,
         sample_rate=sample_rate,

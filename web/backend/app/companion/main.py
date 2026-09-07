@@ -23,6 +23,7 @@ import logging
 import os
 import sys
 import threading
+import time
 import urllib.error
 import urllib.request
 from typing import Any, Final
@@ -43,6 +44,10 @@ POLL_INTERVAL_S: Final = 0.5
 #: Short: an unanswered request means the server is down, which is a state to *show* rather than
 #: wait on.
 TIMEOUT_S: Final = 2.0
+
+#: How often to re-read the input list. Enumerating devices goes through PortAudio and is far more
+#: work than asking the server its state; microphones do not come and go twice a second.
+DEVICE_POLL_S: Final = 5.0
 
 
 def read_state(base: str) -> Snapshot:
@@ -74,6 +79,27 @@ def read_state(base: str) -> Snapshot:
     )
 
 
+def _repo_root() -> str:
+    """Where the checkout is, from the environment the launcher sets."""
+    return os.environ.get(branding.env_var("ROOT")) or os.environ.get(
+        branding.legacy_env_var("ROOT"), "."
+    )
+
+
+class _Shortcuts:
+    """The shortcut settings as attributes, which is what `register_all` reads.
+
+    The companion has no Pydantic model of its own — it deliberately holds no schema, because a
+    second definition of the settings is a second thing to keep in step with the backend.
+    """
+
+    def __init__(self, values: dict[str, Any]) -> None:
+        self.__dict__.update(values)
+
+    def __getattr__(self, name: str) -> Any:
+        return ""
+
+
 class Companion:
     """Polls the server, drives the frame clock, and answers menu activations."""
 
@@ -84,9 +110,14 @@ class Companion:
         port: int = DEFAULT_PORT,
         hold_still: bool = False,
         tray: bool = True,
+        repo_root: str | None = None,
     ) -> None:
         self.base = f"http://{host}:{port}"
         self.listening = True
+        self.repo_root = repo_root or _repo_root()
+        #: What `bind_shortcuts` last reported, for the menu and the settings window.
+        self.shortcuts: list = []
+        self._devices_read = 0.0
         self.clock = FrameClock(self._on_frame, hold_still=hold_still)
         self._stop = threading.Event()
         self._latest_svg = ""
@@ -111,6 +142,7 @@ class Companion:
     def poll_once(self) -> Snapshot:
         snapshot = read_state(self.base)
         self.clock.update(snapshot)
+        self._refresh_devices(snapshot)
         # The menu is rebuilt from this, and only when it has actually changed — a poll every half
         # second that signalled `LayoutUpdated` each time would have the host re-reading a menu
         # nobody has opened.
@@ -121,6 +153,7 @@ class Companion:
     def run(self) -> int:
         if self.tray is not None and not self.tray.start():
             logger.info("Running without a tray icon; shortcuts and the menu are unaffected")
+        self.bind_shortcuts()
         self.clock.start()
         logger.info("Companion watching %s", self.base)
         try:
@@ -134,6 +167,103 @@ class Companion:
                 self.tray.stop()
         return 0
 
+    def _refresh_devices(self, snapshot: Snapshot) -> None:
+        """Re-read the input list occasionally, and the chosen one with it.
+
+        **Not on every poll.** Enumerating devices goes through PortAudio, which is a great deal
+        more work than asking the server what it is doing, and inputs do not appear and vanish
+        twice a second. Every `DEVICE_POLL_S` is often enough to notice a microphone being plugged
+        in without making the tray a load on the machine.
+        """
+        if self.tray is None or not snapshot.reachable:
+            return
+        now = time.monotonic()
+        if now - self._devices_read < DEVICE_POLL_S:
+            return
+        self._devices_read = now
+        try:
+            devices = self._get("/api/audio/devices").get("devices") or []
+            chosen = (
+                (self._get("/api/config").get("config") or {}).get("audio", {}).get("device_id")
+            )
+        except (urllib.error.URLError, OSError, ValueError, TimeoutError):
+            return
+        self.tray.set_devices(devices, chosen)
+
+    def bind_shortcuts(self) -> list:
+        """Install the desktop entries and bind the keys. Reports, and never raises.
+
+        **`register_all` had no call site at all until now**, so the five configured shortcuts had
+        never been registered with anything and the "Listening for shortcuts" checkmark toggled a
+        flag nothing read. The bindings live in the desktop's own configuration once made, so this
+        is a reconciliation on start rather than something the keys depend on staying alive for.
+        """
+        from .shortcuts import describe, register_all
+
+        try:
+            config = self._read_config().get("shortcuts") or {}
+        except Exception as exc:  # noqa: BLE001
+            logger.info("Could not read the shortcut settings: %s", exc)
+            return []
+
+        results = register_all(_Shortcuts(config), self.repo_root)
+        logger.info("Shortcuts:\n%s", describe(results, self.repo_root))
+        self.shortcuts = results
+        return results
+
+    def _read_config(self) -> dict[str, Any]:
+        """The server's resolved configuration. Raises if it cannot be reached."""
+        return self._get("/api/config").get("config") or {}
+
+    def _get(self, path: str) -> dict[str, Any]:
+        request = urllib.request.Request(f"{self.base}{path}")  # noqa: S310 - loopback
+        with urllib.request.urlopen(request, timeout=TIMEOUT_S) as response:  # noqa: S310
+            return json.loads(response.read().decode("utf-8"))
+
+    def _patch(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
+        request = urllib.request.Request(  # noqa: S310 - loopback
+            f"{self.base}{path}",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="PATCH",
+        )
+        with urllib.request.urlopen(request, timeout=TIMEOUT_S) as response:  # noqa: S310
+            return json.loads(response.read().decode("utf-8"))
+
+    def _open_settings(self) -> str:
+        """Launch the native settings window in its own process (D-051).
+
+        Its own process because Tk's main loop must own the thread it runs on, and this one is
+        already answering D-Bus — and because a crash in a settings window must not take down the
+        tray icon that is the only way back to it.
+        """
+        import subprocess
+
+        host, _, port = self.base.removeprefix("http://").partition(":")
+        try:
+            subprocess.Popen(  # noqa: S603
+                [sys.executable, "-m", "app.companion.settings", "--host", host, "--port", port],
+                cwd=f"{self.repo_root}/web/backend",
+                start_new_session=True,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            return f"could not open settings: {exc}"
+        return "opened settings"
+
+    def _choose_device(self, device_id: str) -> str:
+        """Switch the microphone. Persisted by the route, not by us (D-046)."""
+        if not device_id:
+            return "no device given"
+        try:
+            self._patch("/api/config", {"changes": {"audio.device_id": device_id}})
+        except (urllib.error.URLError, OSError, ValueError, TimeoutError) as exc:
+            return f"could not switch microphone: {exc}"
+        # Re-read at once rather than waiting out the poll interval, so the tick moves under the
+        # pointer that just clicked it.
+        self._devices_read = 0.0
+        self._refresh_devices(read_state(self.base))
+        return f"microphone: {device_id}"
+
     def stop(self) -> None:
         self._stop.set()
 
@@ -143,22 +273,23 @@ class Companion:
         """Handle one menu activation. Returns a one-line result, for logs and tests."""
         import subprocess
 
-        repo_root = os.environ.get(branding.env_var("ROOT")) or os.environ.get(
-            branding.legacy_env_var("ROOT"), "."
-        )
-        ctl = [sys.executable, f"{repo_root}/{branding.CONTROL_SCRIPT}"]
+        ctl = [sys.executable, f"{self.repo_root}/{branding.CONTROL_SCRIPT}"]
 
+        if item_id.startswith("device:"):
+            return self._choose_device(item_id.removeprefix("device:"))
         if item_id == "listening":
             self.listening = not self.listening
             return f"shortcuts {'armed' if self.listening else 'disarmed'}"
         if item_id == "quit":
             self.stop()
             return "quitting"
-        if item_id in ("open", "settings"):
+        if item_id == "open":
             import webbrowser
 
             webbrowser.open(self.base)
             return "opened the interface"
+        if item_id == "settings":
+            return self._open_settings()
 
         commands = {
             "stop": ["stop"],

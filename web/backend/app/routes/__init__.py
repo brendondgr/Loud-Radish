@@ -11,6 +11,7 @@ from . import (
     capture,
     chat,
     config,
+    dictation,
     health,
     llm,
     pages,
@@ -33,6 +34,7 @@ def build_router() -> APIRouter:
     router.include_router(sessions.router)
     router.include_router(recordings.router)
     router.include_router(capture.router)
+    router.include_router(dictation.router)
     # Pages last: their catch-all-ish paths must not shadow an API route.
     router.include_router(pages.router)
     return router
