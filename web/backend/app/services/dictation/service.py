@@ -27,6 +27,11 @@ whichever text wins is pasted once.
 stops a dictation must not hold an HTTP request open for twenty seconds; the tray and the desktop's
 own notifications report progress instead.
 
+**The tidy of one chunk runs while the next is transcribed (D-063).** The speech model and the
+language model are different resources, so running them in sequence made a long dictation wait
+for both in full; the state says `tidying` only once the last chunk has been decoded, because
+until then the user is waiting on the speech model whatever the tidy is doing beside it.
+
 **The recording is cut where the speaker paused, never on a clock (D-061).** The first version
 went through the batch pass's thirty-second windows and came back with "..." where a window had
 cut a phrase in half. Now `pipeline.py` finds the silences, ends every chunk inside one, hands each
@@ -360,50 +365,37 @@ class DictationService:
         timings: dict[str, float] = {"recorded": captured}
         chunks = 0
         try:
-            mark = time.monotonic()
-            raw_chunks, chunks = self._transcribe(path, config)
-            timings["transcribe"] = time.monotonic() - mark
-            raw = " ".join(raw_chunks)
+            outcome, chunks = self._transcribe(path, config)
+            timings["transcribe"] = outcome.transcribe_s
+            if config.dictation.cleanup == "llm":
+                # The wait *after* transcription, which is the only part of the tidy anyone
+                # experiences: every earlier chunk was tidied while a later one transcribed.
+                timings["tidy"] = outcome.tidy_wait_s
 
-            if not raw:
+            if not outcome.raw:
                 self._settle(
                     DONE, text="", delivered=False, seconds=captured, timings=timings, chunks=chunks
                 )
                 _discard(path, keep=config.dictation.keep_audio)
                 return
 
-            text = raw
-            tidied = False
-            if config.dictation.cleanup == "llm":
-                self._set_state(TIDYING)
-                self._announce("Tidying…", raw[:120])
-                mark = time.monotonic()
-                tidied_chunks, tidied = pipeline.tidy_chunks(
-                    raw_chunks,
-                    config,
-                    self._backend_factory,
-                    on_progress=self._progress("Tidying…"),
-                )
-                text = " ".join(tidied_chunks)
-                timings["tidy"] = time.monotonic() - mark
-
             self._set_state(DELIVERING)
-            delivered, backend = self._hand_over(text, config)
+            delivered, backend = self._hand_over(outcome.text, config)
 
             # **The tidying up happens before `done`, not after it.** Settling first published a
             # state that said the dictation had finished while the recording was still on disk and
             # the sidecar not yet written — so anything acting on "done" raced the cleanup. Caught
             # by a test that looked for the discarded audio and found it about two runs in five.
-            _write_sidecar(path, text, raw)
+            _write_sidecar(path, outcome.text, outcome.raw)
             _discard(path, keep=config.dictation.keep_audio)
             _prune(Path(config.dictation.directory), config.dictation.keep_transcripts)
 
             self._settle(
                 DONE,
-                text=text,
-                raw_text=raw,
+                text=outcome.text,
+                raw_text=outcome.raw,
                 seconds=captured,
-                tidied=tidied,
+                tidied=outcome.all_tidied,
                 delivered=delivered,
                 backend=backend,
                 timings=timings,
@@ -414,10 +406,11 @@ class DictationService:
             self._settle(ERROR, error=str(exc), timings=timings, chunks=chunks)
             _discard(path, keep=True)
 
-    def _transcribe(self, path: Path, config: AppConfig) -> tuple[list[str], int]:
-        """The clip through the warm model, a pause-bounded chunk at a time (D-061).
+    def _transcribe(self, path: Path, config: AppConfig) -> tuple[pipeline.Delivered, int]:
+        """The clip through the warm model, a pause-bounded chunk at a time (D-061), each chunk
+        tidied while the next transcribes (D-063).
 
-        Returns the text of each chunk that said anything, and how many chunks there were.
+        Returns what was produced, and how many chunks there were.
         """
         asr = self._asr_provider()
         warming = self._warming
@@ -430,17 +423,42 @@ class DictationService:
                 "The recording has been kept."
             )
         chunks = pipeline.cut_at_pauses(path, config, self._detector_factory(config))
-        texts = pipeline.transcribe_chunks(
-            chunks, asr.transcribe, on_progress=self._progress("Transcribing…")
-        )
-        return texts, len(chunks)
+        tidy = config.dictation.cleanup == "llm"
 
-    def _progress(self, verb: str) -> pipeline.ProgressFn:
-        """A notification per chunk — but only once there is more than one to count."""
+        def transcription_done() -> None:
+            # Only now does the state say *tidying*: until the last chunk is decoded the user is
+            # waiting on the speech model, whatever the tidy worker is doing beside it.
+            if tidy:
+                self._set_state(TIDYING)
+                self._announce("Tidying…", "")
+
+        outcome = pipeline.transcribe_and_tidy(
+            chunks,
+            asr.transcribe,
+            config,
+            self._backend_factory,
+            tidy=tidy,
+            on_transcribed=self._progress("Transcribing…"),
+            on_tidied=self._progress("Tidying…", only_in=TIDYING),
+            on_transcription_done=transcription_done,
+        )
+        return outcome, len(chunks)
+
+    def _progress(self, verb: str, only_in: str | None = None) -> pipeline.ProgressFn:
+        """A notification per chunk — but only once there is more than one to count.
+
+        ``only_in`` restricts it to one state. The tidy worker reports progress while the
+        transcription is still running, and two threads replacing the same notification with
+        "Transcribing 3 of 5" and "Tidying 2 of 5" in turn reads as a flicker rather than progress —
+        so the tidy is only reported once it is the thing being waited for.
+        """
 
         def report(index: int, total: int) -> None:
-            if total > 1:
-                self._announce(f"{verb} {index + 1} of {total}", "")
+            if total <= 1:
+                return
+            if only_in is not None and self.state().state != only_in:
+                return
+            self._announce(f"{verb} {index + 1} of {total}", "")
 
         return report
 

@@ -646,3 +646,119 @@ def test_reaching_the_length_limit_delivers_what_was_said(build) -> None:
     assert final.delivered is True
     assert any("limit" in summary for summary, _ in parts["desk"].notices)
     assert parts["source"].stopped is True
+
+
+# -- the tidy runs while the next chunk transcribes (D-063) --------------------------------
+
+
+class SlowAsr(FakeAsr):
+    """A speech model that takes a measurable time per chunk."""
+
+    def __init__(self, delay: float, *texts: str) -> None:
+        super().__init__(*texts)
+        self.delay = delay
+
+    def transcribe(self, audio, prompt=None):  # noqa: ANN001
+        time.sleep(self.delay)
+        return super().transcribe(audio, prompt)
+
+
+def _three_chunk_clip() -> np.ndarray:
+    """Eight seconds, a breath, eight, a breath, eight: three chunks at the ten-second cap."""
+    return np.concatenate([tone(8.0), silence(0.6), tone(8.0), silence(0.6), tone(8.0)])
+
+
+def test_the_tidy_of_one_chunk_runs_while_the_next_transcribes(build) -> None:
+    """Three chunks, each 0.3 s to transcribe and 0.3 s to tidy: in sequence that is 1.8 s, and
+    overlapped it is three transcriptions plus the *last* tidy — about 1.2 s. The margin below is
+    wide, because the point is the shape of the wait and not its exact figure."""
+    llm = FakeLlm(delay=0.3, answers=["One.", "Two.", "Three."])
+    parts = build(
+        asr=SlowAsr(0.3, "one", "two", "three"),
+        llm=llm,
+        source=FakeSource(audio=_three_chunk_clip()),
+        **{"dictation.chunk_seconds": 10.0},
+    )
+
+    parts["service"].start()
+    started = time.monotonic()
+    parts["service"].finish()
+    _settle(parts["service"], timeout=10.0)
+    elapsed = time.monotonic() - started
+
+    final = parts["service"].state()
+    assert final.chunks == 3
+    assert final.text == "One. Two. Three."
+    assert final.tidied is True
+    assert llm.calls == 3
+    assert elapsed < 1.65, f"the two halves ran in sequence: {elapsed:.2f} s"
+    # The transcription took its three turns; the tidy the user waited for was the last one only.
+    assert final.timings["transcribe"] == pytest.approx(0.9, abs=0.25)
+    assert final.timings["tidy"] < 0.5
+
+
+def test_the_texts_come_back_in_the_order_they_were_spoken(build) -> None:
+    """The worker consumes the queue in order, so a fast tidy of chunk two cannot overtake a slow
+    tidy of chunk one."""
+    llm = FakeLlm(answers=["First.", "Second.", "Third."])
+    parts = build(
+        asr=FakeAsr("first", "second", "third"),
+        llm=llm,
+        source=FakeSource(audio=_three_chunk_clip()),
+        **{"dictation.chunk_seconds": 10.0},
+    )
+
+    parts["service"].start()
+    parts["service"].finish()
+    _settle(parts["service"])
+
+    final = parts["service"].state()
+    assert final.text == "First. Second. Third."
+    assert final.raw_text == "first second third"
+
+
+def test_a_stalled_tidy_still_stops_the_chunks_after_it_when_overlapped(build) -> None:
+    """The give-up rule survives the move onto a worker: one timeout, and nothing after it is
+    asked for."""
+    llm = FakeLlm(delay=5.0)
+    parts = build(
+        asr=FakeAsr("one", "two", "three"),
+        llm=llm,
+        source=FakeSource(audio=_three_chunk_clip()),
+        **{"dictation.chunk_seconds": 10.0, "dictation.cleanup_timeout_s": 1.0},
+    )
+
+    parts["service"].start()
+    parts["service"].finish()
+    _settle(parts["service"], timeout=10.0)
+
+    final = parts["service"].state()
+    assert llm.calls == 1
+    assert final.text == "one two three"
+    assert final.tidied is False
+    assert final.delivered is True
+
+
+def test_the_state_says_tidying_only_once_the_last_chunk_is_decoded(build) -> None:
+    """Until then the user is waiting on the speech model, whatever the worker is doing."""
+    seen: list[str] = []
+    parts = build(
+        asr=SlowAsr(0.15, "one", "two", "three"),
+        llm=FakeLlm(delay=0.4),
+        source=FakeSource(audio=_three_chunk_clip()),
+        **{"dictation.chunk_seconds": 10.0},
+    )
+    service = parts["service"]
+    original = service._set_state  # noqa: SLF001 - the transitions are the thing under test
+
+    def spy(state: str) -> None:
+        seen.append(state)
+        original(state)
+
+    service._set_state = spy  # noqa: SLF001
+    service.start()
+    service.finish()
+    _settle(service, timeout=10.0)
+
+    assert seen.index("tidying") < seen.index("delivering")
+    assert seen.count("tidying") == 1

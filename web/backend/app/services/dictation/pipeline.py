@@ -16,13 +16,20 @@ The chunk is also the unit the tidy works on. The language model was measured at
 for twenty-five seconds of speech, so a two-minute chunk sits well inside the timeout — while a
 twenty-minute dictation tidied in one request would blow through it and paste raw. Each chunk gets
 the whole timeout to itself, and a chunk the model mangles falls back to its own raw text alone.
+
+And the tidy of one chunk runs while the next is still being transcribed (D-063). The two models
+are different resources, so the only tidy the user waits for is the last chunk's.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import queue
+import threading
+import time
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -61,52 +68,107 @@ def cut_at_pauses(
     return chunks
 
 
-def transcribe_chunks(
-    chunks: list[Chunk], transcribe: Callable[..., Any], on_progress: ProgressFn | None = None
-) -> list[str]:
-    """Each chunk through the model whole, in order. Chunks that said nothing are dropped."""
-    texts: list[str] = []
-    for chunk in chunks:
-        if on_progress is not None:
-            on_progress(chunk.index, len(chunks))
-        result = transcribe(chunk.samples, None)
-        text = _text_of(result)
-        if text:
-            texts.append(text)
-    return texts
+@dataclass
+class Delivered:
+    """What the pipeline produced, and how long each half of it took."""
+
+    #: The raw text of every chunk that said anything, in order.
+    raws: list[str]
+    #: The text to paste: each chunk tidied where the tidy succeeded, raw where it did not.
+    texts: list[str]
+    #: Whether every chunk was tidied. False when the tidy was off, refused, or overran.
+    all_tidied: bool
+    #: Wall-clock seconds the transcription loop took.
+    transcribe_s: float
+    #: Wall-clock seconds spent waiting for the tidy *after* the last chunk was transcribed. The
+    #: tidy of every earlier chunk ran while a later one was still being transcribed, so this is
+    #: the only part of the tidy the user actually waited for (D-063).
+    tidy_wait_s: float
+
+    @property
+    def raw(self) -> str:
+        return " ".join(self.raws)
+
+    @property
+    def text(self) -> str:
+        return " ".join(self.texts)
 
 
-def tidy_chunks(
-    raws: list[str],
+def transcribe_and_tidy(
+    chunks: list[Chunk],
+    transcribe: Callable[..., Any],
     config: AppConfig,
     backend_factory: Callable[[], Any],
-    on_progress: ProgressFn | None = None,
-) -> tuple[list[str], bool]:
-    """Punctuation and capitalisation for each chunk, each bounded. Returns the texts and whether
-    every one of them was tidied.
+    *,
+    tidy: bool,
+    on_transcribed: Callable[[int, int], None] | None = None,
+    on_tidied: Callable[[int, int], None] | None = None,
+    on_transcription_done: Callable[[], None] | None = None,
+) -> Delivered:
+    """Every chunk through the model in order, each tidied as soon as it has been transcribed.
 
-    **A timeout or a refusal stops the tidy for the chunks that follow.** Those are properties of
-    the server, not of the chunk: a model that has stalled on the first two minutes will stall on
-    the next eight, and waiting the full timeout for each would turn a keystroke into a coffee
-    break — which is the exact failure the timeout exists to prevent. A chunk that comes back with
-    an essay instead of punctuation is the model's opinion of *that* chunk, so the next one is
-    still tried.
+    **The two halves overlap (D-063).** The speech model and the language model are different
+    resources — on this machine one runs on the CPU and the other answers over HTTP — so tidying
+    chunk one while chunk two transcribes costs nothing and, on a long dictation, roughly halves
+    the wait. The transcription runs on the calling thread; the tidy runs on one worker that
+    consumes the chunks in order, so the texts come back in the order they were spoken and the
+    give-up rule in :func:`tidy_one` — a timeout or a refusal stops the tidy for every chunk after
+    it — applies exactly as it did when the two ran in sequence.
+
+    ``on_transcribed`` and ``on_tidied`` are each called with ``(index, count)``; the count of
+    chunks to tidy is not known until the transcription has finished, so ``on_tidied`` is given the
+    number of chunks in the recording. ``on_transcription_done`` is called once, when the last
+    chunk has been transcribed and only the tidy remains.
     """
-    texts: list[str] = []
-    all_tidied = True
-    give_up = False
-    for index, raw in enumerate(raws):
-        if give_up:
-            texts.append(raw)
-            all_tidied = False
+    raws: list[str] = []
+    texts: dict[int, str] = {}
+    tidied: dict[int, bool] = {}
+    pending: queue.Queue[tuple[int, str] | None] = queue.Queue()
+
+    def worker() -> None:
+        give_up = False
+        while (item := pending.get()) is not None:
+            index, raw = item
+            if give_up:
+                texts[index], tidied[index] = raw, False
+                continue
+            if on_tidied is not None:
+                on_tidied(index, len(chunks))
+            text, ok, keep_going = tidy_one(raw, config, backend_factory)
+            texts[index], tidied[index] = text, ok
+            give_up = not keep_going
+
+    thread: threading.Thread | None = None
+    if tidy:
+        thread = threading.Thread(target=worker, name="dictation-tidy", daemon=True)
+        thread.start()
+
+    started = time.monotonic()
+    for chunk in chunks:
+        if on_transcribed is not None:
+            on_transcribed(chunk.index, len(chunks))
+        text = _text_of(transcribe(chunk.samples, None))
+        if not text:
             continue
-        if on_progress is not None:
-            on_progress(index, len(raws))
-        text, tidied, keep_going = tidy_one(raw, config, backend_factory)
-        texts.append(text)
-        all_tidied = all_tidied and tidied
-        give_up = not keep_going
-    return texts, all_tidied
+        raws.append(text)
+        if thread is not None:
+            pending.put((len(raws) - 1, text))
+    transcribed_at = time.monotonic()
+    if on_transcription_done is not None:
+        on_transcription_done()
+
+    if thread is None:
+        return Delivered(raws, list(raws), False, transcribed_at - started, 0.0)
+
+    pending.put(None)
+    thread.join()
+    return Delivered(
+        raws=raws,
+        texts=[texts[index] for index in range(len(raws))],
+        all_tidied=bool(raws) and all(tidied[index] for index in range(len(raws))),
+        transcribe_s=transcribed_at - started,
+        tidy_wait_s=time.monotonic() - transcribed_at,
+    )
 
 
 def tidy_one(
@@ -166,4 +228,4 @@ def _text_of(result: Any) -> str:
     return " ".join(str(getattr(word, "text", "")).strip() for word in words).strip()
 
 
-__all__ = ["ProgressFn", "cut_at_pauses", "tidy_chunks", "tidy_one", "transcribe_chunks"]
+__all__ = ["Delivered", "ProgressFn", "cut_at_pauses", "tidy_one", "transcribe_and_tidy"]

@@ -1,12 +1,12 @@
 # Pause-Aligned Batch and Open Items
 
-*Status: **In progress (2 / 7)** — started 2026-09-08*
+*Status: **In progress (3 / 7)** — started 2026-09-08*
 
 | Step | Topic | Status |
 |---|---|---|
 | 0 | Land the D-061 dictation work and fix the machine-dependent test failure | Complete |
 | 1 | The batch pass cuts where the speaker paused, and the checkpoint records those cuts | Complete |
-| 2 | A dictation's tidy runs while the next chunk transcribes | Pending |
+| 2 | A dictation's tidy runs while the next chunk transcribes | Complete |
 | 3 | Every script repairs the GPU wheel the way `app.py` does | Pending |
 | 4 | `segments_in_range` and `search` read one pass, never the union | Pending |
 | 5 | An export can name its revision, from the API and from the page | Pending |

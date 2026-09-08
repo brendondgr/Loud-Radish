@@ -179,7 +179,8 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   │   │   ├── service.py         # One dictation at a time: record, deliver in the background,
 │   │   │   │                      #   paste exactly once, finish at the cap
 │   │   │   ├── pipeline.py        # The recording cut at pauses; each chunk transcribed whole
-│   │   │   │                      #   and tidied on its own, bounded (D-061)
+│   │   │   │                      #   and tidied on its own, bounded (D-061), the tidy of one
+│   │   │   │                      #   running while the next transcribes (D-063)
 │   │   │   └── prompts.py         # What the language model is asked to do, and not do
 │   │   ├── desktop/               # Talking to the desktop the user is sitting in front of:
 │   │   │   │                      #   clipboard, a keystroke into the focused window, and a

@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-09-08 (the batch pass cut at pauses — D-062)*
+*Last updated: 2026-09-08 (a dictation's tidy overlapping its transcription — D-063)*
 
 The active work list for Loud Radish. Update it whenever a task is finished or new work is
 discovered.
@@ -988,9 +988,10 @@ user's own machine, and none may be reported as passing until it has had one.
       found that an unknown key made the loader ignore the user's entire config file — retired
       keys are now dropped with a log line instead.
 
-- [ ] **A dictation's transcribe and tidy could overlap.** The chunks are transcribed and then
-      tidied in sequence. The speech model and the language model are different resources, so
-      tidying chunk one while chunk two transcribes would roughly halve the wait on a long one.
+- [x] **A dictation's transcribe and tidy could overlap.** Done (D-063). The tidy runs on one
+      worker consuming the chunks in order while the next chunk transcribes; the state reads
+      `tidying` only once the last chunk is decoded, and the `tidy` timing records only the wait
+      after that. Three chunks at 0.3 s each way: about 1.2 s overlapped against 1.8 s in sequence.
 
 - [x] **The native settings window saved nothing but the microphone.** Done (D-060). Every shortcut
       and every dictation option went to the layer that is discarded on exit, so a rebound key
