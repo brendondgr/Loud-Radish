@@ -57,6 +57,8 @@ build step.
 | Capture resilience | ✅ D-036 — a capture that stops producing frames is noticed while it is happening, reopened on the stored consent token, and its pieces joined onto one timeline with the gaps held; the mux no longer truncates the sound to a picture that stopped early |
 | Export quality and the export window | ✅ D-037 — the user's conversation exports separately from the shared archive, a re-encode's size is measured before it is committed to, and one window previews the recording, offers the options, and shows the pipeline running |
 | Desktop integration | ✅ D-024 — toggle endpoint and CLI, autostart, tray companion drawing the Aperture microphone ([motion-spec.md](motion-spec.md)), global keybinds, settings tab |
+| Dictation and the batch pass at pauses | ✅ D-061–D-063 — a dictation and a recorded session are both cut where the speaker paused, never on a clock; the checkpoint records those cuts; a dictation's tidy runs while the next chunk transcribes |
+| The open list, closed by code | ✅ D-064–D-066 — every script and the companion repair the GPU wheel on launch, range reads serve one pass, and an export names its revision from the API and from the recordings page ([plans/pause-aligned-batch-and-open-items.md](plans/pause-aligned-batch-and-open-items.md)) |
 
 Open work is tracked in [checklist.md](checklist.md); phase status in
 [plans/live-seminar-transcriber.md](plans/live-seminar-transcriber.md).

@@ -1,6 +1,6 @@
 # Pause-Aligned Batch and Open Items
 
-*Status: **In progress (6 / 7)** — started 2026-09-08*
+*Status: **Complete (7 / 7)** — 2026-09-08*
 
 | Step | Topic | Status |
 |---|---|---|
@@ -10,7 +10,7 @@
 | 3 | Every script repairs the GPU wheel the way `app.py` does | Complete |
 | 4 | `segments_in_range` and `search` read one pass, never the union | Complete |
 | 5 | An export can name its revision, from the API and from the page | Complete |
-| 6 | Close the checklist entries, record the decisions, merge | Pending |
+| 6 | Close the checklist entries, record the decisions, merge | Complete |
 
 ---
 
