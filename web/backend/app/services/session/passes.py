@@ -24,6 +24,27 @@ logger = logging.getLogger(__name__)
 class TranscriptionPassMixin:
     """See the module docstring: these are methods of ``SessionManager``."""
 
+    def _has_media(self) -> bool:
+        """Whether this session left a file worth offering to export.
+
+        Asked of the recording folder rather than inferred from the mode: `live` normally writes
+        nothing, but does write audio when `storage.retain_audio` is on, and a `recorded` session
+        whose microphone never opened writes nothing despite its mode saying otherwise. The folder
+        is the only thing that knows which of those happened.
+        """
+        from ..recording import layout_for
+
+        try:
+            config = self._config.resolve()
+            layout = layout_for(
+                config.recording.recording_dir,
+                self._metadata.started_at,
+                self._metadata.session_id,
+            )
+        except Exception:  # noqa: BLE001 - a missing folder is an answer, not a failure
+            return False
+        return bool(layout.existing_video()) or layout.has_playable_audio()
+
     def _start_transcription(self, session: SessionMetadata) -> bool:
         """Begin the post-capture pass, if this session produced a recording.
 

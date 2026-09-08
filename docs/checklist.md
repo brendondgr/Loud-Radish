@@ -973,6 +973,11 @@ user's own machine, and none may be reported as passing until it has had one.
 
 ## Discovered work
 
+- [x] **The export window opened after every session, including ones with nothing to export.**
+      Done (D-058). A live transcription ended with a dialog offering five video qualities over
+      "This recording has no video". `session.stopped` now says whether the recording folder holds
+      any media, and the window opens only then.
+
 - [x] **The shortcut editor said "Meta" and meant the Windows key.** Done (D-057). Every label now
       says `Win`; the stored and registered form stays `Meta`, because that is what KDE's own
       settings show. The web panel, whose input *is* the stored value, explains it instead.

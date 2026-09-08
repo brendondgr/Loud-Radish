@@ -38,7 +38,7 @@ Every frame is `{"event": "<name>", "data": { … }}`.
 | Event | Payload | Meaning |
 |---|---|---|
 | `session.started` | `session_id`, `mode`, `config` snapshot, `started_at`, `source` | Capture began. `mode` is the capture mode (D-020) and is authoritative — a client reloading mid-recording adopts it rather than its own last selection |
-| `session.stopped` | `session_id`, `stats` | Capture ended |
+| `session.stopped` | `session_id`, `key`, `stats`, `has_media` | Capture ended. `has_media` says whether the recording folder holds audio or video, which is what decides whether the export window opens (D-058) — asked of the folder, not inferred from the mode |
 | `session.paused` | `session_id`, `at_seconds` | Capture is **held** (D-044). The recording stops growing and the clock stops with it — a pause removes time from the recording rather than adding silence to it, so nine seconds of wall clock across a three-second hold produce six seconds of audio. **Retracts nothing**: unlike a stop, a hold ends nothing, so the tentative tail and the recording figure are both still true |
 | `session.resumed` | `session_id`, `at_seconds` | Capture continues, in the same session, the same file and the same store |
 | `session.cancelled` | `session_id`, `kept` | The session ended and **nothing will be transcribed**. Every artefact it produced is kept — the difference from a stop is exactly one thing, whether the post-capture pass runs |

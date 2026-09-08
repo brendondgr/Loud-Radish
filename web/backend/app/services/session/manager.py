@@ -629,6 +629,12 @@ class SessionManager(
                 "session_id": session_id,
                 "key": self._session_key(),
                 "stats": stats.as_dict(),
+                # **Whether there is anything to export.** The interface opens its export window
+                # when a recording finishes, and it used to open for *every* session — including a
+                # plain live transcription, which writes no media at all. The result was a dialog
+                # offering five video qualities over the words "This recording has no video",
+                # after every dictation and every talk. Reported.
+                "has_media": self._has_media(),
             },
         )
         logger.info("Session %s stopped: %s", session_id, stats.as_dict())

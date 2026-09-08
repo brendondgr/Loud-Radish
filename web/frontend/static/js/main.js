@@ -306,11 +306,19 @@ function wireSession(header) {
   on(SESSION_STOPPED, (payload) => {
     session.stop(payload);
     mode.adoptSession({ running: false, mode: session.mode });
-    // **The recording is the thing that just happened, so the window about it opens now.** The old
-    // flow returned silently to an idle screen and left the user to find the Recordings page, pick
-    // the right row, and choose between two download links with no idea what either would produce.
-    // Opened after a tick, so the stop's own state changes have painted first.
-    if (payload?.key) {
+    // **The recording is the thing that just happened, so the window about it opens now** — but
+    // only if there *is* a recording. The old flow returned silently to an idle screen and left the
+    // user to find the Recordings page, pick the right row, and choose between two download links
+    // with no idea what either would produce; the fix then opened the window after *every* session,
+    // including a plain live transcription that writes no media at all. What that produced was a
+    // dialog offering five video qualities above the words "This recording has no video", after
+    // every talk and every dictation. Reported, with a screenshot.
+    //
+    // `has_media` is the server's answer about the recording folder, not a guess from the mode:
+    // `live` writes audio when `storage.retain_audio` is on, and a `recorded` session whose
+    // microphone never opened writes nothing. Opened after a tick, so the stop's own state changes
+    // have painted first.
+    if (payload?.key && payload.has_media) {
       setTimeout(() => void openExport(payload.key), 0);
     }
   });
