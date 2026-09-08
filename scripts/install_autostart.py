@@ -22,7 +22,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _bootstrap import REPO_ROOT, prepare  # noqa: E402
+
+prepare()
 UNIT_NAME = "loud-radish.service"
 
 #: The unit installed before the rename to Loud Radish. Removed on install rather than left beside

@@ -51,6 +51,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _bootstrap import prepare  # noqa: E402
+
+prepare()
+
 STATE = Path.home() / ".local/state/wireplumber/stream-properties"
 
 #: A saved line is ``<key>={<json>}``. The key is not JSON and may contain escaped spaces.

@@ -32,8 +32,10 @@ import wave
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT / "web" / "backend"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _bootstrap import REPO_ROOT, prepare  # noqa: E402
+
+prepare()
 
 DEFAULT_MODELS = ("tiny", "base", "small")
 DEFAULT_PRECISIONS = ("int8", "float16")
@@ -247,15 +249,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"No such file: {args.audio}", file=sys.stderr)
         return 1
 
-    # **The same repair `app.py` performs on launch.** Any `uv run` synchronises against the
-    # lockfile, which says PyPI, and so replaces the ROCm build of CTranslate2 with the CPU/CUDA
-    # one — after which every GPU row of this table reads "the GPU runtime rejected loading". That
-    # happened twice while writing this script before the cause was obvious.
-    from app.services.asr.acceleration import repair_kept_wheel
-
-    repaired = repair_kept_wheel()
-    if repaired:
-        print(f"  {repaired}")
+    # The repair `app.py` performs on launch happened in `_bootstrap.prepare()` at import: any
+    # `uv run` synchronises against the lockfile, which says PyPI, and so replaces the ROCm build
+    # of CTranslate2 with the CPU/CUDA one — after which every GPU row of this table reads "the
+    # GPU runtime rejected loading". That happened twice while writing this script before the
+    # cause was obvious, and it is why the repair now lives in front of every script (D-064).
 
     results: list[Result] = []
     for model in args.models:

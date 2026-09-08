@@ -26,8 +26,10 @@ import time
 import wave
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT / "web" / "backend"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _bootstrap import REPO_ROOT, prepare  # noqa: E402
+
+prepare()
 
 import numpy as np  # noqa: E402
 from app.config import ConfigStore  # noqa: E402

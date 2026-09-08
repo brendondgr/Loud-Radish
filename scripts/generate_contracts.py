@@ -18,8 +18,10 @@ import json
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT / "web" / "backend"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _bootstrap import REPO_ROOT, prepare  # noqa: E402
+
+prepare()
 
 from app.config import ConfigStore  # noqa: E402
 from app.main import create_app  # noqa: E402

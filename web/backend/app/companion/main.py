@@ -342,6 +342,13 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+    # **Before anything else, and never fatal.** Starting the companion with a bare `uv run` was
+    # swapping the ROCm build of CTranslate2 out from under the *running server*, whose next model
+    # load then failed. `radish` passes `--no-sync` to avoid that; this puts the wheel back on the
+    # launches that forget to (D-064).
+    repaired = _repair_gpu_build()
+    if repaired:
+        logging.getLogger(__name__).info(repaired)
     companion = Companion(
         host=args.host,
         port=args.port,
@@ -356,6 +363,16 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     return companion.run()
+
+
+def _repair_gpu_build() -> str | None:
+    """The same repair `app.py` makes on launch, guarded the same way."""
+    try:
+        from ..services.asr.acceleration import repair_kept_wheel
+
+        return repair_kept_wheel()
+    except Exception:  # noqa: BLE001 - a repair must not stop the tray icon
+        return None
 
 
 if __name__ == "__main__":

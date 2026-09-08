@@ -21,8 +21,10 @@ from pathlib import Path
 
 import numpy as np
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT / "web" / "backend"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _bootstrap import REPO_ROOT, prepare  # noqa: E402
+
+prepare()
 
 from app.services.audio.formats import SAMPLE_RATE  # noqa: E402
 

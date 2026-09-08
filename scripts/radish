@@ -14,8 +14,9 @@
 # The companion is started with `uv run --no-sync`. A plain `uv run` synchronises the environment
 # against the lockfile, and the lockfile says PyPI — so it replaces the ROCm build of CTranslate2
 # with the CPU/CUDA one and the *server's* next model load fails. `app.py` repairs that on its own
-# launch, which is why the server is started first and without the flag, and why the companion,
-# which repairs nothing, must not undo it.
+# launch, which is why the server is started first and without the flag. Since D-064 the companion
+# repairs it too, as does every script — but a sync that is then undone is still a reinstall on
+# every start, so the flag stays.
 #
 # The `pgrep` patterns are anchored to the resolved interpreter path. A looser pattern such as
 # `app.py` matches the shell that is running this script, so `radish stop` would kill itself

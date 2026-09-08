@@ -33,7 +33,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "web" / "backend"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _bootstrap import prepare  # noqa: E402
+
+prepare()
 
 from app.config import ConfigStore  # noqa: E402
 from app.services.transcript import archive  # noqa: E402

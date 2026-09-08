@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-09-08 (a dictation's tidy overlapping its transcription — D-063)*
+*Last updated: 2026-09-08 (every script repairs the GPU wheel on launch — D-064)*
 
 The active work list for Loud Radish. Update it whenever a task is finished or new work is
 discovered.
@@ -1024,17 +1024,18 @@ user's own machine, and none may be reported as passing until it has had one.
       the control is replaced by a pointer to `scripts/prune_empty_sessions.py` — deleting
       recordings on a timer is not something this application should do quietly.
 
-- [ ] **`uv run` outside `app.py` silently breaks GPU transcription.** *Partly mitigated:* the
-      documented companion command now passes `--no-sync`, because starting the tray icon was
-      swapping the wheel out from under the running server. `app.py` calls
-      `acceleration.repair_kept_wheel()` on launch, which puts the ROCm CTranslate2 build back after
-      `uv` has replaced it with the PyPI CPU/CUDA one — so starting the application normally
-      self-heals. **Any other `uv run` does not.** A bare `uv run python some_script.py` re-syncs,
-      swaps the wheel, and the next model load fails with "the installed CTranslate2 cannot use it";
-      running the same script again through `uv run` re-breaks what a manual
-      `uv pip install --reinstall` just fixed. Encountered while testing dictation from a script.
-      Either the repair belongs somewhere every entry point passes through, or the scripts under
-      `scripts/` need the same call `app.py` makes.
+- [x] **`uv run` outside `app.py` silently breaks GPU transcription.** Done (D-064). The repair
+      `app.py` makes on launch now lives in `scripts/_bootstrap.py`, every script's first import,
+      and the companion makes the same call at the top of `main` — so a bare `uv run` of any of
+      them puts the ROCm wheel back rather than leaving the server's next model load to fail. A
+      test asserts every script imports it and calls it before the first backend import. The
+      documented `--no-sync` stays, because a sync that is immediately undone is still a reinstall
+      on every start.
+
+      *Original note:* the documented companion command passed `--no-sync` because starting the
+      tray icon was swapping the wheel out from under the running server, and any other `uv run`
+      re-broke what a manual `uv pip install --reinstall` had just fixed. Encountered while testing
+      dictation from a script.
 
 - [x] **`tests/assistant/test_llm_live.py` can hang the suite.** Done. The tests are now opt-in by
       flag (`--run-live-llm`) rather than by reachability, which is what "skips when nothing

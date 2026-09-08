@@ -239,6 +239,8 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   ├── data/                      # Transcript store, search, export, session archive
 │   └── utils/                     # Configuration and standalone helpers
 ├── scripts/                       # Developer and operational scripts
+│   ├── _bootstrap.py              # Every script's first import: the backend on the path, and the
+│   │                              #   ROCm wheel put back after `uv run` replaced it (D-064)
 │   ├── loud-radish.desktop.in     # Desktop entry template, filled in by install_autostart.py
 │   ├── make_fixture_wav.py        # Generates synthetic WAV fixtures for pipeline tests
 │   ├── measure_capture_cost.py    # Encoding vs. inference contention (D-022)
@@ -287,6 +289,7 @@ listed them has been removed rather than left describing work that has landed.
 | `web/backend/app/services/` | The pipeline. One sub-package per stage, so each is independently testable. |
 | `tests/frontend/` | Accessibility over what the server actually renders: structural rules via `html.parser`, and WCAG contrast over the design tokens. No browser, no build step, no dependency (D-054). |
 | `scripts/radish` | The `radish` terminal command: start the server and tray icon in the background, stop them, say what they are doing. Symlinked into `~/.local/bin` (D-056). |
+| `scripts/_bootstrap.py` | What every script does first: put `web/backend` on `sys.path` and make the same GPU-wheel repair `app.py` makes on launch, so a bare `uv run` of a script cannot break the server's next model load (D-064). A test asserts every script imports it. |
 | `scripts/benchmark_asr.py` | Every model, device and precision measured on *this* machine, each in its own process. Exists because the default cannot be chosen from published benchmarks (D-053). |
 | `web/backend/app/companion/` | The tray icon and the global shortcuts — the two things a browser page cannot do. Deliberately a *remote control*: it polls the HTTP API, holds no state, and can be killed and restarted without the server noticing. |
 | `web/backend/app/services/capture/` | Recording a window's picture. Separate from `recording/` because they solve unrelated problems: one negotiates with a compositor for pixels, the other writes and transcribes audio. |

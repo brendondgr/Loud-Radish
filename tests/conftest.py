@@ -321,3 +321,18 @@ def isolated_data_dirs(tmp_path, monkeypatch):
     monkeypatch.setattr(defaults, "default_layer", isolated_default_layer)
     # `store.py` imported the name directly, so patching the module it came from is not enough.
     monkeypatch.setattr(store_module, "default_layer", isolated_default_layer)
+
+
+@pytest.fixture(autouse=True)
+def no_wheel_repair(monkeypatch):
+    """Keep every test from reinstalling CTranslate2.
+
+    Every script under `scripts/` calls `_bootstrap.prepare()` at import, and the companion's
+    `main` makes the same call — both of which run `repair_kept_wheel`, which on an AMD machine
+    with a kept wheel and the wrong build installed runs `uv pip install`. A test that loads a
+    script by file path must not do that to the developer's environment. The switch is the same
+    environment variable a user would set; the tests of the repair itself clear it again.
+    """
+    from app.services.asr import acceleration
+
+    monkeypatch.setenv(acceleration.REPAIR_OFF, "1")

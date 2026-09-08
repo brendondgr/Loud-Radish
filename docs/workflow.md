@@ -1,6 +1,6 @@
 # Workflow
 
-*Last updated: 2026-08-14 (root launcher on port 8395)*
+*Last updated: 2026-09-08 (every script repairs the GPU wheel on launch — D-064)*
 
 Every command needed to work in Loud Radish. If a command here is wrong, fix this file in the
 same change — do not work around it silently.
@@ -149,12 +149,14 @@ radish            # starts the tray icon along with the server
 cd web/backend && uv run --no-sync python -m app.companion.main
 ```
 
-**`--no-sync` is not optional on a machine with an AMD GPU.** A plain `uv run` synchronises the
-environment against the lockfile before Python starts, and the lockfile says PyPI — so it replaces
-the ROCm build of CTranslate2 with the CPU/CUDA one and the *server's* next model load fails.
-`app.py` repairs that on its own launch (`acceleration.repair_kept_wheel`), but starting the
-companion is not launching `app.py`, so nothing puts it back. The same applies to any script run
-with a bare `uv run`.
+**Keep `--no-sync` on a machine with an AMD GPU.** A plain `uv run` synchronises the environment
+against the lockfile before Python starts, and the lockfile says PyPI — so it replaces the ROCm
+build of CTranslate2 with the CPU/CUDA one. `app.py` repairs that on its own launch
+(`acceleration.repair_kept_wheel`), and since **D-064** so does the companion, and so does every
+script under `scripts/` through `scripts/_bootstrap.py`, its first import. A bare `uv run` of any
+of them therefore no longer breaks the server's next model load — but a sync that is immediately
+undone is still a reinstall on every start, so the flag stays in `radish` and in the commands here.
+`LOUD_RADISH_NO_GPU_REPAIR=1` switches the repair off everywhere it runs.
 
 | Flag | Effect |
 |---|---|

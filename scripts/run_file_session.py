@@ -27,8 +27,10 @@ from pathlib import Path
 
 import numpy as np
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(REPO_ROOT / "web" / "backend"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _bootstrap import prepare  # noqa: E402
+
+prepare()
 
 from app.config.schema import AsrConfig, StreamingConfig, VadConfig  # noqa: E402
 from app.services.asr import PromptBuilder, build_backend  # noqa: E402

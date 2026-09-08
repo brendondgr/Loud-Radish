@@ -29,7 +29,10 @@ import time
 from dataclasses import replace
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "web" / "backend"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _bootstrap import prepare  # noqa: E402
+
+prepare()
 
 from app.services.export.encode import build_command  # noqa: E402
 from app.services.export.estimate import estimate  # noqa: E402
