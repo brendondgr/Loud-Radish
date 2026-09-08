@@ -973,6 +973,11 @@ user's own machine, and none may be reported as passing until it has had one.
 
 ## Discovered work
 
+- [x] **A terminal command to start it in the background.** Done (D-056). `radish` starts the
+      server and the tray icon detached and returns in about a second; `radish stop`,
+      `radish status`, `radish logs`, `radish dictate`. Install with
+      `ln -sf "$PWD/scripts/radish" ~/.local/bin/radish`.
+
 - [x] **Two settings that configured nothing.** Done (D-055). `.env.example` listed eleven
       environment variables no Python reads, and `storage.retention_days` drew a control saying
       "Delete sessions after N days" that deleted nothing. The variables are gone from the file and

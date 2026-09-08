@@ -67,6 +67,21 @@ uv add <package>   # there are no optional groups — see D-023
 One command starts everything — API, WebSocket, and the browser interface, from a single process:
 
 ```bash
+radish
+```
+
+That starts the server **and** the tray icon in the background, detached from the terminal, and
+returns in about a second. `radish stop` stops both, `radish status` says what they are doing, and
+`radish logs -f` follows the server's output. Install the command once, from the checkout:
+
+```bash
+ln -sf "$PWD/scripts/radish" ~/.local/bin/radish
+```
+
+It is a symlink into the repository, so `git pull` updates the command too. To run the server in the
+foreground instead — which is what you want while changing backend code:
+
+```bash
 uv run app.py
 ```
 
@@ -128,6 +143,9 @@ keybinds, and talks to the server over the same loopback HTTP the browser uses. 
 and can be killed and restarted at any moment without the server noticing.
 
 ```bash
+radish            # starts the tray icon along with the server
+
+# or, on its own:
 cd web/backend && uv run --no-sync python -m app.companion.main
 ```
 
