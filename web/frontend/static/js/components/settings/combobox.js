@@ -140,7 +140,10 @@ export class Combobox {
         break;
       case "Escape":
         if (this.isOpen) {
+          // Stopped here: the settings dialog closes on Escape too, and one press should close
+          // the list, not the list and the dialog behind it.
           event.preventDefault();
+          event.stopPropagation();
           this.close();
         }
         break;
