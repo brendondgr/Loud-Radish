@@ -86,10 +86,12 @@ async def time_range(
     request: Request,
     start: float = Query(0.0, ge=0.0),
     end: float = Query(..., ge=0.0),
+    revision: int | None = Query(None, ge=0),
 ) -> dict[str, Any]:
-    """Everything overlapping a time range — what "summarise the last ten minutes" reads."""
+    """Everything of one pass overlapping a time range — what "summarise the last ten minutes"
+    reads. The latest pass unless ``revision`` names another (D-065)."""
     store = _store(request)
-    segments = store.segments_in_range(start, end)
+    segments = store.segments_in_range(start, end, revision)
     return {
         "segments": [segment.as_event() for segment in segments],
         "last_id": store.last_segment_id(),

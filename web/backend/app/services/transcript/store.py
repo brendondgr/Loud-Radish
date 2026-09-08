@@ -265,16 +265,27 @@ class TranscriptStore:
             params = (segment_id, limit)
         return [_row_to_segment(row) for row in self._query(sql, params)]
 
-    def segments_in_range(self, start: float, end: float) -> list[Segment]:
-        """Every segment overlapping the time range — "summarise the last ten minutes".
+    def segments_in_range(
+        self, start: float, end: float, revision: int | None = None
+    ) -> list[Segment]:
+        """Every segment of one pass overlapping the time range — "summarise the last ten minutes".
 
         Overlap rather than containment: a segment straddling the boundary is part of what was said
         in that window, and dropping it would lose the sentence the user is asking about.
+
+        **One pass, never the union (D-065).** The context, polish and chat paths all read through
+        here, and a session holding a live pass and a post-capture one covers the same minutes
+        twice under different ids — so an unscoped read handed the assistant the talk said twice,
+        the exact fault D-022 removed from the export. The latest pass when none is named, which
+        is what every other reader serves; a caller showing the other pass names it.
         """
+        if revision is None:
+            revision = self.latest_revision()
         return [
             _row_to_segment(row)
             for row in self._query(
-                "SELECT * FROM segments WHERE end > ? AND start < ? ORDER BY id", (start, end)
+                "SELECT * FROM segments WHERE revision = ? AND end > ? AND start < ? ORDER BY id",
+                (int(revision), start, end),
             )
         ]
 

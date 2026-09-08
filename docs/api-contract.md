@@ -1,6 +1,6 @@
 # API Contract
 
-*Last updated: 2026-08-29 (what the media block means, corrected — D-032, D-034, D-035)*
+*Last updated: 2026-09-08 (range reads serve one pass — D-065)*
 
 > **Status: the WebSocket event contract below is frozen.** The machine-readable contract lives in
 > `web/shared/contracts/` and is generated from the backend; this document is its human-readable
@@ -260,10 +260,13 @@ them says everything twice.
 pass publishes `transcript.committed` for every revision-1 segment as it writes it, so a client
 displaying revision 0 receives a second whole transcript over the same socket it is already using.
 The browser now holds one revision at a time and drops anything from another, switching wholesale
-when the pass finishes. On the server, `GET /api/transcript/export`, `GET /api/sessions/{key}` and
-`GET /api/sessions/{key}/export` serve the **latest** revision — never the union — so the file a
-reader keeps holds the talk once. The Live/Final switch is the only way to see the other pass, and
-full-text search is the deliberate exception: it spans both, because a hit in either is a real hit.
+when the pass finishes. On the server, `GET /api/transcript/export`, `GET /api/sessions/{key}`,
+`GET /api/sessions/{key}/export` and — since **D-065** — `GET /api/transcript/range`, which is what
+the context, polish and chat paths read through, serve the **latest** revision, never the union, so
+the file a reader keeps and the passage the assistant is shown both hold the talk once. `range`
+takes an optional `revision` for a caller showing the other pass. The Live/Final switch is the
+only way to *see* the other pass, and full-text search is the deliberate exception: it spans both,
+because a hit in either is a real hit.
 
 The unit the transcript store holds, the frontend renders as a paragraph, and the context pipeline
 chunks on.

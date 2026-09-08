@@ -413,7 +413,7 @@
           "session"
         ],
         "summary": "Select Device",
-        "description": "Choose the capture source. Takes effect when the next session starts.",
+        "description": "Choose the capture source. Takes effect when the next session starts, and survives a restart.\n\n**This is the endpoint the Settings \u2192 Audio dropdown calls**, and it used to write to the\nruntime layer like every other setting \u2014 so choosing a microphone worked until the application\nwas restarted, at which point it reverted with no explanation. That is the reported fault, and\nfixing `PATCH /api/config` alone did not fix it, because the dropdown does not go through that\nroute. All three paths written here are in `PERSISTENT_PATHS`; see D-046 for why a device is\nnot like a threshold.",
         "operationId": "select_device_api_audio_device_post",
         "requestBody": {
           "content": {
@@ -713,7 +713,7 @@
           "transcript"
         ],
         "summary": "Time Range",
-        "description": "Everything overlapping a time range \u2014 what \"summarise the last ten minutes\" reads.",
+        "description": "Everything of one pass overlapping a time range \u2014 what \"summarise the last ten minutes\"\nreads. The latest pass unless ``revision`` names another (D-065).",
         "operationId": "time_range_api_transcript_range_get",
         "parameters": [
           {
@@ -735,6 +735,23 @@
               "type": "number",
               "minimum": 0.0,
               "title": "End"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Revision"
             }
           }
         ],
@@ -2262,6 +2279,125 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dictation": {
+      "get": {
+        "tags": [
+          "dictation"
+        ],
+        "summary": "Get Dictation",
+        "description": "What the dictation is doing.",
+        "operationId": "get_dictation_api_dictation_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Dictation Api Dictation Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dictation/toggle": {
+      "post": {
+        "tags": [
+          "dictation"
+        ],
+        "summary": "Toggle Dictation",
+        "description": "Start one, or finish the one running. What the shortcut calls.",
+        "operationId": "toggle_dictation_api_dictation_toggle_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Toggle Dictation Api Dictation Toggle Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dictation/start": {
+      "post": {
+        "tags": [
+          "dictation"
+        ],
+        "summary": "Start Dictation",
+        "operationId": "start_dictation_api_dictation_start_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Start Dictation Api Dictation Start Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dictation/stop": {
+      "post": {
+        "tags": [
+          "dictation"
+        ],
+        "summary": "Stop Dictation",
+        "description": "Stop recording. The transcription and the paste happen afterwards, in the background.",
+        "operationId": "stop_dictation_api_dictation_stop_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Stop Dictation Api Dictation Stop Post"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/dictation/cancel": {
+      "post": {
+        "tags": [
+          "dictation"
+        ],
+        "summary": "Cancel Dictation",
+        "description": "Throw it away. Nothing is transcribed and nothing is pasted.",
+        "operationId": "cancel_dictation_api_dictation_cancel_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Cancel Dictation Api Dictation Cancel Post"
+                }
               }
             }
           }

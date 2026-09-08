@@ -1,6 +1,6 @@
 # Route Map
 
-*Last updated: 2026-08-29 (per-recording folders and the web-app export — D-032, D-034)*
+*Last updated: 2026-09-08 (range reads serve one pass — D-065)*
 
 > **Status column is authoritative.** Every API group is implemented and tested, as is the
 > WebSocket and both pages. Update this file in the same change that adds, removes, or changes a
@@ -208,7 +208,7 @@ state is a second place for it to drift.
 | Method | Path | Purpose | Status |
 |---|---|---|---|
 | `GET` | `/api/transcript/since/{segment_id}` | Everything after a segment id — the reconnection path | **Implemented** |
-| `GET` | `/api/transcript/range` | Everything in a time range | **Implemented** |
+| `GET` | `/api/transcript/range?start=&end=&revision=` | Everything of one pass in a time range — the latest unless `revision` names another (D-065) | **Implemented** |
 | `GET` | `/api/transcript/search` | Full-text search over the session | **Implemented** |
 | `GET` | `/api/transcript/export` | Export as text, Markdown, SRT, VTT, or JSON | **Implemented** |
 | `GET` | `/api/transcript/glossary` | The session glossary | **Implemented** |

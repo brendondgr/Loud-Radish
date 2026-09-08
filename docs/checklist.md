@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-09-08 (every script repairs the GPU wheel on launch — D-064)*
+*Last updated: 2026-09-08 (range reads serve one pass — D-065)*
 
 The active work list for Loud Radish. Update it whenever a task is finished or new work is
 discovered.
@@ -264,10 +264,10 @@ showed the rewritten prose followed immediately by the entire raw transcript aga
       for the live one. The sessions page has no revision control to drive such a parameter, so
       adding it would have widened a bug fix into a feature. Worth doing alongside a revision
       control on that page.
-- [ ] **`segments_in_range` still spans passes.** The context, polish, and chat paths read through
-      it. Not reachable today — the post-capture pass runs after those workers have stopped and
-      closes the store when it finishes — but it is the same union, and it would surface the moment
-      a session with two passes is reopened for reading.
+- [x] **`segments_in_range` still spans passes.** Done (D-065). It reads the latest pass unless a
+      caller names another, so the context, polish and chat paths — and `GET /api/transcript/range`
+      — are handed one transcript when a two-pass session is reopened for reading. Full-text search
+      keeps spanning both, which D-022 recorded as deliberate.
 
 ---
 

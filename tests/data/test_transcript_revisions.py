@@ -87,6 +87,37 @@ def test_segments_default_to_the_live_revision(tmp_path: Path) -> None:
         assert store.segments_at(0)[0].revision == 0
 
 
+def test_a_range_read_serves_the_latest_pass_only(tmp_path: Path) -> None:
+    """The context, polish and chat paths read through this, and a session holding two passes
+    covers the same minutes twice — so an unscoped read said everything twice (D-065)."""
+    with TranscriptStore(tmp_path / "s.db") as store:
+        store.append_segment(segment(1, "live one", revision=0, start=0.0))
+        store.append_segment(segment(2, "live two", revision=0, start=2.0))
+        store.append_segment(segment(3, "final one", revision=1, start=0.0))
+        store.append_segment(segment(4, "final two", revision=1, start=2.0))
+
+        assert [s.text for s in store.segments_in_range(0.0, 10.0)] == ["final one", "final two"]
+
+
+def test_a_range_read_can_name_the_other_pass(tmp_path: Path) -> None:
+    with TranscriptStore(tmp_path / "s.db") as store:
+        store.append_segment(segment(1, "live one", revision=0, start=0.0))
+        store.append_segment(segment(2, "final one", revision=1, start=0.0))
+
+        assert [s.text for s in store.segments_in_range(0.0, 10.0, revision=0)] == ["live one"]
+
+
+def test_a_range_read_over_one_pass_is_unchanged(tmp_path: Path) -> None:
+    """Every ordinary session holds one pass, and this must read exactly as it always has."""
+    with TranscriptStore(tmp_path / "s.db") as store:
+        store.append_segment(segment(1, "first", start=0.0))
+        store.append_segment(segment(2, "second", start=2.0))
+        store.append_segment(segment(3, "third", start=4.0))
+
+        assert [s.text for s in store.segments_in_range(1.0, 3.0)] == ["first", "second"]
+        assert store.segments_in_range(50.0, 60.0) == []
+
+
 def test_search_spans_both_passes(tmp_path: Path) -> None:
     """FTS indexes rows, not revisions. A hit in either is a hit."""
     with TranscriptStore(tmp_path / "s.db") as store:

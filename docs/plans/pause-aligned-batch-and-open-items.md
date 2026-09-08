@@ -1,6 +1,6 @@
 # Pause-Aligned Batch and Open Items
 
-*Status: **In progress (4 / 7)** — started 2026-09-08*
+*Status: **In progress (5 / 7)** — started 2026-09-08*
 
 | Step | Topic | Status |
 |---|---|---|
@@ -8,7 +8,7 @@
 | 1 | The batch pass cuts where the speaker paused, and the checkpoint records those cuts | Complete |
 | 2 | A dictation's tidy runs while the next chunk transcribes | Complete |
 | 3 | Every script repairs the GPU wheel the way `app.py` does | Complete |
-| 4 | `segments_in_range` and `search` read one pass, never the union | Pending |
+| 4 | `segments_in_range` and `search` read one pass, never the union | Complete |
 | 5 | An export can name its revision, from the API and from the page | Pending |
 | 6 | Close the checklist entries, record the decisions, merge | Pending |
 
@@ -54,6 +54,9 @@ the suite fails on this machine for a reason unrelated to it.
 - **How the export page exposes a revision.** *Assumption:* a second select beside the format
   select, shown only for a session that holds two passes, labelled the way the transcript pane
   labels them: Live and Final. The live page's export follows whichever pass the pane shows.
+- **Whether `search` should be scoped too.** *Decided during Step 4: no.* D-022 recorded full-text
+  search spanning both passes as deliberate — a hit in either is a real hit — and a test pins it.
+  Step 4 scopes `segments_in_range` only, which is what the checklist entry named.
 - **The GPU path itself.** Real-model verification of any of this on the GPU is still owed and is
   not attempted here; the machine's own configuration is `base` on the CPU (D-053).
 
