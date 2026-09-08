@@ -282,13 +282,15 @@ def describe(results: list[Registration], repo_root: Path | str) -> str:
 
     for entry in results:
         mark = "✓" if entry.registered else "·"
-        lines.append(f"  {mark} {entry.sequence or '(unset)':<16} {ACTIONS[entry.action][0]}")
+        shown = keys.display_sequence(entry.sequence) if entry.sequence else "(unset)"
+        lines.append(f"  {mark} {shown:<16} {ACTIONS[entry.action][0]}")
 
     if failed:
         lines.append("")
         lines.append("  Not registered. Bind these by hand in your keyboard settings:")
         lines.append("")
         for entry in failed:
-            lines.append(f"      {entry.sequence or '(choose a key)'}")
+            wanted = keys.display_sequence(entry.sequence) if entry.sequence else "(choose a key)"
+            lines.append(f"      {wanted}")
             lines.append(f"          {manual_command(repo_root, entry.action)}")
     return "\n".join(lines)

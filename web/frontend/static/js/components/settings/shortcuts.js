@@ -3,6 +3,11 @@
  *
  * Two things beyond what the binding layer already does. **Capturing a key combination** rather
  * than making the user type `Meta+Alt+L`, and **saying plainly when the companion is not running**,
+ *
+ * `Meta` is what Qt, KDE and this application's configuration call the **Windows key**. The stored
+ * spelling stays `Meta`, because that is what `kglobalshortcutsrc` contains and what someone
+ * comparing against KDE's own System Settings will see — but no user-facing sentence should say
+ * "Meta" without saying which key that is. Reported as "I have no idea what Meta is" (D-057).
  * because the bindings are then inert — a settings page that stores keys nothing listens for is
  * worse than one that admits it.
  */
@@ -21,7 +26,7 @@ export class ShortcutSettings {
     for (const input of root?.querySelectorAll("[data-shortcut-capture]") ?? []) {
       input.addEventListener("keydown", (event) => this._capture(event, input));
       input.setAttribute("readonly", "");
-      input.placeholder = "Press a key combination";
+      input.placeholder = "Press a key combination — e.g. Windows + Shift + Space";
     }
   }
 
@@ -89,7 +94,7 @@ export class ShortcutSettings {
 
     // A bare letter would be caught the moment it was typed anywhere, so a modifier is required.
     if (parts.length === 0) {
-      setText(this.status, "Use at least one modifier — Meta, Ctrl, or Alt.");
+      setText(this.status, "Hold a modifier as well — Meta (the Windows key), Ctrl, or Alt.");
       return;
     }
 

@@ -973,6 +973,10 @@ user's own machine, and none may be reported as passing until it has had one.
 
 ## Discovered work
 
+- [x] **The shortcut editor said "Meta" and meant the Windows key.** Done (D-057). Every label now
+      says `Win`; the stored and registered form stays `Meta`, because that is what KDE's own
+      settings show. The web panel, whose input *is* the stored value, explains it instead.
+
 - [x] **A terminal command to start it in the background.** Done (D-056). `radish` starts the
       server and the tray icon detached and returns in about a second; `radish stop`,
       `radish status`, `radish logs`, `radish dictate`. Install with

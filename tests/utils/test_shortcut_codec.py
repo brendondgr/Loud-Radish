@@ -15,7 +15,13 @@ computed for itself.
 from __future__ import annotations
 
 import pytest
-from app.companion.keys import KeyError_, format_sequence, is_readable, parse_sequence
+from app.companion.keys import (
+    KeyError_,
+    display_sequence,
+    format_sequence,
+    is_readable,
+    parse_sequence,
+)
 
 # -- pinned against KDE itself -------------------------------------------------------------
 
@@ -123,3 +129,43 @@ def test_a_function_key_past_the_end_says_where_the_end_is() -> None:
 def test_an_unknown_modifier_lists_the_ones_that_exist() -> None:
     with pytest.raises(KeyError_, match="Meta"):
         parse_sequence("Hyper+L")
+
+
+# -- what a person is shown --------------------------------------------------------------------
+
+
+def test_the_windows_key_is_called_the_windows_key() -> None:
+    """**Reported as "I have no idea what Meta is", and fairly.** Qt and KDE call the Windows key
+    `Meta`; nothing outside a Qt codebase does. The stored form keeps KDE's name so it matches what
+    System Settings shows, and only the label changes."""
+    assert display_sequence("Meta+Shift+Space") == "Win+Shift+Space"
+    assert display_sequence("Meta+Alt+D") == "Win+Alt+D"
+
+
+def test_the_label_is_not_what_gets_registered() -> None:
+    """`format_sequence` is the canonical form and is what reaches KGlobalAccel and the config
+    file; `display_sequence` is a label and never round-trips back into either."""
+    assert format_sequence(parse_sequence("Meta+Shift+Space")) == "Meta+Shift+Space"
+    assert display_sequence("Meta+Shift+Space") != format_sequence(0x12000020)
+
+
+def test_typing_the_label_back_in_still_works() -> None:
+    """A pleasant accident worth keeping: `Win` was already an accepted input alias, so somebody
+    who copies the label out of the settings window into the config file gets what they meant
+    rather than an error."""
+    assert is_readable("Win+Shift+Space")
+    assert parse_sequence("Win+Shift+Space") == parse_sequence("Meta+Shift+Space")
+
+
+def test_the_other_modifiers_are_already_called_what_people_call_them() -> None:
+    assert display_sequence("Ctrl+Alt+Shift+F9") == "Ctrl+Alt+Shift+F9"
+
+
+def test_an_integer_can_be_shown_directly() -> None:
+    assert display_sequence(0x12000020) == "Win+Shift+Space"
+
+
+def test_the_chord_the_user_asked_for_round_trips() -> None:
+    """Shift + Windows + Spacebar, which is what prompted all of this."""
+    assert format_sequence(parse_sequence("Shift+Meta+Space")) == "Meta+Shift+Space"
+    assert display_sequence("Meta+Shift+Space") == "Win+Shift+Space"

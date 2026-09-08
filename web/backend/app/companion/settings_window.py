@@ -28,7 +28,7 @@ import urllib.request
 from typing import Any
 
 from .. import branding
-from . import settings_form
+from . import keys, settings_form
 from .settings_form import NotAShortcut
 
 logger = logging.getLogger(__name__)
@@ -40,6 +40,11 @@ TIMEOUT_S = 5.0
 SHORTCUT_ORDER = ("dictate", "toggle_live", "toggle_recorded", "arm_window", "stop", "open_app")
 
 PRESS_A_KEY = "press a key…"
+
+
+def _shown(sequence: str | None) -> str:
+    """A stored sequence as a label. `Meta` is the Windows key and nobody calls it Meta."""
+    return keys.display_sequence(sequence) if sequence else "unset"
 
 
 class Api:
@@ -166,8 +171,10 @@ class SettingsWindow:
         ttk.Label(
             frame,
             text=(
-                "Click a shortcut, then press the keys you want. A key already used by something "
-                "else is refused rather than taken."
+                "Click a shortcut, then press the keys you want — for example hold Win and Shift "
+                "and press Space. A key already used by something else is refused rather than "
+                "taken.\n\nWin is the Windows key. KDE calls it Meta, which is what you will see "
+                "if you look these up in System Settings."
             ),
             wraplength=520,
             justify="left",
@@ -179,7 +186,7 @@ class SettingsWindow:
             ttk.Label(frame, text=ACTIONS[action][0]).grid(row=row, column=0, sticky="w", pady=3)
             button = ttk.Button(
                 frame,
-                text=self.sequences.get(action) or "unset",
+                text=_shown(self.sequences.get(action)),
                 width=22,
                 command=lambda a=action: self._begin_capture(a),
             )
@@ -292,26 +299,26 @@ class SettingsWindow:
         self.root.unbind("<KeyPress>")
 
         if (event.keysym or "").lower() == "escape":
-            self._widgets[action].configure(text=self.sequences.get(action) or "unset")
+            self._widgets[action].configure(text=_shown(self.sequences.get(action)))
             self._say("")
             return
 
         try:
             sequence = settings_form.chord_from_event(event.keysym, int(event.state))
         except NotAShortcut as exc:
-            self._widgets[action].configure(text=self.sequences.get(action) or "unset")
+            self._widgets[action].configure(text=_shown(self.sequences.get(action)))
             self._say(str(exc))
             return
 
         clash = settings_form.conflict_for(sequence, action, self.sequences, self.holder)
         if clash:
-            self._widgets[action].configure(text=self.sequences.get(action) or "unset")
-            self._say(f"{sequence} is already used by {clash}.")
+            self._widgets[action].configure(text=_shown(self.sequences.get(action)))
+            self._say(f"{_shown(sequence)} is already used by {clash}.")
             return
 
         self.sequences[action] = sequence
-        self._widgets[action].configure(text=sequence)
-        self._save({f"shortcuts.{action}": sequence}, note=f"{sequence} saved.")
+        self._widgets[action].configure(text=_shown(sequence))
+        self._save({f"shortcuts.{action}": sequence}, note=f"{_shown(sequence)} saved.")
 
     def _choose_device(self) -> None:
         self._save({"audio.device_id": self._device_var.get()}, note="Microphone saved.")

@@ -155,3 +155,27 @@ def is_readable(text: str) -> bool:
     except KeyError_:
         return False
     return True
+
+
+#: What each modifier is called *to a person*, as opposed to what Qt and KDE call it.
+#:
+#: **"Meta" is the Windows key**, and nothing outside a Qt codebase calls it that. Passing KDE's
+#: internal name straight through to the settings window meant the shortcut editor offered people
+#: "Meta+Alt+V" with no clue which key that is — reported, fairly, as "I have no idea what Meta is".
+#:
+#: Only the display changes. The stored and registered form stays `Meta+…`, because that is what
+#: `kglobalshortcutsrc` contains and what a user comparing our settings against KDE's System
+#: Settings will see there.
+DISPLAY_NAMES: Final[dict[str, str]] = {"Meta": "Win"}
+
+
+def display_sequence(sequence: str | int) -> str:
+    """A key sequence as it should be shown to a person: ``"Win+Shift+Space"``.
+
+    Never store or register this form — see :data:`DISPLAY_NAMES`. It is for labels only.
+    """
+    text = format_sequence(sequence) if isinstance(sequence, int) else sequence
+    parts = [part.strip() for part in text.split("+") if part.strip()]
+    if text.endswith("++"):
+        parts.append("+")
+    return "+".join(DISPLAY_NAMES.get(part, part) for part in parts)
