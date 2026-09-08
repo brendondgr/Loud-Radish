@@ -95,7 +95,7 @@ browser owns is genuinely its own — pane widths, text size, which pane is show
 | `StatusBar` | Level, speech state, real-time factor, connection | Never colour alone — every state carries an icon and a word |
 | `Banners` | The three error tiers | Never a modal; a modal during a talk covers the transcript |
 | `SettingsModal` | The five tabs, presets, save | The one modal in the application |
-| `settings/*` | One tab each, plus `bindings.js` | Controls declare a dotted config path; the binding layer does the rest. `shortcuts.js` adds key capture and reports on the *companion process*, since keys can be set and still do nothing |
+| `settings/*` | One tab each, plus `bindings.js` and `combobox.js` — the assistant's model field, a text input that is also a dropdown (D-067) | Controls declare a dotted config path; the binding layer does the rest. `shortcuts.js` adds key capture and reports on the *companion process*, since keys can be set and still do nothing |
 | `FocusTrap` | Modal focus containment and restoration | Recomputes candidates per Tab — the dialog changes shape constantly |
 
 ### The multi-mode expansion (D-020)

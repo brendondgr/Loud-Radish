@@ -1222,6 +1222,56 @@
             }
           }
         }
+      },
+      "post": {
+        "tags": [
+          "llm"
+        ],
+        "summary": "List Llm Models",
+        "description": "Models the endpoint *on screen* reports \u2014 the settings form's Get button (D-067).\n\nTakes the same unsaved partial configuration the connection test takes, and differs from it in\none way that is the whole reason it exists: **it does not care which model is configured.** The\ntest refuses when the saved model is not among what the address offers, which is right for a\ntest and wrong for a button whose job is to find out what the address offers so a model can be\nchosen in the first place.",
+        "operationId": "list_llm_models_api_llm_models_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response List Llm Models Api Llm Models Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/llm/test": {

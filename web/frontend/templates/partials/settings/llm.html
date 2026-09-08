@@ -54,36 +54,48 @@
           type="button"
           class="button"
           data-llm-get
-          title="List the models the server at this address offers"
+          title="List the models the server at this address offers, into the model field's dropdown"
         >
           Get
         </button>
       </div>
-      <p class="field__hint">
-        Anything speaking the OpenAI chat API: Ollama on <code>:11434</code>, LM Studio on
-        <code>:1234</code>, llama.cpp on <code>:8080</code>, vLLM on <code>:8000</code>. Press
-        <strong>Get</strong> to list what it serves.
-      </p>
+      <p class="field__hint">Ollama listens on <code>:11434</code>, LM Studio on <code>:1234</code>.</p>
     </div>
 
     <div class="field">
       <label class="field__label" for="llm-local-model">Model</label>
       <div class="field__row">
-        {# A text field with suggestions, not a dropdown. A dropdown could hold only what the
+        {# Both a text field and a dropdown (D-067). A plain dropdown could hold only what the
            server listed, so a model the list left out — or a name the user simply knows — could
-           not be entered at all (D-067). #}
-        <input
-          class="field__control"
-          id="llm-local-model"
-          type="text"
-          spellcheck="false"
-          autocomplete="off"
-          list="llm-local-models"
-          placeholder="Type a model name, or press Get"
-          data-llm-model-input
-          data-llm-mode="local"
-        />
-        <datalist id="llm-local-models" data-llm-model-list data-llm-mode="local"></datalist>
+           not be entered at all; a plain text field gave nothing to pick from. Get fills the
+           list and opens it; typing narrows it; anything typed is kept as typed. #}
+        <div class="combobox" data-combobox data-llm-model-box data-llm-mode="local">
+          <input
+            class="field__control combobox__input"
+            id="llm-local-model"
+            type="text"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="false"
+            aria-controls="llm-local-models"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="Type a model name, or press Get"
+            data-combobox-input
+            data-llm-model-input
+            data-llm-mode="local"
+          />
+          <button
+            type="button"
+            class="combobox__toggle"
+            data-combobox-toggle
+            aria-label="Show the models this server offers"
+            tabindex="-1"
+          >
+            <span aria-hidden="true">▾</span>
+          </button>
+          <ul class="combobox__list" id="llm-local-models" role="listbox" data-combobox-list hidden></ul>
+        </div>
         <button type="button" class="button" data-llm-test>Test connection</button>
       </div>
       <p class="settings__result" data-llm-result role="status" aria-live="polite"></p>
@@ -143,18 +155,34 @@
     <div class="field">
       <label class="field__label" for="llm-api-model">Model</label>
       <div class="field__row">
-        <input
-          class="field__control"
-          id="llm-api-model"
-          type="text"
-          spellcheck="false"
-          autocomplete="off"
-          list="llm-api-models"
-          placeholder="Type a model name, or test the connection to list them"
-          data-llm-model-input
-          data-llm-mode="api"
-        />
-        <datalist id="llm-api-models" data-llm-model-list data-llm-mode="api"></datalist>
+        <div class="combobox" data-combobox data-llm-model-box data-llm-mode="api">
+          <input
+            class="field__control combobox__input"
+            id="llm-api-model"
+            type="text"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="false"
+            aria-controls="llm-api-models"
+            spellcheck="false"
+            autocomplete="off"
+            placeholder="Type a model name, or press Get"
+            data-combobox-input
+            data-llm-model-input
+            data-llm-mode="api"
+          />
+          <button
+            type="button"
+            class="combobox__toggle"
+            data-combobox-toggle
+            aria-label="Show the models this provider offers"
+            tabindex="-1"
+          >
+            <span aria-hidden="true">▾</span>
+          </button>
+          <ul class="combobox__list" id="llm-api-models" role="listbox" data-combobox-list hidden></ul>
+        </div>
+        <button type="button" class="button" data-llm-get>Get</button>
         <button type="button" class="button" data-llm-test>Test connection</button>
       </div>
       <p class="settings__result" data-llm-result role="status" aria-live="polite"></p>

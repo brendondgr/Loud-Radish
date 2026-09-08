@@ -10,16 +10,18 @@
  * **A credential goes one way only.** The key field writes; nothing reads it back. What comes back
  * is whether a key is present and where it would be read from — never its value.
  *
- * **The model is typed, and the list is a suggestion (D-067).** It used to be a dropdown holding
+ * **The model is typed, and it is also a dropdown (D-067).** It used to be a `<select>` holding
  * only what the last connection test returned, so a model the server did not list — or one the
- * user simply knew the name of — could not be entered at all. It is a text field with a datalist
- * now: Get (beside the address) and Test connection both fill the suggestions, and whatever is in
- * the field when it changes is what gets saved.
+ * user simply knew the name of — could not be entered at all. It is a combobox now: Get lists the
+ * models at the address on screen and opens the list, typing narrows it, and whatever is in the
+ * field when it changes is what gets saved. Get asks the server what it *offers* and does not care
+ * what is currently configured; the connection test is what judges the configured model.
  */
 
 import { $, $$, el, setText } from "../../core/dom.js";
 import { config } from "../../stores/config.js";
 import { api } from "../../transport/api.js";
+import { Combobox } from "./combobox.js";
 
 /** Human wording for each of the four connection-test outcomes. */
 const RESULT_LABEL = {
@@ -35,7 +37,7 @@ export class LlmSettings {
     this.onStatus = onStatus;
     this.onChanged = onChanged;
 
-    this.getButton = $("[data-llm-get]", root);
+    this.getButtons = $$("[data-llm-get]", root);
     this.providerSelect = $("[data-llm-provider]", root) ?? $("#llm-provider", root);
     this.privacyNote = $("[data-llm-privacy]", root);
     this.keyInput = $("[data-llm-key]", root);
@@ -43,13 +45,20 @@ export class LlmSettings {
     /** Both mode panels have their own model field, suggestion list and result line; only one is
      *  ever visible. */
     this.modelInputs = $$("[data-llm-model-input]", root);
-    this.modelLists = $$("[data-llm-model-list]", root);
+    this.modelBoxes = new Map(
+      $$("[data-llm-model-box]", root).map((box) => [
+        box.dataset.llmMode,
+        new Combobox(box, { emptyText: "Nothing listed yet — press Get" }),
+      ])
+    );
     this.results = $$("[data-llm-result]", root);
 
     for (const button of $$("[data-llm-test]", root)) {
       button.addEventListener("click", () => this.test());
     }
-    this.getButton?.addEventListener("click", () => this.getModels());
+    for (const button of this.getButtons) {
+      button.addEventListener("click", () => this.getModels());
+    }
     for (const input of this.modelInputs) {
       input.addEventListener("change", () => this.selectModel(input));
     }
@@ -124,13 +133,13 @@ export class LlmSettings {
 
   /**
    * Put the configured model in both fields, and — when a list is given — the server's models
-   * in the visible mode's suggestions.
+   * in the visible mode's dropdown.
    *
    * The field's own value is never replaced by the list: a name the user typed that the server did
-   * not list is still the name they meant, and the list may be filtered. Only the suggestions
-   * change.
+   * not list is still the name they meant. Only what the dropdown offers changes, and it opens
+   * when asked to, so a Get shows its result rather than filing it away.
    */
-  renderModelOptions(models = null) {
+  renderModelOptions(models = null, { open = false } = {}) {
     const mode = config.get("llm.mode") === "api" ? "api" : "local";
     for (const input of this.modelInputs) {
       const path = input.dataset.llmMode === "api" ? "llm.api.model" : "llm.local.model";
@@ -138,10 +147,7 @@ export class LlmSettings {
       if (document.activeElement !== input) input.value = config.get(path) ?? "";
     }
     if (!models) return;
-    for (const list of this.modelLists) {
-      if (list.dataset.llmMode !== mode) continue;
-      list.replaceChildren(...models.map((model) => el("option", { attrs: { value: model } })));
-    }
+    this.modelBoxes.get(mode)?.setOptions(models, { open });
   }
 
   renderResult(result, message) {
@@ -154,28 +160,30 @@ export class LlmSettings {
   // -- actions --------------------------------------------------------------------
 
   /**
-   * List the models the server at the address on screen offers, into the field's suggestions.
+   * List the models the address on screen offers, into the model dropdown, and open it.
    *
-   * The same probe as the connection test, read the same way — from the form, not the store —
-   * because the address being listed is the one just typed. It differs in what it says: a count
-   * of models rather than a verdict on the connection, since that is the question Get asks.
+   * Read from the form, not the store, because the address being listed is the one just typed —
+   * and through the listing route rather than the connection test, because the test refuses when
+   * the *configured* model is not at that address. That is the right answer for a test and the
+   * wrong one for the button whose job is to find out what can be configured.
    */
   async getModels() {
     this.renderResult("connected", "Listing models…");
     try {
-      const outcome = await api.testLlm(this._overrides());
-      if (outcome.result !== "connected") {
-        this.renderResult(outcome.result, outcome.message);
+      const body = await api.llmModelsAt(this._overrides());
+      const models = (body.models ?? []).map((model) => model.id ?? String(model));
+      if (!models.length && body.note) {
+        this.renderResult("no_server", body.note);
+        this.renderModelOptions([]);
         return;
       }
-      const models = outcome.models ?? [];
-      this.renderModelOptions(models);
-      const endpoint = this._fieldValue("llm.local.endpoint") ?? config.get("llm.local.endpoint");
+      this.renderModelOptions(models, { open: true });
+      const where = body.endpoint || this._fieldValue("llm.local.endpoint") || "the server";
       this.renderResult(
         "connected",
         models.length
-          ? `${models.length} model${models.length === 1 ? "" : "s"} at ${endpoint}. Pick one from the model field, or type a name.`
-          : `Nothing listed at ${endpoint}. Type the model name yourself.`
+          ? `${models.length} model${models.length === 1 ? "" : "s"} at ${where}. Pick one, or type a name.`
+          : `Nothing listed at ${where}. Type the model name yourself.`
       );
     } catch (error) {
       this.renderResult("server_error", error.message);

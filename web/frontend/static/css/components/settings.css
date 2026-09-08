@@ -234,6 +234,88 @@ select.field__control {
   gap: var(--space-5);
 }
 
+/* -- a field that is also a dropdown (D-067) ------------------------------------------------
+ *
+ * The assistant's model: type anything, or open the list the server offered and pick. Drawn by
+ * hand rather than with a datalist, which no browser draws as a dropdown. */
+
+.combobox {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.combobox__input {
+  padding-right: 34px;
+}
+
+.combobox__toggle {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  bottom: 2px;
+  width: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.combobox__toggle:hover {
+  color: var(--text-primary);
+  background: var(--surface-control-hover);
+}
+
+.combobox__list {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  left: 0;
+  right: 0;
+  z-index: 20;
+  max-height: 240px;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--space-2);
+  list-style: none;
+  background: var(--surface-panel);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-popover);
+}
+
+.combobox__list[hidden] {
+  display: none;
+}
+
+.combobox__option {
+  padding: var(--space-3) var(--space-5);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  border-radius: var(--radius);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.combobox__option:hover,
+.combobox__option[aria-selected="true"] {
+  background: var(--surface-control-hover);
+}
+
+.combobox__option[aria-disabled="true"] {
+  font-family: var(--font-ui);
+  color: var(--text-muted);
+  cursor: default;
+  background: none;
+}
+
 .field__row--spread {
   justify-content: space-between;
   margin-top: var(--space-5);

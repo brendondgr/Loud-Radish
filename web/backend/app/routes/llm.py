@@ -136,7 +136,24 @@ async def get_llm_models(request: Request) -> dict[str, Any]:
     populate a dropdown while the user is still typing an address, and a red error for "you have
     not finished typing the URL yet" is noise.
     """
-    config = _llm_config(request)
+    return await _list_models(request, None)
+
+
+@router.post("/models")
+async def list_llm_models(request: Request, body: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Models the endpoint *on screen* reports — the settings form's Get button (D-067).
+
+    Takes the same unsaved partial configuration the connection test takes, and differs from it in
+    one way that is the whole reason it exists: **it does not care which model is configured.** The
+    test refuses when the saved model is not among what the address offers, which is right for a
+    test and wrong for a button whose job is to find out what the address offers so a model can be
+    chosen in the first place.
+    """
+    return await _list_models(request, body or None)
+
+
+async def _list_models(request: Request, overrides: dict[str, Any] | None) -> dict[str, Any]:
+    config = _llm_config(request, overrides)
     try:
         backend = build_llm(config, _credentials(request))
         models = await backend.list_models()

@@ -49,31 +49,37 @@ def _with(elements, attribute: str):
     return [(tag, attrs) for tag, attrs in elements if attribute in attrs]
 
 
-def test_the_model_is_a_text_field_with_suggestions_not_a_dropdown(elements) -> None:
-    """The reported fault: a dropdown could not take a name the server had not listed."""
+def test_the_model_is_a_text_field_that_is_also_a_dropdown(elements) -> None:
+    """The reported fault: a `<select>` could not take a name the server had not listed, and a
+    plain text field gave nothing to pick from. A combobox is both."""
     fields = _with(elements, "data-llm-model-input")
     assert [tag for tag, _ in fields] == ["input", "input"], "one typeable field per mode"
     for _, attrs in fields:
         assert attrs.get("type") == "text"
-        assert attrs.get("list"), "the field must carry the server's models as suggestions"
+        assert attrs.get("role") == "combobox"
+        assert attrs.get("aria-controls"), "the field must name the list it opens"
 
-    lists = {attrs.get("id") for tag, attrs in elements if tag == "datalist"}
-    assert {attrs["list"] for _, attrs in fields} <= lists, "every field's list must exist"
-    assert not _with(elements, "data-llm-model-select"), "the dropdown is gone"
+    lists = {attrs.get("id") for tag, attrs in elements if attrs.get("role") == "listbox"}
+    assert {attrs["aria-controls"] for _, attrs in fields} <= lists, "every field's list exists"
+    assert not _with(elements, "data-llm-model-select"), "the select is gone"
+    assert not [tag for tag, _ in elements if tag == "datalist"], "and so is the datalist"
 
 
 def test_the_address_has_a_get_button_and_no_server_dropdown(elements) -> None:
     buttons = _with(elements, "data-llm-get")
-    assert [tag for tag, _ in buttons] == ["button"]
+    assert [tag for tag, _ in buttons] == ["button", "button"], "one per mode panel"
     assert not _with(elements, "data-llm-preset"), "the common-servers dropdown is gone"
 
 
-def test_get_lists_models_from_the_address_on_screen() -> None:
-    """Get reads the field, not the store: the address being listed is the one just typed."""
+def test_get_lists_models_from_the_address_on_screen_without_judging_the_model() -> None:
+    """Get reads the field, not the store, and asks the listing route rather than the connection
+    test — which refuses when the *saved* model is not at the new address, the exact pop-up that
+    was reported."""
     source = LLM_JS.read_text(encoding="utf-8")
 
     assert "getModels()" in source
-    assert 'this._fieldValue("llm.local.endpoint")' in source
+    assert "api.llmModelsAt(this._overrides())" in source
+    assert "api.testLlm(this._overrides())" in source, "the test still tests"
     assert "applyPreset" not in source, "nothing rewrites the address any more"
 
 

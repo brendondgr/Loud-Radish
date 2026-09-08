@@ -133,6 +133,9 @@ export const api = {
   llmConfig: () => get("/api/llm/config"),
   llmStatus: () => get("/api/llm/status"),
   llmModels: () => get("/api/llm/models"),
+  /** The models at the address on screen, saved or not — and whatever model is saved, listed
+   *  regardless (D-067). */
+  llmModelsAt: (overrides = {}) => post("/api/llm/models", overrides),
   // Takes the unsaved form values, so the button tests the address on screen rather than the one
   // last saved — which is the whole point of pressing it after typing a new one.
   testLlm: (overrides = {}) => post("/api/llm/test", overrides),

@@ -1,6 +1,6 @@
 # Route Map
 
-*Last updated: 2026-09-08 (an export names its revision — D-066)*
+*Last updated: 2026-09-08 (Get lists models without judging the configured one — D-067)*
 
 > **Status column is authoritative.** Every API group is implemented and tested, as is the
 > WebSocket and both pages. Update this file in the same change that adds, removes, or changes a
@@ -187,6 +187,7 @@ black rectangle.
 | `DELETE` | `/api/llm/credential/{provider}` | Remove a stored credential | **Implemented** |
 | `POST` | `/api/llm/test` | Connection test — one of four specific results, never generic failure text. Accepts an unsaved partial config so the form tests what is on screen. | **Implemented** |
 | `GET` | `/api/llm/models` | Models the configured endpoint reports. Degrades to an empty list with an explanation rather than an HTTP error. | **Implemented** |
+| `POST` | `/api/llm/models` | The same listing for an unsaved partial config — the settings form's **Get** button. Unlike `/test`, it does not care which model is configured (D-067). | **Implemented** |
 
 There is no `PUT /api/llm/config`. Configuration is written through the one configuration surface,
 `PATCH /api/config`, with dotted paths such as `llm.local.model` — a second writer for the same

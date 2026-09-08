@@ -980,8 +980,10 @@ user's own machine, and none may be reported as passing until it has had one.
       returned, so a model the server did not list — or a name the user knew — could not be
       entered; and the "Common…" dropdown of server presets sat beside the address and replaced it
       with Ollama's or LM Studio's, which nobody had asked for. The model is a text field with the
-      server's models as suggestions now, and the preset dropdown is a **Get** button that lists
-      the models at the address on screen.
+      server's models as a dropdown it can also be typed into now, and the preset dropdown is a
+      **Get** button that lists the models at the address on screen — through the listing route,
+      not the connection test, so a saved model that is not at the new address no longer stops the
+      list from appearing.
 
 - [x] **A dictation came back with "..." where a window boundary fell mid-sentence.** Done
       (D-061). The recording is now cut where the speaker paused — `vad/pauses.py` finds the

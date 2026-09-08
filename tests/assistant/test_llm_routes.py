@@ -178,6 +178,36 @@ def test_the_model_list_degrades_to_an_explanation_rather_than_an_error(
     assert "No server responded" in response.json()["note"]
 
 
+def test_listing_models_uses_the_address_on_screen_and_ignores_the_saved_model(
+    client: TestClient, monkeypatch
+) -> None:
+    """The settings form's Get button (D-067). The connection test refuses when the saved model
+    is not among what the address offers — right for a test, and the reported pop-up for a button
+    whose job is to find out what can be chosen."""
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        return httpx.Response(200, json={"data": [{"id": "gemma-4-26B-it"}, {"id": "nemotron"}]})
+
+    _use_mock_transport(monkeypatch, handler)
+    client.patch("/api/config", json={"changes": {"llm.local.model": "default-model"}})
+
+    body = client.post(
+        "/api/llm/models", json={"local": {"endpoint": "http://localhost:7070/v1"}}
+    ).json()
+
+    assert [model["id"] for model in body["models"]] == ["gemma-4-26B-it", "nemotron"]
+    assert body["endpoint"] == "http://localhost:7070/v1"
+    assert seen == ["http://localhost:7070/v1/models"]
+    # For comparison: the test *does* refuse, naming the model, which is its job.
+    verdict = client.post(
+        "/api/llm/test", json={"local": {"endpoint": "http://localhost:7070/v1"}}
+    ).json()
+    assert verdict["result"] != "connected"
+    assert "default-model" in verdict["message"]
+
+
 # -- credentials -------------------------------------------------------------------------
 
 
