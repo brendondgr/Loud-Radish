@@ -109,6 +109,17 @@ async def search(
     return {"query": q, "segments": [s.as_event() for s in store.search(q, limit=limit)]}
 
 
+def _unknown_revision(revision: int | None, store: Any) -> dict[str, Any]:
+    """The 404 body for a pass this session does not hold."""
+    available = ", ".join(str(item) for item in store.revisions()) or "none"
+    return {
+        "error": {
+            "code": "unknown-revision",
+            "message": f"This session has no transcription pass {revision}; it holds: {available}.",
+        }
+    }
+
+
 def _optional_store(request: Request):  # noqa: ANN201 - returns TranscriptStore | None
     """The store if a session is open, otherwise ``None``.
 
@@ -147,18 +158,28 @@ async def glossary(request: Request) -> dict[str, Any]:
 
 
 @router.get("/export")
-async def export(request: Request, fmt: str = Query("markdown")) -> Response:
-    """Download the transcript in one of the five formats."""
+async def export(
+    request: Request,
+    fmt: str = Query("markdown"),
+    revision: int | None = Query(None, ge=0),
+) -> Response:
+    """Download the transcript in one of the five formats.
+
+    One pass, never the union (D-022): a window session that transcribed live and again afterwards
+    holds both over the same audio, and exporting both writes the talk out twice under one heading.
+    The newest pass unless ``revision`` names another — which is how the Live/Final switch's
+    choice reaches the file (D-066).
+    """
     store = _store(request)
     metadata = store.metadata()
+    segments = store.segments_for(revision)
+    if segments is None:
+        raise HTTPException(status_code=404, detail=_unknown_revision(revision, store))
 
     try:
         body, mime, extension = render_export(
             fmt,
-            # The newest pass only. A window session that transcribed live and again afterwards
-            # holds both over the same audio (D-022), and exporting their union writes the talk out
-            # twice under one "Transcript" heading.
-            segments=store.latest_segments(),
+            segments=segments,
             metadata=metadata,
             summaries=store.summaries(),
             glossary=store.glossary(),

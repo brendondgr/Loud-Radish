@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-09-08 (range reads serve one pass — D-065)*
+*Last updated: 2026-09-08 (an export names its revision — D-066)*
 
 The active work list for Loud Radish. Update it whenever a task is finished or new work is
 discovered.
@@ -260,10 +260,10 @@ showed the rewritten prose followed immediately by the entire raw transcript aga
       a two-pass session and asserts each sentence appears exactly once in every export format and
       on the sessions page — verified failing before the fix, seven of thirteen.
 
-- [ ] **Export cannot name a revision.** `/export` serves the latest pass and there is no way to ask
-      for the live one. The sessions page has no revision control to drive such a parameter, so
-      adding it would have widened a bug fix into a feature. Worth doing alongside a revision
-      control on that page.
+- [x] **Export cannot name a revision.** Done (D-066). Both exports and `GET /api/sessions/{key}`
+      take `revision=`, the latest by default and `404 unknown-revision` for a pass the session
+      does not hold; the recordings page draws a Live/Final select beside the format select only
+      for a session that holds two passes, and the application page's export follows the pane.
 - [x] **`segments_in_range` still spans passes.** Done (D-065). It reads the latest pass unless a
       caller names another, so the context, polish and chat paths — and `GET /api/transcript/range`
       — are handed one transcript when a two-pass session is reopened for reading. Full-text search
@@ -445,9 +445,9 @@ Five reported problems, planned in
       679 removed, 291 kept. The rule turned out to need a second clause: 28 of the empty databases
       own a recording folder and are failed transcriptions rather than leavings. See Part 3l and
       `scripts/prune_empty_sessions.py`.
-- [ ] **The export cannot be scoped to a revision.** It ships the latest pass, like every other
-      export. Same gap as the one recorded in Part 3g, and the same remedy — a revision control on
-      the recordings page.
+- [x] **The export cannot be scoped to a revision.** Done (D-066), together with the Part 3g entry
+      that recorded the same gap: a revision control on the recordings page, drawn only where
+      there is a choice.
 - [ ] **The exported page speaks OpenAI-compatible endpoints only.** Anthropic's shape genuinely
       differs (D-014) and a static page cannot hold a key safely, so the export deliberately points
       at a local model. Worth revisiting only if someone asks for it.

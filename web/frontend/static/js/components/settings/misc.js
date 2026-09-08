@@ -11,6 +11,7 @@ import { duration } from "../../core/format.js";
 import { config } from "../../stores/config.js";
 import { api } from "../../transport/api.js";
 import { session } from "../../stores/session.js";
+import { transcript } from "../../stores/transcript.js";
 
 export class ContextSettings {
   constructor(root) {
@@ -199,7 +200,12 @@ export class StorageSettings {
       this.onStatus?.("There is no session to export yet.", "error");
       return;
     }
-    window.location.assign(api.exportUrl(config.get("storage.default_export_format")));
+    // The pass the pane is showing, so the file matches the screen when a session holds two
+    // (D-066). The store always holds a pass the session has — it is reset *into* one — and on a
+    // session with a single pass this names the same transcript the server would have chosen.
+    window.location.assign(
+      api.exportUrl(config.get("storage.default_export_format"), transcript.revision)
+    );
     this.onStatus?.("Export started.", "ok");
   }
 }

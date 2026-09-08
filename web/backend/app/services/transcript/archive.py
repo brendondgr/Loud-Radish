@@ -101,6 +101,10 @@ class ArchivedSession:
     size_bytes: int
     #: What this session's recording folder actually holds. See :class:`SessionMedia`.
     media: SessionMedia = field(default_factory=lambda: SessionMedia())
+    #: Which transcription passes the session holds (D-022): usually ``[0]``, and ``[0, 1]`` for a
+    #: window session that transcribed live and again afterwards. The recordings page offers a
+    #: choice of pass to export only when there are two (D-066).
+    revisions: list[int] = field(default_factory=list)
     #: Empty when the file is readable. Otherwise says what is wrong with it.
     problem: str = ""
 
@@ -124,6 +128,7 @@ class ArchivedSession:
             "chat_messages": self.chat_messages,
             "size_bytes": self.size_bytes,
             "media": self.media.as_dict(),
+            "revisions": list(self.revisions),
             "problem": self.problem,
             "readable": self.readable,
         }
@@ -230,6 +235,7 @@ def describe(path: Path, recordings: Path | None = None) -> ArchivedSession:
         # does not have would turn every one of those sessions into "not a readable session file"
         # — which is exactly what it did, caught by the test written for the previous instance.
         chat = _count_or_zero(connection, "chat_messages")
+        revisions = _revisions(connection)
     except sqlite3.Error as exc:
         # A file from an older schema, or one truncated by a crash. Listed with the reason.
         return _unreadable(path, size, f"Not a readable session file ({type(exc).__name__}).")
@@ -252,6 +258,7 @@ def describe(path: Path, recordings: Path | None = None) -> ArchivedSession:
         chat_messages=chat,
         size_bytes=size,
         media=media_for(path.stem, recordings, has_transcript=segments > 0),
+        revisions=revisions,
     )
 
 
@@ -285,6 +292,21 @@ def _has_table(connection: sqlite3.Connection, table: str) -> bool:
         "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?", (table,)
     ).fetchone()
     return row is not None
+
+
+def _revisions(connection: sqlite3.Connection) -> list[int]:
+    """Every pass this session holds, in order — guarded like the stats query, because this
+    connection is read-only and does not migrate. A database from before the column holds one
+    pass if it holds any segments at all."""
+    try:
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(segments)")}
+    except sqlite3.Error:
+        return []
+    if "revision" not in columns:
+        row = connection.execute("SELECT COUNT(*) AS n FROM segments").fetchone()
+        return [0] if int(row["n"] or 0) > 0 else []
+    rows = connection.execute("SELECT DISTINCT revision FROM segments ORDER BY revision")
+    return [int(row[0]) for row in rows]
 
 
 def _stats_query(connection: sqlite3.Connection) -> str:

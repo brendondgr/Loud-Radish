@@ -109,19 +109,31 @@ def _running_key(manager: Any) -> str:
 
 @router.get("/{key}")
 async def read_session(
-    request: Request, key: str, limit: int = Query(2000, ge=1, le=20_000)
+    request: Request,
+    key: str,
+    limit: int = Query(2000, ge=1, le=20_000),
+    revision: int | None = Query(None, ge=0),
 ) -> dict[str, Any]:
-    """One past session's transcript, summaries, and glossary."""
+    """One past session's transcript, summaries, and glossary.
+
+    One transcription pass, not every row: a session holding both a live and a post-capture pass
+    would otherwise render the same talk twice on the page (D-022). The latest unless ``revision``
+    names another; ``revisions`` says which ones there are (D-066).
+    """
     store = _open(request, key)
     try:
         metadata = store.metadata()
+        segments = store.segments_for(revision)
+        if segments is None:
+            raise HTTPException(status_code=404, detail=_unknown_revision(revision, store))
+        available = store.revisions()
         return {
             "key": key,
             "session": metadata.as_dict() if metadata else None,
             "stats": store.stats().as_dict(),
-            # One transcription pass, not every row: a session holding both a live and a
-            # post-capture pass would otherwise render the same talk twice on the page (D-022).
-            "segments": [segment.as_event() for segment in store.latest_segments()[:limit]],
+            "revisions": available,
+            "revision": revision if revision is not None else store.latest_revision(),
+            "segments": [segment.as_event() for segment in segments[:limit]],
             "summaries": [summary.as_event() for summary in store.summaries()],
             "glossary": [term.as_event() for term in store.glossary()],
             "chat": [message.as_dict() for message in store.chat_history()],
@@ -136,6 +148,7 @@ async def export_session(
     key: str,
     fmt: str = Query("markdown"),
     include_chat: bool = Query(False),
+    revision: int | None = Query(None, ge=0),
 ) -> Response:
     """Download a past session in any of the five formats.
 
@@ -144,13 +157,19 @@ async def export_session(
     that could. But a transcript export is mostly a thing being handed to somebody else, and one
     person's half of a conversation is not part of the record of the talk. It exports on its own
     from ``/{key}/chat``; `include_chat=true` puts it back in here for anyone who wants one file.
+
+    **One pass, and it can be named.** The latest unless ``revision`` says otherwise; a pass the
+    session does not hold is a 404, not an empty file (D-066).
     """
     store = _open(request, key)
     try:
         metadata = store.metadata()
+        segments = store.segments_for(revision)
+        if segments is None:
+            raise HTTPException(status_code=404, detail=_unknown_revision(revision, store))
         body, mime, extension = render_export(
             fmt,
-            segments=store.latest_segments(),
+            segments=segments,
             metadata=metadata,
             summaries=store.summaries(),
             glossary=store.glossary(),
@@ -195,6 +214,15 @@ async def export_chat_only(request: Request, key: str, fmt: str = Query("markdow
         content=body,
         media_type=mime,
         headers={"Content-Disposition": f'attachment; filename="{stem}-chat.{extension}"'},
+    )
+
+
+def _unknown_revision(revision: int | None, store: TranscriptStore) -> dict[str, Any]:
+    """The 404 body for a pass this session does not hold."""
+    available = ", ".join(str(item) for item in store.revisions()) or "none"
+    return _error(
+        "unknown-revision",
+        f"This session has no transcription pass {revision}; it holds: {available}.",
     )
 
 

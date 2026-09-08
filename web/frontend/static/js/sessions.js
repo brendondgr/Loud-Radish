@@ -12,6 +12,15 @@ import { duration as formatDuration } from "./core/format.js";
 import { exportJob } from "./stores/export.js";
 import { api } from "./transport/api.js";
 
+
+/**
+ * Named the way the transcript pane names them: "Final" means something to a reader and
+ * "revision 1" does not. Anything beyond the two the application produces today falls back to a
+ * number rather than being hidden.
+ */
+const REVISION_LABELS = { 0: "Live", 1: "Final" };
+const revisionLabel = (revision) => REVISION_LABELS[revision] ?? `Version ${revision}`;
+
 const FORMATS = [
   ["markdown", "Markdown"],
   ["text", "Plain text"],
@@ -193,16 +202,42 @@ class SessionsPage {
       ),
     });
 
+    // **Only where there is a choice (D-066).** A session that transcribed live and again
+    // afterwards holds two passes, and the export used to ship the newest with no way to ask for
+    // the other. The control is drawn only for those sessions — a select with one option is
+    // chrome that explains nothing, the same rule the transcript pane's Live/Final switch follows.
+    const revisions = Array.isArray(session.revisions) ? session.revisions : [];
+    const latest = revisions.length ? revisions[revisions.length - 1] : undefined;
+    const version =
+      revisions.length > 1
+        ? el("select", {
+            className: "field__control field__control--compact",
+            attrs: { "aria-label": `Transcript version to export for ${session.title}` },
+            children: revisions.map((revision) =>
+              el("option", {
+                text: revisionLabel(revision),
+                attrs: { value: String(revision), ...(revision === latest ? { selected: "" } : {}) },
+              })
+            ),
+          })
+        : null;
+    const chosenRevision = () => (version ? Number(version.value) : undefined);
+
     const download = el("a", {
       className: "button",
       text: "Export",
-      attrs: { href: api.sessionExportUrl(session.key, "markdown"), download: "" },
+      attrs: {
+        href: api.sessionExportUrl(session.key, "markdown", chosenRevision()),
+        download: "",
+      },
     });
-    // The link's href follows the dropdown, so the browser handles the download itself and the
+    // The link's href follows both dropdowns, so the browser handles the download itself and the
     // filename comes from the server's own header rather than being invented here.
-    format.addEventListener("change", () => {
-      download.href = api.sessionExportUrl(session.key, format.value);
-    });
+    const follow = () => {
+      download.href = api.sessionExportUrl(session.key, format.value, chosenRevision());
+    };
+    format.addEventListener("change", follow);
+    version?.addEventListener("change", follow);
 
     // **Its own button, and only where there is one.** The transcript export deliberately no
     // longer carries the conversation: a transcript is usually being handed to somebody else, and
@@ -253,7 +288,7 @@ class SessionsPage {
 
     return el("div", {
       className: "session__actions",
-      children: [format, download, chat, webapp, remove].filter(Boolean),
+      children: [version, format, download, chat, webapp, remove].filter(Boolean),
     });
   }
 

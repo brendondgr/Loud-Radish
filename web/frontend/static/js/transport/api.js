@@ -83,6 +83,12 @@ async function upload(path, file) {
 }
 
 /** The endpoints, named so no call site builds a path by hand. */
+
+/** `&revision=N` when a pass is named, nothing when the caller wants the latest. */
+function revisionQuery(revision) {
+  return Number.isInteger(revision) ? `&revision=${revision}` : "";
+}
+
 export const api = {
   health: () => get("/api/health"),
 
@@ -156,15 +162,21 @@ export const api = {
   polished: () => get("/api/transcript/polished"),
   summaries: () => get("/api/transcript/summaries"),
   glossary: () => get("/api/transcript/glossary"),
-  exportUrl: (fmt) => `/api/transcript/export?fmt=${encodeURIComponent(fmt)}`,
+  /**
+   * `revision` names the transcription pass to export; omitted, the server serves the latest.
+   * Passed as a number so the file follows the Live/Final switch rather than always the newest.
+   */
+  exportUrl: (fmt, revision) =>
+    `/api/transcript/export?fmt=${encodeURIComponent(fmt)}${revisionQuery(revision)}`,
 
   // Past sessions. The live transcript routes read the *running* session's store and stop
   // answering the moment it ends, which is exactly when a finished talk needs retrieving.
   sessions: () => get("/api/sessions"),
   pastSession: (key) => get(`/api/sessions/${encodeURIComponent(key)}`),
   deleteSession: (key) => del(`/api/sessions/${encodeURIComponent(key)}`),
-  sessionExportUrl: (key, fmt) =>
-    `/api/sessions/${encodeURIComponent(key)}/export?fmt=${encodeURIComponent(fmt)}`,
+  sessionExportUrl: (key, fmt, revision) =>
+    `/api/sessions/${encodeURIComponent(key)}/export?fmt=${encodeURIComponent(fmt)}` +
+    revisionQuery(revision),
   /**
    * The conversation the user had with the assistant during a recording, on its own.
    *

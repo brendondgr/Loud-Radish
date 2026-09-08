@@ -1,6 +1,6 @@
 # API Contract
 
-*Last updated: 2026-09-08 (range reads serve one pass — D-065)*
+*Last updated: 2026-09-08 (an export names its revision — D-066)*
 
 > **Status: the WebSocket event contract below is frozen.** The machine-readable contract lives in
 > `web/shared/contracts/` and is generated from the backend; this document is its human-readable
@@ -157,6 +157,7 @@ Response `200 OK`:
       "summaries": 9,
       "glossary_terms": 22,
       "size_bytes": 483328,
+      "revisions": [0, 1],
       "media": {
         "video": true,
         "audio": true,
@@ -264,9 +265,12 @@ when the pass finishes. On the server, `GET /api/transcript/export`, `GET /api/s
 `GET /api/sessions/{key}/export` and — since **D-065** — `GET /api/transcript/range`, which is what
 the context, polish and chat paths read through, serve the **latest** revision, never the union, so
 the file a reader keeps and the passage the assistant is shown both hold the talk once. `range`
-takes an optional `revision` for a caller showing the other pass. The Live/Final switch is the
-only way to *see* the other pass, and full-text search is the deliberate exception: it spans both,
-because a hit in either is a real hit.
+takes an optional `revision` for a caller showing the other pass, and since **D-066** so do both
+exports and `GET /api/sessions/{key}`: the latest pass by default, the named one when asked, and
+`404 unknown-revision` for a pass the session does not hold. `GET /api/sessions` reports
+`revisions` per session so the recordings page can offer the choice only where there is one, and
+the application page's export follows whichever pass the transcript pane is showing. Full-text
+search is the deliberate exception: it spans both, because a hit in either is a real hit.
 
 The unit the transcript store holds, the frontend renders as a paragraph, and the context pipeline
 chunks on.

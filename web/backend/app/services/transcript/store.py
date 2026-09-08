@@ -243,6 +243,22 @@ class TranscriptStore:
         """
         return self.segments_at(self.latest_revision())
 
+    def segments_for(self, revision: int | None) -> list[Segment] | None:
+        """The pass an export should carry: the latest when none is named, the named one when it
+        exists, and ``None`` when it does not — so a route can answer 404 rather than an empty
+        file that looks like a transcript of silence (D-066).
+
+        An empty session has no passes at all, and asking it for revision 0 — which is what a
+        client that has never seen a revision list asks for — is not an error; it gets the empty
+        transcript it would have got with no revision named.
+        """
+        if revision is None:
+            return self.latest_segments()
+        available = self.revisions()
+        if available and int(revision) not in available:
+            return None
+        return self.segments_at(int(revision))
+
     def segments_at(self, revision: int) -> list[Segment]:
         """Every segment from one transcription pass, in order."""
         return [

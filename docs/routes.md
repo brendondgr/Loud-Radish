@@ -1,6 +1,6 @@
 # Route Map
 
-*Last updated: 2026-09-08 (range reads serve one pass — D-065)*
+*Last updated: 2026-09-08 (an export names its revision — D-066)*
 
 > **Status column is authoritative.** Every API group is implemented and tested, as is the
 > WebSocket and both pages. Update this file in the same change that adds, removes, or changes a
@@ -97,8 +97,8 @@ minutes ago.
 | Method | Path | Purpose | Status |
 |---|---|---|---|
 | `GET` | `/api/sessions` | Every session on disk, newest first, each with what it holds | **Implemented** |
-| `GET` | `/api/sessions/{key}` | One session's transcript, summaries, glossary, and conversation | **Implemented** |
-| `GET` | `/api/sessions/{key}/export?fmt=&include_chat=` | Text, Markdown, SRT, VTT, or JSON. `include_chat` defaults to **false** | **Implemented** |
+| `GET` | `/api/sessions/{key}?revision=` | One session's transcript, summaries, glossary, and conversation. The latest pass unless `revision` names another; `revisions` lists them (D-066) | **Implemented** |
+| `GET` | `/api/sessions/{key}/export?fmt=&include_chat=&revision=` | Text, Markdown, SRT, VTT, or JSON. `include_chat` defaults to **false**; `revision` names a pass, the latest by default, and an unknown one is `404 unknown-revision` (D-066) | **Implemented** |
 | `GET` | `/api/sessions/{key}/chat?fmt=` | The conversation on its own — Markdown or JSON | **Implemented** |
 | `GET` | `/api/sessions/{key}/webapp?include_chat=` | The recording as a self-contained web application, as a ZIP. `include_chat` defaults to **false** | **Implemented** |
 | `GET` | `/api/sessions/{key}/media` | The recording itself, with range support, for the export window's preview | **Implemented** |
@@ -210,7 +210,7 @@ state is a second place for it to drift.
 | `GET` | `/api/transcript/since/{segment_id}` | Everything after a segment id — the reconnection path | **Implemented** |
 | `GET` | `/api/transcript/range?start=&end=&revision=` | Everything of one pass in a time range — the latest unless `revision` names another (D-065) | **Implemented** |
 | `GET` | `/api/transcript/search` | Full-text search over the session | **Implemented** |
-| `GET` | `/api/transcript/export` | Export as text, Markdown, SRT, VTT, or JSON | **Implemented** |
+| `GET` | `/api/transcript/export?fmt=&revision=` | Export as text, Markdown, SRT, VTT, or JSON — the latest pass unless `revision` names another (D-066) | **Implemented** |
 | `GET` | `/api/transcript/glossary` | The session glossary | **Implemented** |
 | `GET` | `/api/transcript/summaries` | The rolling outline | **Implemented** |
 | `GET` | `/api/transcript/revisions` | Which transcription passes this session holds (D-022) | **Implemented** |

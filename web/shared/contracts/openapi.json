@@ -908,7 +908,7 @@
           "transcript"
         ],
         "summary": "Export",
-        "description": "Download the transcript in one of the five formats.",
+        "description": "Download the transcript in one of the five formats.\n\nOne pass, never the union (D-022): a window session that transcribed live and again afterwards\nholds both over the same audio, and exporting both writes the talk out twice under one heading.\nThe newest pass unless ``revision`` names another \u2014 which is how the Live/Final switch's\nchoice reaches the file (D-066).",
         "operationId": "export_api_transcript_export_get",
         "parameters": [
           {
@@ -919,6 +919,23 @@
               "type": "string",
               "default": "markdown",
               "title": "Fmt"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Revision"
             }
           }
         ],
@@ -1495,7 +1512,7 @@
           "sessions"
         ],
         "summary": "Read Session",
-        "description": "One past session's transcript, summaries, and glossary.",
+        "description": "One past session's transcript, summaries, and glossary.\n\nOne transcription pass, not every row: a session holding both a live and a post-capture pass\nwould otherwise render the same talk twice on the page (D-022). The latest unless ``revision``\nnames another; ``revisions`` says which ones there are (D-066).",
         "operationId": "read_session_api_sessions__key__get",
         "parameters": [
           {
@@ -1517,6 +1534,23 @@
               "minimum": 1,
               "default": 2000,
               "title": "Limit"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Revision"
             }
           }
         ],
@@ -1595,7 +1629,7 @@
           "sessions"
         ],
         "summary": "Export Session",
-        "description": "Download a past session in any of the five formats.\n\n**The conversation is not in it unless it is asked for.** Markdown and JSON used to carry the\nquestions the user put to the assistant during the recording, because they were the two formats\nthat could. But a transcript export is mostly a thing being handed to somebody else, and one\nperson's half of a conversation is not part of the record of the talk. It exports on its own\nfrom ``/{key}/chat``; `include_chat=true` puts it back in here for anyone who wants one file.",
+        "description": "Download a past session in any of the five formats.\n\n**The conversation is not in it unless it is asked for.** Markdown and JSON used to carry the\nquestions the user put to the assistant during the recording, because they were the two formats\nthat could. But a transcript export is mostly a thing being handed to somebody else, and one\nperson's half of a conversation is not part of the record of the talk. It exports on its own\nfrom ``/{key}/chat``; `include_chat=true` puts it back in here for anyone who wants one file.\n\n**One pass, and it can be named.** The latest unless ``revision`` says otherwise; a pass the\nsession does not hold is a 404, not an empty file (D-066).",
         "operationId": "export_session_api_sessions__key__export_get",
         "parameters": [
           {
@@ -1625,6 +1659,23 @@
               "type": "boolean",
               "default": false,
               "title": "Include Chat"
+            }
+          },
+          {
+            "name": "revision",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Revision"
             }
           }
         ],

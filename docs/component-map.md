@@ -39,8 +39,9 @@ web/frontend/
     └── js/
         ├── main.js             the application page's entry point
         ├── sessions.js         the recordings page's entry point — the list, the media
-        │                       chips, the transcript and conversation exports, and the
-        │                       export window (polled, since this page has no socket)
+        │                       chips, the transcript and conversation exports (with a
+        │                       Live/Final choice where a session holds two passes, D-066),
+        │                       and the export window (polled, since this page has no socket)
         ├── core/               DOM helpers, the event bus, formatting, preferences, modes,
         │                       export presets — the last two mirrored from the backend and
         │                       held identical by a test
