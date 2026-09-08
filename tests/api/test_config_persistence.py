@@ -17,7 +17,7 @@ import json
 
 import pytest
 from app.config import ConfigStore
-from app.config.store import PERSISTENT_PATHS
+from app.config.store import PERSISTENT_PATHS, persists
 from fastapi.testclient import TestClient
 
 
@@ -144,3 +144,50 @@ def test_choosing_a_file_source_from_the_dropdown_persists_its_path(client, conf
     )
 
     assert _on_disk(config_path)["audio"]["file_path"] == "/tmp/a.wav"
+
+
+# -- the settings window has no Save button, so everything it writes must survive ----------------
+
+
+def test_a_rebound_shortcut_survives_a_restart(client, config_path) -> None:
+    """**The reported fault, and the second time this exact mistake was made.** A shortcut set in
+    the native settings window reverted to the shipped default on the next start — so the user
+    pressed their own key and nothing happened. Same shape as the microphone: a deliberate choice,
+    lost silently, noticed much later."""
+    client.patch("/api/config", json={"changes": {"shortcuts.dictate": "Meta+Shift+Space"}})
+
+    restarted = ConfigStore(config_path=config_path)
+    restarted.load()
+
+    assert restarted.resolve().shortcuts.dictate == "Meta+Shift+Space"
+
+
+def test_the_dictation_options_survive_a_restart(client, config_path) -> None:
+    """The same window writes these, and it has no Save button either."""
+    client.patch(
+        "/api/config",
+        json={"changes": {"dictation.paste_chord": "ctrl+shift+v", "dictation.cleanup": "off"}},
+    )
+
+    restarted = ConfigStore(config_path=config_path)
+    restarted.load()
+
+    assert restarted.resolve().dictation.paste_chord == "ctrl+shift+v"
+    assert restarted.resolve().dictation.cleanup == "off"
+
+
+def test_whole_families_persist_not_just_named_paths() -> None:
+    """A shortcut that did not exist when this was written must persist too, or adding one
+    reintroduces the fault."""
+    assert persists("shortcuts.some_future_action")
+    assert persists("dictation.some_future_option")
+    assert persists("audio.device_id")
+
+
+def test_the_tuning_values_still_wait_for_save() -> None:
+    """The Save button keeps its job for the web panel's thresholds — the settings someone tries
+    mid-talk and gets rid of by restarting."""
+    assert not persists("vad.sensitivity")
+    assert not persists("polish.min_retained_ratio")
+    assert not persists("asr.beam_size")
+    assert not persists("streaming.step_s")

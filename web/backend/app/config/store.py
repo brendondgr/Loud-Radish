@@ -49,6 +49,27 @@ PERSISTENT_PATHS = frozenset(
     }
 )
 
+#: Whole families that persist, for the same reason and one more.
+#:
+#: **The native settings window has no Save button.** It writes each change as you make it, which
+#: is the right shape for a small window you open, adjust and close — and it means every path it
+#: touches must reach the file, or the window silently saves nothing. It did: a shortcut rebound
+#: there survived until the next restart and then reverted to the shipped default, which is how a
+#: user came to press their own key and have nothing happen.
+#:
+#: A shortcut is the same kind of thing as a microphone: a deliberate choice whose loss is silent
+#: and only shows up much later, when the key does nothing. So is the paste chord, and so is
+#: whether dictation runs the tidy pass. The settings that keep the Save button are the tuning
+#: values in the web panel — thresholds and intervals someone tries mid-talk and abandons by
+#: restarting.
+PERSISTENT_PREFIXES = ("audio.", "shortcuts.", "dictation.")
+
+
+def persists(path: str) -> bool:
+    """Whether ``path`` is written straight to the config file rather than to the runtime layer."""
+    return path in PERSISTENT_PATHS or path.startswith(PERSISTENT_PREFIXES)
+
+
 DEFAULT_CONFIG_FILENAME = branding.CONFIG_FILENAME
 LEGACY_CONFIG_FILENAME = branding.LEGACY_CONFIG_FILENAME
 

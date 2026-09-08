@@ -105,6 +105,10 @@ def build(
 
 def _status_line(snapshot: Snapshot) -> str:
     """What it is doing, in words. The icon says it too, but not everyone reads icons."""
+    if snapshot.dictation == "recording":
+        return "Dictating — press the key again to finish"
+    if snapshot.dictation:
+        return "Writing down what you said…"
     if snapshot.state == modes.PROCESSING:
         return "Transcribing the recording…"
     if snapshot.state == modes.STOPPING:

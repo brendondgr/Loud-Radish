@@ -31,11 +31,17 @@ class Snapshot:
     mode: str = "live"
     state: str = "idle"
     running_pass: bool = False
+    #: What the dictation service is doing, or empty when it is idle. Carried separately from
+    #: ``state`` because a dictation is not a capture session (D-049) — it has its own lifecycle
+    #: and the two cannot run at once.
+    dictation: str = ""
 
     def visual(self) -> VisualState:
         if not self.reachable:
             return VISUALS[SERVER_DOWN]
-        return visual_for(self.mode, self.state, running_pass=self.running_pass)
+        return visual_for(
+            self.mode, self.state, running_pass=self.running_pass, dictation=self.dictation
+        )
 
 
 class FrameClock:

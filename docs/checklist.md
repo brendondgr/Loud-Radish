@@ -973,6 +973,17 @@ user's own machine, and none may be reported as passing until it has had one.
 
 ## Discovered work
 
+- [x] **The native settings window saved nothing but the microphone.** Done (D-060). Every shortcut
+      and every dictation option went to the layer that is discarded on exit, so a rebound key
+      reverted to its default on the next start and the user pressed it to no effect. Whole
+      families persist now — `audio.`, `shortcuts.`, `dictation.` — rather than a list of paths a
+      new setting can fall off.
+
+- [x] **A dictation was invisible in the tray, and every keypress showed a loading window.**
+      Done (D-059). The icon now shows an open microphone while dictating and the decoding sweep
+      afterwards; the menu says which key ends it. The `.desktop` entries set
+      `StartupNotify=false`, so the desktop stops waiting for a window that never comes.
+
 - [x] **The export window opened after every session, including ones with nothing to export.**
       Done (D-058). A live transcription ended with a dialog offering five video qualities over
       "This recording has no video". `session.stopped` now says whether the recording folder holds

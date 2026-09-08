@@ -80,6 +80,14 @@ def install(action: str, label: str, arguments: list[str], repo_root: Path | str
         # Stop recording" entries nobody would ever click is clutter the user did not ask for.
         "NoDisplay=true\n"
         "Terminal=false\n"
+        # **Without this the desktop shows launch feedback on every keypress.** KDE assumes a
+        # `.desktop` application is about to open a window, so it puts a task-manager entry and a
+        # loading indicator on screen and leaves them there until it gives up waiting. These
+        # entries open no window at all — they post to a loopback API and exit in 70 ms — so the
+        # feedback is a spinner for something that has already finished. Reported as "it opens a
+        # window and shows something loading every single time I run it" (D-059).
+        "StartupNotify=false\n"
+        "X-KDE-StartupNotify=false\n"
         f"Icon={branding.APP_SLUG}\n",
         encoding="utf-8",
     )

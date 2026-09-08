@@ -312,6 +312,8 @@ to the config file whatever `layer` was asked for:
 | `audio.source_type` | Which kind of input to listen to is an identity, not a tuning value |
 | `audio.device_id` | Same; losing it means the next recording uses the wrong input, or none |
 | `audio.file_path` | Travels with the two above when the source is a file |
+| `shortcuts.*` | A rebound key is a deliberate choice; losing it means pressing it and nothing happening |
+| `dictation.*` | Written by the native settings window, which has no Save button (D-060) |
 
 The set lives in `web/backend/app/config/store.py` as `PERSISTENT_PATHS`, and the split happens on
 the route so that every client — the settings modal, the tray's device picker, the native settings

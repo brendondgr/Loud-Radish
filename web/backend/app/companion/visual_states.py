@@ -111,7 +111,9 @@ VISUALS: Final[dict[str, VisualState]] = {
 }
 
 
-def visual_for(mode: str, state: str, *, running_pass: bool = False) -> VisualState:
+def visual_for(
+    mode: str, state: str, *, running_pass: bool = False, dictation: str = ""
+) -> VisualState:
     """The picture for one (capture mode, run state) pair.
 
     ``running_pass`` marks a *polish* pass running in the background — the specification's
@@ -119,9 +121,21 @@ def visual_for(mode: str, state: str, *, running_pass: bool = False) -> VisualSt
     rather than as a phase of one. It is deliberately given lower precedence than recording: an
     instrument that stopped looking like it was recording because a background rewrite started
     would be lying about the thing that matters most.
+
+    ``dictation`` takes precedence over everything but a fault, and that is the point of it. A
+    dictation is started by a keystroke with no window open and nothing else on screen to say it
+    is listening; if the icon does not show it, **there is no way to tell whether the microphone is
+    live**. Reported exactly that way. The two cannot overlap — the service refuses to start a
+    dictation while a session is running — so this steals nothing from the session states.
     """
     if state == modes.ERROR:
         return VISUALS[FAULT]
+
+    if dictation:
+        # Listening reads as *live*: the microphone is open and the words are being taken down.
+        # Everything after the microphone closes is the transcribing picture, because that is what
+        # is happening — including the tidy pass and the paste.
+        return VISUALS[LIVE] if dictation == "recording" else VISUALS[TRANSCRIBING]
 
     if state == modes.PROCESSING:
         return VISUALS[TRANSCRIBING]

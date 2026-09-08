@@ -321,6 +321,15 @@ class DictationService:
 
             self._set_state(DELIVERING)
             delivered, backend = self._hand_over(text, config)
+
+            # **The tidying up happens before `done`, not after it.** Settling first published a
+            # state that said the dictation had finished while the recording was still on disk and
+            # the sidecar not yet written — so anything acting on "done" raced the cleanup. Caught
+            # by a test that looked for the discarded audio and found it about two runs in five.
+            _write_sidecar(path, text, raw)
+            _discard(path, keep=config.dictation.keep_audio)
+            _prune(Path(config.dictation.directory), config.dictation.keep_transcripts)
+
             self._settle(
                 DONE,
                 text=text,
@@ -331,9 +340,6 @@ class DictationService:
                 backend=backend,
                 timings=timings,
             )
-            _write_sidecar(path, text, raw)
-            _discard(path, keep=config.dictation.keep_audio)
-            _prune(Path(config.dictation.directory), config.dictation.keep_transcripts)
         except Exception as exc:  # noqa: BLE001 - a background thread has nowhere to raise
             logger.exception("Dictation failed")
             self._settle(ERROR, error=str(exc), timings=timings)

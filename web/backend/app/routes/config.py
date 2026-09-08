@@ -14,7 +14,7 @@ from fastapi import APIRouter, HTTPException, Request
 from ..config import CLASS_CONSEQUENCE, HotSwapClass
 from ..config.hotswap import classify_many
 from ..config.presets import PRESET_DESCRIPTIONS, preset_names
-from ..config.store import PERSISTENT_PATHS
+from ..config.store import persists
 from ..schemas.api import ConfigPatchRequest, ConfigPatchResponse, ConfigResponse, PresetRequest
 
 router = APIRouter(prefix="/api/config", tags=["config"])
@@ -43,8 +43,8 @@ async def patch_config(request: Request, body: ConfigPatchRequest) -> dict[str, 
     # `PERSISTENT_PATHS` for why the microphone is not like a threshold — and note that this lives
     # here, on the shared route, so the tray's device picker and the native settings window inherit
     # it rather than each having to remember.
-    lasting = {path: value for path, value in body.changes.items() if path in PERSISTENT_PATHS}
-    passing = {path: value for path, value in body.changes.items() if path not in PERSISTENT_PATHS}
+    lasting = {path: value for path, value in body.changes.items() if persists(path)}
+    passing = {path: value for path, value in body.changes.items() if not persists(path)}
     try:
         config.update(passing, layer=body.layer)
         config.persist(lasting)

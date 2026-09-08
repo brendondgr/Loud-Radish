@@ -76,7 +76,24 @@ def read_state(base: str) -> Snapshot:
         # The polish pass runs during a session and has no run state of its own (D-018), so it is
         # carried separately rather than folded into `state`.
         running_pass=bool(payload.get("polishing")),
+        dictation=read_dictation(base),
     )
+
+
+def read_dictation(base: str) -> str:
+    """What the dictation service is doing, or empty. Never raises.
+
+    A second request per poll rather than a field on `/api/session`, because a dictation is not a
+    session (D-049) and folding it into that payload would make the API say otherwise. Two loopback
+    GETs twice a second is not a cost worth designing around.
+    """
+    try:
+        request = urllib.request.Request(f"{base}/api/dictation")  # noqa: S310 - loopback
+        with urllib.request.urlopen(request, timeout=TIMEOUT_S) as response:  # noqa: S310
+            state: dict[str, Any] = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, OSError, ValueError, TimeoutError):
+        return ""
+    return str(state.get("state") or "") if state.get("busy") else ""
 
 
 def _repo_root() -> str:
