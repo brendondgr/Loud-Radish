@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-09-08 (an export names its revision — D-066)*
+*Last updated: 2026-09-08 (the assistant's model is typed, and Get lists them — D-067)*
 
 The active work list for Loud Radish. Update it whenever a task is finished or new work is
 discovered.
@@ -974,6 +974,14 @@ user's own machine, and none may be reported as passing until it has had one.
       build on it, that is the one to try.
 
 ## Discovered work
+
+- [x] **The assistant's model could not be typed, and a dropdown beside the address rewrote it.**
+      Done (D-067). The model field was a `<select>` holding only what the last connection test
+      returned, so a model the server did not list — or a name the user knew — could not be
+      entered; and the "Common…" dropdown of server presets sat beside the address and replaced it
+      with Ollama's or LM Studio's, which nobody had asked for. The model is a text field with the
+      server's models as suggestions now, and the preset dropdown is a **Get** button that lists
+      the models at the address on screen.
 
 - [x] **A dictation came back with "..." where a window boundary fell mid-sentence.** Done
       (D-061). The recording is now cut where the speaker paused — `vad/pauses.py` finds the

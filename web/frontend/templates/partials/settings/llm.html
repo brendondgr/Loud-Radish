@@ -32,8 +32,8 @@
   <div class="settings__group" data-when="llm.mode=local">
     <h3 class="settings__heading">Local server</h3>
     <p class="settings__blurb">
-      Anything speaking the OpenAI chat API works — Ollama, LM Studio, llama.cpp, vLLM, or a relay
-      in front of them. The address is the API base, ending in <code>/v1</code>.
+      The address is the API base of a server speaking the OpenAI chat API, ending in
+      <code>/v1</code>.
     </p>
 
     <div class="field">
@@ -47,18 +47,43 @@
           placeholder="http://localhost:11434/v1"
           data-config="llm.local.endpoint"
         />
-        <select class="field__control field__control--compact" data-llm-preset aria-label="Common servers">
-          <option value="">Common…</option>
-        </select>
+        {# Lists the models the server at *this* address reports, into the model field's
+           suggestions. It replaced a dropdown of common servers that rewrote the address, which
+           nobody asked for and which sat exactly where the model list was wanted (D-067). #}
+        <button
+          type="button"
+          class="button"
+          data-llm-get
+          title="List the models the server at this address offers"
+        >
+          Get
+        </button>
       </div>
+      <p class="field__hint">
+        Anything speaking the OpenAI chat API: Ollama on <code>:11434</code>, LM Studio on
+        <code>:1234</code>, llama.cpp on <code>:8080</code>, vLLM on <code>:8000</code>. Press
+        <strong>Get</strong> to list what it serves.
+      </p>
     </div>
 
     <div class="field">
       <label class="field__label" for="llm-local-model">Model</label>
       <div class="field__row">
-        <select class="field__control" id="llm-local-model" data-llm-model-select data-llm-mode="local">
-          <option value="">Test the connection to list models</option>
-        </select>
+        {# A text field with suggestions, not a dropdown. A dropdown could hold only what the
+           server listed, so a model the list left out — or a name the user simply knows — could
+           not be entered at all (D-067). #}
+        <input
+          class="field__control"
+          id="llm-local-model"
+          type="text"
+          spellcheck="false"
+          autocomplete="off"
+          list="llm-local-models"
+          placeholder="Type a model name, or press Get"
+          data-llm-model-input
+          data-llm-mode="local"
+        />
+        <datalist id="llm-local-models" data-llm-model-list data-llm-mode="local"></datalist>
         <button type="button" class="button" data-llm-test>Test connection</button>
       </div>
       <p class="settings__result" data-llm-result role="status" aria-live="polite"></p>
@@ -118,9 +143,18 @@
     <div class="field">
       <label class="field__label" for="llm-api-model">Model</label>
       <div class="field__row">
-        <select class="field__control" id="llm-api-model" data-llm-model-select data-llm-mode="api">
-          <option value="">Test the connection to list models</option>
-        </select>
+        <input
+          class="field__control"
+          id="llm-api-model"
+          type="text"
+          spellcheck="false"
+          autocomplete="off"
+          list="llm-api-models"
+          placeholder="Type a model name, or test the connection to list them"
+          data-llm-model-input
+          data-llm-mode="api"
+        />
+        <datalist id="llm-api-models" data-llm-model-list data-llm-mode="api"></datalist>
         <button type="button" class="button" data-llm-test>Test connection</button>
       </div>
       <p class="settings__result" data-llm-result role="status" aria-live="polite"></p>
