@@ -228,11 +228,14 @@ class RecordingConfig(_Base):
     #: Stop after this long. A toggle is easy to forget, and an unattended microphone will fill a
     #: disk overnight. Reaching it stops cleanly and says so rather than truncating in silence.
     max_minutes: float = Field(default=240.0, ge=1.0, le=1440.0)
-    #: Seconds of audio handed to the model per pass in the batch transcription. Long enough that
-    #: the model has real context, short enough that progress moves and a failure loses little.
+    #: The longest stretch of audio handed to the model at once when a finished recording is
+    #: transcribed. The recording is cut into pieces no longer than this, each ending where the
+    #: speaker paused, so no piece begins or ends mid-word (D-062). A pause, a cancel and a
+    #: checkpoint all land on those cuts, so a longer cap means a longer wait when holding a pass.
     batch_window_s: float = Field(default=30.0, ge=5.0, le=300.0)
-    #: Overlap between consecutive windows, so a word split across a boundary is seen whole once.
-    batch_overlap_s: float = Field(default=1.0, ge=0.0, le=10.0)
+    #: The shortest silence that counts as somewhere to cut. Three hundred milliseconds is a
+    #: breath between clauses; the gap between two words in a phrase is shorter than that.
+    min_pause_ms: int = Field(default=300, ge=100, le=3000)
 
 
 class CaptureConfig(_Base):

@@ -98,7 +98,7 @@ def transcribe(audio: Path, backend: str, model: str) -> tuple[float, int]:
     asyncio.run(lifecycle.load(config))
 
     started = time.monotonic()
-    segments = transcribe_file(audio, transcribe=lifecycle.transcribe, window_s=30.0)
+    segments = transcribe_file(audio, transcribe=lifecycle.transcribe, chunk_s=30.0)
     elapsed = time.monotonic() - started
 
     asyncio.run(lifecycle.unload())

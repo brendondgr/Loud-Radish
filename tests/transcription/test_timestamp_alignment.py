@@ -12,7 +12,7 @@ they have opposite fixes, so this file measures before anything is changed:
    the values, which no amount of correct storage would fix.
 
 The tests here settle (1) and (2). A word's time comes back from the model relative to *the array
-that was submitted*, and a recording is transcribed in overlapping windows — so every stored time
+that was submitted*, and a recording is transcribed a chunk at a time — so every stored time
 is a sum, and a sum done in the wrong place is invisible until someone clicks a citation. The
 scripted transcriber below returns words at times it chooses, which is what makes the arithmetic
 checkable rather than merely plausible: the expected absolute time is known exactly.
@@ -27,14 +27,36 @@ import numpy as np
 import pytest
 from app.services.asr.contract import AsrResult, WordToken
 from app.services.audio.formats import SAMPLE_RATE
-from app.services.recording.batch import plan_windows, transcribe_file
+from app.services.recording.batch import plan_recording, transcribe_file
+from app.services.vad.base import VoiceActivityDetector
 
-#: Long enough to need several windows at the size used below, so the rebasing is exercised rather
+#: Long enough to need several chunks at the size used below, so the rebasing is exercised rather
 #: than trivially correct on a single pass.
 RECORDING_S = 95.0
 
-WINDOW_S = 30.0
-OVERLAP_S = 1.0
+CHUNK_S = 30.0
+
+
+class Speaking(VoiceActivityDetector):
+    """A detector that hears speech everywhere, so every cut is the hard one at the cap.
+
+    The recording below is a constant tone, and an adaptive detector learns a constant tone as its
+    noise floor — then reports pauses everywhere and cuts mid-second. This file measures the
+    timestamp arithmetic, not where a cut falls, so the cuts are pinned to the cap.
+    """
+
+    @property
+    def name(self) -> str:
+        return "speaking"
+
+    def is_speech(self, frame: np.ndarray) -> bool:
+        return True
+
+    def set_sensitivity(self, sensitivity: float) -> None:
+        return None
+
+    def reset(self) -> None:
+        return None
 
 
 #: Second *n* of the recording is a pure tone at this frequency. Spaced widely enough that a
@@ -110,8 +132,8 @@ def transcribe(tmp_path: Path, **overrides):
     return transcribe_file(
         path,
         transcribe=MarkerTranscriber(),
-        window_s=WINDOW_S,
-        overlap_s=OVERLAP_S,
+        detector=Speaking(),
+        chunk_s=CHUNK_S,
         **overrides,
     )
 
@@ -123,8 +145,8 @@ def test_a_word_is_stored_at_the_second_it_was_spoken(tmp_path: Path) -> None:
     """Every word names its own absolute time, so every stored time is checkable exactly.
 
     A word's offset is relative to the buffer submitted to the model. A recording is transcribed in
-    windows. If the window's own start is added anywhere other than exactly once, timestamps drift
-    by a whole window and every citation past the first thirty seconds points at the wrong moment —
+    chunks. If the chunk's own start is added anywhere other than exactly once, timestamps drift
+    by a whole chunk and every citation past the first thirty seconds points at the wrong moment —
     which is precisely the reported symptom.
     """
     segments = transcribe(tmp_path)
@@ -141,7 +163,7 @@ def test_a_word_is_stored_at_the_second_it_was_spoken(tmp_path: Path) -> None:
 def test_no_word_is_stored_beyond_the_end_of_the_recording(tmp_path: Path) -> None:
     """The cheapest possible check on the sum, and the one that catches double-counting.
 
-    Adding the window offset twice puts the tail of a 95-second talk past three minutes. Nothing
+    Adding the chunk offset twice puts the tail of a 95-second talk past three minutes. Nothing
     downstream validates that, so it surfaces as a citation that seeks past the end of the audio.
     """
     segments = transcribe(tmp_path)
@@ -152,7 +174,7 @@ def test_no_word_is_stored_beyond_the_end_of_the_recording(tmp_path: Path) -> No
 
 
 def test_segments_run_forwards(tmp_path: Path) -> None:
-    """Out-of-order starts mean a window was rebased against the wrong origin."""
+    """Out-of-order starts mean a chunk was rebased against the wrong origin."""
     starts = [segment.start for segment in transcribe(tmp_path)]
 
     assert starts == sorted(starts)
@@ -174,33 +196,33 @@ def test_the_two_passes_agree_on_when_things_were_said(tmp_path: Path) -> None:
     assert [round(s.start, 2) for s in live] == [round(s.start, 2) for s in second]
 
 
-def test_the_overlap_is_context_and_not_extra_transcript(tmp_path: Path) -> None:
-    """A word seen by two windows must be stored once, at one time.
+def test_no_word_is_stored_twice_across_a_chunk_seam(tmp_path: Path) -> None:
+    """A word said once must be stored once, at one time.
 
-    The overlap exists so a word split across a boundary is seen whole by someone. Emitting it from
-    both windows would put the same word at two different seconds, which reads downstream as the
-    speaker having said it twice.
+    The overlapping windows this pass used to walk emitted the boundary word from both windows or
+    from neither (D-061). Chunks tile the recording, so there is no second window to emit it from —
+    and this keeps that true.
     """
     segments = transcribe(tmp_path)
     spoken = [word.text for segment in segments for word in segment.words or []]
 
-    assert len(spoken) == len(set(spoken)), "a word in the overlap was emitted by both windows"
+    assert len(spoken) == len(set(spoken)), "a word at a chunk seam was emitted twice"
 
 
-# -- the windows themselves --------------------------------------------------------------------
+# -- the chunks themselves ---------------------------------------------------------------------
 
 
-def test_windows_tile_the_recording_without_a_gap() -> None:
+def test_chunks_tile_the_recording_without_a_gap() -> None:
     """A gap is a stretch of talk nobody transcribes, and it is silent when it happens."""
     total = int(RECORDING_S * SAMPLE_RATE)
-    windows = list(
-        plan_windows(np.zeros(total, dtype=np.float32), window_s=WINDOW_S, overlap_s=OVERLAP_S)
-    )
+    chunks = plan_recording(np.zeros(total, dtype=np.float32), detector=Speaking(), chunk_s=CHUNK_S)
 
-    assert windows[0].start_s == 0.0
-    for earlier, later in zip(windows, windows[1:], strict=False):
-        assert later.start_s <= earlier.end_s, "a stretch of the recording is in no window at all"
-    assert windows[-1].end_s == pytest.approx(RECORDING_S, abs=0.01)
+    assert chunks[0].start_s == 0.0
+    for earlier, later in zip(chunks, chunks[1:], strict=False):
+        assert later.start_s == pytest.approx(earlier.end_s), (
+            "a stretch of the recording is in no chunk"
+        )
+    assert chunks[-1].end_s == pytest.approx(RECORDING_S, abs=0.01)
 
 
 # -- citations the model produced ---------------------------------------------------------------

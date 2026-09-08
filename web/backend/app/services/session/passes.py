@@ -14,7 +14,7 @@ from pathlib import Path
 
 from ...config import AppConfig
 from ...models.session import SessionMetadata
-from ..recording import SinkError, TranscriptionJob, TranscriptionRunner
+from ..recording import SinkError, TranscriptionJob, TranscriptionRunner, pass_options
 from ..transcript import TranscriptStore, archive
 from . import degradation
 
@@ -91,9 +91,7 @@ class TranscriptionPassMixin:
             registry=self.jobs,
             emit=self._emit,
             transcribe=self._asr.transcribe,
-            window_s=config.recording.batch_window_s,
-            overlap_s=config.recording.batch_overlap_s,
-            max_segment_s=config.streaming.max_segment_s,
+            **pass_options(config),
             revision=revision,
             on_released=self._on_transcription_released,
         )

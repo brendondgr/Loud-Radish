@@ -116,7 +116,8 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   │   │   └── recording/         # Capture to disk, and transcribe it whole (D-021)
 │   │   │       ├── layout.py      # One directory per recording, named for when it started (D-032)
 │   │   │       ├── sink.py        # Incremental WAV writer; crash-safe header, duration cap
-│   │   │       ├── batch.py       # Whole-file pass in overlapping windows; bypasses agreement
+│   │   │       ├── batch.py       # Whole-file pass, one pause-bounded chunk at a time; bypasses
+│   │   │       │                  #   agreement, checkpoints on every chunk (D-021, D-045, D-062)
 │   │   │       ├── chunks.py      # Cuts a finished file into pieces that each end in a pause,
 │   │   │       │                  #   so no boundary falls mid-word (D-061)
 │   │   │       ├── job.py         # One pass's state, progress, and the one-at-a-time rule

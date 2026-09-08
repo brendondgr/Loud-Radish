@@ -25,7 +25,12 @@ from ..services.export import by_id as by_preset_id
 from ..services.export import estimate as estimate_export
 from ..services.export import probe as probe_media
 from ..services.export.webapp import video_type as video_mime
-from ..services.recording import TranscriptionJob, TranscriptionRunner, resolve_recording
+from ..services.recording import (
+    TranscriptionJob,
+    TranscriptionRunner,
+    pass_options,
+    resolve_recording,
+)
 from ..services.transcript import archive
 from ..services.transcript import export as render_export
 from ..services.transcript import export_chat as render_chat_export
@@ -553,9 +558,7 @@ async def resume_transcription(request: Request, key: str) -> dict[str, Any]:
         registry=manager.jobs,
         emit=manager.emit,
         transcribe=manager.asr.transcribe,
-        window_s=config.recording.batch_window_s,
-        overlap_s=config.recording.batch_overlap_s,
-        max_segment_s=config.streaming.max_segment_s,
+        **pass_options(config),
         revision=int(checkpoint["revision"]),
     )
     job = TranscriptionJob(

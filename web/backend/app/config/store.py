@@ -74,6 +74,15 @@ DEFAULT_CONFIG_FILENAME = branding.CONFIG_FILENAME
 LEGACY_CONFIG_FILENAME = branding.LEGACY_CONFIG_FILENAME
 
 CONFIG_PATH_ENV = branding.env_var("CONFIG_PATH")
+
+#: Dotted paths the schema no longer has. **Dropped on load rather than rejected**, because the
+#: schema forbids unknown keys and a rejected file is *ignored whole* — so retiring one setting
+#: would silently reset every setting the user ever chose on their next start. A key lands here
+#: when it is removed from `schema.py`, and stays until nobody could still have it on disk.
+RETIRED_PATHS: tuple[str, ...] = (
+    # The batch pass cuts at pauses and has no overlap (D-062).
+    "recording.batch_overlap_s",
+)
 LEGACY_CONFIG_PATH_ENV = branding.legacy_env_var("CONFIG_PATH")
 
 
@@ -288,6 +297,8 @@ class ConfigStore:
         if not isinstance(raw, dict):
             logger.warning("Ignoring config at %s: expected a JSON object", self._path)
             return
+        for path in _drop_retired(raw):
+            logger.info("Dropped the retired setting %s from %s", path, self._path)
         try:
             self._validate_with(LAYER_USER, raw)
         except ValueError as exc:
@@ -365,3 +376,19 @@ def _dotted_paths(overlay: dict[str, Any], prefix: str = "") -> list[str]:
         else:
             paths.append(path)
     return paths
+
+
+def _drop_retired(raw: dict[str, Any]) -> list[str]:
+    """Remove every :data:`RETIRED_PATHS` entry present in ``raw``. Returns the ones removed."""
+    dropped: list[str] = []
+    for path in RETIRED_PATHS:
+        *parents, leaf = path.split(".")
+        node: Any = raw
+        for name in parents:
+            node = node.get(name) if isinstance(node, dict) else None
+            if node is None:
+                break
+        if isinstance(node, dict) and leaf in node:
+            del node[leaf]
+            dropped.append(path)
+    return dropped

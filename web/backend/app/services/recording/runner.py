@@ -21,9 +21,13 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from ...config.schema import AppConfig
 from ...models.segment import Segment
 from ..transcript import TranscriptStore
-from .batch import BatchError, transcribe_file
+from ..vad import build_detector
+from ..vad.base import VoiceActivityDetector
+from ..vad.energy import EnergyVad
+from .batch import DEFAULT_MIN_PAUSE_MS, DEFAULT_PAUSE_BOUNDARY_MS, BatchError, transcribe_file
 from .characterise import characterise
 from .job import JobRegistry, TranscriptionJob
 
@@ -31,9 +35,28 @@ logger = logging.getLogger(__name__)
 
 EmitFn = Callable[[str, dict[str, Any]], None]
 
-#: Publish progress at most this often. A window every second or two would otherwise put a socket
-#: frame on the wire per window for an hour.
+#: Publish progress at most this often. A chunk every few seconds would otherwise put a socket
+#: frame on the wire per chunk for an hour.
 PROGRESS_INTERVAL_S = 1.0
+
+
+def pass_options(
+    config: AppConfig, on_fallback: Callable[[str], None] | None = None
+) -> dict[str, Any]:
+    """The runner arguments a configuration decides. One place, because three callers build one.
+
+    The detector is the configured one — the same Silero model that gates the live path, with the
+    same announced fallback — built fresh for each pass so its adaptive floor learns *that*
+    recording. The pause that ends a thought is the live gate's own ``pause_ms``, so a recorded
+    transcript is segmented the way a live one would have been.
+    """
+    return {
+        "chunk_s": config.recording.batch_window_s,
+        "min_pause_ms": config.recording.min_pause_ms,
+        "pause_boundary_ms": config.vad.pause_ms,
+        "max_segment_s": config.streaming.max_segment_s,
+        "detector_factory": lambda: build_detector(config.vad, on_fallback),
+    }
 
 
 class TranscriptionRunner:
@@ -45,9 +68,11 @@ class TranscriptionRunner:
         registry: JobRegistry,
         emit: EmitFn,
         transcribe: Callable[..., Any],
-        window_s: float = 30.0,
-        overlap_s: float = 1.0,
+        chunk_s: float = 30.0,
+        min_pause_ms: int = DEFAULT_MIN_PAUSE_MS,
+        pause_boundary_ms: int = DEFAULT_PAUSE_BOUNDARY_MS,
         max_segment_s: float = 30.0,
+        detector_factory: Callable[[], VoiceActivityDetector] | None = None,
         revision: int = 0,
         on_released: Callable[[], None] | None = None,
     ) -> None:
@@ -59,22 +84,24 @@ class TranscriptionRunner:
         #: while someone is guaranteed to say when it goes away.
         self._on_released = on_released
         self._transcribe = transcribe
-        self._window_s = window_s
-        self._overlap_s = overlap_s
+        self._chunk_s = chunk_s
+        self._min_pause_ms = min_pause_ms
+        self._pause_boundary_ms = pause_boundary_ms
         self._max_segment_s = max_segment_s
+        self._detector_factory = detector_factory or EnergyVad
         self._revision = revision
 
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
         # **Distinct from `_stop`, and that distinction is the whole feature.** Shutdown and pause
-        # both end the loop at a window boundary, but they mean opposite things afterwards: a
+        # both end the loop at a chunk boundary, but they mean opposite things afterwards: a
         # shutdown leaves a pass to be resumed by the next process, a pause leaves one to be
         # resumed by the user, and a cancel leaves one that must not be resumed at all. One flag
         # could not tell the runner which terminal state to write (D-045).
         self._hold = threading.Event()
         self._cancel = threading.Event()
         self._last_progress = 0.0
-        #: Set while a resumed pass has not yet reached its first window, so the trim can happen at
+        #: Set while a resumed pass has not yet reached its first chunk, so the trim can happen at
         #: the real boundary rather than the requested one.
         self._resumed_from: float | None = None
 
@@ -83,9 +110,9 @@ class TranscriptionRunner:
         return self._thread is not None and self._thread.is_alive()
 
     def pause(self) -> None:
-        """Ask the pass to hold at the next window boundary. Returns immediately.
+        """Ask the pass to hold at the next chunk boundary. Returns immediately.
 
-        The thread finishes the window it is inside — windows are atomic, and abandoning one
+        The thread finishes the chunk it is inside — chunks are atomic, and abandoning one
         mid-decode would lose its work without recording that it had been started.
         """
         self._hold.set()
@@ -145,11 +172,11 @@ class TranscriptionRunner:
         return True
 
     def _should_stop(self) -> bool:
-        """Consulted between windows. Any of the three reasons ends the loop the same way."""
+        """Consulted between chunks. Any of the three reasons ends the loop the same way."""
         return self._stop.is_set() or self._hold.is_set() or self._cancel.is_set()
 
     def stop(self, timeout: float = 5.0) -> None:
-        """Ask the pass to end at the next window boundary and wait briefly for it.
+        """Ask the pass to end at the next chunk boundary and wait briefly for it.
 
         Called on shutdown. Deliberately does not wait for the whole pass: a server that takes half
         an hour to exit is a server nobody will let start automatically, and the partial transcript
@@ -169,12 +196,12 @@ class TranscriptionRunner:
         retain_audio: bool,
         prompt: str | None,
     ) -> None:
-        # **The trim happens at the first window, not here**, because *here* does not yet know
-        # where the first window actually is: `plan_windows` snaps a resume back to the boundary at
-        # or before the requested second, so asking to resume at 540 s can genuinely begin at 522 s.
-        # Trimming at 540 and then transcribing from 522 re-derives 522-540 on top of segments that
-        # were kept — which is exactly the duplication the trim exists to prevent, and it is what a
-        # real interrupted pass produced before this was moved.
+        # **The trim happens at the first chunk, not here**, because *here* does not yet know
+        # where the first chunk actually is: `plan_recording` snaps a resume back to the boundary
+        # at or before the requested second, so asking to resume at 540 s can genuinely begin at
+        # 522 s. Trimming at 540 and then transcribing from 522 re-derives 522-540 on top of
+        # segments that were kept — which is exactly the duplication the trim exists to prevent,
+        # and it is what a real interrupted pass produced before this was moved.
         self._resumed_from = job.next_start_s if job.next_start_s > 0 else None
         first_id = store.last_segment_id() + 1
         self._checkpoint(job, store, prompt, state="running")
@@ -182,8 +209,10 @@ class TranscriptionRunner:
             transcribe_file(
                 job.source_path,
                 transcribe=self._transcribe,
-                window_s=self._window_s,
-                overlap_s=self._overlap_s,
+                detector=self._detector_factory(),
+                chunk_s=self._chunk_s,
+                min_pause_ms=self._min_pause_ms,
+                pause_boundary_ms=self._pause_boundary_ms,
                 max_segment_s=self._max_segment_s,
                 first_segment_id=first_id,
                 revision=self._revision,
@@ -193,7 +222,7 @@ class TranscriptionRunner:
                 ),
                 should_stop=self._should_stop,
                 start_s=job.next_start_s,
-                on_window_start=lambda start_s, next_id: self._on_window_start(
+                on_chunk_start=lambda start_s, next_id: self._on_chunk_start(
                     job, store, prompt, start_s, next_id
                 ),
             )
@@ -223,7 +252,7 @@ class TranscriptionRunner:
             logger.info("Transcription of %s held at %.1f s", job.source_path, job.next_start_s)
             return
         if self._stop.is_set():
-            # Shutdown. The checkpoint is already on disk from the last window, and the state stays
+            # Shutdown. The checkpoint is already on disk from the last chunk, and the state stays
             # `running` on purpose: that is what the next process reads as "this was interrupted",
             # which is exactly what happened.
             self._release(store)
@@ -312,7 +341,7 @@ class TranscriptionRunner:
             self._last_progress = now
             self._emit("transcription.progress", job.as_event())
 
-    def _on_window_start(
+    def _on_chunk_start(
         self,
         job: TranscriptionJob,
         store: TranscriptStore,
@@ -320,10 +349,10 @@ class TranscriptionRunner:
         start_s: float,
         next_id: int,
     ) -> None:
-        """Record where a resume would begin, before the window is decoded.
+        """Record where a resume would begin, before the chunk is decoded.
 
         The first call of a resumed pass also trims: this is the first moment the *real* first
-        window is known, and everything from it onward is about to be re-derived from audio that is
+        chunk is known, and everything from it onward is about to be re-derived from audio that is
         still on disk. Nothing before it is touched, so the transcript already read does not change.
         """
         if self._resumed_from is not None:

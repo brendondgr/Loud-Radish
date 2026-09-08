@@ -83,7 +83,7 @@
     </div>
 
     <div class="field field--inline">
-      <label class="field__label field__label--inline" for="recording-window">Transcribe in windows of</label>
+      <label class="field__label field__label--inline" for="recording-window">Transcribe in pieces of at most</label>
       <input
         class="field__control field__control--number"
         id="recording-window"
@@ -95,8 +95,9 @@
       />
       <span class="field__value">s</span>
       <p class="field__hint">
-        How much audio the model sees per pass when transcribing a finished recording. Longer gives
-        it more context; shorter moves the progress figure more often and loses less if it fails.
+        The most audio the model is handed at once when transcribing a finished recording. Each
+        piece is cut shorter than this wherever the speaker paused, so no piece starts or ends
+        mid-word. Shorter moves the progress figure more often and makes a pause take effect sooner.
       </p>
     </div>
   </div>

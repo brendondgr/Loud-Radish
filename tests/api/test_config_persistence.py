@@ -191,3 +191,20 @@ def test_the_tuning_values_still_wait_for_save() -> None:
     assert not persists("polish.min_retained_ratio")
     assert not persists("asr.beam_size")
     assert not persists("streaming.step_s")
+
+
+# -- settings that no longer exist ------------------------------------------------------------
+
+
+def test_a_retired_setting_is_dropped_rather_than_the_whole_file_ignored(config_path) -> None:
+    """The schema forbids unknown keys, and a rejected file is ignored *whole* — so retiring one
+    setting would have silently reset every setting the user ever chose (D-062)."""
+    config_path.write_text(
+        json.dumps({"recording": {"batch_overlap_s": 1.0, "batch_window_s": 45.0}}),
+        encoding="utf-8",
+    )
+    store = ConfigStore(config_path=config_path)
+    store.load()
+
+    assert store.resolve().recording.batch_window_s == 45.0
+    assert "batch_overlap_s" not in store.resolve().recording.model_dump()

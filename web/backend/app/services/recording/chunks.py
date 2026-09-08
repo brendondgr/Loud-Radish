@@ -47,6 +47,10 @@ class Chunk:
     #: Whether the cut that ends this chunk fell inside a pause. The last chunk ends at the end of
     #: the recording, which counts. ``False`` is the hard cut described in the module docstring.
     ends_at_pause: bool
+    #: How long that pause was, in seconds. Zero for a hard cut and for the end of the recording.
+    #: A caller deciding whether the pause ended a *thought* — rather than merely being a safe
+    #: place to cut — reads this rather than ``ends_at_pause`` (D-062).
+    pause_s: float = 0.0
 
     @property
     def duration_s(self) -> float:
@@ -83,7 +87,7 @@ def plan_chunks(
             return chunks
 
         limit = start + max_chunk_s
-        cut, at_pause = _best_cut(ordered, start + max_chunk_s / 2.0, limit)
+        cut, pause = _best_cut(ordered, start + max_chunk_s / 2.0, limit)
 
         # A sliver left after the cut is not worth a pass of its own. Folding it in can only
         # lengthen this chunk by under a second, since the cut was at or before the limit.
@@ -91,16 +95,27 @@ def plan_chunks(
             chunks.append(_chunk(len(chunks), start, duration, array, sample_rate, at_pause=True))
             return chunks
 
-        chunks.append(_chunk(len(chunks), start, cut, array, sample_rate, at_pause=at_pause))
+        chunks.append(
+            _chunk(
+                len(chunks),
+                start,
+                cut,
+                array,
+                sample_rate,
+                at_pause=pause is not None,
+                pause_s=pause.duration_s if pause is not None else 0.0,
+            )
+        )
         start = cut
 
 
-def _best_cut(pauses: list[Pause], region_start: float, limit: float) -> tuple[float, bool]:
+def _best_cut(pauses: list[Pause], region_start: float, limit: float) -> tuple[float, Pause | None]:
     """Where to end a chunk that must end by ``limit``: inside a pause if one can be found.
 
     Candidates are the pauses overlapping the back half of the chunk. The longest wins; among
     equals the later one, because a longer chunk means fewer cuts. The cut lands at the pause's
-    midpoint, pulled inside the region if the pause runs past either edge of it.
+    midpoint, pulled inside the region if the pause runs past either edge of it. Returns the cut
+    and the pause it fell in, or ``None`` for the hard cut at the limit.
     """
     best: Pause | None = None
     for pause in pauses:
@@ -110,15 +125,22 @@ def _best_cut(pauses: list[Pause], region_start: float, limit: float) -> tuple[f
             best = pause
 
     if best is None:
-        return limit, False
+        return limit, None
 
     low = max(best.start_s, region_start)
     high = min(best.end_s, limit)
-    return min(max(best.middle_s, low), high), True
+    return min(max(best.middle_s, low), high), best
 
 
 def _chunk(
-    index: int, start_s: float, end_s: float, array: np.ndarray, sample_rate: int, *, at_pause: bool
+    index: int,
+    start_s: float,
+    end_s: float,
+    array: np.ndarray,
+    sample_rate: int,
+    *,
+    at_pause: bool,
+    pause_s: float = 0.0,
 ) -> Chunk:
     first = int(round(start_s * sample_rate))
     last = int(round(end_s * sample_rate))
@@ -128,6 +150,7 @@ def _chunk(
         end_s=last / sample_rate,
         samples=array[first:last],
         ends_at_pause=at_pause,
+        pause_s=pause_s,
     )
 
 

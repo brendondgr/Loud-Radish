@@ -6,7 +6,7 @@ and the polish pass all work on segments, and every one of them would break in a
 recorded transcript had different ids, different timestamps, or different boundaries.
 
 The second property is that word times are on the *recording's* timeline. The model returns times
-relative to the array it was handed, and every window after the first is handed a different array.
+relative to the array it was handed, and every chunk after the first is handed a different array.
 A rebasing bug here does not fail loudly; it produces a transcript whose every citation points at
 the wrong moment.
 """
@@ -26,11 +26,12 @@ from app.services.recording import (
     JobRegistry,
     JobState,
     TranscriptionJob,
-    plan_windows,
+    plan_recording,
     read_wav,
     transcribe_file,
 )
 from app.services.recording.sink import WavSink
+from app.services.vad.energy import EnergyVad
 
 
 def write_recording(path: Path, seconds: float = 10.0) -> Path:
@@ -95,48 +96,51 @@ def test_a_wrong_rate_recording_is_refused_by_name(tmp_path: Path) -> None:
         read_wav(path)
 
 
-# -- windowing ---------------------------------------------------------------------------
+# -- planning the chunks ------------------------------------------------------------------
+#
+# The recordings here are continuous tones, which the energy detector hears as speech throughout —
+# so every cut is the hard one at the cap, and the chunks behave like fixed windows with no overlap.
+# Where a cut falls when there *is* a pause is covered in `test_pause_chunking.py`.
 
 
-def test_windows_cover_the_whole_recording() -> None:
+def plan(samples: np.ndarray, **options):
+    return plan_recording(samples, detector=EnergyVad(), **options)
+
+
+def test_chunks_cover_the_whole_recording() -> None:
     samples = np.zeros(int(10 * SAMPLE_RATE), dtype=np.float32)
-    windows = list(plan_windows(samples, window_s=3.0, overlap_s=1.0))
-    assert windows[0].start_s == 0.0
-    assert windows[-1].end_s == pytest.approx(10.0)
+    chunks = plan(samples, chunk_s=3.0)
+    assert chunks[0].start_s == 0.0
+    assert chunks[-1].end_s == pytest.approx(10.0)
 
 
-def test_windows_overlap_by_the_requested_amount() -> None:
+def test_chunks_tile_the_recording_without_overlap() -> None:
+    """No overlap and no gap: nothing is transcribed twice and nothing is skipped (D-062)."""
     samples = np.zeros(int(10 * SAMPLE_RATE), dtype=np.float32)
-    windows = list(plan_windows(samples, window_s=4.0, overlap_s=1.0))
-    for previous, current in zip(windows, windows[1:], strict=False):
-        assert previous.end_s - current.start_s == pytest.approx(1.0)
+    chunks = plan(samples, chunk_s=4.0)
+    for previous, current in zip(chunks, chunks[1:], strict=False):
+        assert current.start_s == pytest.approx(previous.end_s)
 
 
-def test_only_the_first_window_keeps_its_overlap() -> None:
-    """The overlap is context for the model, not extra transcript."""
+def test_no_chunk_is_longer_than_the_cap() -> None:
     samples = np.zeros(int(10 * SAMPLE_RATE), dtype=np.float32)
-    windows = list(plan_windows(samples, window_s=4.0, overlap_s=1.0))
-    assert windows[0].keep_from_s == 0.0
-    assert all(w.keep_from_s == pytest.approx(1.0) for w in windows[1:])
+    # Silence throughout is one long pause, so every cut is inside it — at the cap, since the
+    # pause's midpoint lies beyond it.
+    chunks = plan(samples, chunk_s=4.0)
+    assert all(chunk.duration_s <= 4.0 + 1e-6 for chunk in chunks)
+    assert len(chunks) >= 3
 
 
-def test_an_overlap_larger_than_the_window_is_capped_at_half() -> None:
-    """Found by writing this test: clamping only to `window - 1` terminates but is pathological.
-
-    It leaves a one-sample step — a six-second recording planned into sixty-four thousand windows,
-    each of them a full inference pass. The cap is at half the window, which is also where an
-    overlap stops being context and becomes the majority of the audio decoded twice.
-    """
-    samples = np.zeros(int(6 * SAMPLE_RATE), dtype=np.float32)
-    windows = list(plan_windows(samples, window_s=2.0, overlap_s=5.0))
-    assert len(windows) <= 6
-    assert windows[-1].end_s == pytest.approx(6.0)
-    # Half of a two-second window.
-    assert windows[1].keep_from_s == pytest.approx(1.0)
+def test_a_resume_keeps_only_the_chunks_not_yet_done() -> None:
+    """The chunk that ends exactly at the resume point is the one that wrote the checkpoint."""
+    samples = np.zeros(int(10 * SAMPLE_RATE), dtype=np.float32)
+    whole = plan(samples, chunk_s=4.0)
+    resumed = plan(samples, chunk_s=4.0, start_s=whole[1].end_s)
+    assert [chunk.start_s for chunk in resumed] == [chunk.start_s for chunk in whole[2:]]
 
 
-def test_an_empty_recording_produces_no_windows() -> None:
-    assert list(plan_windows(np.zeros(0, dtype=np.float32), window_s=3.0, overlap_s=1.0)) == []
+def test_an_empty_recording_produces_no_chunks() -> None:
+    assert plan(np.zeros(0, dtype=np.float32), chunk_s=3.0) == []
 
 
 # -- the segments it produces ------------------------------------------------------------
@@ -144,7 +148,7 @@ def test_an_empty_recording_produces_no_windows() -> None:
 
 def test_segments_carry_ids_contiguous_from_the_first(tmp_path: Path) -> None:
     segments = transcribe_file(
-        write_recording(tmp_path / "talk.wav", 9.0), transcribe=FakeAsr(), window_s=3.0
+        write_recording(tmp_path / "talk.wav", 9.0), transcribe=FakeAsr(), chunk_s=3.0
     )
     assert segments
     assert [s.id for s in segments] == list(range(1, len(segments) + 1))
@@ -155,7 +159,7 @@ def test_the_first_segment_id_can_be_offset(tmp_path: Path) -> None:
     segments = transcribe_file(
         write_recording(tmp_path / "talk.wav", 6.0),
         transcribe=FakeAsr(),
-        window_s=3.0,
+        chunk_s=3.0,
         first_segment_id=50,
     )
     assert segments[0].id == 50
@@ -166,8 +170,7 @@ def test_word_times_are_on_the_recordings_timeline(tmp_path: Path) -> None:
     segments = transcribe_file(
         write_recording(tmp_path / "talk.wav", 12.0),
         transcribe=FakeAsr(),
-        window_s=4.0,
-        overlap_s=0.0,
+        chunk_s=4.0,
     )
     assert segments[-1].end > 6.0, "late words were not rebased onto the recording's timeline"
     assert segments[-1].end <= 12.5
@@ -175,7 +178,7 @@ def test_word_times_are_on_the_recordings_timeline(tmp_path: Path) -> None:
 
 def test_segments_advance_in_time_and_do_not_overlap(tmp_path: Path) -> None:
     segments = transcribe_file(
-        write_recording(tmp_path / "talk.wav", 12.0), transcribe=FakeAsr(), window_s=4.0
+        write_recording(tmp_path / "talk.wav", 12.0), transcribe=FakeAsr(), chunk_s=4.0
     )
     for previous, current in zip(segments, segments[1:], strict=False):
         assert current.start >= previous.start
@@ -186,7 +189,7 @@ def test_the_final_words_are_not_lost(tmp_path: Path) -> None:
     """A recording rarely ends on a full stop, and the end is where conclusions live."""
     unpunctuated = FakeAsr(punctuate_every=100)
     segments = transcribe_file(
-        write_recording(tmp_path / "talk.wav", 5.0), transcribe=unpunctuated, window_s=5.0
+        write_recording(tmp_path / "talk.wav", 5.0), transcribe=unpunctuated, chunk_s=5.0
     )
     assert segments, "a recording with no sentence-ending punctuation produced nothing"
     assert "word4" in segments[-1].text
@@ -196,7 +199,7 @@ def test_the_model_id_reaches_the_segment(tmp_path: Path) -> None:
     segments = transcribe_file(
         write_recording(tmp_path / "talk.wav", 4.0),
         transcribe=FakeAsr(model_id="whisper/small"),
-        window_s=4.0,
+        chunk_s=4.0,
     )
     assert segments[0].model_id == "whisper/small"
 
@@ -210,7 +213,7 @@ def test_a_silent_recording_produces_nothing_rather_than_failing(tmp_path: Path)
     def silent(audio: np.ndarray, prompt: str | None = None) -> AsrResult:
         return AsrResult(words=[], model_id="fake")
 
-    assert transcribe_file(tmp_path / "silence.wav", transcribe=silent, window_s=2.0) == []
+    assert transcribe_file(tmp_path / "silence.wav", transcribe=silent, chunk_s=2.0) == []
 
 
 def test_an_empty_recording_is_not_an_error(tmp_path: Path) -> None:
@@ -227,7 +230,7 @@ def test_progress_is_monotonic_and_reaches_the_end(tmp_path: Path) -> None:
     transcribe_file(
         write_recording(tmp_path / "talk.wav", 12.0),
         transcribe=FakeAsr(),
-        window_s=4.0,
+        chunk_s=4.0,
         on_progress=lambda seconds, _segments: reported.append(seconds),
     )
     assert reported == sorted(reported), "progress went backwards"
@@ -239,7 +242,7 @@ def test_progress_reports_the_segments_from_that_window(tmp_path: Path) -> None:
     segments = transcribe_file(
         write_recording(tmp_path / "talk.wav", 9.0),
         transcribe=FakeAsr(),
-        window_s=3.0,
+        chunk_s=3.0,
         on_progress=lambda _seconds, produced: batches.append(len(produced)),
     )
     assert sum(batches) == len(segments)
@@ -259,7 +262,7 @@ def test_a_stop_request_returns_what_was_produced(tmp_path: Path) -> None:
     segments = transcribe_file(
         write_recording(tmp_path / "talk.wav", 30.0),
         transcribe=FakeAsr(),
-        window_s=3.0,
+        chunk_s=3.0,
         should_stop=stop_after_two,
     )
     assert segments, "stopping early discarded everything already transcribed"
@@ -277,13 +280,13 @@ def test_stopping_immediately_still_flushes_nothing_rather_than_raising(tmp_path
     )
 
 
-# -- the pass sees whole windows, not frames --------------------------------------------------
+# -- the pass sees whole chunks, not frames ---------------------------------------------------
 
 
-def test_the_model_is_given_long_windows_not_frames(tmp_path: Path) -> None:
+def test_the_model_is_given_long_chunks_not_frames(tmp_path: Path) -> None:
     """The point of the mode: full context per pass, rather than the live path's short buffers."""
     asr = FakeAsr()
-    transcribe_file(write_recording(tmp_path / "talk.wav", 20.0), transcribe=asr, window_s=10.0)
+    transcribe_file(write_recording(tmp_path / "talk.wav", 20.0), transcribe=asr, chunk_s=10.0)
     assert asr.calls
     assert max(asr.calls) == pytest.approx(10.0, abs=0.1)
 
@@ -305,7 +308,7 @@ class TestJob:
         assert job.state is JobState.DONE
 
     def test_progress_never_walks_backwards(self) -> None:
-        # Windows overlap, so a naive assignment would report losing ground.
+        # A stale report must not be allowed to walk the figure back.
         job = self.make()
         job.advance(40.0, 2)
         job.advance(35.0, 1)

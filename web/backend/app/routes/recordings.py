@@ -26,6 +26,7 @@ from ..services.recording import (
     TranscriptionJob,
     TranscriptionRunner,
     iter_recordings,
+    pass_options,
     read_wav,
     resolve_recording,
 )
@@ -186,9 +187,7 @@ async def transcribe_recording(request: Request, name: str) -> dict[str, Any]:
         registry=manager.jobs,
         emit=manager.emit,
         transcribe=manager.asr.transcribe,
-        window_s=config.recording.batch_window_s,
-        overlap_s=config.recording.batch_overlap_s,
-        max_segment_s=config.streaming.max_segment_s,
+        **pass_options(config),
     )
     job = TranscriptionJob(
         session_id=session.session_id,

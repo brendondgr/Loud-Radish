@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-09-08 (a dictation cut where the speaker paused — D-061)*
+*Last updated: 2026-09-08 (the batch pass cut at pauses — D-062)*
 
 The active work list for Loud Radish. Update it whenever a task is finished or new work is
 discovered.
@@ -174,9 +174,11 @@ each was invisible to reading and obvious to using, which is the argument for th
       The item said the right design "cannot be guessed before anyone has watched a real one run",
       and that turned out to be exactly right: watching one run is what found the window-boundary
       defect. A server restart mid-pass now keeps the recording *and* the job.
-- [ ] **`recording.batch_window_s` has not been tuned against a real model.** The 30-second default
-      matches Whisper's own window, but whether a longer window measurably improves a recorded
-      transcript over a live one is the question the mode exists to exploit, and it is unmeasured.
+- [ ] **`recording.batch_window_s` has not been tuned against a real model.** Since D-062 it is the
+      *longest* chunk, cut shorter at a pause wherever one exists, and the model walks anything over
+      thirty seconds itself. Whether a longer cap measurably improves a recorded transcript over a
+      live one is the question the mode exists to exploit, and it is still unmeasured; what a longer
+      cap certainly does is make a pause or a cancel wait longer for the chunk in flight.
 
 - [ ] **Port takeover is Linux-only.** `app.py` finds the process holding its port through `/proc`;
       on any other platform it degrades to the old "port in use" refusal. Dependency-free was the
@@ -979,11 +981,12 @@ user's own machine, and none may be reported as passing until it has had one.
       model whole and is tidied on its own. The cap is thirty minutes, up from five, and reaching
       it delivers what was said instead of silently dropping everything after it.
 
-- [ ] **Recorded mode's batch pass still cuts on a clock.** `recording/batch.py` walks fixed
-      thirty-second windows with a one-second overlap reconciled by word timestamp — the exact
-      mechanism D-061 measured losing a word at every boundary. `plan_chunks` is the fix; the
-      checkpoint written before each window (D-045) would need to record pause-aligned boundaries
-      instead of a step grid.
+- [x] **Recorded mode's batch pass still cuts on a clock.** Done (D-062). `transcribe_file` now
+      plans the whole file into pause-bounded chunks with the configured detector, hands each to
+      the model whole, and checkpoints before every chunk; both sides of a resume plan the same
+      boundaries, so the resume point is a real one. `batch_overlap_s` is retired, and retiring it
+      found that an unknown key made the loader ignore the user's entire config file — retired
+      keys are now dropped with a log line instead.
 
 - [ ] **A dictation's transcribe and tidy could overlap.** The chunks are transcribed and then
       tidied in sequence. The speech model and the language model are different resources, so

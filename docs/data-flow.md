@@ -92,7 +92,7 @@ device ──► capture ──► VAD (meter only, gates nothing)
                  └──► WavSink ──► data/recordings/<stamp>-<id>/audio.wav
                                    │  (toggle off)
                                    ▼
-                        batch pass, overlapping windows
+                        batch pass, one pause-bounded chunk at a time
                                    │
                         ASR ──► segmenter ──► transcript store ──► transport ──► browser
                                    │
@@ -108,11 +108,19 @@ Three differences from the live flow, each deliberate:
 - **The pass outlives the session.** The transcript store is handed to the runner, which alone
   closes it; the manager keeps a read-only reference so `/api/transcript/...` still serves during
   the pass, and reopens it for reading when the runner says the store is gone.
+- **The pass cuts the recording where the speaker paused, never on a clock.** The configured
+  detector marks the silences over the whole file, every chunk ends inside one, and each chunk goes
+  to the model whole — so no boundary falls mid-word, there is no overlap, and there is nothing to
+  merge. Fixed windows with an overlap reconciled by word timestamp were measured losing a word at
+  every seam (**D-061**, **D-062**). `recording.batch_window_s` is now the *longest* chunk, and a
+  chunk ends earlier wherever a pause of at least `recording.min_pause_ms` allows.
 - **And the pass outlives the process.** It writes where it has got to into the session's own
-  database on every window, so a pause — or a `SIGKILL` — leaves enough to pick it up again: which
-  file, how far in, which segment id comes next, what prompt it was started with. A resume trims
-  everything at or after the window it actually restarts on and re-derives it from the audio, which
-  makes it idempotent whatever the process was doing when it stopped (**D-045**).
+  database on every chunk, so a pause — or a `SIGKILL` — leaves enough to pick it up again: which
+  file, how far in, which segment id comes next, what prompt it was started with. The chunks are
+  planned over the whole file from the same detector and settings on both sides of a resume, so the
+  checkpoint names a boundary that exists on the next run too. A resume trims everything at or
+  after the chunk it actually restarts on and re-derives it from the audio, which makes it
+  idempotent whatever the process was doing when it stopped (**D-045**).
 - **The transcript outlives the session too.** The store stays open for reading until the next
   session starts, so a question asked *after* a talk — a summary, a definition, what was missed —
   reaches the same store the live ones did, and a reload still finds segments to re-fetch. Asking

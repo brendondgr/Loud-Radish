@@ -1,4 +1,4 @@
-"""Transcribe a finished recording in one pass (D-021).
+"""Transcribe a finished recording in one pass (D-021), cut where the speaker paused (D-062).
 
 **This deliberately does not use the streaming engine.** LocalAgreement exists to answer a question
 that only arises while audio is still arriving: *what is safe to show now, given that the next
@@ -12,17 +12,27 @@ live path's: same shape, same id sequence, same sentence boundaries. That is wha
 the FTS index, export, citations, and the polish pass work on a recorded transcript without knowing
 it was produced differently.
 
-The pass walks the file in overlapping windows. Overlap matters: a word split across a boundary is
-transcribed as two fragments by both windows, and taking the second window's words only from the
-point where the first window ended keeps whichever one saw it whole.
+**The pass walks the file in chunks that each end in a pause, not in windows on a clock.** The
+first version used fixed thirty-second windows with a second of overlap reconciled by word
+timestamp, and D-061 measured that against a real recording: the model wrote "..." over the phrase
+each window had cut in half, and the overlap — reconciled by timestamps that jitter by a few
+hundred milliseconds — dropped the boundary word from both windows or kept it in both. So the
+recording is cut where nobody was speaking instead (`chunks.plan_chunks`), each chunk goes to the
+model whole, and the chunks tile the file: nothing is transcribed twice and there is nothing to
+merge. The only cut that can still land mid-word is the hard one taken when someone speaks through
+the whole back half of a chunk without a breath, and the chunk says so.
+
+The chunk is also the unit of the checkpoint (D-045). The chunks are planned over the *whole* file
+before any is transcribed, from the same detector and the same settings, so a resumed pass plans
+the same boundaries and picks up on one of them.
 """
 
 from __future__ import annotations
 
 import logging
 import wave
-from collections.abc import Callable, Iterator
-from dataclasses import dataclass, replace
+from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -31,31 +41,30 @@ from ...models.segment import Segment
 from ..asr.contract import WordToken
 from ..audio.formats import SAMPLE_RATE
 from ..streaming.segmenter import Segmenter
+from ..vad.base import VoiceActivityDetector
+from ..vad.energy import EnergyVad
+from ..vad.pauses import find_pauses
+from .chunks import Chunk, plan_chunks
 
 logger = logging.getLogger(__name__)
 
-#: Called with (transcribed_seconds, segments) after every window.
+#: Called with (transcribed_seconds, segments) after every chunk.
 ProgressFn = Callable[[float, list[Segment]], None]
 #: Signature of ``AsrLifecycle.transcribe``.
 TranscribeFn = Callable[..., object]
 
+#: The shortest silence that counts as somewhere to cut, when the caller does not say. A breath
+#: between clauses; the gap between two words in a phrase is shorter.
+DEFAULT_MIN_PAUSE_MS = 300
+#: A pause at least this long is reported to the segmenter as a boundary, the way the live gate
+#: reports one. Shorter pauses are still safe places to *cut* — no word straddles them — but a
+#: breath mid-sentence is not the end of a thought, and telling the segmenter it was would split
+#: sentences at every chunk seam. Matches ``VadConfig.pause_ms``.
+DEFAULT_PAUSE_BOUNDARY_MS = 500
+
 
 class BatchError(RuntimeError):
     """The recording could not be transcribed. The message names the file."""
-
-
-@dataclass(frozen=True)
-class Window:
-    """One slice of the recording handed to the model."""
-
-    index: int
-    #: Seconds from the start of the recording.
-    start_s: float
-    end_s: float
-    samples: np.ndarray
-    #: Words starting before this offset *within the window* were already covered by the previous
-    #: window's non-overlapping part, and are dropped rather than emitted twice.
-    keep_from_s: float
 
 
 def read_wav(path: Path | str) -> tuple[np.ndarray, float]:
@@ -91,68 +100,41 @@ def read_wav(path: Path | str) -> tuple[np.ndarray, float]:
     return samples, samples.size / float(SAMPLE_RATE)
 
 
-def plan_windows(
+def plan_recording(
     samples: np.ndarray,
     *,
-    window_s: float,
-    overlap_s: float,
+    detector: VoiceActivityDetector,
+    chunk_s: float,
+    min_pause_ms: int = DEFAULT_MIN_PAUSE_MS,
     start_s: float = 0.0,
-) -> Iterator[Window]:
-    """Slice the recording into overlapping windows, in order.
+) -> list[Chunk]:
+    """Cut the recording at pauses, and drop every chunk that ends at or before ``start_s``.
 
-    The overlap is *context for the model*, not extra transcript: each window's words are kept only
-    from where the previous window stopped, so nothing is emitted twice.
-
-    **The overlap is capped at half the window**, and that cap is load-bearing rather than tidiness.
-    Clamping it only to ``window - 1`` still terminates, but an overlap larger than the window
-    leaves a step of one sample: a six-second recording planned into sixty-four thousand windows,
-    each a full inference pass. Half a window is also the point past which the overlap stops being
-    context and starts being the majority of the audio, transcribed twice for nothing.
+    The chunks tile the recording — each begins where the previous ended — so what is left after
+    the drop begins on a chunk boundary at or before ``start_s``. **A resume begins on a boundary,
+    not mid-chunk (D-045).** Chunks are the unit the model sees and the unit a checkpoint records,
+    so starting between two would either re-decode audio already committed or skip the part the
+    previous chunk had not reached. The whole file is planned every time, from the same detector
+    and the same settings, which is what makes the boundaries the same on both sides of a resume.
     """
-    total = samples.size
-    if total == 0:
-        return
-
-    window = max(1, int(window_s * SAMPLE_RATE))
-    overlap = max(0, min(int(overlap_s * SAMPLE_RATE), window // 2))
-    step = max(1, window - overlap)
-
-    # **A resume begins on a window boundary, not mid-window (D-045).** Windows are the unit the
-    # model sees and the unit a checkpoint records, so starting between two would either re-decode
-    # audio already committed or skip the part of it the previous window had not reached. Snapping
-    # to the step grid keeps the overlap doing its job — a resumed window still sees the second of
-    # context before it — and costs at most one window of work.
-    index = 0
-    start = 0
-    if start_s > 0:
-        offset = max(0, int(start_s * SAMPLE_RATE))
-        index = max(0, offset // step)
-        start = index * step
-        if start >= total:
-            return
-    while start < total:
-        end = min(start + window, total)
-        yield Window(
-            index=index,
-            start_s=start / SAMPLE_RATE,
-            end_s=end / SAMPLE_RATE,
-            samples=samples[start:end],
-            # The first window keeps everything; later ones keep only what the previous one did
-            # not already cover.
-            keep_from_s=0.0 if index == 0 else overlap / SAMPLE_RATE,
-        )
-        if end >= total:
-            return
-        start += step
-        index += 1
+    if samples.size == 0:
+        return []
+    pauses = find_pauses(samples, detector, min_pause_ms=min_pause_ms)
+    chunks = plan_chunks(samples, pauses, max_chunk_s=chunk_s)
+    if start_s <= 0:
+        return chunks
+    # Strictly after: a chunk ending exactly at the resume point was the one that wrote it.
+    return [chunk for chunk in chunks if chunk.end_s > start_s + 1e-6]
 
 
 def transcribe_file(
     path: Path | str,
     *,
     transcribe: TranscribeFn,
-    window_s: float = 30.0,
-    overlap_s: float = 1.0,
+    detector: VoiceActivityDetector | None = None,
+    chunk_s: float = 30.0,
+    min_pause_ms: int = DEFAULT_MIN_PAUSE_MS,
+    pause_boundary_ms: int = DEFAULT_PAUSE_BOUNDARY_MS,
     max_segment_s: float = 30.0,
     first_segment_id: int = 1,
     revision: int = 0,
@@ -160,7 +142,7 @@ def transcribe_file(
     on_progress: ProgressFn | None = None,
     should_stop: Callable[[], bool] | None = None,
     start_s: float = 0.0,
-    on_window_start: Callable[[float, int], None] | None = None,
+    on_chunk_start: Callable[[float, int], None] | None = None,
 ) -> list[Segment]:
     """Transcribe a finished recording and return its segments, in order.
 
@@ -168,14 +150,20 @@ def transcribe_file(
         transcribe: ``AsrLifecycle.transcribe``. Its hallucination filtering applies unchanged,
             which matters more here than live: a long recording contains far more silence than a
             talk anyone is watching, and silence is what makes a speech model invent text.
-        should_stop: consulted between windows so a server shutdown does not have to wait for a
+        detector: what decides where the recording is quiet. The energy detector when not given —
+            dependency-free and deterministic — and the configured one, usually Silero, from the
+            runner.
+        chunk_s: the longest chunk handed to the model. A chunk ends earlier than this wherever a
+            pause allows, so the real lengths vary; the model itself walks anything longer than
+            thirty seconds in windows of its own, seeking to the end of its last complete segment.
+        should_stop: consulted between chunks so a server shutdown does not have to wait for a
             forty-minute pass. Stopping returns what was produced so far rather than raising —
             partial transcript beats none.
-        start_s: where to begin. Snapped to a window boundary, so a resumed pass never re-decodes
-            audio it already committed nor skips audio it did not (D-045).
-        on_window_start: called with the second the next window begins at and the id the next
-            segment will take, *before* that window is transcribed. This is the checkpoint, and it
-            is written on every window rather than only on a pause: a pause can write its own, and
+        start_s: where to begin. Snapped back to a chunk boundary, so a resumed pass never
+            re-decodes audio it already committed nor skips audio it did not (D-045).
+        on_chunk_start: called with the second the next chunk begins at and the id the next
+            segment will take, *before* that chunk is transcribed. This is the checkpoint, and it
+            is written on every chunk rather than only on a pause: a pause can write its own, and
             a killed process cannot.
     """
     samples, duration = read_wav(path)
@@ -186,37 +174,60 @@ def transcribe_file(
         logger.info("Recording %s contains no audio; nothing to transcribe.", path)
         return produced
 
-    #: The end of the last window actually transcribed, and whether the loop was cut short. Both
+    chunks = plan_recording(
+        samples,
+        detector=detector or EnergyVad(),
+        chunk_s=chunk_s,
+        min_pause_ms=min_pause_ms,
+        start_s=start_s,
+    )
+    hard = sum(1 for chunk in chunks if not chunk.ends_at_pause)
+    logger.info(
+        "Recording %s (%.1f s) planned into %d chunk%s%s%s",
+        path,
+        duration,
+        len(chunks),
+        "" if len(chunks) == 1 else "s",
+        f" from {start_s:.1f} s" if start_s > 0 else "",
+        f"; {hard} cut mid-speech for want of a pause" if hard else "",
+    )
+
+    #: The end of the last chunk actually transcribed, and whether the loop was cut short. Both
     #: exist for the tail flush below, which otherwise reports the whole file's length as the
     #: position — walking a *held* pass to 100 % complete.
     reached = start_s
     stopped_early = False
+    boundary_s = pause_boundary_ms / 1000.0
 
-    for window in plan_windows(samples, window_s=window_s, overlap_s=overlap_s, start_s=start_s):
+    for chunk in chunks:
         if should_stop is not None and should_stop():
-            logger.info("Transcription of %s stopped early at %.1f s.", path, window.start_s)
+            logger.info("Transcription of %s stopped early at %.1f s.", path, chunk.start_s)
             stopped_early = True
             break
 
-        # Before the window, not after it: a checkpoint written afterwards names a position whose
+        # Before the chunk, not after it: a checkpoint written afterwards names a position whose
         # work may not have been committed if the process died between the two.
-        if on_window_start is not None:
-            on_window_start(window.start_s, segmenter.next_id)
+        if on_chunk_start is not None:
+            on_chunk_start(chunk.start_s, segmenter.next_id)
 
-        result = transcribe(window.samples, prompt)
-        words = _absolute_words(result, window)
+        result = transcribe(chunk.samples, prompt)
+        words = _absolute_words(result, chunk)
 
-        # No pause boundary: the VAD did not run over this audio, so the only boundaries available
-        # are punctuation and the duration cap. Claiming a pause we did not detect would split
-        # sentences at arbitrary points.
-        segments = segmenter.add(words, model_id=getattr(result, "model_id", ""))
+        # The detector did run over this audio, so a pause long enough to end a thought is
+        # reported as one — the same boundary the live gate would have raised. A shorter pause
+        # was a safe place to cut and nothing more.
+        segments = segmenter.add(
+            words,
+            model_id=getattr(result, "model_id", ""),
+            pause_boundary=chunk.ends_at_pause and chunk.pause_s >= boundary_s,
+        )
         # Stamped here rather than by the segmenter: which *pass* produced a segment is a fact
         # about this function's caller, and the segmenter is shared with the live path.
         segments = [replace(segment, revision=revision) for segment in segments]
         produced.extend(segments)
-        reached = window.end_s
+        reached = chunk.end_s
         if on_progress is not None:
-            on_progress(window.end_s, segments)
+            on_progress(chunk.end_s, segments)
 
     # The last words spoken are usually not followed by a full stop. Without this they are dropped,
     # which loses the end of every recording — the part a speaker most often uses for conclusions.
@@ -236,24 +247,21 @@ def transcribe_file(
     return produced
 
 
-def _absolute_words(result: object, window: Window) -> list[WordToken]:
-    """Rebase a window's words onto the recording's timeline, dropping the overlap's duplicates.
+def _absolute_words(result: object, chunk: Chunk) -> list[WordToken]:
+    """Rebase a chunk's words onto the recording's timeline.
 
     Word times come back relative to the array that was submitted. Every consumer downstream —
     the store, citations, export, the polish pass — assumes times relative to the *session*, so
-    the rebasing has to happen here and exactly once.
+    the rebasing has to happen here and exactly once. Nothing is dropped: the chunks do not
+    overlap, so every word the model returned was said inside this chunk.
     """
     words = getattr(result, "words", None) or []
-    kept: list[WordToken] = []
-    for word in words:
-        if word.start < window.keep_from_s:
-            continue
-        kept.append(
-            WordToken(
-                text=word.text,
-                start=window.start_s + word.start,
-                end=window.start_s + word.end,
-                confidence=word.confidence,
-            )
+    return [
+        WordToken(
+            text=word.text,
+            start=chunk.start_s + word.start,
+            end=chunk.start_s + word.end,
+            confidence=word.confidence,
         )
-    return kept
+        for word in words
+    ]

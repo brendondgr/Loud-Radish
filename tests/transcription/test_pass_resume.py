@@ -1,11 +1,11 @@
 """A transcription pass held, cancelled, and picked up again from its checkpoint (D-045).
 
 The assertion that matters is the one Part 3g established as the right shape for this class of bug:
-**every sentence appears exactly once**. A resume that begins a window too early re-decodes audio it
-has already committed and says everything twice; one that begins a window too late drops whatever
+**every sentence appears exactly once**. A resume that begins a chunk too early re-decodes audio it
+has already committed and says everything twice; one that begins a chunk too late drops whatever
 lay between. Both look like a working transcript until somebody reads it.
 
-Driven with a scripted backend over a real WAV, so the windows, the overlap and the segment
+Driven with a scripted backend over a real WAV, so the chunks, the seam and the segment
 numbering are the real ones.
 """
 
@@ -23,14 +23,15 @@ from app.models.session import SessionMetadata
 # than one shaped to make this file pass.
 from app.services.asr.contract import WordToken as Word  # noqa: E402
 from app.services.audio.formats import SAMPLE_RATE
-from app.services.recording.batch import plan_windows, transcribe_file
+from app.services.recording.batch import plan_recording, transcribe_file
 from app.services.recording.job import JobRegistry, JobState, TranscriptionJob
 from app.services.recording.runner import TranscriptionRunner
 from app.services.transcript.store import TranscriptStore
+from app.services.vad.energy import EnergyVad
 
 
 class Result:
-    """What an ASR backend returns: words with times relative to the window it was given."""
+    """What an ASR backend returns: words with times relative to the chunk it was given."""
 
     def __init__(self, words: list[Word]) -> None:
         self.words = words
@@ -50,7 +51,7 @@ def write_wav(path: Path, seconds: float) -> Path:
 
 
 def transcriber(offset_holder: dict):
-    """One sentence per window, naming the second it started at, so the seam is readable."""
+    """One sentence per chunk, naming the second it started at, so the seam is readable."""
 
     def transcribe(samples: np.ndarray, prompt=None):  # noqa: ANN001, ANN202
         index = offset_holder["calls"]
@@ -66,34 +67,44 @@ def transcriber(offset_holder: dict):
     return transcribe
 
 
-# -- the window planner ---------------------------------------------------------------------
+# -- the chunk planner ----------------------------------------------------------------------
 
 
-def test_a_resume_starts_on_a_window_boundary() -> None:
-    """Starting between two windows would either re-decode audio already committed or skip the
-    part the previous window had not reached."""
+def test_a_resume_starts_on_a_chunk_boundary() -> None:
+    """Starting between two chunks would either re-decode audio already committed or skip the
+    part the previous chunk had not reached."""
     samples = np.zeros(int(120 * SAMPLE_RATE), dtype=np.float32)
 
-    windows = list(plan_windows(samples, window_s=30.0, overlap_s=1.0, start_s=47.0))
+    chunks = plan_recording(samples, detector=EnergyVad(), chunk_s=30.0, start_s=47.0)
 
-    assert windows, "a resume inside the recording must produce windows"
-    # 29 s step, so boundaries are 0, 29, 58, ... — 47 s snaps back to 29.
-    assert windows[0].start_s == pytest.approx(29.0, abs=0.01)
+    assert chunks, "a resume inside the recording must produce chunks"
+    # Silence throughout is one long pause, so every cut is at the cap: boundaries are 0, 30, 60,
+    # 90 — and 47 s snaps back to 30.
+    assert chunks[0].start_s == pytest.approx(30.0, abs=0.01)
 
 
 def test_a_resume_past_the_end_produces_nothing() -> None:
     samples = np.zeros(int(10 * SAMPLE_RATE), dtype=np.float32)
 
-    assert list(plan_windows(samples, window_s=30.0, overlap_s=1.0, start_s=60.0)) == []
+    assert plan_recording(samples, detector=EnergyVad(), chunk_s=30.0, start_s=60.0) == []
 
 
 def test_starting_at_zero_is_unchanged() -> None:
     samples = np.zeros(int(90 * SAMPLE_RATE), dtype=np.float32)
 
-    plain = list(plan_windows(samples, window_s=30.0, overlap_s=1.0))
-    explicit = list(plan_windows(samples, window_s=30.0, overlap_s=1.0, start_s=0.0))
+    plain = plan_recording(samples, detector=EnergyVad(), chunk_s=30.0)
+    explicit = plan_recording(samples, detector=EnergyVad(), chunk_s=30.0, start_s=0.0)
 
-    assert [w.start_s for w in plain] == [w.start_s for w in explicit]
+    assert [c.start_s for c in plain] == [c.start_s for c in explicit]
+
+
+def test_both_sides_of_a_resume_plan_the_same_boundaries() -> None:
+    """What makes a checkpoint meaningful: the boundary it names exists on the next run too."""
+    samples = np.zeros(int(100 * SAMPLE_RATE), dtype=np.float32)
+    whole = plan_recording(samples, detector=EnergyVad(), chunk_s=30.0)
+    later = plan_recording(samples, detector=EnergyVad(), chunk_s=30.0, start_s=whole[2].start_s)
+
+    assert [c.start_s for c in later] == [c.start_s for c in whole[2:]]
 
 
 # -- stopping and resuming the driver ---------------------------------------------------------
@@ -108,13 +119,12 @@ def test_a_stopped_pass_reports_where_it_got_to(tmp_path: Path) -> None:
     segments = transcribe_file(
         path,
         transcribe=transcriber(holder),
-        window_s=30.0,
-        overlap_s=1.0,
+        chunk_s=30.0,
         should_stop=lambda: len(marks) > stop_after,
-        on_window_start=lambda start_s, next_id: marks.append((start_s, next_id)),
+        on_chunk_start=lambda start_s, next_id: marks.append((start_s, next_id)),
     )
 
-    assert marks, "the checkpoint must be offered before each window"
+    assert marks, "the checkpoint must be offered before each chunk"
     assert segments, "what was produced before stopping is returned, not discarded"
     assert marks[-1][0] > 0
 
@@ -128,16 +138,14 @@ def test_resuming_continues_the_segment_numbering(tmp_path: Path) -> None:
     first = transcribe_file(
         path,
         transcribe=transcriber(holder),
-        window_s=30.0,
-        overlap_s=1.0,
+        chunk_s=30.0,
         first_segment_id=1,
         should_stop=_after_windows(2),
     )
     resumed = transcribe_file(
         path,
         transcribe=transcriber(holder),
-        window_s=30.0,
-        overlap_s=1.0,
+        chunk_s=30.0,
         first_segment_id=max(s.id for s in first) + 1,
         start_s=58.0,
     )
@@ -147,7 +155,7 @@ def test_resuming_continues_the_segment_numbering(tmp_path: Path) -> None:
     assert ids == sorted(ids)
 
 
-def test_no_window_is_transcribed_twice_across_the_seam(tmp_path: Path) -> None:
+def test_no_chunk_is_transcribed_twice_across_the_seam(tmp_path: Path) -> None:
     """The assertion Part 3g established for this class of bug: everything appears exactly once."""
     path = write_wav(tmp_path / "talk.wav", 120.0)
     holder = {"calls": 0}
@@ -156,22 +164,20 @@ def test_no_window_is_transcribed_twice_across_the_seam(tmp_path: Path) -> None:
     first = transcribe_file(
         path,
         transcribe=transcriber(holder),
-        window_s=30.0,
-        overlap_s=1.0,
+        chunk_s=30.0,
         should_stop=_after_windows(2),
-        on_window_start=lambda start_s, _id: marks.append(start_s),
+        on_chunk_start=lambda start_s, _id: marks.append(start_s),
     )
     resume_at = marks[-1]
     resumed = transcribe_file(
         path,
         transcribe=transcriber({"calls": 100}),
-        window_s=30.0,
-        overlap_s=1.0,
+        chunk_s=30.0,
         first_segment_id=max(s.id for s in first) + 1,
         start_s=resume_at,
     )
 
-    # Each window covers a distinct span of the recording; the spans must tile it without overlap.
+    # Each chunk covers a distinct span of the recording; the spans must tile it without overlap.
     starts = [round(s.start, 1) for s in first if s.start < resume_at]
     later = [round(s.start, 1) for s in resumed]
     assert not (set(starts) & set(later)), (
@@ -180,7 +186,7 @@ def test_no_window_is_transcribed_twice_across_the_seam(tmp_path: Path) -> None:
 
 
 def _after_windows(count: int):
-    """A `should_stop` that fires once `count` windows have been started."""
+    """A `should_stop` that fires once `count` chunks have been started."""
     state = {"n": 0}
 
     def should_stop() -> bool:
@@ -217,7 +223,7 @@ def test_cancelling_is_not_failing() -> None:
 
 
 def test_a_checkpoint_only_moves_forward() -> None:
-    """Windows overlap, so a naive write would walk the figure backwards — which on resume would
+    """A stale write must not walk the figure backwards — which on resume would
     re-decode audio already committed."""
     job = TranscriptionJob(session_id="a", source_path="/tmp/a.wav", total_seconds=600.0)
 
@@ -306,8 +312,7 @@ def test_holding_a_pass_writes_a_checkpoint_and_keeps_the_audio(tmp_path: Path) 
         registry=JobRegistry(),
         emit=lambda name, data: events.append((name, data)),
         transcribe=_slow(transcriber(holder), runner_holder := {}),
-        window_s=30.0,
-        overlap_s=1.0,
+        chunk_s=30.0,
     )
     runner_holder["runner"] = runner
     job = TranscriptionJob(session_id="aaaaaa", source_path=str(audio), total_seconds=150.0)
@@ -330,7 +335,7 @@ def test_holding_a_pass_writes_a_checkpoint_and_keeps_the_audio(tmp_path: Path) 
 
 
 def _slow(transcribe, holder: dict):
-    """Pause the runner from inside the second window, which is the only way to catch a pass that
+    """Pause the runner from inside the second chunk, which is the only way to catch a pass that
     is genuinely mid-flight rather than one that never started."""
     state = {"n": 0}
 
@@ -352,8 +357,7 @@ def test_a_cancelled_pass_says_so_rather_than_failing(tmp_path: Path) -> None:
         registry=JobRegistry(),
         emit=lambda name, data: events.append((name, data)),
         transcribe=_cancelling(transcriber({"calls": 0}), holder),
-        window_s=30.0,
-        overlap_s=1.0,
+        chunk_s=30.0,
     )
     holder["runner"] = runner
     job = TranscriptionJob(session_id="s", source_path=str(audio), total_seconds=90.0)
@@ -390,8 +394,7 @@ def test_the_committed_segments_survive_a_cancel(tmp_path: Path) -> None:
         registry=JobRegistry(),
         emit=lambda *_a: None,
         transcribe=_cancelling(transcriber({"calls": 0}), holder),
-        window_s=30.0,
-        overlap_s=1.0,
+        chunk_s=30.0,
     )
     holder["runner"] = runner
 
@@ -412,15 +415,15 @@ def test_the_committed_segments_survive_a_cancel(tmp_path: Path) -> None:
 def test_a_resume_trims_at_the_real_boundary_not_the_requested_one(tmp_path: Path) -> None:
     """Found on a real interrupted pass, not by reading (D-045).
 
-    `plan_windows` snaps a resume back to the boundary at or before the requested second, so asking
-    to resume at 540 s can genuinely begin at 522 s. Trimming at 540 and then transcribing from 522
-    re-derives 522-540 on top of segments that were kept — which produced overlapping timestamps and
-    a line transcribed twice in the live run this test is taken from.
+    `plan_recording` snaps a resume back to the boundary at or before the requested second, so
+    asking to resume at 540 s can genuinely begin at 522 s. Trimming at 540 and then transcribing
+    from 522 re-derives 522-540 on top of segments that were kept — which produced overlapping
+    timestamps and a line transcribed twice in the live run this test is taken from.
     """
     audio = write_wav(tmp_path / "talk.wav", 200.0)
     database = tmp_path / "s.db"
     store = TranscriptStore(database, metadata=SessionMetadata(session_id="s"))
-    # Segments a previous run committed, including some inside the window a resume will snap into.
+    # Segments a previous run committed, including some inside the chunk a resume will snap into.
     for index, start in enumerate([100.0, 110.0, 118.0, 125.0], start=1):
         store.append_segment(
             Segment(id=index, text=f"committed at {start}", start=start, end=start + 4.0)
@@ -430,8 +433,7 @@ def test_a_resume_trims_at_the_real_boundary_not_the_requested_one(tmp_path: Pat
         registry=JobRegistry(),
         emit=lambda *_a: None,
         transcribe=transcriber({"calls": 0}),
-        window_s=30.0,
-        overlap_s=1.0,
+        chunk_s=30.0,
     )
     job = TranscriptionJob(
         session_id="s", source_path=str(audio), total_seconds=200.0, next_start_s=130.0
@@ -447,9 +449,10 @@ def test_a_resume_trims_at_the_real_boundary_not_the_requested_one(tmp_path: Pat
         assert starts == sorted(starts), f"timestamps went backwards across the seam: {starts}"
         ids = [s.id for s in segments]
         assert len(ids) == len(set(ids)), f"segment ids repeat: {ids}"
-        # 116 is the boundary at or before 130 (step 29). Nothing committed at or after it survives.
-        assert not [s for s in segments if s.start >= 116.0 and s.text.startswith("committed")], (
-            "segments inside the re-derived window must be trimmed, not kept beside the new ones"
+        # A tone throughout gives the detector no pause, so every cut is at the 30 s cap and 120 is
+        # the boundary at or before 130. Nothing committed at or after it survives.
+        assert not [s for s in segments if s.start >= 120.0 and s.text.startswith("committed")], (
+            "segments inside the re-derived chunk must be trimmed, not kept beside the new ones"
         )
         assert [s for s in segments if s.text.startswith("committed")], (
             "segments before the resume point must be left alone"
@@ -480,8 +483,7 @@ def test_a_pass_stopped_early_does_not_report_itself_complete(tmp_path: Path) ->
     transcribe_file(
         path,
         transcribe=unterminated,
-        window_s=30.0,
-        overlap_s=1.0,
+        chunk_s=30.0,
         should_stop=_after_windows(2),
         on_progress=lambda seconds, _segments: positions.append(seconds),
     )
