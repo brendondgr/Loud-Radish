@@ -188,6 +188,11 @@ class TestWhisperVadFilter:
                 seen.update(kwargs)
                 return iter(()), SimpleNamespace(language="en")
 
+        # **On the CPU, whatever the machine has.** The shipped defaults resolve to `small` at
+        # `int8` on the GPU, which D-053 refuses before the load on an AMD machine — and these
+        # tests are about the `vad_filter` argument, not the device. Pinning it keeps them
+        # passing on every machine rather than only on ones without a GPU.
+        overrides.setdefault("device", "cpu")
         backend = FasterWhisperBackend(model_factory=lambda *a, **k: FakeModel(), **overrides)
         backend.load()
         backend.transcribe(audio(1.0))

@@ -3,6 +3,7 @@
 * ``layout`` — one directory per recording, named for the moment it started
 * ``sink``  — writes the canonical stream to a WAV file while a session records
 * ``batch`` — transcribes a finished file in one pass
+* ``chunks`` — cuts a finished file into pieces that each end in a pause (D-061)
 * ``job``    — the state of one such pass, and the one-at-a-time rule
 * ``runner`` — runs a pass on its own thread, outliving the session that produced the recording
 
@@ -13,6 +14,7 @@ available rather than to decide what is safe to show before the talk has finishe
 """
 
 from .batch import BatchError, plan_windows, read_wav, transcribe_file
+from .chunks import Chunk, plan_chunks
 from .job import JobRegistry, JobState, TranscriptionJob
 from .layout import (
     RecordingLayout,
@@ -27,6 +29,7 @@ from .sink import RecordingLimitReached, SinkError, WavSink
 
 __all__ = [
     "BatchError",
+    "Chunk",
     "JobRegistry",
     "JobState",
     "RecordingLayout",
@@ -39,6 +42,7 @@ __all__ = [
     "key_for",
     "layout_for",
     "migrate_flat_recordings",
+    "plan_chunks",
     "plan_windows",
     "read_wav",
     "resolve_recording",

@@ -19,17 +19,57 @@ import time
 import numpy as np
 import pytest
 from app.config import ConfigStore
-from app.models.segment import Segment
+from app.services.asr.contract import AsrResult, WordToken
+from app.services.audio.formats import SAMPLE_RATE
 from app.services.dictation import DictationError, DictationService
 from app.services.dictation.service import DONE, ERROR, RECORDING
+from app.services.vad.base import VoiceActivityDetector
+
+
+def said(text: str) -> AsrResult:
+    """What a speech model returns for ``text``: one token per word, timed at 2.5 a second."""
+    words = [
+        WordToken(text=word, start=index / 2.5, end=(index + 1) / 2.5)
+        for index, word in enumerate(text.split())
+    ]
+    return AsrResult(words=words, model_id="fake")
+
+
+def tone(seconds: float, amplitude: float = 0.3) -> np.ndarray:
+    """Something a loudness detector calls speech."""
+    t = np.arange(int(seconds * SAMPLE_RATE), dtype=np.float64) / SAMPLE_RATE
+    return (amplitude * np.sin(2 * np.pi * 220 * t)).astype(np.float32)
+
+
+def silence(seconds: float) -> np.ndarray:
+    return np.zeros(int(seconds * SAMPLE_RATE), dtype=np.float32)
+
+
+class Loudness(VoiceActivityDetector):
+    """Speech is anything louder than a whisper. Deterministic, so a cut lands where a test says."""
+
+    def is_speech(self, frame: np.ndarray) -> bool:
+        return bool(np.sqrt(np.mean(np.square(frame, dtype=np.float64))) > 0.01)
+
+    def set_sensitivity(self, sensitivity: float) -> None:
+        pass
+
+    def reset(self) -> None:
+        pass
+
+    @property
+    def name(self) -> str:
+        return "loudness"
 
 
 class FakeSource:
-    """A microphone that writes a fixed tone for as long as it is running."""
+    """A microphone that writes a fixed clip the moment it is started."""
 
-    def __init__(self, *, fail: bool = False, samples: int = 16_000) -> None:
+    def __init__(
+        self, *, fail: bool = False, samples: int = 16_000, audio: np.ndarray | None = None
+    ) -> None:
         self.fail = fail
-        self.samples = samples
+        self.audio = audio if audio is not None else np.zeros(samples, dtype=np.float32)
         self.started = False
         self.stopped = False
 
@@ -37,29 +77,42 @@ class FakeSource:
         if self.fail:
             raise OSError("no such device")
         self.started = True
-        on_frame(np.zeros(self.samples, dtype=np.float32))
+        on_frame(self.audio)
 
     def stop(self) -> None:
         self.stopped = True
 
 
 class FakeAsr:
+    """Answers each pass with the next scripted text, and remembers how much audio it was given."""
+
     is_ready = True
 
-    def __init__(self, text: str = "so i was thinking um we should move the meeting") -> None:
-        self.text = text
+    def __init__(self, text: str = "so i was thinking um we should move the meeting", *texts):
+        self.texts = [text, *texts]
         self.calls = 0
+        self.seconds_seen: list[float] = []
+        self.audio_seen: list[np.ndarray] = []
 
-    def transcribe(self, _audio, prompt=None):  # noqa: ANN001, ARG002
+    def transcribe(self, audio, prompt=None):  # noqa: ANN001, ARG002
         self.calls += 1
-        return self.text
+        self.seconds_seen.append(len(audio) / SAMPLE_RATE if audio is not None else 0.0)
+        self.audio_seen.append(audio)
+        return said(self.texts[min(self.calls - 1, len(self.texts) - 1)])
 
 
 class FakeLlm:
-    """Answers `complete`, optionally slowly or badly."""
+    """Answers `complete`, optionally slowly or badly — or differently on each call."""
 
-    def __init__(self, answer: str = "So I was thinking we should move the meeting.", delay=0.0):
+    def __init__(
+        self,
+        answer: str = "So I was thinking we should move the meeting.",
+        delay=0.0,
+        *,
+        answers: list[str] | None = None,
+    ):
         self.answer = answer
+        self.answers = answers
         self.delay = delay
         self.calls = 0
 
@@ -67,6 +120,8 @@ class FakeLlm:
         self.calls += 1
         if self.delay:
             await asyncio.sleep(self.delay)
+        if self.answers:
+            return self.answers[min(self.calls - 1, len(self.answers) - 1)]
         return self.answer
 
 
@@ -129,6 +184,7 @@ def build(tmp_path, desk):
             asr_provider=lambda: pieces["asr"],
             backend_factory=lambda: pieces["llm"],
             source_factory=lambda _config: pieces["source"],
+            detector_factory=lambda _config: Loudness(),
             session_busy=lambda: busy,
             notifier=lambda summary, body="", **_k: desk.notices.append((summary, body)) or _Ok(),
         )
@@ -151,22 +207,6 @@ def _settle(service, timeout: float = 5.0) -> None:
             return
         time.sleep(0.02)
     raise AssertionError(f"the dictation never settled; stuck at {service.state().state}")
-
-
-def _fake_segments(text: str) -> list[Segment]:
-    return [Segment(id=1, text=text, start=0.0, end=1.0)]
-
-
-@pytest.fixture(autouse=True)
-def _transcribe_without_a_model(monkeypatch):
-    """`transcribe_file` reads a real wav through a real segmenter; the text is what matters."""
-    from app.services.recording import batch
-
-    monkeypatch.setattr(
-        batch,
-        "transcribe_file",
-        lambda _path, *, transcribe, **_k: _fake_segments(transcribe(None)),
-    )
 
 
 # -- the happy path --------------------------------------------------------------------------
@@ -384,7 +424,7 @@ def test_a_cold_model_is_loaded_while_the_user_is_already_talking(build) -> None
 
         def transcribe(self, _audio, prompt=None):  # noqa: ANN001, ARG002
             assert self.is_ready, "transcribed before the model finished loading"
-            return "it loaded in time"
+            return said("it loaded in time")
 
     cold = Cold()
     parts = build(asr=cold)
@@ -502,3 +542,107 @@ def test_old_dictations_are_pruned(build, tmp_path) -> None:
     _settle(parts["service"])
 
     assert len(list(directory.glob("*.json"))) == 3
+
+
+# -- long dictations: cut where the speaker paused, never on a clock (D-061) -----------------
+
+
+def _long_clip() -> np.ndarray:
+    """Four seconds of speech, a breath, four more, a breath, four more: 13.2 s in all."""
+    return np.concatenate([tone(4.0), silence(0.6), tone(4.0), silence(0.6), tone(4.0)])
+
+
+def test_a_long_dictation_is_cut_where_the_speaker_paused(build) -> None:
+    """**The fault this exists for**: a real two-and-a-half minute dictation came back with "..."
+    where a thirty-second window had cut a phrase in half. A chunk ends inside a pause, so there
+    is no half-word for the model to see and nothing for anything to merge."""
+    asr = FakeAsr("the first part", "the second part")
+    parts = build(
+        asr=asr,
+        source=FakeSource(audio=_long_clip()),
+        **{"dictation.chunk_seconds": 10.0, "dictation.cleanup": "off"},
+    )
+
+    parts["service"].start()
+    parts["service"].finish()
+    _settle(parts["service"])
+
+    final = parts["service"].state()
+    assert final.state == DONE
+    assert final.chunks == 2
+    assert final.text == "the first part the second part"
+
+    # The first chunk must end by 10 s. The longest pause in its back half (5-10 s) is the breath
+    # at 8.6-9.2 s, so the cut lands in the middle of it, and the second chunk is the rest.
+    assert asr.seconds_seen == pytest.approx([8.9, 4.3], abs=0.01)
+    assert sum(asr.seconds_seen) == pytest.approx(13.2, abs=0.01), "nothing skipped, nothing twice"
+
+    first, second = asr.audio_seen
+    quarter = int(0.25 * SAMPLE_RATE)
+    assert np.max(np.abs(first[-quarter:])) == 0, "the first chunk ends in silence"
+    assert np.max(np.abs(second[:quarter])) == 0, "the second chunk begins in silence"
+
+
+def test_each_chunk_is_tidied_on_its_own_and_a_mangled_one_falls_back_alone(build) -> None:
+    """The tidy's word-count guard is the model's opinion of *one* chunk. The chunk it mangles
+    keeps its raw text; the others keep their tidy."""
+    llm = FakeLlm(answers=["The first part.", " ".join(["the model had opinions"] * 40)])
+    parts = build(
+        asr=FakeAsr("the first part", "the second part"),
+        llm=llm,
+        source=FakeSource(audio=_long_clip()),
+        **{"dictation.chunk_seconds": 10.0},
+    )
+
+    parts["service"].start()
+    parts["service"].finish()
+    _settle(parts["service"])
+
+    final = parts["service"].state()
+    assert llm.calls == 2
+    assert final.text == "The first part. the second part"
+    assert final.raw_text == "the first part the second part"
+    assert final.tidied is False
+
+
+def test_a_stalled_tidy_is_not_waited_for_once_per_chunk(build) -> None:
+    """A timeout is a property of the server, not of the chunk. Waiting the full timeout for each
+    of ten chunks would turn a keystroke into the coffee break the timeout exists to prevent."""
+    llm = FakeLlm(delay=5.0)
+    parts = build(
+        asr=FakeAsr("the first part", "the second part"),
+        llm=llm,
+        source=FakeSource(audio=_long_clip()),
+        **{"dictation.chunk_seconds": 10.0, "dictation.cleanup_timeout_s": 1.0},
+    )
+
+    parts["service"].start()
+    parts["service"].finish()
+    _settle(parts["service"], timeout=10.0)
+
+    final = parts["service"].state()
+    assert llm.calls == 1, "a server that stalled on the first chunk is not asked about the rest"
+    assert final.text == "the first part the second part"
+    assert final.tidied is False
+    assert final.delivered is True
+
+
+def test_reaching_the_length_limit_delivers_what_was_said(build) -> None:
+    """A key pressed once and forgotten used to leave the dictation *recording* over a file that
+    had stopped growing, and everything said after the cap was lost without a word. Now the cap
+    ends the dictation and delivers what was captured."""
+    parts = build(
+        source=FakeSource(audio=tone(7.0)),
+        **{"dictation.max_seconds": 5.0, "dictation.cleanup": "off"},
+    )
+
+    parts["service"].start()
+    # Nobody presses the key again.
+    _settle(parts["service"], timeout=10.0)
+
+    final = parts["service"].state()
+    assert final.state == DONE
+    assert final.seconds == pytest.approx(5.0, abs=0.01)
+    assert final.delivered is True
+    assert any("limit" in summary for summary, _ in parts["desk"].notices)
+    assert parts["source"].stopped is True

@@ -4,6 +4,7 @@
 * ``energy``     — the dependency-free default, with an adaptive noise floor
 * ``silero``     — an optional learned detector behind the same interface
 * ``hysteresis`` — shared debouncing and pause-event emission, above the interface
+* ``pauses``     — the silences in a *finished* recording, for cutting it where no word is (D-061)
 
 The split matters: detectors answer only "is this frame speech?", and everything that is easy to
 get subtly wrong — flicker, entering late, leaving early, when a pause counts as a pause — is
@@ -20,6 +21,7 @@ from ..audio.formats import SAMPLE_RATE
 from .base import VoiceActivityDetector
 from .energy import EnergyVad
 from .hysteresis import SpeechGate, SpeechState, VadFrameResult
+from .pauses import Pause, find_pauses
 from .silero import SileroUnavailableError, SileroVad
 
 logger = logging.getLogger(__name__)
@@ -70,6 +72,7 @@ def build_gate(
 
 __all__ = [
     "EnergyVad",
+    "Pause",
     "SileroUnavailableError",
     "SileroVad",
     "SpeechGate",
@@ -78,4 +81,5 @@ __all__ = [
     "VoiceActivityDetector",
     "build_detector",
     "build_gate",
+    "find_pauses",
 ]

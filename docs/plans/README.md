@@ -37,6 +37,7 @@ conventions in [../skills/planner/SKILL.md](../skills/planner/SKILL.md).
 | [loud-radish-rebrand.md](loud-radish-rebrand.md) | Rebranding the project as **Loud Radish — Live Audio & Video Transcriber**: one module owns the name, and every identifier it put on the machine is renamed with a path that adopts the old one | **Complete (8 / 8)** |
 | [tray-restart-clutter-and-interruptible-work.md](tray-restart-clutter-and-interruptible-work.md) | The tray icon exported to D-Bus, the last transcript reopened after a restart, 679 empty session databases pruned safely, and pausing, resuming and cancelling both a recording and a transcription pass | **Complete (10 / 10)** |
 | [shortcuts-dictation-and-the-open-list.md](shortcuts-dictation-and-the-open-list.md) | Global shortcuts that actually fire, dictation from a keypress to the clipboard and into the focused window, a microphone picker and a native settings window in the tray, and Part 4 of the checklist closed out | **Complete (10 / 10)** |
+| [pause-aligned-batch-and-open-items.md](pause-aligned-batch-and-open-items.md) | Six checklist items closed by code: the batch pass cut at pauses with a pause-aligned checkpoint, a dictation whose tidy overlaps its transcription, a bootstrap so a bare `uv run` cannot break the GPU wheel, single-pass range and search reads, and an export that names its revision | In progress (1 / 7) |
 
 ## The multi-mode expansion
 

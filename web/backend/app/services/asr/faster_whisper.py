@@ -31,8 +31,12 @@ from .contract import AsrBackend, AsrCapabilities, AsrLoadError, AsrResult, Word
 
 logger = logging.getLogger(__name__)
 
-#: Whisper's hard window. Submitting more is silently truncated by the model, which produces a
-#: transcript missing its tail rather than an error — so the engine must respect this.
+#: Whisper's window: the model itself sees thirty seconds of features at a time. **This is a
+#: bound on the streaming buffer, not on what `transcribe` accepts.** `WhisperModel.transcribe`
+#: walks a longer array in thirty-second windows of its own, each starting where the last complete
+#: segment ended — a pause-aware cut — so a finished recording of any length can be handed over
+#: whole (D-061). The streaming engine still respects it, because a live buffer longer than the
+#: model's window only adds latency.
 MAX_AUDIO_SECONDS = 30.0
 
 #: Above this ratio of raw to compressed text, the output has degenerated into repetition — the

@@ -26,6 +26,13 @@ whichever text wins is pasted once.
 **The delivery runs in the background and the caller returns immediately.** The keystroke that
 stops a dictation must not hold an HTTP request open for twenty seconds; the tray and the desktop's
 own notifications report progress instead.
+
+**The recording is cut where the speaker paused, never on a clock (D-061).** The first version
+went through the batch pass's thirty-second windows and came back with "..." where a window had
+cut a phrase in half. Now `pipeline.py` finds the silences, ends every chunk inside one, hands each
+chunk to the model whole, and tidies each on its own — so a dictation can run for half an hour and
+lose nothing at a boundary, and reaching the length limit delivers what was said rather than
+dropping it.
 """
 
 from __future__ import annotations
@@ -45,6 +52,9 @@ from ...desktop import clipboard, keystroke
 from ...desktop.notification import notify
 from ..audio.formats import SAMPLE_RATE
 from ..recording.sink import WavSink
+from ..vad import build_detector
+from ..vad.base import VoiceActivityDetector
+from . import pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +101,8 @@ class DictationState:
     backend: str = ""
     started_at: str = ""
     timings: dict[str, float] = field(default_factory=dict)
+    #: How many pieces the recording was cut into, each ending in a pause (D-061).
+    chunks: int = 0
 
     @property
     def recording(self) -> bool:
@@ -114,6 +126,7 @@ class DictationState:
             "backend": self.backend,
             "started_at": self.started_at,
             "timings": {name: round(value, 2) for name, value in self.timings.items()},
+            "chunks": self.chunks,
         }
 
     def summary(self) -> str:
@@ -143,6 +156,7 @@ class DictationService:
         asr_provider: Callable[[], Any],
         backend_factory: Callable[[], Any],
         source_factory: Callable[[AppConfig], Any] | None = None,
+        detector_factory: Callable[[AppConfig], VoiceActivityDetector] | None = None,
         session_busy: Callable[[], bool] = lambda: False,
         emit: Callable[[str, dict[str, Any]], None] | None = None,
         notifier: Callable[..., Any] = notify,
@@ -151,6 +165,9 @@ class DictationService:
         self._asr_provider = asr_provider
         self._backend_factory = backend_factory
         self._source_factory = source_factory or _default_source
+        # The detector that finds the pauses a recording is cut at. The configured one by
+        # default, so the same Silero model that gates the live path marks the silences here.
+        self._detector_factory = detector_factory or (lambda config: build_detector(config.vad))
         self._session_busy = session_busy
         self._emit = emit or (lambda _name, _payload: None)
         self._notify = notifier
@@ -164,6 +181,8 @@ class DictationService:
         self._notification_id = 0
         self._worker: threading.Thread | None = None
         self._warming: threading.Thread | None = None
+        #: Whether the running recording has hit `max_seconds`. Reset on every start.
+        self._capped = False
 
     # -- what it is doing ------------------------------------------------------------
 
@@ -205,19 +224,33 @@ class DictationService:
         sink = WavSink(path, max_minutes=config.dictation.max_seconds / 60.0)
         source = self._source_factory(config)
 
+        # **Recording before the microphone opens, not after.** The first frame can arrive inside
+        # `source.start` itself, and the cap it may trip needs the recording to already exist.
+        with self._lock:
+            self._source, self._sink, self._path = source, sink, path
+            self._started = time.monotonic()
+            self._capped = False
+            self._state = DictationState(
+                state=RECORDING, started_at=started_at.isoformat(timespec="seconds")
+            )
+
+        def on_frame(frame: Any) -> None:
+            # The sink answers whether the cap was reached. Nothing said after it is captured,
+            # so the dictation ends there and delivers what was — rather than staying "recording"
+            # over a file that stopped growing.
+            if sink.write(frame):
+                self._cap_reached(sink)
+
         try:
-            source.start(sink.write, self._on_source_error)
+            source.start(on_frame, self._on_source_error)
         except Exception as exc:
+            with self._lock:
+                self._source = self._sink = self._path = None
+                self._state = DictationState(state=IDLE)
             sink.close()
             path.unlink(missing_ok=True)
             raise DictationError(f"The microphone could not be opened: {exc}") from exc
 
-        with self._lock:
-            self._source, self._sink, self._path = source, sink, path
-            self._started = time.monotonic()
-            self._state = DictationState(
-                state=RECORDING, started_at=started_at.isoformat(timespec="seconds")
-            )
         # **The model is loaded while the user is already talking, not before they may start.**
         # Refusing a dictation because nothing has opened the browser yet defeats the whole point
         # of a key that works without one, and the load takes about as long as a sentence — so it
@@ -294,19 +327,48 @@ class DictationService:
         self._publish()
         return self.state()
 
+    def _cap_reached(self, sink: WavSink) -> None:
+        """The recording hit `max_seconds`. Finish it, once, off the microphone's thread.
+
+        Off that thread because `finish` stops the source, and a capture stream cannot be stopped
+        from inside its own callback. Once, because the sink reports the cap on every frame after
+        it. And only for the sink that is *still* this dictation's — a late frame from a source
+        that has been told to stop must not end the next dictation.
+        """
+        with self._lock:
+            if self._sink is not sink or self._capped:
+                return
+            self._capped = True
+            minutes = self._config_provider().dictation.max_seconds / 60.0
+
+        def stop() -> None:
+            self._announce(
+                f"Reached the {minutes:g}-minute limit", "Delivering what was said so far."
+            )
+            try:
+                self.finish()
+            except DictationError as exc:
+                logger.debug("The cap arrived after the dictation had ended: %s", exc)
+
+        threading.Thread(target=stop, name="dictation-cap", daemon=True).start()
+
     # -- the pipeline ----------------------------------------------------------------
 
     def _deliver(self, path: Path, captured: float) -> None:
         """Transcribe, tidy, copy, paste. Runs on its own thread; never raises out of it."""
         config = self._config_provider()
         timings: dict[str, float] = {"recorded": captured}
+        chunks = 0
         try:
             mark = time.monotonic()
-            raw = self._transcribe(path)
+            raw_chunks, chunks = self._transcribe(path, config)
             timings["transcribe"] = time.monotonic() - mark
+            raw = " ".join(raw_chunks)
 
             if not raw:
-                self._settle(DONE, text="", delivered=False, seconds=captured, timings=timings)
+                self._settle(
+                    DONE, text="", delivered=False, seconds=captured, timings=timings, chunks=chunks
+                )
                 _discard(path, keep=config.dictation.keep_audio)
                 return
 
@@ -316,7 +378,13 @@ class DictationService:
                 self._set_state(TIDYING)
                 self._announce("Tidying…", raw[:120])
                 mark = time.monotonic()
-                text, tidied = self._tidy(raw, config)
+                tidied_chunks, tidied = pipeline.tidy_chunks(
+                    raw_chunks,
+                    config,
+                    self._backend_factory,
+                    on_progress=self._progress("Tidying…"),
+                )
+                text = " ".join(tidied_chunks)
                 timings["tidy"] = time.monotonic() - mark
 
             self._set_state(DELIVERING)
@@ -339,16 +407,18 @@ class DictationService:
                 delivered=delivered,
                 backend=backend,
                 timings=timings,
+                chunks=chunks,
             )
         except Exception as exc:  # noqa: BLE001 - a background thread has nowhere to raise
             logger.exception("Dictation failed")
-            self._settle(ERROR, error=str(exc), timings=timings)
+            self._settle(ERROR, error=str(exc), timings=timings, chunks=chunks)
             _discard(path, keep=True)
 
-    def _transcribe(self, path: Path) -> str:
-        """The whole clip through the warm model, in one pass."""
-        from ..recording.batch import transcribe_file
+    def _transcribe(self, path: Path, config: AppConfig) -> tuple[list[str], int]:
+        """The clip through the warm model, a pause-bounded chunk at a time (D-061).
 
+        Returns the text of each chunk that said anything, and how many chunks there were.
+        """
         asr = self._asr_provider()
         warming = self._warming
         if warming is not None and warming.is_alive():
@@ -359,50 +429,20 @@ class DictationService:
                 "The speech model would not load, so what you said could not be transcribed. "
                 "The recording has been kept."
             )
-        segments = transcribe_file(path, transcribe=asr.transcribe)
-        return " ".join(segment.text.strip() for segment in segments if segment.text).strip()
+        chunks = pipeline.cut_at_pauses(path, config, self._detector_factory(config))
+        texts = pipeline.transcribe_chunks(
+            chunks, asr.transcribe, on_progress=self._progress("Transcribing…")
+        )
+        return texts, len(chunks)
 
-    def _tidy(self, raw: str, config: AppConfig) -> tuple[str, bool]:
-        """Punctuation and capitalisation, bounded. Falls back to ``raw`` rather than waiting."""
-        from ...services.llm.contract import GenerationOptions, system, user
-        from . import prompts
+    def _progress(self, verb: str) -> pipeline.ProgressFn:
+        """A notification per chunk — but only once there is more than one to count."""
 
-        async def ask() -> str:
-            backend = self._backend_factory()
-            options = GenerationOptions(
-                temperature=0.0,
-                max_output_tokens=max(256, len(raw.split()) * 6),
-                extra=dict(prompts.NO_REASONING_EXTRAS),
-            )
-            return await backend.complete([system(prompts.DICTATION_PROMPT), user(raw)], options)
+        def report(index: int, total: int) -> None:
+            if total > 1:
+                self._announce(f"{verb} {index + 1} of {total}", "")
 
-        async def bounded() -> str:
-            return await asyncio.wait_for(ask(), timeout=config.dictation.cleanup_timeout_s)
-
-        try:
-            cleaned = asyncio.run(bounded()).strip()
-        except TimeoutError:
-            logger.info(
-                "The tidy pass overran %.0f s; pasting what was said instead",
-                config.dictation.cleanup_timeout_s,
-            )
-            return raw, False
-        except Exception as exc:  # noqa: BLE001 - no model, no server, a refusal
-            logger.info("Could not tidy the dictation (%s); pasting what was said", exc)
-            return raw, False
-
-        if not cleaned:
-            return raw, False
-        # **A guard, not a formality.** A model that answers a punctuation request with a paragraph
-        # of its own has not tidied anything, and pasting that into someone's document is the worst
-        # outcome this feature has. Compare word counts, the same check the polish pass makes.
-        spoken, written = len(raw.split()), len(cleaned.split())
-        if written > spoken * 2 + 8 or written < spoken * 0.5:
-            logger.info(
-                "The tidy pass returned %d words for %d; keeping what was said", written, spoken
-            )
-            return raw, False
-        return cleaned, True
+        return report
 
     def _hand_over(self, text: str, config: AppConfig) -> tuple[bool, str]:
         """Clipboard first, then the keystroke — and only if the clipboard really took it."""

@@ -197,9 +197,13 @@ class TestFasterWhisperGuards:
         with pytest.raises(AsrLoadError):
             FasterWhisperBackend().transcribe(np.zeros(1000, dtype=np.float32))
 
+    # **`device="cpu"` throughout.** The defaults resolve to `small` at `int8` on whatever GPU the
+    # machine has, and D-053 refuses that combination on an AMD one before the load — so tests
+    # about the output shape failed on the developer's own machine and nowhere else.
+
     def test_output_is_converted_into_word_tokens(self) -> None:
         """The nested segment/word shape faster-whisper returns is flattened here."""
-        backend = FasterWhisperBackend(model_factory=_fake_whisper_factory)
+        backend = FasterWhisperBackend(model_factory=_fake_whisper_factory, device="cpu")
         backend.load()
         result = backend.transcribe(np.ones(16_000, dtype=np.float32))
 
@@ -208,12 +212,12 @@ class TestFasterWhisperGuards:
         assert result.words[1].confidence == pytest.approx(0.87)
 
     def test_empty_audio_short_circuits(self) -> None:
-        backend = FasterWhisperBackend(model_factory=_fake_whisper_factory)
+        backend = FasterWhisperBackend(model_factory=_fake_whisper_factory, device="cpu")
         backend.load()
         assert backend.transcribe(np.zeros(0, dtype=np.float32)).is_empty()
 
     def test_blank_words_are_dropped(self) -> None:
-        backend = FasterWhisperBackend(model_factory=_blank_word_factory)
+        backend = FasterWhisperBackend(model_factory=_blank_word_factory, device="cpu")
         backend.load()
         assert backend.transcribe(np.ones(1000, dtype=np.float32)).is_empty()
 
@@ -252,8 +256,10 @@ class TestFasterWhisperGuards:
         def failing_factory(*args: object, **kwargs: object):  # noqa: ANN202
             raise RuntimeError("CUDA driver version is insufficient for CUDA runtime version")
 
+        # `float16`, not the default `int8`: D-053 refuses `small` at `int8` on an AMD GPU before
+        # the load, and this test is about the message the *load* produces.
         with pytest.raises(AsrLoadError) as excinfo:
-            FasterWhisperBackend(model_factory=failing_factory).load()
+            FasterWhisperBackend(model_factory=failing_factory, precision="float16").load()
 
         message = str(excinfo.value)
         assert "NVIDIA" not in message
@@ -261,7 +267,7 @@ class TestFasterWhisperGuards:
         assert "uv pip install" in message
 
     def test_unload_releases_the_model(self) -> None:
-        backend = FasterWhisperBackend(model_factory=_fake_whisper_factory)
+        backend = FasterWhisperBackend(model_factory=_fake_whisper_factory, device="cpu")
         backend.load()
         backend.unload()
         assert not backend.is_loaded

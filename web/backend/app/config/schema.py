@@ -312,8 +312,23 @@ class DictationConfig(_Base):
     paste_chord: str = "ctrl+v"
 
     #: A stop nobody pressed. Dictation is push-to-talk, so a recording still running after this
-    #: long is a key that was pressed once and forgotten.
-    max_seconds: float = Field(default=300.0, ge=5.0, le=3600.0)
+    #: long is a key that was pressed once and forgotten. Reaching it *finishes* the dictation
+    #: rather than silently dropping everything said afterwards: what was captured is delivered.
+    #:
+    #: Thirty minutes, up from five. Five was chosen when a dictation was a sentence; it is now
+    #: used for thinking aloud at length, and the chunked pass below means a long one costs
+    #: nothing at a boundary (D-061).
+    max_seconds: float = Field(default=1800.0, ge=5.0, le=7200.0)
+
+    #: The most audio handed to the speech model — and then to the tidy — at once. The recording
+    #: is cut into pieces no longer than this, each ending where the speaker paused, so no piece
+    #: ever begins or ends mid-word (D-061). Two minutes keeps a chunk's tidy well inside
+    #: `cleanup_timeout_s` on the model measured here, and gives progress something to report.
+    chunk_seconds: float = Field(default=120.0, ge=10.0, le=600.0)
+
+    #: The shortest silence that counts as somewhere to cut. Three hundred milliseconds is a
+    #: breath between clauses; the gap between two words in a phrase is shorter than that.
+    min_pause_ms: int = Field(default=300, ge=100, le=3000)
 
     #: Kept out of `data/recordings/`, which is for recordings someone means to keep. This
     #: repository deleted 679 empty session databases one plan ago; fifty dictations a day would

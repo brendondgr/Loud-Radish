@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-09-06 (the tray, the restart, the clutter, and work that can be interrupted)*
+*Last updated: 2026-09-08 (a dictation cut where the speaker paused — D-061)*
 
 The active work list for Loud Radish. Update it whenever a task is finished or new work is
 discovered.
@@ -972,6 +972,22 @@ user's own machine, and none may be reported as passing until it has had one.
       build on it, that is the one to try.
 
 ## Discovered work
+
+- [x] **A dictation came back with "..." where a window boundary fell mid-sentence.** Done
+      (D-061). The recording is now cut where the speaker paused — `vad/pauses.py` finds the
+      silences, `recording/chunks.py` ends every chunk inside one — and each chunk goes to the
+      model whole and is tidied on its own. The cap is thirty minutes, up from five, and reaching
+      it delivers what was said instead of silently dropping everything after it.
+
+- [ ] **Recorded mode's batch pass still cuts on a clock.** `recording/batch.py` walks fixed
+      thirty-second windows with a one-second overlap reconciled by word timestamp — the exact
+      mechanism D-061 measured losing a word at every boundary. `plan_chunks` is the fix; the
+      checkpoint written before each window (D-045) would need to record pause-aligned boundaries
+      instead of a step grid.
+
+- [ ] **A dictation's transcribe and tidy could overlap.** The chunks are transcribed and then
+      tidied in sequence. The speech model and the language model are different resources, so
+      tidying chunk one while chunk two transcribes would roughly halve the wait on a long one.
 
 - [x] **The native settings window saved nothing but the microphone.** Done (D-060). Every shortcut
       and every dictation option went to the layer that is discarded on exit, so a rebound key

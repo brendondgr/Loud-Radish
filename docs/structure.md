@@ -1,6 +1,6 @@
 # Repository Structure
 
-*Last updated: 2026-09-07 (the session manager split across six files)*
+*Last updated: 2026-09-08 (pauses, chunks, and the dictation pipeline — D-061)*
 
 Canonical map of Loud Radish. This file documents **purpose**, not source code. Update it in
 the same change that adds, moves, renames, or removes a directory or significant file.
@@ -86,7 +86,8 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   │   │       ├── base.py        # The one-question-per-frame detector interface
 │   │   │       ├── energy.py      # Dependency-free default, adaptive noise floor
 │   │   │       ├── silero.py      # Optional learned detector, same interface
-│   │   │       └── hysteresis.py  # Shared debouncing and pause-event emission
+│   │   │       ├── hysteresis.py  # Shared debouncing and pause-event emission
+│   │   │       └── pauses.py      # The silences in a finished recording — where to cut (D-061)
 │   │   │   └── asr/               # SEAM A — the pluggable speech model
 │   │   │       ├── contract.py    # Interface, word tokens, capability declaration
 │   │   │       ├── registry.py    # Backend registration and construction
@@ -116,6 +117,8 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   │   │       ├── layout.py      # One directory per recording, named for when it started (D-032)
 │   │   │       ├── sink.py        # Incremental WAV writer; crash-safe header, duration cap
 │   │   │       ├── batch.py       # Whole-file pass in overlapping windows; bypasses agreement
+│   │   │       ├── chunks.py      # Cuts a finished file into pieces that each end in a pause,
+│   │   │       │                  #   so no boundary falls mid-word (D-061)
 │   │   │       ├── job.py         # One pass's state, progress, and the one-at-a-time rule
 │   │   │       └── runner.py      # Runs it on a thread, outliving the session that made the file
 │   │   │   └── polish/            # The minute-by-minute clean-up pass (D-018)
@@ -171,7 +174,12 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   │   │                          #   stylesheets, and five classic scripts (not modules —
 │   │   │                          #   `import` is refused across file:// URLs)
 │   │   ├── services/dictation/    # Press a key, speak, press again: the words arrive in
-│   │   │                          #   whatever window has focus (D-049)
+│   │   │   │                      #   whatever window has focus (D-049)
+│   │   │   ├── service.py         # One dictation at a time: record, deliver in the background,
+│   │   │   │                      #   paste exactly once, finish at the cap
+│   │   │   ├── pipeline.py        # The recording cut at pauses; each chunk transcribed whole
+│   │   │   │                      #   and tidied on its own, bounded (D-061)
+│   │   │   └── prompts.py         # What the language model is asked to do, and not do
 │   │   ├── desktop/               # Talking to the desktop the user is sitting in front of:
 │   │   │   │                      #   clipboard, a keystroke into the focused window, and a
 │   │   │   │                      #   notification. Ordered, probed backends (D-048)
