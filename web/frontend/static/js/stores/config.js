@@ -31,6 +31,15 @@ class ConfigStore {
     this.data = {};
     /** Named profiles, for the preset control. */
     this.presets = [];
+    /**
+     * The shipped text behind each settable instruction list, keyed by dotted path.
+     *
+     * Served rather than hardcoded here on purpose. A blank instruction list means "use what
+     * shipped", so the panel has to display a paragraph it is deliberately not storing — and a
+     * copy of that paragraph in this file would be a second source of truth for it, drifting on
+     * the first edit to either (D-068).
+     */
+    this.promptDefaults = {};
     /** True once a load has succeeded, so components can tell "empty" from "not yet fetched". */
     this.loaded = false;
     /** Set when the last write reported a cost beyond `live`, for the footer to explain. */
@@ -40,9 +49,10 @@ class ConfigStore {
 
   /** Fetch the full configuration. Safe to call repeatedly. */
   async load() {
-    const { config, presets } = await api.config();
+    const { config, presets, prompt_defaults: promptDefaults } = await api.config();
     this.data = config;
     this.presets = presets ?? [];
+    this.promptDefaults = promptDefaults ?? {};
     this.loaded = true;
     emit(CONFIG_CHANGED, this);
     return this;
@@ -51,6 +61,17 @@ class ConfigStore {
   /** Read one dotted path from the cache. */
   get(path) {
     return readPath(this.data, path);
+  }
+
+  /** The shipped text for an instruction list, or "" if the backend named no default for it. */
+  shipped(path) {
+    return this.promptDefaults[path] ?? "";
+  }
+
+  /** What the model will actually be told: what was written, or the shipped text if nothing was. */
+  effective(path) {
+    const written = String(this.get(path) ?? "").trim();
+    return written || this.shipped(path);
   }
 
   /**
@@ -62,6 +83,7 @@ class ConfigStore {
   async patch(changes) {
     const response = await api.patchConfig(changes);
     this.data = response.config;
+    if (response.prompt_defaults) this.promptDefaults = response.prompt_defaults;
     this.lastHotSwap = response.hot_swap;
     this.lastConsequence = response.consequence;
     emit(CONFIG_CHANGED, this);
@@ -72,6 +94,7 @@ class ConfigStore {
   async applyPreset(name) {
     const response = await api.applyPreset(name);
     this.data = response.config;
+    if (response.prompt_defaults) this.promptDefaults = response.prompt_defaults;
     this.lastHotSwap = response.hot_swap;
     this.lastConsequence = response.consequence;
     emit(CONFIG_CHANGED, this);

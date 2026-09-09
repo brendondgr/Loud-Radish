@@ -1,6 +1,6 @@
 # Component Map
 
-*Last updated: 2026-08-29 (the recordings page's media indicators)*
+*Last updated: 2026-09-09 (the Rewriting tab — D-068)*
 
 > **Status: implemented.** Update this file in the same change that adds, moves, or renames a
 > component.
@@ -29,7 +29,8 @@ web/frontend/
 │       ├── transcript/         pane, toolbar, hypothesis, empty state, glossary panel…
 │       ├── chat/               pane, composer, quick actions, empty state
 │       ├── monitor/            the recording monitor pane and its states
-│       └── settings/           modal, nav, and one file per tab
+│       └── settings/           modal, nav, and one file per tab, including
+│                               rewriting.html — the two instruction editors (D-068)
 └── static/
     ├── css/
     │   ├── tokens.css          every colour, size, and duration in the application
@@ -94,8 +95,9 @@ browser owns is genuinely its own — pane widths, text size, which pane is show
 | `GlossaryPanel` | Terms, sorted by first appearance | Each term navigates the transcript |
 | `StatusBar` | Level, speech state, real-time factor, connection | Never colour alone — every state carries an icon and a word |
 | `Banners` | The three error tiers | Never a modal; a modal during a talk covers the transcript |
-| `SettingsModal` | The five tabs, presets, save | The one modal in the application |
+| `SettingsModal` | The seven tabs, presets, save | The one modal in the application |
 | `settings/*` | One tab each, plus `bindings.js` and `combobox.js` — the assistant's model field, a text input that is also a dropdown (D-067) | Controls declare a dotted config path; the binding layer does the rest. `shortcuts.js` adds key capture and reports on the *companion process*, since keys can be set and still do nothing |
+| `RewritingSettings` | The two instruction editors, their Reset controls, and the line saying which text is in force | The one thing the binding layer cannot do: a blank field means the instructions that shipped, so the shipped text is the field's **placeholder** and never its value — seeding it would store a copy on the next change event and freeze this installation on today's wording. Reset writes `""` for the same reason (D-068) |
 | `FocusTrap` | Modal focus containment and restoration | Recomputes candidates per Tab — the dialog changes shape constantly |
 
 ### The multi-mode expansion (D-020)

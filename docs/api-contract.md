@@ -321,10 +321,34 @@ to the config file whatever `layer` was asked for:
 | `audio.file_path` | Travels with the two above when the source is a file |
 | `shortcuts.*` | A rebound key is a deliberate choice; losing it means pressing it and nothing happening |
 | `dictation.*` | Written by the native settings window, which has no Save button (D-060) |
+| `polish.instructions` | A rewritten instruction list is prose somebody authored, not a threshold (D-068) |
 
 The set lives in `web/backend/app/config/store.py` as `PERSISTENT_PATHS`, and the split happens on
 the route so that every client — the settings modal, the tray's device picker, the native settings
 window — inherits it rather than each remembering separately (D-046).
+
+### The shipped instruction lists
+
+Every configuration response — `GET /api/config`, `PATCH /api/config`, and
+`POST /api/config/preset` — carries a `prompt_defaults` map alongside `config`:
+
+```json
+{ "config": { "polish": { "instructions": "" } },
+  "prompt_defaults": {
+    "polish.instructions": "You are turning a live speech-to-text transcript into…",
+    "dictation.instructions": "You are cleaning up a short piece of dictated speech…" } }
+```
+
+`polish.instructions` and `dictation.instructions` are what the language model is told to do with
+transcribed speech, and **blank means the text that shipped** rather than no instructions at all
+(D-068). The settings panel therefore has to display text it is not storing, and has to restore it
+when Reset is pressed, which is what `prompt_defaults` is for. It is sent with every response rather
+than from an endpoint of its own so a client re-rendering after a write never has to fetch it
+separately.
+
+Resetting an instruction list means writing `""`, not writing the shipped text back. That is the
+difference between an installation that keeps tracking a later release's improved default and one
+frozen on a copy of today's.
 
 ### Connection test
 

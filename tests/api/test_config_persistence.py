@@ -118,8 +118,26 @@ def test_a_later_runtime_write_does_not_shadow_the_persisted_device(client, conf
 
 def test_the_persistent_set_stays_small(client) -> None:
     """A guard, not a tautology. Persisting everything by accident would silently retire the Save
-    button and make every experiment permanent."""
-    assert PERSISTENT_PATHS <= {"audio.source_type", "audio.device_id", "audio.file_path"}
+    button and make every experiment permanent.
+
+    `polish.instructions` earns its place on the same grounds as the microphone: it holds prose
+    somebody sat and wrote, and losing that to a restart reads as the application discarding their
+    work. The numeric polish settings beside it deliberately do not qualify."""
+    assert PERSISTENT_PATHS <= {
+        "audio.source_type",
+        "audio.device_id",
+        "audio.file_path",
+        "polish.instructions",
+    }
+
+
+def test_rewrite_instructions_reach_the_file_without_saving(client, config_path) -> None:
+    """Written with Done rather than Save, and still there on the next start."""
+    client.patch("/api/config", json={"changes": {"polish.instructions": "Keep every hesitation."}})
+
+    stored = _on_disk(config_path)
+    assert stored["polish"]["instructions"] == "Keep every hesitation."
+    assert "chunk_seconds" not in stored.get("polish", {}), "a tuning value reached the file"
 
 
 def test_the_settings_dropdown_endpoint_also_persists(client, config_path) -> None:
@@ -208,3 +226,22 @@ def test_a_retired_setting_is_dropped_rather_than_the_whole_file_ignored(config_
 
     assert store.resolve().recording.batch_window_s == 45.0
     assert "batch_overlap_s" not in store.resolve().recording.model_dump()
+
+
+def test_the_shipped_instructions_come_back_with_the_configuration(client) -> None:
+    """The panel shows the shipped text in an empty field, so it has to be served rather than
+    copied into the frontend — a paragraph with two sources of truth drifts on the first edit."""
+    from app.services.dictation.prompts import DEFAULT_DICTATION_PROMPT
+    from app.services.polish.prompts import DEFAULT_POLISH_PROMPT
+
+    defaults = client.get("/api/config").json()["prompt_defaults"]
+
+    assert defaults["polish.instructions"] == DEFAULT_POLISH_PROMPT
+    assert defaults["dictation.instructions"] == DEFAULT_DICTATION_PROMPT
+
+
+def test_a_write_carries_the_shipped_instructions_too(client) -> None:
+    """A client that re-renders from the patch response must not have to fetch them separately."""
+    response = client.patch("/api/config", json={"changes": {"polish.enabled": True}})
+
+    assert response.json()["prompt_defaults"]["polish.instructions"].startswith("You are turning")

@@ -20,6 +20,7 @@ import { AudioSettings } from "./settings/audio.js";
 import { AsrSettings } from "./settings/asr.js";
 import { LlmSettings } from "./settings/llm.js";
 import { ContextSettings, StorageSettings } from "./settings/misc.js";
+import { RewritingSettings } from "./settings/rewriting.js";
 import { ShortcutSettings } from "./settings/shortcuts.js";
 import { attach, hydrate, refreshDependants } from "./settings/bindings.js";
 
@@ -53,6 +54,7 @@ export class SettingsModal {
       asr: new AsrSettings(this.panels, handlers),
       llm: new LlmSettings(this.panels, handlers),
       context: new ContextSettings(this.panels),
+      rewriting: new RewritingSettings(this.panels, handlers),
       storage: new StorageSettings(this.panels, handlers),
       shortcuts: new ShortcutSettings(this.panels),
     };

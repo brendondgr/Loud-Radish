@@ -1,6 +1,6 @@
 # Repository Structure
 
-*Last updated: 2026-09-08 (pauses, chunks, and the dictation pipeline — D-061)*
+*Last updated: 2026-09-09 (the rewrite instructions belong to the user — D-068)*
 
 Canonical map of Loud Radish. This file documents **purpose**, not source code. Update it in
 the same change that adds, moves, renames, or removes a directory or significant file.
@@ -126,7 +126,8 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   │   │       ├── chunker.py     # When a chunk is ready: a minute, then a pause
 │   │   │       ├── source.py      # The chunk flattened to one run, timestamps placed
 │   │   │       ├── guard.py       # Strips decoration and invented timestamps; catches summaries
-│   │   │       ├── prompts.py     # The instruction list, and the no-reasoning hints
+│   │   │       ├── prompts.py     # The shipped instruction list, and the rule that a blank
+│   │   │                          #   setting means it rather than a stored copy of it (D-068)
 │   │   │       └── worker.py      # The background loop and every failure path
 │   │   │   └── transcript/        # The durable record
 │   │   │       ├── schema.sql     # SQLite tables, FTS5 index, its triggers, and where a
@@ -181,7 +182,8 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   │   │   ├── pipeline.py        # The recording cut at pauses; each chunk transcribed whole
 │   │   │   │                      #   and tidied on its own, bounded (D-061), the tidy of one
 │   │   │   │                      #   running while the next transcribes (D-063)
-│   │   │   └── prompts.py         # What the language model is asked to do, and not do
+│   │   │   └── prompts.py         # What the language model is asked to do, and not do —
+│   │   │                          #   narrower than the polish list by default, not by decree
 │   │   ├── desktop/               # Talking to the desktop the user is sitting in front of:
 │   │   │   │                      #   clipboard, a keystroke into the focused window, and a
 │   │   │   │                      #   notification. Ordered, probed backends (D-048)
@@ -294,7 +296,7 @@ listed them has been removed rather than left describing work that has landed.
 | `web/backend/app/companion/` | The tray icon and the global shortcuts — the two things a browser page cannot do. Deliberately a *remote control*: it polls the HTTP API, holds no state, and can be killed and restarted without the server noticing. |
 | `web/backend/app/services/capture/` | Recording a window's picture. Separate from `recording/` because they solve unrelated problems: one negotiates with a compositor for pixels, the other writes and transcribes audio. |
 | `web/backend/app/services/recording/` | Capturing audio to a file and transcribing it once whole. Separate from `streaming/` because the two answer opposite questions: `streaming/` decides what is safe to show while audio is still arriving, and this runs only when it has stopped. |
-| `web/backend/app/services/polish/` | The clean-up pass that rewrites finished minutes for reading. Separate from `context/` because the two do opposite things: `context/` compresses on purpose, and this must not lose a single claim. |
+| `web/backend/app/services/polish/` | The clean-up pass that rewrites finished minutes for reading. Separate from `context/` because the two do opposite things: `context/` compresses on purpose, and this must not lose a single claim. What it is told to do, and every guard on what comes back, are settings (D-068). |
 | `web/backend/app/models/` | Persistence shape, separated so storage concerns do not leak into routes. |
 | `web/backend/app/schemas/` | Request and response validation — the runtime enforcement of `docs/api-contract.md`. |
 | `web/frontend/templates/` | Jinja2 templates, split into many small partials rather than a few large pages. One partial per region of the interface. |

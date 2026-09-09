@@ -1,6 +1,6 @@
 # Design System
 
-*Last updated: 2026-08-15 (capture modes — D-020)*
+*Last updated: 2026-09-09 (the instruction field's placeholder — D-068)*
 
 > **Status: implemented.** The tokens below are the ones in
 > `web/frontend/static/css/tokens.css`, which remains the source of truth — this file is the
@@ -320,6 +320,19 @@ Measured against the surfaces each token actually sits on, and corrected twice:
 - When checking a translucent background such as `--accent-wash`, **composite it over its parent
   first**. Comparing a foreground against the wash's own RGB ignores its alpha and produces a figure
   that is wrong by a factor of six.
+
+### A placeholder that is not a hint
+
+`.field__control--instructions` breaks the usual rule, and the exception is worth stating because
+it looks like an oversight otherwise. A placeholder normally suggests what to type and disappears
+the moment it stops mattering. Here it carries the instructions **actually in force** whenever the
+box is empty, which is the ordinary state (D-068), so it is set at `--text-muted` at full opacity
+rather than fading toward the hint colours.
+
+That is not enough on its own — a grey paragraph still reads as inactive — so a line under each
+field says in words which of the two texts is being used, and the field is tall and monospaced
+because what is being edited is a numbered list of rules rather than a sentence. Colour is never
+the only signal, and neither is placement.
 
 ### Colour is never the only signal
 

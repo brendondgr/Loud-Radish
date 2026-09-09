@@ -115,9 +115,12 @@ class FakeLlm:
         self.answers = answers
         self.delay = delay
         self.calls = 0
+        self.systems: list[str] = []
 
-    async def complete(self, _messages, _options=None) -> str:  # noqa: ANN001
+    async def complete(self, messages, _options=None) -> str:  # noqa: ANN001
         self.calls += 1
+        #: The system message of each call — the instruction list the pipeline resolved.
+        self.systems.append(messages[0].content)
         if self.delay:
             await asyncio.sleep(self.delay)
         if self.answers:
@@ -762,3 +765,73 @@ def test_the_state_says_tidying_only_once_the_last_chunk_is_decoded(build) -> No
 
     assert seen.index("tidying") < seen.index("delivering")
     assert seen.count("tidying") == 1
+
+
+# -- the instructions, and the bounds around them (D-068) ------------------------------------
+
+
+def test_the_shipped_instructions_are_sent_when_nothing_was_written(build) -> None:
+    from app.services.dictation.prompts import DEFAULT_DICTATION_PROMPT
+
+    parts = build(llm=(llm := FakeLlm()))
+    parts["service"].start()
+    parts["service"].finish()
+    _settle(parts["service"])
+
+    assert llm.systems == [DEFAULT_DICTATION_PROMPT]
+
+
+def test_a_written_instruction_list_is_sent_instead(build) -> None:
+    """The words are the speaker's, and so is the opinion about what to do with them. Somebody
+    dictating into a codebase and somebody dictating a letter want different passes."""
+    parts = build(
+        llm=(llm := FakeLlm()),
+        **{"dictation.instructions": "Leave the disfluencies. Punctuation only."},
+    )
+    parts["service"].start()
+    parts["service"].finish()
+    _settle(parts["service"])
+
+    assert llm.systems == ["Leave the disfluencies. Punctuation only."]
+
+
+def test_a_cleared_field_falls_back_to_the_shipped_instructions(build) -> None:
+    from app.services.dictation.prompts import DEFAULT_DICTATION_PROMPT
+
+    parts = build(llm=(llm := FakeLlm()), **{"dictation.instructions": "  \n "})
+    parts["service"].start()
+    parts["service"].finish()
+    _settle(parts["service"])
+
+    assert llm.systems == [DEFAULT_DICTATION_PROMPT]
+
+
+def test_a_long_answer_is_kept_once_the_ceiling_allows_it(build) -> None:
+    """An instruction list that expands spoken code returns more words than the shipped one, and
+    a bound that cannot follow it would discard every result it produced."""
+    parts = build(
+        asr=FakeAsr("open paren self dot value close paren"),
+        llm=FakeLlm(answer=" ".join(["expanded"] * 30)),
+        **{"dictation.max_expansion_ratio": 8.0},
+    )
+    parts["service"].start()
+    parts["service"].finish()
+    _settle(parts["service"])
+
+    final = parts["service"].state()
+    assert final.tidied is True
+    assert final.text.startswith("expanded")
+
+
+def test_that_same_answer_is_discarded_at_the_shipped_ceiling(build) -> None:
+    parts = build(
+        asr=FakeAsr("open paren self dot value close paren"),
+        llm=FakeLlm(answer=" ".join(["invented"] * 30)),
+    )
+    parts["service"].start()
+    parts["service"].finish()
+    _settle(parts["service"])
+
+    final = parts["service"].state()
+    assert final.tidied is False
+    assert final.text == "open paren self dot value close paren"

@@ -215,6 +215,41 @@
   min-height: 72px;
 }
 
+/* An instruction list, and the shipped one behind it (D-068).
+ *
+ * Tall on purpose: the shipped polish instructions are eleven numbered rules, and a four-row box
+ * asks somebody to edit a document through a letterbox. Monospaced for the same reason the field
+ * is tall — this is a list of numbered rules being edited as a structure, not a sentence being
+ * composed.
+ *
+ * The placeholder carries the shipped wording, so it has to stay legible rather than fading to the
+ * usual hint colour. It is the text that is actually in force whenever the box is empty, which is
+ * the opposite of what a placeholder normally means. */
+.field__control--instructions {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  min-height: 160px;
+}
+
+.field__control--instructions::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+.field__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+/* Says which of the two texts is in force. An empty box and a box that was just reset look
+ * identical without it. */
+[data-instructions-state][data-tone="edited"] {
+  color: var(--text-secondary);
+}
+
 select.field__control {
   cursor: pointer;
 }

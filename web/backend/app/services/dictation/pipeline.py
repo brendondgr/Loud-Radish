@@ -188,7 +188,7 @@ def tidy_one(
             max_output_tokens=max(256, len(raw.split()) * 6),
             extra=dict(prompts.NO_REASONING_EXTRAS),
         )
-        return await backend.complete([system(prompts.DICTATION_PROMPT), user(raw)], options)
+        return await backend.complete([system(prompts.resolve(config)), user(raw)], options)
 
     async def bounded() -> str:
         return await asyncio.wait_for(ask(), timeout=config.dictation.cleanup_timeout_s)
@@ -210,8 +210,15 @@ def tidy_one(
     # **A guard, not a formality.** A model that answers a punctuation request with a paragraph
     # of its own has not tidied anything, and pasting that into someone's document is the worst
     # outcome this feature has. Compare word counts, the same check the polish pass makes.
+    #
+    # The bounds are settings rather than literals because the instructions above them are
+    # (D-068): a list rewritten to expand spoken code aggressively legitimately returns more words
+    # than the shipped one does, and a bound that cannot follow it would discard every result.
+    # The constant term is what keeps a four-word dictation from failing on punctuation alone.
+    settings = config.dictation
     spoken, written = len(raw.split()), len(cleaned.split())
-    if written > spoken * 2 + 8 or written < spoken * 0.5:
+    ceiling = spoken * settings.max_expansion_ratio + settings.max_expansion_words
+    if written > ceiling or written < spoken * settings.min_retained_ratio:
         logger.info(
             "The tidy pass returned %d words for %d; keeping what was said", written, spoken
         )

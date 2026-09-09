@@ -164,6 +164,13 @@ class ConfigResponse(_Model):
 
     config: dict[str, Any]
     presets: list[dict[str, str]]
+    #: The shipped text behind every settable instruction list, keyed by dotted path (D-068).
+    #:
+    #: **Sent so the interface never holds a copy.** A blank ``polish.instructions`` means "use
+    #: what shipped", so the settings panel has to show that text in an empty field and restore it
+    #: on Reset. Hardcoding it in the frontend would be a second source of truth for a paragraph
+    #: that already has one, and the two would drift on the first edit to either.
+    prompt_defaults: dict[str, str] = Field(default_factory=dict)
 
 
 class ConfigPatchRequest(_Model):
@@ -181,6 +188,9 @@ class ConfigPatchResponse(_Model):
     hot_swap: Literal["live", "restart-stage", "restart-session"]
     consequence: str
     config: dict[str, Any]
+    #: Carried on every write for the same reason :class:`ConfigResponse` carries it: a client that
+    #: re-renders from a patch response must not have to go and fetch the shipped text separately.
+    prompt_defaults: dict[str, str] = Field(default_factory=dict)
 
 
 class PresetRequest(_Model):

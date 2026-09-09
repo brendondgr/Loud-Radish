@@ -46,6 +46,12 @@ PERSISTENT_PATHS = frozenset(
         "audio.source_type",
         "audio.device_id",
         "audio.file_path",
+        # A rewritten instruction list is the same kind of thing (D-068). Somebody who sat and
+        # wrote a paragraph of instructions authored something; losing it to a restart because
+        # they closed the dialog with Done rather than Save would be indistinguishable from the
+        # application discarding their work. The numeric polish settings around it keep the Save
+        # button, because those are the thresholds someone tries mid-talk and abandons.
+        "polish.instructions",
     }
 )
 

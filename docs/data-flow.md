@@ -1,6 +1,6 @@
 # Data Flow
 
-*Last updated: 2026-08-29 (one folder per recording, the web-app export, and the capture offset)*
+*Last updated: 2026-09-09 (the rewrite instructions belong to the user — D-068)*
 
 > **Status: the design is agreed; the stages land phase by phase.** Update this file in the same
 > change that alters how data moves between capture, pipeline, storage, transport, or browser.
@@ -62,12 +62,17 @@ never uploaded; it is captured locally and consumed in flight.
                     times. It reads as nonsense here — that is what concatenated
                     speech-model output is.
      b. REWRITE     the model rewrites that whole run at once, not fragment by
-                    fragment: repair punctuation and sentences, write out anything
-                    dictated aloud ("guard dot py" is guard.py), carry the markers
-                    through, return one continuous paragraph, change nothing else.
+                    fragment, following whatever `polish.instructions` says. Blank
+                    means the shipped list (D-068): repair punctuation and sentences,
+                    write out anything dictated aloud ("guard dot py" is guard.py),
+                    carry the markers through, return one continuous paragraph,
+                    change nothing else.
      c. RECONCILE   markers the model invented, reversed, or repeated are removed;
-                    line breaks it inserted anyway are collapsed away.
-     d. CHECK       a rewrite far shorter than the source is a summary, and discarded.
+                    line breaks it inserted anyway are collapsed away. Both steps
+                    are switches — they enforce two of the shipped instructions, and
+                    would otherwise reverse a rewritten one.
+     d. CHECK       a rewrite far outside the configured length bounds is a summary
+                    or an invention, and is discarded.
 
    The result is a POLISHED BLOCK, published as `transcript.polished`. The segments it
    covers are left exactly as they are; the block is an additional row, never a
