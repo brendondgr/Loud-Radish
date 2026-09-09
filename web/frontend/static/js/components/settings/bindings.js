@@ -15,9 +15,27 @@
 import { $$ } from "../../core/dom.js";
 import { config } from "../../stores/config.js";
 
+/**
+ * The two strings a checkbox stands for, when the setting behind it is not a boolean.
+ *
+ * `dictation.cleanup` is `"llm"` or `"off"`, and the question a user is answering — should this be
+ * tidied — is a switch. Rendering it as a two-option dropdown to match the storage type would be
+ * the schema showing through the interface.
+ */
+function pair(control) {
+  const spec = control.dataset.configBoolean;
+  if (!spec) return null;
+  const [on, off = ""] = spec.split("|");
+  return { on, off };
+}
+
 /** Read the value a control currently holds, coerced to the type the backend expects. */
 export function valueOf(control) {
-  if (control.type === "checkbox") return control.checked;
+  if (control.type === "checkbox") {
+    const strings = pair(control);
+    if (strings) return control.checked ? strings.on : strings.off;
+    return control.checked;
+  }
 
   const raw = control.value;
   if (control.type === "number" || control.type === "range") {
@@ -33,7 +51,8 @@ export function valueOf(control) {
 /** Write a configuration value into a control. */
 export function applyValue(control, value) {
   if (control.type === "checkbox") {
-    control.checked = Boolean(value);
+    const strings = pair(control);
+    control.checked = strings ? value === strings.on : Boolean(value);
     return;
   }
   control.value = value === null || value === undefined ? "" : String(value);

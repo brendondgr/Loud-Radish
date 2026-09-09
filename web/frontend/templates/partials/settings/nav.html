@@ -1,6 +1,6 @@
 {# The settings tab list.
 
-   Six tabs, matching the configuration areas the backend exposes. Vertical on a wide screen
+   Seven tabs, matching the configuration areas the backend exposes. Vertical on a wide screen
    and horizontal when the dialog goes narrow — a vertical rail costs width the panels need more. #}
 
 <nav class="settings__nav" role="tablist" aria-label="Settings sections" data-settings-nav>
@@ -57,6 +57,20 @@
   >
     Context
     <span class="settings__tab-hint">Summaries, glossary, budget</span>
+  </button>
+
+  <button
+    type="button"
+    class="settings__tab"
+    role="tab"
+    id="settings-tab-rewriting"
+    aria-controls="settings-panel-rewriting"
+    aria-selected="false"
+    tabindex="-1"
+    data-settings-tab="rewriting"
+  >
+    Rewriting
+    <span class="settings__tab-hint">What the model is told to do with the words</span>
   </button>
 
   <button
