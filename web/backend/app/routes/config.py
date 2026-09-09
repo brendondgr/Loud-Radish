@@ -16,6 +16,8 @@ from ..config.hotswap import classify_many
 from ..config.presets import PRESET_DESCRIPTIONS, preset_names
 from ..config.store import persists
 from ..schemas.api import ConfigPatchRequest, ConfigPatchResponse, ConfigResponse, PresetRequest
+from ..services.dictation import prompts as dictation_prompts
+from ..services.polish import prompts as polish_prompts
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 
@@ -24,10 +26,28 @@ def _presets() -> list[dict[str, str]]:
     return [{"name": name, "description": PRESET_DESCRIPTIONS[name]} for name in preset_names()]
 
 
+def _prompt_defaults() -> dict[str, str]:
+    """The shipped instruction list behind each settable one (D-068).
+
+    Sent with every configuration response rather than from an endpoint of its own. The settings
+    panel needs it on open, on Reset, and after any write that re-renders the field, and a client
+    that has to remember to fetch it separately is a client that will one day render an empty box
+    where the instructions should be.
+    """
+    return {
+        "polish.instructions": polish_prompts.DEFAULT_POLISH_PROMPT,
+        "dictation.instructions": dictation_prompts.DEFAULT_DICTATION_PROMPT,
+    }
+
+
 @router.get("", response_model=ConfigResponse)
 async def get_config(request: Request) -> dict[str, Any]:
     """The full resolved configuration."""
-    return {"config": request.app.state.config.as_dict(), "presets": _presets()}
+    return {
+        "config": request.app.state.config.as_dict(),
+        "presets": _presets(),
+        "prompt_defaults": _prompt_defaults(),
+    }
 
 
 @router.patch("", response_model=ConfigPatchResponse)
@@ -72,6 +92,7 @@ async def patch_config(request: Request, body: ConfigPatchRequest) -> dict[str, 
         "hot_swap": str(hot_swap),
         "consequence": CLASS_CONSEQUENCE[hot_swap],
         "config": config.as_dict(),
+        "prompt_defaults": _prompt_defaults(),
     }
 
 
@@ -92,6 +113,7 @@ async def apply_preset(request: Request, body: PresetRequest) -> dict[str, Any]:
         "hot_swap": str(hot_swap),
         "consequence": CLASS_CONSEQUENCE[hot_swap],
         "config": config.as_dict(),
+        "prompt_defaults": _prompt_defaults(),
     }
 
 
