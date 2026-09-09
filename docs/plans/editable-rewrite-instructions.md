@@ -1,6 +1,6 @@
 # Editable Rewrite Instructions
 
-*Status: **Not started (0 / 7)*** · *Created 2026-09-09* · *Decision **D-068***
+*Status: **Complete (7 / 7)*** · *Created 2026-09-09* · *Decision **D-068***
 
 ## 1. Introduction
 

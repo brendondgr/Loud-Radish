@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-09-08 (the assistant's model is typed, and Get lists them — D-067)*
+*Last updated: 2026-09-09 (the rewrite instructions belong to the user — D-068)*
 
 The active work list for Loud Radish. Update it whenever a task is finished or new work is
 discovered.
@@ -867,6 +867,35 @@ under "Still Open" for months, which made the list longer than the actual debt a
       launched from the tray's "Settings…" item. Three tabs: shortcuts with press-to-capture and
       conflict checking, the microphone list, and the dictation options. Verified by clicking the
       real menu item over D-Bus.
+
+---
+
+## Part 4d — The rewrite instructions
+
+Plan: [plans/editable-rewrite-instructions.md](plans/editable-rewrite-instructions.md). **Complete
+(7 / 7).**
+
+- [x] **Both rewrite passes take their instructions from settings.** Done (D-068). The polish pass
+      and the dictation tidy each read an `instructions` field, and a blank one means the text that
+      shipped rather than a stored copy of it — so an installation that never edits the field keeps
+      tracking a later release's wording. Whitespace counts as blank, because a box cleared by
+      selecting all and deleting holds a newline.
+- [x] **Every output guard is a switch rather than a law.** Done. Paragraph collapsing, decoration
+      stripping and timestamp reconciliation each answer to a setting, and the two length bounds are
+      numbers. They exist because models comply unevenly with the shipped prompt, and each would
+      otherwise quietly reverse the same instruction once somebody rewrote it.
+- [x] **A Rewriting tab.** Done. The clean-up moved off Context, which is about what the assistant
+      is *given* rather than what it writes, and the dictation tidy gained a home in the web
+      interface for the first time. Verified in a browser: the panel renders, an edit reaches the
+      config file without pressing Save, Reset clears it, and the dependent fields follow.
+- [ ] **An edited instruction list has not been run against a real language model.** The pass was
+      exercised against a scripted backend and the settings were exercised against a real server,
+      but nobody has yet written their own instructions and watched a real model follow them. What
+      that would tell us is whether the shipped ratio bounds are sensible for an instruction list
+      that asks for expansion — the ceiling is now adjustable precisely because it might not be.
+- [ ] **A later release's improved instructions have never actually reached anyone.** The whole
+      empty-means-shipped design exists for that case and it cannot be verified until the shipped
+      text changes. The tests pin the mechanism; the outcome is unobserved.
 
 ---
 
