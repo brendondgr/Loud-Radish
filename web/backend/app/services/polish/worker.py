@@ -269,7 +269,8 @@ class PolishWorker:
 
         parts: list[str] = []
         finish_reason = ""
-        async for chunk in backend.stream([system(prompts.POLISH_PROMPT), user(source)], options):
+        messages = [system(prompts.resolve(config)), user(source)]
+        async for chunk in backend.stream(messages, options):
             if chunk.done:
                 finish_reason = chunk.finish_reason
             elif chunk.text:

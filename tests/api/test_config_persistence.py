@@ -118,8 +118,28 @@ def test_a_later_runtime_write_does_not_shadow_the_persisted_device(client, conf
 
 def test_the_persistent_set_stays_small(client) -> None:
     """A guard, not a tautology. Persisting everything by accident would silently retire the Save
-    button and make every experiment permanent."""
-    assert PERSISTENT_PATHS <= {"audio.source_type", "audio.device_id", "audio.file_path"}
+    button and make every experiment permanent.
+
+    `polish.instructions` earns its place on the same grounds as the microphone: it holds prose
+    somebody sat and wrote, and losing that to a restart reads as the application discarding their
+    work. The numeric polish settings beside it deliberately do not qualify."""
+    assert PERSISTENT_PATHS <= {
+        "audio.source_type",
+        "audio.device_id",
+        "audio.file_path",
+        "polish.instructions",
+    }
+
+
+def test_rewrite_instructions_reach_the_file_without_saving(client, config_path) -> None:
+    """Written with Done rather than Save, and still there on the next start."""
+    client.patch(
+        "/api/config", json={"changes": {"polish.instructions": "Keep every hesitation."}}
+    )
+
+    stored = _on_disk(config_path)
+    assert stored["polish"]["instructions"] == "Keep every hesitation."
+    assert "chunk_seconds" not in stored.get("polish", {}), "a tuning value reached the file"
 
 
 def test_the_settings_dropdown_endpoint_also_persists(client, config_path) -> None:

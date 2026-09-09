@@ -198,6 +198,31 @@ class PolishConfig(_Base):
     #: The floor on ``returned words ÷ source words``. Below it the result is a summary rather than
     #: a tidy-up, and is discarded in favour of the raw text.
     min_retained_ratio: float = Field(default=0.6, ge=0.0, le=1.0)
+    #: The ceiling on the same ratio. Above it the model added material rather than tidying it.
+    #: Generous, because expanding contractions and repairing elisions legitimately adds words.
+    max_expansion_ratio: float = Field(default=1.5, ge=1.0, le=10.0)
+
+    #: What the model is told to do. **Blank means the instructions that shipped**, which is not
+    #: the same as storing a copy of them: an installation that never edits this keeps tracking a
+    #: later release's improved default, and only a list somebody actually wrote is held on disk.
+    #: Resolved by :func:`...services.polish.prompts.resolve`.
+    instructions: str = Field(default="", max_length=20_000)
+
+    #: The output guards, each of which enforces one instruction after the fact. They exist
+    #: because models comply unevenly — but every one of them will also quietly reverse an
+    #: instruction somebody wrote, so each is a switch rather than a law. Turning one off does not
+    #: turn off the fallback: a rewrite that cannot be used still leaves the raw transcript on the
+    #: page.
+    #:
+    #: Removes bold, italics, headings, quotes and code fences. The transcript pane renders text
+    #: rather than markup, so unstripped markers appear on screen as themselves.
+    strip_decoration: bool = True
+    #: Joins everything that is not a list into one continuous paragraph. Turn off to let an
+    #: instruction list that asks for paragraphs actually produce them.
+    collapse_paragraphs: bool = True
+    #: Discards ``[MM:SS]`` markers the model invented, moved backwards, or repeated. Turning this
+    #: off means a timestamp in the polished text may point at a moment nobody chose.
+    reconcile_timestamps: bool = True
 
 
 class StorageConfig(_Base):
@@ -345,6 +370,23 @@ class DictationConfig(_Base):
     #: How many past dictations to keep the text of, so one that pastes into the wrong window is
     #: recoverable. Oldest are pruned on each new dictation.
     keep_transcripts: int = Field(default=50, ge=0, le=1000)
+
+    #: What the model is told to do to a dictated sentence. Blank means the instructions that
+    #: shipped, on the same terms as :attr:`PolishConfig.instructions`. Deliberately narrower than
+    #: the polish list by default: the words are the speaker's own, and a model that improves them
+    #: has changed what they said into what it would have said.
+    instructions: str = Field(default="", max_length=20_000)
+
+    #: The bounds on ``returned words ÷ spoken words``, checked before anything is pasted. A model
+    #: that answers a punctuation request with a paragraph of its own has not tidied anything, and
+    #: pasting that into somebody's document is the worst outcome this feature has. Outside these
+    #: bounds the raw transcript is pasted instead.
+    #:
+    #: The ceiling is ``spoken × max_expansion_ratio + max_expansion_words``. The constant term is
+    #: what keeps a four-word dictation from failing on punctuation alone.
+    max_expansion_ratio: float = Field(default=2.0, ge=1.0, le=10.0)
+    max_expansion_words: int = Field(default=8, ge=0, le=200)
+    min_retained_ratio: float = Field(default=0.5, ge=0.0, le=1.0)
 
 
 class ShortcutsConfig(_Base):

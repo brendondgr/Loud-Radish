@@ -188,7 +188,7 @@ def tidy_one(
             max_output_tokens=max(256, len(raw.split()) * 6),
             extra=dict(prompts.NO_REASONING_EXTRAS),
         )
-        return await backend.complete([system(prompts.DICTATION_PROMPT), user(raw)], options)
+        return await backend.complete([system(prompts.resolve(config)), user(raw)], options)
 
     async def bounded() -> str:
         return await asyncio.wait_for(ask(), timeout=config.dictation.cleanup_timeout_s)

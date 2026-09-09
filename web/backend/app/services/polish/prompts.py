@@ -24,13 +24,23 @@ carry the weight, and each of them is here because of a specific way the output 
 The timestamps in 5 are not the model's to compute. They arrive already placed by
 :mod:`.source` and are carried along; :func:`..guard.reconcile_timestamps` removes any the model
 invents anyway.
+
+**None of it is fixed.** Every judgement above is a judgement, and whose talk it is decides which
+ones are right — legal dictation wants the disfluencies kept, a code walkthrough wants far more
+expansion of spoken identifiers than rule 2 grants. :func:`resolve` reads
+``polish.instructions`` and returns the text below only when nothing has been written there
+(D-068). Blank means the default rather than a stored copy of it, so an installation that never
+edits this keeps tracking whatever ships next.
 """
 
 from __future__ import annotations
 
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
-POLISH_PROMPT: Final = """\
+if TYPE_CHECKING:
+    from ...config.schema import AppConfig
+
+DEFAULT_POLISH_PROMPT: Final = """\
 You are turning a live speech-to-text transcript into readable dialogue. You will be given one \
 stretch of a talk as a single unbroken run of text. Rewrite the whole run and return it. Apply the \
 following instructions directly. Do not reason about the task first, do not plan, and do not \
@@ -87,3 +97,17 @@ NO_REASONING_EXTRAS: Final[dict[str, Any]] = {
     "chat_template_kwargs": {"enable_thinking": False},
     "think": False,
 }
+
+
+def resolve(config: AppConfig) -> str:
+    """The instructions this polish pass should follow.
+
+    Whitespace counts as blank. A field someone cleared by selecting all and deleting holds a
+    newline, and treating that as "no instructions at all" would send the model a source text with
+    nothing asked of it.
+    """
+    written = (config.polish.instructions or "").strip()
+    return written or DEFAULT_POLISH_PROMPT
+
+
+__all__ = ["DEFAULT_POLISH_PROMPT", "NO_REASONING_EXTRAS", "resolve"]
