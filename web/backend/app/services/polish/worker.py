@@ -167,11 +167,23 @@ class PolishWorker:
             self._give_up_or_retry(end)
             return False
 
-        polished = reconcile_timestamps(
-            collapse_to_paragraph(answer), source.labels, fallback=source.first_label
-        )
+        # Each guard enforces one of the instructions after the fact, because models comply with
+        # them unevenly. Each is also a switch, because an instruction somebody wrote themselves
+        # is exactly the thing these would quietly reverse — a rewritten rule 7 asking for
+        # paragraphs produces none at all while `collapse_paragraphs` is on, and nothing on the
+        # page explains why (D-068). Turning one off does not turn off the fallback below.
+        polished = answer
+        if config.polish.collapse_paragraphs:
+            polished = collapse_to_paragraph(polished)
+        if config.polish.reconcile_timestamps:
+            polished = reconcile_timestamps(polished, source.labels, fallback=source.first_label)
 
-        check = preserves_content(source.text, polished, config.polish.min_retained_ratio)
+        check = preserves_content(
+            source.text,
+            polished,
+            config.polish.min_retained_ratio,
+            config.polish.max_expansion_ratio,
+        )
         if not check.ok:
             # Not retried: a model that summarised when told to tidy will do it again, and a
             # second call costs the same as the first. The raw segments stay on the page, which
@@ -244,7 +256,7 @@ class PolishWorker:
             return None
 
         self._reported_failure = False
-        return strip_decoration(answer)
+        return strip_decoration(answer) if config.polish.strip_decoration else answer
 
     async def _generate(
         self, backend: LlmBackend, source: str, config: AppConfig

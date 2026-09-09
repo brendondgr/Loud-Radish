@@ -83,6 +83,13 @@ class TestContentPreservation:
         assert preserves_content(self.SOURCE, result, min_ratio=0.6).ok
         assert not preserves_content(self.SOURCE, result, min_ratio=0.8).ok
 
+    def test_the_ceiling_is_configurable_too(self) -> None:
+        """An instruction list that expands spoken identifiers returns more words than the shipped
+        one, and a ceiling nailed to a module constant would discard everything it produced."""
+        result = " ".join(f"word{i}" for i in range(300))
+        assert not preserves_content(self.SOURCE, result, min_ratio=0.6).ok
+        assert preserves_content(self.SOURCE, result, min_ratio=0.6, max_ratio=4.0).ok
+
     def test_timestamps_are_not_counted_as_words(self) -> None:
         """They are navigation, not speech; counting them measures punctuation."""
         marked_source = "[00:00] " + " ".join(f"word{i}" for i in range(10))

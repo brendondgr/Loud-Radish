@@ -14,6 +14,7 @@ from app.config.defaults import default_config
 from app.models.segment import Segment
 from app.services.llm.contract import LlmChunk
 from app.services.llm.errors import LlmServerError, LlmUnreachableError
+from app.services.polish.prompts import DEFAULT_POLISH_PROMPT
 from app.services.polish.worker import MAX_ATTEMPTS, PolishWorker
 from app.services.transcript import TranscriptStore
 
@@ -37,6 +38,8 @@ class ScriptedBackend:
         self._fail_times = fail_times
         self.calls: list[str] = []
         self.extras: list[dict] = []
+        #: The system message of each call — the instruction list the worker resolved.
+        self.systems: list[str] = []
 
     async def _generate(self, messages, options):
         self.extras.append(dict(options.extra) if options else {})
@@ -46,6 +49,7 @@ class ScriptedBackend:
         if self._error:
             raise self._error
         self.calls.append(messages[-1].content)
+        self.systems.append(messages[0].content)
         reply = self._replies.pop(0) if self._replies else ""
         if reply:
             yield LlmChunk(text=reply)
@@ -410,3 +414,108 @@ async def test_start_and_stop_flush_the_tail(store) -> None:
 
     assert len(store.polished_blocks()) == 1
     assert events[0][0] == "transcript.polished"
+
+
+class TestTheInstructionsAreTheUsers:
+    """The instruction list and each guard are settings, not laws (D-068).
+
+    A guard exists because models comply unevenly with the shipped prompt. That reasoning stops
+    holding the moment somebody writes their own: a rewritten rule asking for paragraphs produces
+    none while `collapse_paragraphs` is on, and nothing on the page explains why. So each one is a
+    switch — and turning one off never turns off the fallback, which is the raw transcript.
+    """
+
+    async def test_the_shipped_instructions_are_sent_when_nothing_was_written(self, store) -> None:
+        fill(store)
+        backend = ScriptedBackend([POLISHED])
+        worker, _, _ = build(store, backend)
+
+        await worker.poll()
+
+        assert backend.systems[0] == DEFAULT_POLISH_PROMPT
+
+    async def test_a_written_instruction_list_is_sent_instead(self, store) -> None:
+        fill(store)
+        backend = ScriptedBackend([POLISHED])
+        worker, _, _ = build(store, backend, instructions="Keep every hesitation exactly as said.")
+
+        await worker.poll()
+
+        assert backend.systems[0] == "Keep every hesitation exactly as said."
+
+    async def test_a_cleared_field_falls_back_rather_than_sending_nothing(self, store) -> None:
+        """Selecting all and deleting leaves a newline behind, and a model given no instructions
+        at all would be handed a page of transcript fragments with nothing asked of it."""
+        fill(store)
+        backend = ScriptedBackend([POLISHED])
+        worker, _, _ = build(store, backend, instructions="   \n  ")
+
+        await worker.poll()
+
+        assert backend.systems[0] == DEFAULT_POLISH_PROMPT
+
+    async def test_paragraphs_survive_when_collapsing_is_turned_off(self, store) -> None:
+        fill(store)
+        broken = POLISHED.replace("[00:32]", "\n\n[00:32]")
+        worker, events, _ = build(store, ScriptedBackend([broken]), collapse_paragraphs=False)
+
+        await worker.poll()
+
+        assert "\n\n" in events[0][1]["text"]
+
+    async def test_paragraphs_are_still_collapsed_by_default(self, store) -> None:
+        fill(store)
+        broken = POLISHED.replace("[00:32]", "\n\n[00:32]")
+        worker, events, _ = build(store, ScriptedBackend([broken]))
+
+        await worker.poll()
+
+        assert "\n\n" not in events[0][1]["text"]
+
+    async def test_an_invented_timestamp_survives_when_reconciliation_is_off(self, store) -> None:
+        """Documented as a cost, not a feature: the marker points at a moment nobody chose."""
+        fill(store)
+        invented = POLISHED.replace("[00:48]", "[09:99]")
+        worker, events, _ = build(store, ScriptedBackend([invented]), reconcile_timestamps=False)
+
+        await worker.poll()
+
+        assert "[09:99]" in events[0][1]["text"]
+
+    async def test_an_invented_timestamp_is_removed_by_default(self, store) -> None:
+        fill(store)
+        invented = POLISHED.replace("[00:48]", "[09:99]")
+        worker, events, _ = build(store, ScriptedBackend([invented]))
+
+        await worker.poll()
+
+        assert "[09:99]" not in events[0][1]["text"]
+
+    async def test_markup_survives_when_stripping_is_turned_off(self, store) -> None:
+        fill(store)
+        decorated = POLISHED.replace("forty two", "**forty two**")
+        worker, events, _ = build(store, ScriptedBackend([decorated]), strip_decoration=False)
+
+        await worker.poll()
+
+        assert "**forty two**" in events[0][1]["text"]
+
+    async def test_a_longer_rewrite_is_kept_when_the_ceiling_is_raised(self, store) -> None:
+        """An instruction list that expands spoken identifiers legitimately returns more words
+        than the shipped one, and a fixed ceiling would discard every result it produced."""
+        fill(store)
+        long_answer = POLISHED + " " + " ".join(["expanded"] * 40)
+        worker, events, _ = build(store, ScriptedBackend([long_answer]), max_expansion_ratio=5.0)
+
+        await worker.poll()
+
+        assert [name for name, _ in events] == ["transcript.polished"]
+
+    async def test_that_same_rewrite_is_discarded_at_the_shipped_ceiling(self, store) -> None:
+        fill(store)
+        long_answer = POLISHED + " " + " ".join(["invented"] * 40)
+        worker, events, _ = build(store, ScriptedBackend([long_answer]))
+
+        await worker.poll()
+
+        assert events == []

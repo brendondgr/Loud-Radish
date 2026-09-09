@@ -55,6 +55,11 @@ _BLANK_RUN = re.compile(r"\n{3,}")
 
 #: A rewrite longer than this multiple of the source did not tidy it — it invented. Generous,
 #: because expanding contractions and repairing elisions legitimately adds words.
+#:
+#: The schema default for ``polish.max_expansion_ratio``, kept here as the value
+#: :func:`preserves_content` falls back to when no ceiling is supplied. A caller that has the
+#: configuration passes the configured one instead: an instruction list that asks the model to
+#: expand spoken identifiers aggressively legitimately produces longer output than this (D-068).
 MAX_EXPANSION_RATIO = 1.5
 
 
@@ -82,7 +87,9 @@ def strip_decoration(text: str) -> str:
     return "\n".join(line.rstrip() for line in cleaned.splitlines()).strip()
 
 
-def preserves_content(source: str, result: str, min_ratio: float) -> ContentCheck:
+def preserves_content(
+    source: str, result: str, min_ratio: float, max_ratio: float = MAX_EXPANSION_RATIO
+) -> ContentCheck:
     """Judge whether ``result`` is a tidied ``source`` rather than a summary of it.
 
     A length check, not a meaning check. It catches the failure that matters — a model that
@@ -108,7 +115,7 @@ def preserves_content(source: str, result: str, min_ratio: float) -> ContentChec
             f"the model summarised rather than tidied",
             ratio,
         )
-    if ratio > MAX_EXPANSION_RATIO:
+    if ratio > max_ratio:
         return ContentCheck(
             False,
             f"the rewrite is {ratio:.0%} of the length of what was said — the model added material",
