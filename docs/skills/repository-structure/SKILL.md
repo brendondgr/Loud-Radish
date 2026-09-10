@@ -20,7 +20,7 @@ root/
 ├── docs/       # Source of truth for all repository documentation
 ├── web/        # All web application code
 │   ├── backend/    # Python API + transcription pipeline (uv)
-│   ├── frontend/   # Node/TypeScript browser client (npm)
+│   ├── frontend/   # Jinja templates + static ES modules (no build step)
 │   └── shared/     # Contracts both sides depend on
 ├── libs/       # Internal shared packages
 ├── utils/      # Utility functions and helper classes
@@ -115,7 +115,8 @@ Frontend tests live beside the frontend under `web/frontend/`, following that to
 ### Package Management
 
 - Python: `uv` only — `uv init`, `uv add`, `uv run`. No other Python package manager.
-- Frontend: `npm`, run from `web/frontend/`.
+- Frontend: none. No `package.json`, no lockfile, no bundler — see
+  `docs/skills/global-project-rules/SKILL.md` §2.
 
 ## Other Reference Structures
 

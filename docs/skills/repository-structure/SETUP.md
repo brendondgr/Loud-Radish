@@ -8,7 +8,7 @@ update this file **and** `docs/structure.md`, `docs/documentation.md`, and
 | # | Question | Answer |
 |---|---|---|
 | 1 | **Web Interface Generation:** web-interface-specific structure, or purely backend/CLI? | Web interface. Loud Radish is a web application. Mode G (API plus separate frontend) from `structures/web-interfaces.md` is selected. |
-| 2 | **Primary Runtime:** main runtime or language? | Mixed full-stack. Python managed by `uv` for the backend and transcription pipeline; Node/npm for the frontend. |
+| 2 | **Primary Runtime:** main runtime or language? | Python, managed by `uv`, throughout. *(Corrected 2026-09-10: this answer originally said "Node/npm for the frontend". No Node toolchain was ever added — the frontend is Jinja templates plus static ES modules with no build step.)* |
 | 3 | **Repository Shape:** single app, multi-app workspace, or library/tooling repo? | Single application, internally split into `web/backend` and `web/frontend`. |
 | 4 | **Shared Code:** need `libs/`, `utils/`, or contract/schema folders? | Yes to all three. `utils/` for standalone helpers, `libs/` for internal packages with more than one consumer, `web/shared/contracts/` for API schemas and types shared across the frontend/backend boundary. |
 | 5 | **Test Structure:** which top-level `tests/` sub-directories should exist? | `tests/api/`, `tests/transcription/`, `tests/data/`, `tests/utils/`. Frontend tests live under `web/frontend/` per that toolchain's convention. |

@@ -1,6 +1,6 @@
 ---
 name: global-project-rules
-description: Read this before any work in this repository — before editing code, creating files, running commands, or answering questions about the project. Defines the required reading list, the uv/npm environment rules, documentation maintenance duties, testing expectations, and cleanup rules.
+description: Read this before any work in this repository — before editing code, creating files, running commands, or answering questions about the project. Defines the required reading list, the uv environment rules, documentation maintenance duties, testing expectations, and cleanup rules.
 ---
 
 # Global Project Rules
@@ -18,7 +18,7 @@ Read these files before acting:
 Non-negotiables, in brief:
 
 - `docs/` is the single source of truth. This file must never carry rule content of its own.
-- Python is managed **only** with `uv`. The frontend is managed with `npm` from `web/frontend/`.
+- Python is managed **only** with `uv`. The frontend has no package manager and no build step.
 - All web application code lives under `web/`.
 - Documentation updates ship in the same change as the code they describe.
 - Files cap at 800 lines, ideally under 500.
