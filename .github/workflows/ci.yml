@@ -1,0 +1,90 @@
+# Two jobs, and neither of them exists to look impressive.
+#
+# `checks` runs the suite because a 98-second suite that nothing runs will drift, and a
+# regression found by a stranger cloning the repository is found too late.
+#
+# `documented-commands` runs the commands the README tells a reader to run, from a clean
+# checkout, because setup instructions rot silently — nothing re-executes them, so they stay
+# correct only for as long as the author's machine happens to agree with them. This is the job
+# that keeps the "about seventeen seconds from a clean clone" claim in the README true.
+#
+# Deliberately absent: a status badge. GitHub's own README documentation never mentions badges,
+# and a decorative row of them pushes the answer to "what is this" below the fold.
+
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Tests and lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # D-064: `uv run` re-syncs against a lockfile that names PyPI, and the launcher repairs the
+      # kept ROCm CTranslate2 wheel afterwards. There is no such wheel on a runner, and a repair
+      # that shells out to `uv pip install` in CI would be both pointless and slow.
+      LOUD_RADISH_NO_GPU_REPAIR: "1"
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Sync
+        run: uv sync
+
+      # The live-model tests are opt-in by flag and stay opt-in here. There is no model to talk
+      # to, and reachability was never the right gate anyway.
+      - name: Tests
+        run: uv run pytest -q
+
+      - name: Lint
+        run: uv run ruff check .
+
+  documented-commands:
+    name: README commands from a clean checkout
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      LOUD_RADISH_NO_GPU_REPAIR: "1"
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      # No cache, on purpose. A stranger's first `uv sync` is a cold one, and the timing the
+      # README quotes is the cold number.
+      - name: uv sync
+        run: |
+          start=$(date +%s)
+          uv sync
+          echo "uv sync took $(( $(date +%s) - start ))s"
+
+      - name: uv run app.py, and answer on the documented port
+        run: |
+          uv run python app.py &
+          server=$!
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8395/api/health > health.json; then
+              echo "serving after ${i}s"
+              cat health.json
+              kill "$server"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::the application did not answer on 127.0.0.1:8395 within 30s"
+          kill "$server" 2>/dev/null || true
+          exit 1

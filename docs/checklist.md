@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-09-09 (the rewrite instructions belong to the user — D-068)*
+*Last updated: 2026-09-10 (the repository audit — D-069)*
 
 The active work list for Loud Radish. Update it whenever a task is finished or new work is
 discovered.
@@ -1001,6 +1001,57 @@ user's own machine, and none may be reported as passing until it has had one.
       by a real `systemctl`, or the shortcut component being re-registered with a real KGlobalAccel
       — none of the three was installed here to migrate. If you have another machine with the old
       build on it, that is the one to try.
+
+---
+
+## Part 7 — The repository audit (D-069)
+
+Run 2026-09-10 against the `repo-audit` skill. [audit/audit-report.md](audit/audit-report.md) and
+[audit/restructure-plan.md](audit/restructure-plan.md) carry the full findings and the plan that
+was approved; `repo-profile.yaml` at the root is the scoping record the skill's scripts read. No
+source file moved.
+
+**Done.**
+
+- [x] `LICENSE` — MIT at the root, plus `license` and `license-files` in `pyproject.toml`. Was a
+      legal blocker: without it the work was under exclusive copyright and nobody could use it.
+- [x] The global rules' `npm` frontend requirement corrected, along with its three pointer copies
+      and the six other places the claim had spread to. No `package.json` ever existed.
+- [x] The README's three false statements about `test_llm_live.py` replaced with the measured
+      truth. `docs/workflow.md` had been right all along; the README was the only stale copy.
+- [x] The finished 14-phase plan's "resume at Phase 9" banner corrected **additively**, kept as the
+      record of where the work paused rather than edited to match today.
+- [x] `LLM_TEST_ENDPOINT` and `LLM_TEST_MODEL` added to `.env.example`.
+- [x] `docs/structure.md:193` — `notify.py` → `notification.py`. The only stale name in a tree of
+      160.
+- [x] Five screenshots in `docs/assets/`, mock-data only, with `capture.py` making them
+      reproducible.
+- [x] README rewritten: hero image, an honest status line, a Why section, and the six capabilities
+      it had never mentioned.
+- [x] `.github/workflows/ci.yml` — suite, lint, and the README's own commands on a clean checkout.
+- [x] Dead Node section removed from `.gitignore`.
+- [x] `git remote` repointed to `loud-radish`.
+
+**Open, and needing you rather than an agent.**
+
+- [ ] **Replace the three drafted paragraphs in the README.** The one-liner, the Why section and the
+      status line are marked with `DRAFT` HTML comments in the README source. They were inferred
+      from the code and the decision log, which is not the same as being true about your reasons.
+      An invented motivation on a front page is a claim that has to be defended by whoever reads
+      it, so these are the highest-value edit left in the repository.
+- [ ] **Decide whether `LICENSE` should carry your legal name** rather than `brendondgr`. Left as
+      the git identity because guessing a legal name into a licence file is not an audit's call.
+- [ ] **Set the GitHub repository description, topics and social preview.** None can be set from a
+      file. Unset, a shared link renders as generic grey. `docs/assets/live-transcript.png` is the
+      obvious preview image.
+- [ ] **Watch the first CI run.** The `documented-commands` job starts the application on a runner
+      with no audio device. It worked in a container here, but if it proves flaky on GitHub, fix or
+      drop that job — a red CI on a repository people look at is worse than none.
+
+**Recorded as deliberately declined**, so it does not get re-suggested: a CI status badge, profile
+stats cards and trophies, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, issue templates,
+`CODEOWNERS`. Each is either unsupported by evidence as a signal or checkbox theatre on a
+single-owner repository. The reasoning is in D-069 and in [audit/audit-report.md](audit/audit-report.md).
 
 ## Discovered work
 
