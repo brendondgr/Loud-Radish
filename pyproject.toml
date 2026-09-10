@@ -3,6 +3,9 @@ name = "loud-radish"
 version = "0.1.0"
 description = "Loud Radish — a local live audio and video transcriber with a language-model assistant."
 requires-python = ">=3.11"
+# PEP 639: an SPDX expression and the file it points at, not the older table form.
+license = "MIT"
+license-files = ["LICENSE"]
 # Everything the application can do is installed by `uv sync`, which `uv run app.py` performs on
 # its own. There are **no optional groups** — see Decision D-023.
 #

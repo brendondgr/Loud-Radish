@@ -14,12 +14,6 @@ __pycache__/
 .coverage
 htmlcov/
 
-# Node
-node_modules/
-dist/
-.vite/
-*.tsbuildinfo
-
 # Project data — uploaded audio and generated transcripts may contain
 # personal or confidential speech. Never commit.
 data/*
