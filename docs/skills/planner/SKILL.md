@@ -34,8 +34,8 @@ in `planner.md` where they conflict.
 - **Status tracking:** mark each phase's status in the plan as work completes. Do not delete completed
   plans; mark them complete so they remain a record.
 - **Validation:** every phase names the concrete verification it requires, drawn from
-  `docs/workflow.md` — Python tests via `uv run pytest`, lint/format via `ruff`, frontend build and
-  type check via npm, plus manual browser QA for UI-visible changes.
+  `docs/workflow.md` — Python tests via `uv run pytest`, lint/format via `ruff`, plus manual browser
+  QA for UI-visible changes. There is no frontend build or type check to run.
 - **Git workflow:** each completed and validated phase ends with a commit on a feature branch. Push
   only when the user asks. Use the wording:
   `[Plan Name] ([Current Step] / [Total Steps]) Complete: <sentence describing what was done>`

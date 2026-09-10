@@ -3,6 +3,14 @@
 *Created: 2026-08-14 · Status: **complete** (14 / 14 phases). The header said nine for a while
 after the last five landed; `docs/checklist.md` has recorded all fourteen as done since Phase 14.*
 
+> **Correction, 2026-09-10.** The three paragraphs below are the handoff note as it stood partway
+> through the build, when five phases were still outstanding. They are kept because they are the
+> record of where the work paused and why Phase 11 was taken early — not because there is anything
+> left to resume. **All fourteen phases are complete; the status table in §5 is authoritative.**
+> Read the block below as history, and ignore its instruction to start at Phase 9.
+
+### Handoff note as of Phase 8, superseded
+
 **Where this stands.** The backend is complete and tested end to end, and the application runs: a
 session captures audio, transcribes it, persists the transcript, and streams it to a browser that
 renders it correctly. Phases 1–8 and 11 are done. What remains is the language model (9), chat and

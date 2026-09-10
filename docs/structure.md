@@ -13,7 +13,8 @@ static assets rather than a separately built Node application. There is no npm t
 ## Tree — what exists today
 
 ```text
-TranscriberPrototype/                # the checkout keeps its old name; the product does not (D-038)
+TranscriberPrototype/                # this checkout keeps the old name; the product and the
+                                    #   GitHub repository are both `loud-radish` (D-038, D-069)
 ├── docs/                          # Source of truth for all repository documentation
 │   ├── plans/
 │   │   ├── README.md              # Plan conventions and index
@@ -28,6 +29,13 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   │   ├── system-integration.md              # Expansion 5 — autostart, tray, global keybinds
 │   │   └── recording-folders-and-web-export.md  # Per-recording folders, the completion-state
 │   │                                            #   repair, and the self-contained export
+│   ├── audit/                     # The repository audit of D-069: findings, and the plan
+│   │   ├── audit-report.md        #   What was true on 2026-09-10, with evidence tiers
+│   │   └── restructure-plan.md    #   What was changed, stage by stage, as approved
+│   ├── assets/                    # README screenshots, and the script that recaptures them
+│   │   ├── README.md              # What each image shows, and why they use the mock model
+│   │   ├── capture.py             # Playwright recapture; not imported by the application
+│   │   └── *.png                  # 2880x1800, mock-data only — never a real transcript
 │   ├── skills/                    # Canonical skill definitions used by every agent tool
 │   │   ├── global-project-rules/SKILL.md
 │   │   ├── planner/{SKILL.md,SETUP.md,planner.md}
@@ -190,7 +198,7 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │   │   │   ├── outcome.py         # What was tried and what happened — never an exception
 │   │   │   ├── clipboard.py       # wl-copy → klipper → xclip
 │   │   │   ├── keystroke.py       # ydotool → wtype. That order was measured, not assumed
-│   │   │   └── notify.py          # org.freedesktop.Notifications, for when nobody is looking
+│   │   │   └── notification.py    # org.freedesktop.Notifications, for when nobody is looking
 │   │   │                          #   at the browser
 │   │   ├── companion/             # The desktop presence — a remote control, not a rewrite (D-024)
 │   │   │   ├── visual_states.py   # (capture mode, run state) → which picture the instrument shows
@@ -261,12 +269,15 @@ TranscriberPrototype/                # the checkout keeps its old name; the prod
 │                                  #   was restarted is still being joined together (D-036)
 ├── logs/                          # Runtime logs (gitignored)
 │
+├── .github/workflows/ci.yml       # Tests, lint, and the README's own commands on a clean checkout
 ├── .claude/skills/ · .agents/skills/ · .cursor/rules/   # Pointers → docs/skills/
 ├── app.py                         # Launcher: starts everything on port 8395
-├── pyproject.toml                 # Python project, optional groups, tool configuration
+├── pyproject.toml                 # Python project, licence, tool configuration (no extras, D-023)
 ├── uv.lock                        # Committed, authoritative Python lockfile
 ├── .env.example                   # Every environment variable, with safe placeholders
 ├── .gitignore
+├── LICENSE                        # MIT
+├── repo-profile.yaml              # Scoping record the repo-audit scripts read; root by convention
 └── README.md
 ```
 
@@ -282,6 +293,8 @@ listed them has been removed rather than left describing work that has landed.
 | `docs/` | The single source of truth for every durable instruction, decision, and map. Nothing outside it may contradict it. |
 | `docs/plans/` | Written implementation plans. Each is a handoff artifact another agent can resume from cold. |
 | `docs/skills/` | Canonical skill definitions. The three agent-tool folders point here rather than carrying copies. |
+| `docs/audit/` | The repository audit and the restructure plan it produced (D-069). Kept because a re-audit is a diff against them rather than an argument from scratch. |
+| `docs/assets/` | Images the README renders, committed rather than hosted so they cannot rot, plus the script that recaptures them. Mock-data only: a real transcript is somebody's talk and must not be published. |
 | `web/` | All web application code and assets. Keeps application code out of the repository root. |
 | `web/backend/` | The Python side: the pipeline, the HTTP API, and the WebSocket stream. |
 | `web/backend/app/branding.py` | The product name and every machine identifier built from it, each beside the legacy value it replaces. One file, so the next rename is one diff rather than a hunt through eleven — and so the migration policy is readable in one place instead of scattered across six subsystems. |

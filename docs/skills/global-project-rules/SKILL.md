@@ -1,6 +1,6 @@
 ---
 name: global-project-rules
-description: Read this first, before any work in the Loud Radish repository. Defines the required reading list, the uv/npm environment rules, documentation maintenance duties, testing expectations, and cleanup rules that every AI agent and human contributor must follow.
+description: Read this first, before any work in the Loud Radish repository. Defines the required reading list, the uv environment rules, documentation maintenance duties, testing expectations, and cleanup rules that every AI agent and human contributor must follow.
 ---
 
 # Global Project Rules
@@ -32,7 +32,8 @@ and — for anything that draws the application's state — `docs/motion-spec.md
 
 ## 2. Environment Manager Rules
 
-This repository is a Python backend plus a Node frontend. The environment managers are **not** optional.
+This repository is Python throughout: a FastAPI backend that also renders the frontend's templates.
+The environment manager is **not** optional.
 
 ### Python — `uv` only
 
@@ -42,11 +43,22 @@ This repository is a Python backend plus a Node frontend. The environment manage
 - `uv.lock` is committed and authoritative. Never hand-edit it.
 - Never create or activate a virtualenv manually; `uv` owns `.venv/`.
 
-### Frontend — `npm`
+### Frontend — no package manager, and no build step
 
-- The frontend lives in `web/frontend/` and is managed with `npm`.
-- `package-lock.json` is committed. Never hand-edit it.
-- Run frontend commands from `web/frontend/`, not from the repository root.
+**There is no Node toolchain in this repository, and adding one is a decision, not a convenience.**
+This section previously mandated `npm` from `web/frontend/` and a committed `package-lock.json`.
+Neither ever existed; the rule described a frontend the repository does not have, and it contradicted
+the README, which has always said there is no build step. Corrected 2026-09-10.
+
+- The frontend lives in `web/frontend/`: Jinja templates rendered by the backend, plus hand-written
+  ES modules and CSS served as static files. Nothing is bundled, transpiled, or minified.
+- There is no `package.json`, no lockfile, and no `node_modules/`. Do not add one to install a
+  convenience library. A dependency that needs a bundler turns a two-command install into a
+  toolchain, and the install is currently `uv sync` and nothing else.
+- Edit `web/frontend/static/js/` and `web/frontend/static/css/` directly and reload the page. There
+  is no watch process to run.
+- `ruff` excludes `web/frontend`. The frontend has no linter or formatter configured; if one is ever
+  wanted, it has to arrive without a build step or with this rule changed on purpose.
 
 Exact commands live in `docs/workflow.md`. If a command there is wrong, fix `docs/workflow.md` in the
 same change — do not work around it silently.
@@ -96,8 +108,8 @@ published from this repository, introduce `CHANGELOG.md` and record that decisio
 - Python tests live in the top-level `tests/` directory, grouped by area:
   `tests/<area>/test_<behavior>.py`. Do not create a single flat test dump.
 - Add tests alongside features as they are built. Small and focused beats exhaustive and late.
-- Before declaring work done, run the applicable commands from `docs/workflow.md`
-  (tests, lint, type check, frontend build).
+- Before declaring work done, run the applicable commands from `docs/workflow.md` — `uv run pytest`
+  and `uv run ruff check .`. There is no type check and no frontend build.
 - If a verification command was not run, say so explicitly and explain why. Never imply a check passed
   when it was skipped.
 - Report failures with the actual output. Do not summarize a failure as a success.

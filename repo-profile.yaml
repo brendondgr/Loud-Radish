@@ -1,0 +1,112 @@
+# repo-profile.yaml — the scoping record for the repo-audit skill.
+# Every routing decision in an audit of this repository reads from this file.
+# Regenerate the detected fields with:
+#   python3 <skill>/scripts/audit_structure.py . --detect
+#
+# First written 2026-09-10. Re-validate on every audit; links rot on a months timescale.
+
+repo:
+  name: loud-radish
+  archetype: web-app
+  secondary: tool
+  # Detection returned `mixed` at 0.36 confidence and scored ml-research equal to web-app.
+  # That was a false positive: the ML signals are `configs/` (application configuration, not
+  # training configs), faster-whisper and onnxruntime in dependencies (inference, no training),
+  # and a "results directory" that is the user's own recordings. Nothing here trains or
+  # reports a metric, so the ml section is omitted and ml-research.md does not apply.
+  # Confirmed by the owner 2026-09-10.
+  one_liner: >-
+    Transcribes a talk on your own machine as it is spoken, then answers questions about what
+    was said with timestamps you can click back to.
+  status: active
+  status_honest_note: >-
+    Built solo between 2026-08-14 and 2026-09-10; 208 commits. All fourteen planned phases are
+    complete and the suite passes. Linux only, single user, loopback only, no authentication.
+    Which behaviours have been confirmed on real hardware is tracked in docs/checklist.md.
+  visibility: public
+
+purpose: portfolio
+reader: hiring-manager
+# Secondary reader, stated by the owner: someone who just wants to run the app. The README has
+# to serve both, which is why install stays near the top rather than being pushed under docs/.
+secondary_reader: stranger
+role_family: swe
+
+ecosystem:
+  primary: python
+  package_manager: uv
+  lockfile: uv.lock
+  layout: flat
+  min_version: "3.11"
+  # No Node toolchain and no build step. The frontend is server-rendered Jinja plus hand-written
+  # ES modules served as static files; there is no package.json anywhere in the tree.
+  frontend_build: none
+
+entrypoints:
+  setup: uv sync
+  run: uv run app.py
+  test: uv run pytest
+  verified: true
+  steps_to_first_run: 2
+  seconds_to_first_run: 17        # measured in-container; see docs/audit/audit-report.md § Measurements
+  verified_on: 2026-09-10
+  verified_how: >-
+    Test command run locally: 2163 passed, 11 skipped in 98s. Clean-clone `uv sync` (15.4s) and
+    `uv run app.py` to serving (1.2s) verified in a container from a fresh clone. Local run
+    confirmed by driving both pages and the settings dialog in a browser against an isolated
+    instance. Not verified: macOS, Windows, real microphone or loopback capture, the D-Bus
+    screen-cast portal, GPU inference. A container cannot exercise any of them.
+
+showcase:
+  has_ui: true
+  showable:
+    - live transcript committing paragraph by paragraph, with the tentative tail in italics
+    - assistant answer citing clickable transcript timestamps
+    - settings, showing that everything is configured in-app rather than in a file
+    - the recordings archive with its export controls
+  assets_dir: docs/assets
+  demo_url: null                  # local-only app; there is nothing to host
+  pages_url: null
+  personal_site_url: null
+  personal_site_has_page: false
+  video_url: null
+  social_preview_set: false       # a GitHub setting, not a file; must be set by hand
+  links_verified_on: 2026-09-10
+  # Rung 4 of the fallback ladder in scoping.md §4: in-repo committed assets. Rungs 1-3 are
+  # unavailable and should not be faked — the app captures a microphone and talks to a local
+  # language model, so a hosted demo would be a different product.
+  ladder_rung: 4
+  screenshots_use_mock_data: true
+  # Screenshots are captured against the scripted mock speech model in an isolated clone, so no
+  # real seminar audio or transcript text is published. Regenerate with docs/assets/capture.py;
+  # the recipe is in docs/assets/README.md.
+  screenshot_count: 5
+
+docs:
+  surface: docs-dir
+  file_count: 61              # as audit_docs.py counts it
+  governing_rules:
+    - docs/skills/global-project-rules/SKILL.md      # canonical
+    - .claude/skills/global-project-rules/SKILL.md   # pointer
+    - .agents/skills/global-project-rules/SKILL.md   # pointer
+    - .cursor/rules/global-project-rules.mdc         # pointer
+    - docs/skills/repository-structure/SKILL.md
+    - docs/skills/planner/SKILL.md
+    - docs/structure.md
+    - docs/workflow.md
+  historical_dirs:
+    # SAFETY FIELD. These describe the repository as it WAS at the commit each plan was written.
+    # A path inside them is correct for that commit and is EXEMPT from rename propagation.
+    # Sweeping a restructure through here turns a true record into a claim that a command ran
+    # at a commit where it did not exist.
+    - docs/plans
+
+constraints:
+  do_not_publish:
+    - data/            # real seminar audio, video and transcripts; untracked, keep it that way
+    - logs/
+  do_not_move:
+    - app.py           # docs/workflow.md, .claude/launch.json and the autostart unit all name it
+    - scripts/install_autostart.py
+    - utils/loud_radish_ctl.py   # README tells pre-rename users to re-copy shortcuts to this
+  history_rewrite_allowed: false

@@ -313,6 +313,27 @@ Run what applies to the change:
 **If a command was not run, say so and explain why.** Never imply a check passed when it was skipped.
 Report failures with the actual output.
 
+### Continuous integration
+
+`.github/workflows/ci.yml` runs on every push and pull request. Two jobs:
+
+| Job | What it does |
+|---|---|
+| `checks` | `uv sync`, `uv run pytest -q`, `uv run ruff check .` |
+| `documented-commands` | The commands the README tells a reader to run, from a clean checkout with no cache: `uv sync`, then `uv run python app.py` and a `GET /api/health` on port 8395 |
+
+The second job exists because setup instructions rot silently — nothing re-executes them, so they
+stay correct only for as long as the author's machine happens to agree with them. It is what keeps
+the README's "about seventeen seconds from a clean clone" true rather than merely once-measured.
+If it ever fails on a runner for reasons that are about the runner rather than the repository,
+fix or drop that job — a red CI on a repository people look at is worse than no CI at all.
+
+Both jobs set `LOUD_RADISH_NO_GPU_REPAIR=1`. There is no kept ROCm wheel on a runner (D-064), and a
+repair that shells out to `uv pip install` in CI would be slow and pointless.
+
+CI is not a substitute for the manual passes above. It cannot open an audio device, negotiate the
+screen-cast portal, or look at the page.
+
 ### Recorded mode, by hand
 
 `recorded` mode makes two claims that only a real run confirms. With a WAV selected as the source
