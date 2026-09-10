@@ -1041,9 +1041,13 @@ source file moved.
       it, so these are the highest-value edit left in the repository.
 - [ ] **Decide whether `LICENSE` should carry your legal name** rather than `brendondgr`. Left as
       the git identity because guessing a legal name into a licence file is not an audit's call.
-- [ ] **Set the GitHub repository description, topics and social preview.** None can be set from a
-      file. Unset, a shared link renders as generic grey. `docs/assets/live-transcript.png` is the
-      obvious preview image.
+- [ ] **Make the repository public.** It is **private** as of 2026-09-10, checked via the API.
+      Everything this audit did was aimed at a reader who cannot see it yet, so this is the item
+      the rest depends on. It is also why the committed screenshots currently 404 for anyone
+      unauthenticated, which is worth knowing before mistaking that for a broken path.
+- [ ] **Set the GitHub topics and the social preview.** Neither can be set from a file. The
+      description is already set and is a good one. Topics are empty; unset, a shared link renders
+      as generic grey, and `docs/assets/live-transcript.png` is the obvious preview image.
 - [x] **Watch the first CI run.** Done. The `documented-commands` job passed — `uv sync` and
       `uv run app.py` answering on 8395 both work on a runner with no audio device. **The `checks`
       job failed, and it was right to.** Three tests asserted on things that depend on the

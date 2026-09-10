@@ -284,11 +284,34 @@ force outranks a major one resting on convention.
 ```
 
 ```
+[MAJOR · FUNCTIONAL] The repository is private, so it has no reader at all
+  where:     GitHub repository settings
+  observed:  `gh api repos/brendondgr/Loud-Radish` returns "visibility": "private".
+             Checked 2026-09-10, after this report was first written — the first
+             draft of repo-profile.yaml recorded it as public, which was wrong.
+  why:       The reader this audit optimised for is a hiring manager reading the
+             repository after a resume passed. They cannot read it. Everything
+             below the truth and runnability gates is aimed at somebody who does
+             not currently have access, so this is the finding the rest depends on.
+             It is also why every raw.githubusercontent.com URL for the committed
+             screenshots returns 404 to anyone unauthenticated, which looks exactly
+             like a broken image path and is not one — the images are on the default
+             branch and verified present through the authenticated API.
+  fix:       Make it public, once the three drafted README paragraphs are the
+             owner's own words. Not an audit's decision to take.
+  effort:    one click, after the writing.
+  verify:    gh api repos/brendondgr/Loud-Radish --jq .visibility
+```
+
+```
 [ADVISORY] The social preview image is unset, and cannot be set from a file
   observed:  Not detectable from the repository; it is a GitHub setting. Unset means a
-             link shared in Slack or a DM renders as generic grey.
-  fix:       Upload one by hand at Settings → Social preview. The hero screenshot works.
-             The most commonly skipped front-page item.
+             link shared in Slack or a DM renders as generic grey. Topics are also
+             empty. The description, checked 2026-09-10, is already set and is a
+             good one: "Loud Radish, All-In-One Transcriber: Record Apps & Sounds
+             in Real Time".
+  fix:       Upload a preview by hand at Settings → Social preview. The hero
+             screenshot works. The most commonly skipped front-page item.
 ```
 
 **Explicitly not recommended**, because the evidence does not support it and the owner has probably

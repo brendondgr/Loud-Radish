@@ -23,7 +23,17 @@ repo:
     Built solo between 2026-08-14 and 2026-09-10; 208 commits. All fourteen planned phases are
     complete and the suite passes. Linux only, single user, loopback only, no authentication.
     Which behaviours have been confirmed on real hardware is tracked in docs/checklist.md.
-  visibility: public
+  # **Private as of 2026-09-10**, checked via the GitHub API — not public, which the first draft
+  # of this profile assumed. Two consequences worth keeping in mind. The committed screenshots
+  # are not public today, so the mock-data discipline is a precaution taken before it is needed
+  # rather than after; and every raw.githubusercontent.com URL 404s for anyone unauthenticated,
+  # which is what a broken image would also look like. Re-check this field before concluding
+  # anything about a link from outside.
+  visibility: private
+  # `purpose: portfolio` and `reader: hiring-manager` below describe the intent for this
+  # repository, not its current state. It has to be made public for either to mean anything.
+  visibility_note: "Must be made public before it can serve the reader it is written for."
+
 
 purpose: portfolio
 reader: hiring-manager
@@ -71,6 +81,10 @@ showcase:
   personal_site_has_page: false
   video_url: null
   social_preview_set: false       # a GitHub setting, not a file; must be set by hand
+  # Already set, and better than a placeholder: "Loud Radish, All-In-One Transcriber: Record Apps
+  # & Sounds in Real Time". Checked via the API 2026-09-10.
+  github_description_set: true
+  github_topics: []               # none set; a GitHub setting, not a file
   links_verified_on: 2026-09-10
   # Rung 4 of the fallback ladder in scoping.md §4: in-repo committed assets. Rungs 1-3 are
   # unavailable and should not be faked — the app captures a microphone and talks to a local
