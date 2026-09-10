@@ -1044,9 +1044,18 @@ source file moved.
 - [ ] **Set the GitHub repository description, topics and social preview.** None can be set from a
       file. Unset, a shared link renders as generic grey. `docs/assets/live-transcript.png` is the
       obvious preview image.
-- [ ] **Watch the first CI run.** The `documented-commands` job starts the application on a runner
-      with no audio device. It worked in a container here, but if it proves flaky on GitHub, fix or
-      drop that job — a red CI on a repository people look at is worse than none.
+- [x] **Watch the first CI run.** Done. The `documented-commands` job passed — `uv sync` and
+      `uv run app.py` answering on 8395 both work on a runner with no audio device. **The `checks`
+      job failed, and it was right to.** Three tests asserted on things that depend on the
+      developer's desktop rather than on what they claimed to check: two shortcut tests stubbed
+      `service_available` and `_register_one` but not the session bus `register_all` actually
+      opens, so on a machine with no `DBUS_SESSION_BUS_ADDRESS` every action fell into the
+      "bus failed" branch; and `test_missing_device_support_is_explained` looked for the error
+      code `audio-device` in a note that says no such thing — an assertion that never ran on a
+      machine with a working audio backend, so it had been silently vacuous. All three are fixed,
+      and the shortcut ones are now verified with `env -u DBUS_SESSION_BUS_ADDRESS`. This is the
+      first regression CI caught, on its first run, which is the argument for it recorded in
+      D-069.
 
 **Recorded as deliberately declined**, so it does not get re-suggested: a CI status badge, profile
 stats cards and trophies, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, issue templates,

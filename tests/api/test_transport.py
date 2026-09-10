@@ -250,10 +250,21 @@ class TestHttpSurface:
         assert any(device["kind"] == "file" for device in body["devices"])
 
     def test_missing_device_support_is_explained(self, client: TestClient) -> None:
-        """An empty list with no explanation looks like a broken feature."""
+        """An empty list with no explanation looks like a broken feature.
+
+        **This assertion only runs on a machine without device support**, which is why it was
+        wrong for a fortnight without anyone noticing: on a developer's desktop `sounddevice`
+        opens a backend, `device_support` is true, and the branch below is never taken. On a
+        runner it is, and the assertion was still looking for the error *code* `audio-device`
+        rather than for anything the note actually says. What the note owes the reader is the
+        problem and the remedy, so that is what this checks.
+        """
         body = client.get("/api/audio/devices").json()
-        if not body["device_support"]:
-            assert "audio-device" in body["note"]
+        if body["device_support"]:
+            assert body["note"] == ""
+            return
+        assert "audio backend is missing" in body["note"]
+        assert "uv sync" in body["note"]
 
     def test_asr_models_are_listed_with_capabilities(self, client: TestClient) -> None:
         body = client.get("/api/asr/models").json()

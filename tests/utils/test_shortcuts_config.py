@@ -8,10 +8,29 @@ must produce a message naming the exact command to bind by hand.
 
 from __future__ import annotations
 
+import contextlib
+
 from app.companion import shortcuts
 from app.config import ShortcutsConfig
 
 from app import branding
+
+
+def _a_bus_that_opens(monkeypatch) -> None:  # noqa: ANN001
+    """Stub the session bus, so a test about the report is not a test about the machine.
+
+    `register_all` imports `open_dbus_connection` at call time and opens the SESSION bus. On a
+    developer's desktop that succeeds and these tests pass; on a machine with no session bus —
+    CI, a container, a headless box — it raises `KeyError('DBUS_SESSION_BUS_ADDRESS')`, every
+    action falls into the "bus failed" branch, and two tests that assert on registration *results*
+    fail for a reason that has nothing to do with what they are checking. Stubbing
+    `service_available` and `_register_one` was never enough on its own, because neither of them
+    is what opens the bus.
+    """
+    monkeypatch.setattr(
+        "jeepney.io.blocking.open_dbus_connection",
+        lambda bus="SESSION": contextlib.nullcontext(object()),
+    )
 
 
 def test_every_action_has_a_default_key() -> None:
@@ -74,6 +93,7 @@ def test_the_report_names_what_to_do_for_each_failure(monkeypatch) -> None:
 
 
 def test_a_registered_report_is_quiet(monkeypatch) -> None:
+    _a_bus_that_opens(monkeypatch)
     monkeypatch.setattr(shortcuts, "service_available", lambda: True)
     monkeypatch.setattr(
         shortcuts,
@@ -101,6 +121,7 @@ def test_registration_never_raises(monkeypatch) -> None:
 
 
 def test_an_empty_key_is_reported_rather_than_registered(monkeypatch) -> None:
+    _a_bus_that_opens(monkeypatch)
     monkeypatch.setattr(shortcuts, "service_available", lambda: True)
     monkeypatch.setattr(
         shortcuts,
