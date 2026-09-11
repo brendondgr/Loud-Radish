@@ -247,7 +247,10 @@ different in each and a blank pane during a recording reads as a broken transcri
 
 `web/frontend/static/brand/radish.svg` — a radish shouting through a megaphone, which is where the
 name comes from (D-038). One file, used in five places: the browser tab, the application header, the
-exported bundle's tab and topbar, the desktop entry, and the README.
+exported bundle's tab and topbar, the desktop entry, and the README's banner — which embeds these
+paths rather than linking the file, because GitHub will not render one SVG inside another. The
+banner is generated from the mark by `docs/assets/make_header.py`, so the drawing still has exactly
+one source (D-070).
 
 Its palette ships as `--brand-*` tokens:
 

@@ -1,0 +1,139 @@
+"""Compose ``docs/assets/header.svg``, the banner the root README opens with.
+
+The banner is *generated* rather than drawn by hand because it embeds the brand mark's own paths:
+``web/frontend/static/brand/radish.svg`` is the single source of the drawing (see "The Mark" in
+``docs/design-system.md``), and a hand-copied duplicate would drift the first time the mark is
+touched. Re-run this after any change to the mark, to the wordmark, or to the chip rows:
+
+    uv run docs/assets/make_header.py
+
+Two constraints shape what it emits. GitHub renders a README image in a sandbox with no web fonts
+and no external CSS, so every colour is literal, the type is asked for by system-font stack, and the
+chip widths are measured against a **monospace** stack, whose advance width is predictable enough to
+centre a row without a text-measuring pass. And the same file is rendered on GitHub's light *and*
+dark page backgrounds, so it carries its own dark panel instead of trusting the ground it lands on.
+
+This directory is documentation. No application code imports it.
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+SRC = ROOT / "web/frontend/static/brand/radish.svg"
+OUT = ROOT / "docs/assets/header.svg"
+
+W, H = 1000, 474
+
+SANS = "ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif"
+MONO = "ui-monospace,SFMono-Regular,Menlo,Consolas,'DejaVu Sans Mono',monospace"
+
+# Surfaces and text, mirrored from `web/frontend/static/css/tokens.css`. They are literals here
+# because an SVG served to GitHub cannot read the stylesheet; if the tokens move, move these too.
+PANEL_BG, PANEL_EDGE = "#0a0c0d", "#1c2123"
+CHIP_BG, CHIP_EDGE = "#101415", "#2a3033"
+TEXT, CHIP_TEXT, MUTED = "#e9e6df", "#c9ccc7", "#8e948f"
+CREAM = "#f6f2e8"  # --brand-cream
+
+# The mark sits on a cream disc, at the proportions `.header__mark` uses in the application:
+# a 28 px box with 2 px of padding around a 24 px drawing. It is drawn for a light ground — the
+# outline and the legs are near-black — so on a dark panel the disc is what keeps it a drawing.
+MARK = 148.0
+CX, CY = W / 2, 122.0
+DISC_R = MARK * 28 / 24 / 2
+
+CHIP_H, CHIP_FS, CHIP_GAP, CHIP_PAD = 32, 14.0, 10.0, 15.0
+DOT_R, DOT_GUTTER = 4.0, 13.0
+ADVANCE = 0.6  # monospace advance width, as a fraction of the font size
+
+#: Row one: the languages, each with its dot in the colour GitHub's own language bar uses.
+LANGUAGES = [
+    ("Python", "#3572a5"),
+    ("JavaScript", "#f1e05a"),
+    ("HTML", "#e34c26"),
+    ("CSS", "#663399"),
+    ("SQL", "#e38c00"),
+]
+
+#: Row two: what those languages are written against. No dots — they are not languages.
+STACK = [(name, None) for name in ("FastAPI", "uvicorn", "SQLite", "Jinja", "faster-whisper", "uv")]
+
+#: The tagline, one line per string. It is a condensation of the README's opening paragraph rather
+#: than a copy of it, because the paragraph is longer than a banner can carry — so it has to be
+#: re-read against that paragraph whenever the paragraph changes.
+TAGLINE = (
+    "Transcribes talks, calls, videos and your own voice — live, and on your own machine.",
+    "Answers questions about what was said. Types your dictation into any window.",
+)
+
+
+def mark_paths() -> str:
+    """The drawing inside `radish.svg`, without its wrapper or its C2PA metadata block."""
+    raw = SRC.read_text()
+    body = re.sub(r"<metadata>.*?</metadata>", "", raw, flags=re.S)
+    return body[body.index(">", body.index("<svg")) + 1 : body.rindex("</svg>")].strip()
+
+
+def chip_width(label: str, dot: str | None) -> float:
+    return CHIP_PAD * 2 + len(label) * CHIP_FS * ADVANCE + (DOT_GUTTER if dot else 0.0)
+
+
+def chip_row(items: list[tuple[str, str | None]], y: float) -> str:
+    """Lay a row of chips out centred on the banner, and return its markup."""
+    widths = [chip_width(label, dot) for label, dot in items]
+    x = (W - (sum(widths) + CHIP_GAP * (len(items) - 1))) / 2
+    parts: list[str] = []
+    for (label, dot), width in zip(items, widths, strict=True):
+        text_x = x + CHIP_PAD
+        parts.append(
+            f'<rect x="{x:.1f}" y="{y:g}" width="{width:.1f}" height="{CHIP_H}" '
+            f'rx="{CHIP_H / 2:g}" fill="{CHIP_BG}" stroke="{CHIP_EDGE}" />'
+        )
+        if dot:
+            parts.append(
+                f'<circle cx="{text_x + DOT_R:.1f}" cy="{y + CHIP_H / 2:.1f}" '
+                f'r="{DOT_R:g}" fill="{dot}" />'
+            )
+            text_x += DOT_GUTTER
+        parts.append(
+            f'<text x="{text_x:.1f}" y="{y + CHIP_H / 2 + 5:.1f}" font-family="{MONO}" '
+            f'font-size="{CHIP_FS:g}" fill="{CHIP_TEXT}">{label}</text>'
+        )
+        x += width + CHIP_GAP
+    return "\n    ".join(parts)
+
+
+def render() -> str:
+    return f"""<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" \
+height="{H}" role="img" aria-label="Loud Radish">
+  <!-- Generated by docs/assets/make_header.py — edit that, not this. -->
+  <rect x="0.5" y="0.5" width="{W - 1}" height="{H - 1}" rx="24" fill="{PANEL_BG}" \
+stroke="{PANEL_EDGE}" />
+
+  <circle cx="{CX:g}" cy="{CY:g}" r="{DISC_R:.1f}" fill="{CREAM}" />
+  <g transform="translate({CX - MARK / 2:.1f},{CY - MARK / 2:.1f}) scale({MARK / 1254:.6f})">
+    {mark_paths()}
+  </g>
+
+  <text x="{CX:g}" y="264" text-anchor="middle" font-family="{SANS}" font-size="66" \
+font-weight="700" letter-spacing="-1" fill="{TEXT}">Loud Radish</text>
+  <text x="{CX:g}" y="302" text-anchor="middle" font-family="{SANS}" font-size="19" \
+fill="{MUTED}">{TAGLINE[0]}</text>
+  <text x="{CX:g}" y="330" text-anchor="middle" font-family="{SANS}" font-size="19" \
+fill="{MUTED}">{TAGLINE[1]}</text>
+
+  <g>
+    {chip_row(LANGUAGES, 372)}
+  </g>
+  <g>
+    {chip_row(STACK, 418)}
+  </g>
+</svg>
+"""
+
+
+if __name__ == "__main__":
+    OUT.write_text(render())
+    print(f"wrote {OUT.relative_to(ROOT)} ({OUT.stat().st_size / 1024:.0f} kB)")

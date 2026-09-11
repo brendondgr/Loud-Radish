@@ -32,9 +32,11 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   ├── audit/                     # The repository audit of D-069: findings, and the plan
 │   │   ├── audit-report.md        #   What was true on 2026-09-10, with evidence tiers
 │   │   └── restructure-plan.md    #   What was changed, stage by stage, as approved
-│   ├── assets/                    # README screenshots, and the script that recaptures them
+│   ├── assets/                    # README screenshots and banner, and the scripts that redraw them
 │   │   ├── README.md              # What each image shows, and why they use the mock model
 │   │   ├── capture.py             # Playwright recapture; not imported by the application
+│   │   ├── make_header.py         # Redraws header.svg from the brand mark (D-070)
+│   │   ├── header.svg             # The README banner: the mark, the wordmark, the stack
 │   │   └── *.png                  # 2880x1800, mock-data only — never a real transcript
 │   ├── skills/                    # Canonical skill definitions used by every agent tool
 │   │   ├── global-project-rules/SKILL.md
@@ -294,7 +296,7 @@ listed them has been removed rather than left describing work that has landed.
 | `docs/plans/` | Written implementation plans. Each is a handoff artifact another agent can resume from cold. |
 | `docs/skills/` | Canonical skill definitions. The three agent-tool folders point here rather than carrying copies. |
 | `docs/audit/` | The repository audit and the restructure plan it produced (D-069). Kept because a re-audit is a diff against them rather than an argument from scratch. |
-| `docs/assets/` | Images the README renders, committed rather than hosted so they cannot rot, plus the script that recaptures them. Mock-data only: a real transcript is somebody's talk and must not be published. |
+| `docs/assets/` | Images the README renders, committed rather than hosted so they cannot rot, plus the scripts that regenerate them — `capture.py` for the screenshots, `make_header.py` for the banner. Mock-data only: a real transcript is somebody's talk and must not be published. |
 | `web/` | All web application code and assets. Keeps application code out of the repository root. |
 | `web/backend/` | The Python side: the pipeline, the HTTP API, and the WebSocket stream. |
 | `web/backend/app/branding.py` | The product name and every machine identifier built from it, each beside the legacy value it replaces. One file, so the next rename is one diff rather than a hunt through eleven — and so the migration policy is readable in one place instead of scattered across six subsystems. |

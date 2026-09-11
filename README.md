@@ -1,16 +1,21 @@
-<img src="web/frontend/static/brand/radish.svg" alt="" width="110" align="right" />
+<p align="center">
+  <img src="docs/assets/header.svg" width="880"
+       alt="Loud Radish — a radish shouting through a megaphone. Transcribes talks, calls, videos and your own voice, live and on your own machine. Answers questions about what was said, and types your dictation into any window. Written in Python, JavaScript, HTML, CSS and SQL, on FastAPI, uvicorn, SQLite, Jinja, faster-whisper and uv." />
+</p>
 
-# Loud Radish
+<!-- The banner is generated: `uv run docs/assets/make_header.py` redraws it from the mark in
+     `web/frontend/static/brand/radish.svg`. Its two tagline lines condense the paragraph below,
+     so if that paragraph changes, edit TAGLINE in the generator and re-run it. -->
 
-<!-- DRAFT, written by the repo audit on 2026-09-10 — rewrite this in your own words.
-     The one-liner is the highest-value sentence in the repository and it should be yours.
-     It needs three things: what it does, what it operates on, and the part a reader
-     would not guess (here, almost certainly "on your own machine" and "click the
-     timestamp to hear the claim"). Delete this comment once you have replaced it. -->
+**Turns anything this machine can hear into text you can work with, as it is being said.** Sit in a
+talk and read it as it is transcribed. Record a meeting, a call or a window on your desktop, with
+video if you want it, and get a second, more accurate pass when it ends. Ask questions about what
+was said and get an answer with timestamps you can click back to. Or press a shortcut, speak, press
+it again, and have the tidied text typed straight into whatever window you were already in.
 
-**Transcribes a talk on your own machine as it is spoken, then answers questions about what was
-said — with timestamps you can click back to.** Point it at a microphone, at whatever your
-speakers are playing, or at a window on your desktop. Nothing is uploaded.
+There is not one thing this does. The common part is that the audio and the text stay on your own
+machine: point it at a microphone, at whatever your speakers are playing, or at a window, and
+nothing is uploaded.
 
 <p align="center">
   <img src="docs/assets/live-transcript.png" width="900"

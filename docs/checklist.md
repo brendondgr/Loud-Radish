@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-09-10 (the repository audit — D-069)*
+*Last updated: 2026-09-10 (the README banner — D-070)*
 
 The active work list for Loud Radish. Update it whenever a task is finished or new work is
 discovered.
@@ -1034,11 +1034,14 @@ source file moved.
 
 **Open, and needing you rather than an agent.**
 
-- [ ] **Replace the three drafted paragraphs in the README.** The one-liner, the Why section and the
-      status line are marked with `DRAFT` HTML comments in the README source. They were inferred
-      from the code and the decision log, which is not the same as being true about your reasons.
-      An invented motivation on a front page is a claim that has to be defended by whoever reads
-      it, so these are the highest-value edit left in the repository.
+- [ ] **Replace the two remaining drafted paragraphs in the README.** The Why section and the status
+      line are still marked with `DRAFT` HTML comments in the README source. They were inferred from
+      the code and the decision log, which is not the same as being true about your reasons. An
+      invented motivation on a front page is a claim that has to be defended by whoever reads it, so
+      this is the highest-value edit left in the repository. **The opening paragraph is done** — it
+      is yours as of 2026-09-10 and now covers the whole application rather than only the talk it
+      started as (D-070). Its two-line condensation lives in `TAGLINE` in
+      `docs/assets/make_header.py`, so changing it means editing that and re-running the script.
 - [ ] **Decide whether `LICENSE` should carry your legal name** rather than `brendondgr`. Left as
       the git identity because guessing a legal name into a licence file is not an audit's call.
 - [ ] **Make the repository public.** It is **private** as of 2026-09-10, checked via the API.
@@ -1065,6 +1068,22 @@ source file moved.
 stats cards and trophies, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, issue templates,
 `CODEOWNERS`. Each is either unsupported by evidence as a signal or checkbox theatre on a
 single-owner repository. The reasoning is in D-069 and in [audit/audit-report.md](audit/audit-report.md).
+
+## Part 8 — The README banner (D-070)
+
+Done 2026-09-10. The README's header was the mark floated right of a Markdown heading, and the mark
+was unbacked — on GitHub's dark theme it lost its outline and its legs, which the design system had
+already recorded as the reason the application discs it in cream.
+
+- [x] `docs/assets/header.svg` — one centred banner: the disced mark, the wordmark, the one-liner,
+      and two chip rows for the languages and the stack.
+- [x] `docs/assets/make_header.py` generates it from `web/frontend/static/brand/radish.svg`, so the
+      drawing keeps one source even though GitHub forces the paths to be embedded.
+- [x] Rendered and checked on both GitHub page backgrounds; the banner carries its own panel.
+- [x] The README's opening paragraph widened from the original single goal to what the application
+      actually does — live transcription of anything the machine hears, recorded and window capture
+      with video, the second pass, the assistant, and dictation. The banner's tagline follows it.
+- [x] `docs/design-system.md`, `docs/structure.md` and `docs/assets/README.md` updated with it.
 
 ## Discovered work
 
