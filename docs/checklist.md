@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-09-10 (the README banner — D-070)*
+*Last updated: 2026-09-18 (a GPU fault ended two recordings — D-071 to D-074)*
 
 The active work list for Loud Radish. Update it whenever a task is finished or new work is
 discovered.
@@ -1084,6 +1084,36 @@ already recorded as the reason the application discs it in cream.
       actually does — live transcription of anything the machine hears, recorded and window capture
       with video, the second pass, the assistant, and dictation. The banner's tagline follows it.
 - [x] `docs/design-system.md`, `docs/structure.md` and `docs/assets/README.md` updated with it.
+
+## Part 9 — A GPU fault ended two recordings (D-071 to D-074)
+
+On 2026-09-18 two Zoom window recordings died when an `amdgpu` page fault aborted the server,
+both times during a long local gemma-4 generation on the iGPU faster-whisper was using. Plan:
+[plans/gpu-fault-isolation.md](plans/gpu-fault-isolation.md).
+
+- [x] Every request asks the model not to think — `llm.generation.disable_reasoning`, sent by the
+      client for all five callers; `polish.disable_reasoning` retired (D-073).
+- [x] The speech model runs in a supervised worker process: restarted after a fault in about a
+      second on the real GPU, moved to the CPU after three faults in ten minutes (D-071).
+- [x] The speech model and a local language model take turns on the GPU, with the speech model's
+      wait bounded so that turns never drop audio (D-072).
+- [x] The video recorder finalises its file when the server dies, and start-up finalises any an
+      earlier server left running (D-074).
+- [ ] **Confirm in a real Zoom window recording with the local model polishing.** The mechanisms
+      are tested with real processes and the real GPU model, but not yet under a live call.
+      **The fault did not reproduce on demand:** four minutes of GPU Whisper passes (54) beside
+      back-to-back thinking-mode gemma-4 generations (9) produced no fault and no restart, so the
+      link to overlap is still correlation. With turns on and the language model saturated,
+      29 of 31 passes ran alongside it after their 4 s wait. Turns keep the two apart only while
+      the language model has gaps, which the polish pass (about once a minute, about 3 s) leaves
+      and a long chat answer does not.
+- [ ] **The two recordings of 2026-09-18 are unfinished.** Their `audio.wav` is intact (328 s and
+      306 s), their `video.webm` has no index, and neither got its mux or its transcription pass.
+      A remux (`ffmpeg -i video.webm -c copy`) should make the videos seekable, and Recordings →
+      re-run should transcribe them. Not done, because it rewrites the user's own files.
+- [ ] **A kernel-side mitigation, if faults continue.** `amdgpu.cwsr_enable=0` is a plausible
+      candidate for compute preemption faults on gfx1151. It is untested here, and a kernel
+      parameter is the user's decision.
 
 ## Discovered work
 

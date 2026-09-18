@@ -38,6 +38,7 @@ RESTART_STAGE_PATHS: frozenset[str] = frozenset(
         "asr.precision",
         "asr.language",
         "asr.beam_size",
+        "asr.process_isolation",
     }
 )
 

@@ -13,6 +13,11 @@ application must not have to know about:
 * an answer can legitimately arrive with **no content at all** when the token budget was spent on
   reasoning, which surfaces as ``finish_reason == "length"`` and an empty ``text``.
 
+**Not thinking at all.** Built with ``disable_reasoning``, every request carries
+:data:`NO_REASONING_EXTRAS`. There is no portable field for this, so several are sent, and an
+endpoint that answers them with 400 or 422 is asked once more without them and never sent them
+again in this process (D-073).
+
 **Timeouts.** Connection and read timeouts are separate. A local model may take a minute to answer,
 which is normal, but should refuse to connect instantly if nothing is listening — one timeout value
 for both would either declare a working server dead or hang for a minute on a wrong port.
@@ -27,6 +32,7 @@ from typing import Any
 
 import httpx
 
+from ..gpu.turns import GpuTurns
 from .contract import (
     GenerationOptions,
     LlmBackend,
@@ -54,6 +60,32 @@ CONNECT_TIMEOUT_S = 4.0
 READ_TIMEOUT_S = 180.0
 #: Seconds allowed for a whole non-streaming call, such as listing models.
 PROBE_TIMEOUT_S = 10.0
+
+#: Extra request-body fields that ask a server not to think before answering.
+#:
+#: Each is understood by some servers and ignored by the rest. ``chat_template_kwargs`` reaches the
+#: chat template on llama.cpp and vLLM, and it is the one that works for gemma-4 behind llama.cpp:
+#: measured on 2026-09-18, a one-sentence request cost 242 tokens without it and 12 with it.
+#: ``reasoning_effort`` and llama.cpp's own ``reasoning_budget`` were both ignored there.
+#: ``reasoning_effort`` is what OpenAI and vLLM read, and ``think`` is what Ollama reads.
+NO_REASONING_EXTRAS: dict[str, Any] = {
+    "chat_template_kwargs": {"enable_thinking": False},
+    "reasoning_effort": "none",
+    "think": False,
+}
+
+#: The statuses a server uses when it refuses a field it does not know. Anything else — a 500, a
+#: 503 while a model loads — says nothing about the fields and is reported as it is.
+REJECTED_FIELD_STATUSES = frozenset({400, 422})
+
+#: Endpoints that have refused :data:`NO_REASONING_EXTRAS`. Kept for the life of the process,
+#: because a backend is built per request and would otherwise pay for the refusal every time.
+_REFUSES_REASONING_FIELDS: set[str] = set()
+
+
+class _FieldsRefused(Exception):
+    """Raised before anything is yielded, so the request can be made again without the fields."""
+
 
 #: Fields carrying the model's working rather than its answer. Servers disagree on the name.
 REASONING_KEYS = ("reasoning", "reasoning_content")
@@ -88,6 +120,8 @@ class OpenAiCompatibleBackend(LlmBackend):
         context_window: int = 8192,
         provider_id: str = "openai-compatible",
         client: httpx.AsyncClient | None = None,
+        disable_reasoning: bool = False,
+        gpu_turns: GpuTurns | None = None,
     ) -> None:
         self._endpoint = normalise_base_url(endpoint)
         self._model = model
@@ -99,6 +133,10 @@ class OpenAiCompatibleBackend(LlmBackend):
         self._client = client
         #: Set once a stream has been seen to carry reasoning, so the UI can offer to show it.
         self._saw_reasoning = False
+        self._disable_reasoning = disable_reasoning
+        #: Set when this server computes on the speech model's GPU: every stream waits out a
+        #: speech pass before it starts, and holds the GPU until it ends (D-072).
+        self._gpu_turns = gpu_turns
 
     # -- identity ------------------------------------------------------------------
 
@@ -198,9 +236,41 @@ class OpenAiCompatibleBackend(LlmBackend):
             "temperature": opts.temperature,
             "max_tokens": opts.max_output_tokens,
             "stream": True,
-            **opts.extra,
         }
+        asks_not_to_think = (
+            self._disable_reasoning and self._endpoint not in _REFUSES_REASONING_FIELDS
+        )
+        # The caller's own fields win: a request that needs something specific says so.
+        first = {**body, **NO_REASONING_EXTRAS, **opts.extra} if asks_not_to_think else None
 
+        if self._gpu_turns is None:
+            async for chunk in self._stream_with_fallback(body, first, opts):
+                yield chunk
+            return
+        async with self._gpu_turns.language_model():
+            async for chunk in self._stream_with_fallback(body, first, opts):
+                yield chunk
+
+    async def _stream_with_fallback(
+        self, body: dict[str, Any], first: dict[str, Any] | None, opts: GenerationOptions
+    ) -> AsyncIterator[LlmChunk]:
+        """Ask with the no-reasoning fields; ask once more without them if they are refused."""
+        try:
+            async for chunk in self._stream_once(first or {**body, **opts.extra}, bool(first)):
+                yield chunk
+        except _FieldsRefused:
+            _REFUSES_REASONING_FIELDS.add(self._endpoint)
+            logger.info(
+                "%s refused the no-reasoning fields; sending requests without them",
+                self._endpoint,
+            )
+            async for chunk in self._stream_once({**body, **opts.extra}, False):
+                yield chunk
+
+    async def _stream_once(
+        self, body: dict[str, Any], refusal_is_retryable: bool
+    ) -> AsyncIterator[LlmChunk]:
+        """Make one request. Raises :class:`_FieldsRefused` before yielding, or not at all."""
         client, owned = self._open(READ_TIMEOUT_S)
         url = f"{self._endpoint}/chat/completions"
         usage: LlmUsage | None = None
@@ -218,6 +288,8 @@ class OpenAiCompatibleBackend(LlmBackend):
                     # The body must be read before it can be quoted; on a streaming response that
                     # is an explicit step rather than an attribute.
                     await response.aread()
+                    if refusal_is_retryable and response.status_code in REJECTED_FIELD_STATUSES:
+                        raise _FieldsRefused
                     self._raise_for_status(response, _safe_text(response))
 
                 async for line in response.aiter_lines():

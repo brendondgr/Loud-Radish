@@ -108,7 +108,9 @@ class SessionManager(
         self._source: AudioSource | None = None
         self._engine: Any = None
         self._gate: SpeechGate | None = None
-        self._asr = AsrLifecycle(config.resolve().asr, on_progress=self._on_load_progress)
+        self._asr = AsrLifecycle(
+            config.resolve().asr, on_progress=self._on_load_progress, on_notice=self._on_asr_notice
+        )
         self._prompts: PromptBuilder | None = None
 
         self._queue: DropOldestQueue[CapturedFrame] = DropOldestQueue(QUEUE_CAPACITY)

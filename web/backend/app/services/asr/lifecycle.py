@@ -24,8 +24,10 @@ import numpy as np
 
 from ...config.schema import AsrConfig
 from ..audio.formats import SAMPLE_RATE
+from ..gpu.turns import GpuTurns, shared_turns
 from .contract import AsrBackend, AsrLoadError, AsrResult
 from .hallucination import judge
+from .isolated import IsolatedAsrBackend, NoticeListener
 from .registry import build_backend
 
 logger = logging.getLogger(__name__)
@@ -74,9 +76,19 @@ ProgressCallback = Callable[[LoadProgress], None | Awaitable[None]]
 class AsrLifecycle:
     """Owns the loaded backend and the transitions between models."""
 
-    def __init__(self, config: AsrConfig, on_progress: ProgressCallback | None = None) -> None:
+    def __init__(
+        self,
+        config: AsrConfig,
+        on_progress: ProgressCallback | None = None,
+        on_notice: NoticeListener | None = None,
+        turns: GpuTurns | None = None,
+    ) -> None:
         self._config = config
         self._on_progress = on_progress
+        #: Told when an isolated model's process is replaced, or moved to the CPU (D-071).
+        self._on_notice = on_notice
+        #: Taken for every pass that runs on the GPU, so a local language model waits (D-072).
+        self._turns = turns or shared_turns()
         self._backend: AsrBackend | None = None
         self._state = LoadState.UNLOADED
         self._error: str = ""
@@ -149,6 +161,8 @@ class AsrLifecycle:
             await self._unload_locked()
 
             backend = build_backend(self._config)
+            if isinstance(backend, IsolatedAsrBackend):
+                backend.set_notice_listener(self._on_notice)
             await self._report(LoadState.LOADING, backend.model_id, "Loading model")
 
             try:
@@ -222,7 +236,11 @@ class AsrLifecycle:
         if not backend.capabilities.accepts_prompt:
             prompt = None
 
-        result = backend.transcribe(audio, prompt)
+        if backend.capabilities.runs_on == "cuda":
+            with self._turns.speech_pass(self._config.gpu_turn_wait_s):
+                result = backend.transcribe(audio, prompt)
+        else:
+            result = backend.transcribe(audio, prompt)
         return self._filter_hallucinations(result, audio)
 
     def _filter_hallucinations(self, result: AsrResult, audio: np.ndarray) -> AsrResult:

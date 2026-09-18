@@ -18,7 +18,7 @@ comes back the wrong length is discarded and the raw transcript is pasted instea
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Final
 
 if TYPE_CHECKING:
     from ...config.schema import AppConfig
@@ -42,19 +42,10 @@ Do NOT:
 Reply with the corrected text alone. If the input is empty or is not speech, reply with the input
 unchanged."""
 
-#: Sent to servers that expose a reasoning toggle. A dictation is a punctuation pass, and a model
-#: that spends 292 thinking tokens on a twenty-word sentence — measured here — turns a keystroke
-#: into a coffee break.
-NO_REASONING_EXTRAS: Final[dict[str, Any]] = {
-    "chat_template_kwargs": {"enable_thinking": False},
-    "reasoning_effort": "low",
-}
-
-
 def resolve(config: AppConfig) -> str:
     """The instructions this dictation tidy should follow. Whitespace counts as blank."""
     written = (config.dictation.instructions or "").strip()
     return written or DEFAULT_DICTATION_PROMPT
 
 
-__all__ = ["DEFAULT_DICTATION_PROMPT", "NO_REASONING_EXTRAS", "resolve"]
+__all__ = ["DEFAULT_DICTATION_PROMPT", "resolve"]

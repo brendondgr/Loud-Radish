@@ -1,6 +1,6 @@
 # Repository Structure
 
-*Last updated: 2026-09-09 (the rewrite instructions belong to the user — D-068)*
+*Last updated: 2026-09-18 (the speech model's own process, GPU turns, the recorder's lifetime — D-071 to D-074)*
 
 Canonical map of Loud Radish. This file documents **purpose**, not source code. Update it in
 the same change that adds, moves, renames, or removes a directory or significant file.
@@ -105,6 +105,9 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   │       ├── faster_whisper.py  # The real default, optional dependency
 │   │   │       ├── hallucination.py  # Discards text the model invented (D-019)
 │   │   │       ├── prompting.py   # Session and rolling-context term biasing
+│   │   │       ├── isolated.py    # A GPU backend in its own process: supervised, restarted after
+│   │   │       │                  #   a fault, moved to the CPU if it keeps faulting (D-071)
+│   │   │       ├── worker.py      # That process: load, transcribe, exit when the server goes
 │   │   │       └── lifecycle.py   # Async load, warm-up, swap, unload
 │   │   │   └── streaming/         # The core — commit policy and buffering
 │   │   │       ├── agreement.py   # LocalAgreement-n, the commit rule
@@ -119,6 +122,8 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   │       ├── portal.py      # ScreenCast over D-Bus: consent, and a PipeWire node
 │   │   │       ├── pipeline.py    # The GStreamer launch line, built from what is installed
 │   │   │       ├── recorder.py    # The subprocess, its lifetime, and its finalisation
+│   │   │       ├── lifetime.py    # A recorder that finalises when the server dies, and the
+│   │   │       │                  #   start-up sweep for ones an old server left (D-074)
 │   │   │       ├── mux.py         # Combines the video with the session's audio, correcting the
 │   │   │                          #   capture-start offset between them (D-035)
 │   │   │       └── stitch.py      # Joins the pieces of a capture that had to be restarted onto
@@ -159,6 +164,8 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   │       └── manager.py     # capture → VAD → engine → store → transport. Owns the
 │   │   │                          #   lifecycle; the five modules above are the rest of this one
 │   │   │                          #   class, split across files (D-039)
+│   │   │   └── gpu/               # The GPU shared between the speech and language models
+│   │   │       └── turns.py       # They take turns; the speech model's wait is bounded (D-072)
 │   │   │   └── llm/               # SEAM B — the pluggable language model
 │   │   │       ├── contract.py    # Interface, streaming chunks, capabilities
 │   │   │       ├── openai_compatible.py  # Ollama, LM Studio, llama.cpp, vLLM, OpenAI
@@ -309,6 +316,7 @@ listed them has been removed rather than left describing work that has landed.
 | `scripts/_bootstrap.py` | What every script does first: put `web/backend` on `sys.path` and make the same GPU-wheel repair `app.py` makes on launch, so a bare `uv run` of a script cannot break the server's next model load (D-064). A test asserts every script imports it. |
 | `scripts/benchmark_asr.py` | Every model, device and precision measured on *this* machine, each in its own process. Exists because the default cannot be chosen from published benchmarks (D-053). |
 | `web/backend/app/companion/` | The tray icon and the global shortcuts — the two things a browser page cannot do. Deliberately a *remote control*: it polls the HTTP API, holds no state, and can be killed and restarted without the server noticing. |
+| `web/backend/app/services/gpu/` | The GPU as a resource two unrelated stages share. Its own package because it belongs to neither: the speech model and the language model both take turns through it, and neither should import the other (D-072). |
 | `web/backend/app/services/capture/` | Recording a window's picture. Separate from `recording/` because they solve unrelated problems: one negotiates with a compositor for pixels, the other writes and transcribes audio. |
 | `web/backend/app/services/recording/` | Capturing audio to a file and transcribing it once whole. Separate from `streaming/` because the two answer opposite questions: `streaming/` decides what is safe to show while audio is still arriving, and this runs only when it has stopped. |
 | `web/backend/app/services/polish/` | The clean-up pass that rewrites finished minutes for reading. Separate from `context/` because the two do opposite things: `context/` compresses on purpose, and this must not lose a single claim. What it is told to do, and every guard on what comes back, are settings (D-068). |

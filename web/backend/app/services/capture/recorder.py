@@ -38,6 +38,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Final
 
+from .lifetime import spawn_recorder
 from .pipeline import PipelineSpec
 
 logger = logging.getLogger(__name__)
@@ -157,7 +158,9 @@ class WindowRecorder:
         Path(self.spec.video_path).parent.mkdir(parents=True, exist_ok=True)
 
         try:
-            self._process = subprocess.Popen(  # noqa: S603 - argv built from a fixed vocabulary
+            # Through the spawner, so the recorder is sent SIGINT — and finalises its file — if
+            # the server dies without stopping it (D-074).
+            self._process = spawn_recorder(
                 self.spec.args,
                 stdout=subprocess.DEVNULL,
                 # **A file, not a pipe, whenever there is somewhere to put it.** Nothing reads this

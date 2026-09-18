@@ -118,6 +118,20 @@
         from the front, silently removing the instructions.
       </p>
     </div>
+
+    <div class="field">
+      <label class="field__label" for="llm-shares-gpu">Shares the speech model's GPU</label>
+      <select class="field__control" id="llm-shares-gpu" data-config="llm.local.shares_gpu">
+        <option value="auto">When the address is this machine</option>
+        <option value="yes">Yes</option>
+        <option value="no">No — it runs elsewhere</option>
+      </select>
+      <p class="field__hint">
+        When it does, the two take turns: an answer waits for the speech model's current pass,
+        and a pass waits a few seconds for an answer to finish. Running both at once on one GPU is
+        what crashed two recordings.
+      </p>
+    </div>
   </div>
 
   {# -- hosted ------------------------------------------------------------------------ #}
@@ -255,6 +269,18 @@
       <p class="field__hint">
         A reasoning model spends part of this budget thinking before it writes anything. If answers
         come back empty, this is the first thing to raise.
+      </p>
+    </div>
+
+    <div class="field field--switch">
+      <input type="checkbox" id="llm-no-reasoning" data-config="llm.generation.disable_reasoning" />
+      <label class="field__label field__label--inline" for="llm-no-reasoning">
+        Answer without thinking first
+      </label>
+      <p class="field__hint">
+        Applies to every request: the clean-up pass, summaries, glossary, chat and dictation.
+        Thinking makes a local model's answers about ten times longer, and it spends that time on
+        the GPU the speech model is using.
       </p>
     </div>
   </div>

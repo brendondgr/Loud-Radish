@@ -13,7 +13,7 @@ import pytest
 from app.config.defaults import default_config
 from app.models.segment import Segment
 from app.services.llm.contract import LlmChunk
-from app.services.llm.errors import LlmServerError, LlmUnreachableError
+from app.services.llm.errors import LlmUnreachableError
 from app.services.polish.prompts import DEFAULT_POLISH_PROMPT
 from app.services.polish.worker import MAX_ATTEMPTS, PolishWorker
 from app.services.transcript import TranscriptStore
@@ -29,13 +29,10 @@ def anyio_backend() -> str:
 class ScriptedBackend:
     """Returns canned completions, or raises. Streams, because that is the path the worker takes."""
 
-    def __init__(self, replies=None, error=None, finish_reason="stop", fail_times=0):
+    def __init__(self, replies=None, error=None, finish_reason="stop"):
         self._replies = list(replies or [])
         self._error = error
         self._finish_reason = finish_reason
-        #: Raise for the first N calls only — how a strict server rejecting an unknown body field
-        #: is distinguished from a server that is simply down.
-        self._fail_times = fail_times
         self.calls: list[str] = []
         self.extras: list[dict] = []
         #: The system message of each call — the instruction list the worker resolved.
@@ -43,9 +40,6 @@ class ScriptedBackend:
 
     async def _generate(self, messages, options):
         self.extras.append(dict(options.extra) if options else {})
-        if self._fail_times > 0:
-            self._fail_times -= 1
-            raise LlmServerError("HTTP 400: unknown field 'think'")
         if self._error:
             raise self._error
         self.calls.append(messages[-1].content)
@@ -336,28 +330,14 @@ class TestWhenTheModelIsNotAvailable:
         assert await worker.poll() is False
         assert "output budget" in events[0][1]["message"]
 
-    async def test_a_server_that_rejects_the_no_reasoning_fields_is_retried_without_them(
-        self, store
-    ) -> None:
+    async def test_the_worker_leaves_the_reasoning_fields_to_the_client(self, store) -> None:
+        """The client sends them on every request (D-073); a second copy here would drift."""
         fill(store)
-        backend = ScriptedBackend(replies=[POLISHED], fail_times=1)
-        worker, events, _ = build(store, backend)
+        backend = ScriptedBackend(replies=[POLISHED])
+        worker, _, _ = build(store, backend)
 
         assert await worker.poll() is True
-        assert backend.extras[0] != {}
-        assert backend.extras[1] == {}
-        assert events[0][0] == "transcript.polished"
-
-    async def test_the_rejected_fields_are_not_sent_again(self, store) -> None:
-        fill(store)
-        backend = ScriptedBackend(replies=[POLISHED, POLISHED], fail_times=1)
-        worker, _, _ = build(store, backend)
-        await worker.poll()
-
-        store.append_segment(Segment(id=99, text=" ".join(RAW), start=200.0, end=280.0))
-        await worker.poll()
-
-        assert backend.extras[-1] == {}
+        assert backend.extras == [{}]
 
 
 class TestTheContentGuard:

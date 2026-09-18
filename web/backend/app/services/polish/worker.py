@@ -38,7 +38,7 @@ from typing import Any
 
 from ...config.schema import AppConfig
 from ..llm.contract import GenerationOptions, LlmBackend, system, user
-from ..llm.errors import LlmError, LlmServerError
+from ..llm.errors import LlmError
 from . import prompts
 from .chunker import decide_cut
 from .guard import collapse_to_paragraph, preserves_content, reconcile_timestamps, strip_decoration
@@ -98,9 +98,6 @@ class PolishWorker:
         self._cursor = float(store.last_polished_end()) if store is not None else 0.0
         self._attempts = 0
         self._reported_failure = False
-        #: Cleared once a server has rejected the no-reasoning fields, so they are sent at most
-        #: twice per session rather than on every chunk.
-        self._send_reasoning_extras = True
 
     @property
     def cursor(self) -> float:
@@ -226,20 +223,6 @@ class PolishWorker:
 
         try:
             answer, finish_reason = await self._generate(backend, source, config)
-        except LlmServerError as exc:
-            # The most likely cause of a server error on this particular request is the extra
-            # no-reasoning fields, which not every server tolerates. One retry without them
-            # distinguishes "this server is strict" from "this server is broken".
-            if not self._send_reasoning_extras:
-                self._report(exc.message)
-                return None
-            logger.info("Retrying without the no-reasoning fields: %s", exc.message)
-            self._send_reasoning_extras = False
-            try:
-                answer, finish_reason = await self._generate(backend, source, config)
-            except LlmError as retry_exc:
-                self._report(retry_exc.message)
-                return None
         except LlmError as exc:
             self._report(exc.message)
             return None
@@ -268,15 +251,10 @@ class PolishWorker:
         have different remedies. Reasoning chunks are dropped here — a model's working is not the
         transcript.
         """
-        extra = (
-            dict(prompts.NO_REASONING_EXTRAS)
-            if config.polish.disable_reasoning and self._send_reasoning_extras
-            else {}
-        )
+        # No reasoning fields here: the client sends them on every request (D-073).
         options = GenerationOptions(
             temperature=min(config.llm.generation.temperature, MAX_TEMPERATURE),
             max_output_tokens=max(POLISH_TOKENS, config.llm.generation.max_output_tokens),
-            extra=extra,
         )
 
         parts: list[str] = []

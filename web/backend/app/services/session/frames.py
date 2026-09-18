@@ -139,6 +139,13 @@ class FramePathMixin:
             return
         self._dispatch(events)
 
+    def _on_asr_notice(self, kind: str, detail: str) -> None:
+        """The speech model's process was replaced. Called on whichever thread noticed (D-071)."""
+        if kind == "fell-back":
+            self._emit_failure(degradation.asr_fell_back_to_cpu(self._asr.model_id))
+        else:
+            self._emit_failure(degradation.asr_worker_restarted(detail))
+
     def _dispatch(self, events: list[Any]) -> None:
         """Persist and publish whatever the engine produced."""
         for event in events:
