@@ -88,6 +88,8 @@ CONFIG_PATH_ENV = branding.env_var("CONFIG_PATH")
 RETIRED_PATHS: tuple[str, ...] = (
     # The batch pass cuts at pauses and has no overlap (D-062).
     "recording.batch_overlap_s",
+    # One switch for every request now, not one for the polish pass alone (D-073).
+    "polish.disable_reasoning",
 )
 LEGACY_CONFIG_PATH_ENV = branding.legacy_env_var("CONFIG_PATH")
 

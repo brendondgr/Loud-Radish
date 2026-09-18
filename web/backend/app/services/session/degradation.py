@@ -172,6 +172,39 @@ def dropped_audio(events: int, model: str = "") -> Failure:
     )
 
 
+def asr_worker_restarted(detail: str) -> Failure:
+    """The speech model's process died or hung, and a new one took over (D-071).
+
+    A warning rather than a failure, because transcription continued: the pass that was in flight
+    was made again in the new process. Said anyway, because the few seconds it took are a visible
+    pause in the live transcript, and a pause nobody explains reads as the application stalling.
+    """
+    return Failure(
+        code="asr-worker-restarted",
+        message=(
+            f"{detail} The speech model was restarted in a new process and transcription "
+            "carried on; the recording was not affected."
+        ),
+        severity=Severity.WARNING,
+    )
+
+
+def asr_fell_back_to_cpu(model: str) -> Failure:
+    """The GPU faulted repeatedly, so the speech model now runs on the CPU (D-071)."""
+    fallback = smaller_model(model.split(":")[1] if ":" in model else model)
+    return Failure(
+        code="asr-fell-back-to-cpu",
+        message=(
+            "The speech model's GPU process kept failing, so it has moved to the CPU for the "
+            "rest of this session. Transcription continues, more slowly"
+            + (f" — {fallback} would keep up more easily." if fallback else ".")
+        ),
+        severity=Severity.WARNING,
+        remedy={"asr.model": fallback} if fallback else None,
+        remedy_label=f"Switch to {fallback}" if fallback else "",
+    )
+
+
 def disk_full(detail: str) -> Failure:
     """The session file could not be written.
 

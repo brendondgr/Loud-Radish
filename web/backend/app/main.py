@@ -16,6 +16,7 @@ import logging
 import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -25,6 +26,7 @@ from . import branding, paths
 from .branding import APP_TITLE
 from .config import ConfigStore, CredentialStore
 from .routes import build_router
+from .services.capture.lifetime import finalise_orphans_in_background
 from .services.chat import ChatService
 from .services.context import ContextWorker
 from .services.dictation import DictationService
@@ -63,6 +65,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Done at start-up rather than lazily because every reader — the listing, the past-sessions
     # page, the export — would otherwise need to understand both layouts forever.
     migrate_flat_recordings(config.resolve().recording.recording_dir)
+
+    # A recorder left running by a server that died is writing nothing and holding an unfinished
+    # file. There can be no legitimate one yet, so each is asked to finalise (D-074).
+    finalise_orphans_in_background(Path(config.resolve().recording.recording_dir))
 
     # The hub needs the running loop so the pipeline's worker threads can hand it events. This is
     # the only place asyncio and the audio path meet.

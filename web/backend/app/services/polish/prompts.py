@@ -35,7 +35,7 @@ edits this keeps tracking whatever ships next.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Final
 
 if TYPE_CHECKING:
     from ...config.schema import AppConfig
@@ -82,23 +82,6 @@ around the whole passage, no markup of any kind.
 changed.
 """
 
-#: Extra request-body fields that ask a provider not to think before answering.
-#:
-#: There is no portable way to do this. Each of these is understood by some servers and ignored by
-#: others: ``reasoning_effort`` by OpenAI and vLLM, ``chat_template_kwargs`` by vLLM and llama.cpp
-#: for Qwen-style templates, ``think`` by Ollama. Sending all three works because almost every
-#: OpenAI-compatible server ignores fields it does not recognise — and for the few that do not, the
-#: worker retries once without them and then stops sending them for the rest of the session.
-#:
-#: They are belt and braces regardless: the client already keeps reasoning in a separate field from
-#: the answer, so working that arrives anyway is discarded rather than shown.
-NO_REASONING_EXTRAS: Final[dict[str, Any]] = {
-    "reasoning_effort": "none",
-    "chat_template_kwargs": {"enable_thinking": False},
-    "think": False,
-}
-
-
 def resolve(config: AppConfig) -> str:
     """The instructions this polish pass should follow.
 
@@ -110,4 +93,4 @@ def resolve(config: AppConfig) -> str:
     return written or DEFAULT_POLISH_PROMPT
 
 
-__all__ = ["DEFAULT_POLISH_PROMPT", "NO_REASONING_EXTRAS", "resolve"]
+__all__ = ["DEFAULT_POLISH_PROMPT", "resolve"]

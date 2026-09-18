@@ -53,12 +53,26 @@ class BackendInfo:
 
 _FACTORIES: dict[str, BackendFactory] = {}
 _INFO: dict[str, Callable[[], BackendInfo]] = {}
+#: Backends that run in their own process when ``asr.process_isolation`` is on (D-071): the ones
+#: that drive a GPU, where a fault aborts whichever process made it. The mock stays in-process,
+#: because it cannot fault and the tests that use it would pay a process start each.
+_ISOLATED: set[str] = set()
 
 
-def register(backend_id: str, factory: BackendFactory, info: Callable[[], BackendInfo]) -> None:
+def register(
+    backend_id: str,
+    factory: BackendFactory,
+    info: Callable[[], BackendInfo],
+    *,
+    isolate: bool = False,
+) -> None:
     """Register a backend and the description of it shown in the UI."""
     _FACTORIES[backend_id] = factory
     _INFO[backend_id] = info
+    if isolate:
+        _ISOLATED.add(backend_id)
+    else:
+        _ISOLATED.discard(backend_id)
 
 
 def registered_ids() -> list[str]:
@@ -77,7 +91,20 @@ def available_backends() -> list[BackendInfo]:
 
 
 def build_backend(config: AsrConfig) -> AsrBackend:
-    """Construct the configured backend.
+    """Construct the configured backend — in its own process when it drives a GPU (D-071).
+
+    Raises:
+        AsrUnavailableError: when the backend id is unknown, listing what is registered.
+    """
+    if config.process_isolation and config.backend in _ISOLATED:
+        from .isolated import IsolatedAsrBackend
+
+        return IsolatedAsrBackend(config)
+    return build_in_process(config)
+
+
+def build_in_process(config: AsrConfig) -> AsrBackend:
+    """Construct the configured backend in this process. What the worker process itself calls.
 
     Raises:
         AsrUnavailableError: when the backend id is unknown, listing what is registered.
@@ -169,4 +196,4 @@ def _faster_whisper_info() -> BackendInfo:
 
 
 register("mock", _build_mock, _mock_info)
-register("faster-whisper", _build_faster_whisper, _faster_whisper_info)
+register("faster-whisper", _build_faster_whisper, _faster_whisper_info, isolate=True)

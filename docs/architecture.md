@@ -189,10 +189,29 @@ Four workers connected by queues. This structure is what satisfies **C5**.
 | Chat | On demand | Yes | Cancellable in flight |
 | Transport | Responsive | Never on the event path | Hypothesis events coalesce to the latest; committed events are never dropped |
 
-Single process, `asyncio` for transport, dedicated threads for capture and inference. Python's global
-interpreter lock is tolerable because inference libraries release it during native computation. If
-capture stalls are ever observed under soak, the escape hatch is moving ASR into its own process
-behind the same queue interface — the interface is designed for that, but the split is not built.
+One server process, `asyncio` for transport, dedicated threads for capture and inference. Python's
+global interpreter lock is tolerable because inference libraries release it during native
+computation.
+
+**The speech model runs in a process of its own (D-071).** It was designed as an escape hatch
+against capture stalls and was never needed for that. It was built on 2026-09-18 for a different
+reason: a GPU memory fault is not an exception, and the ROCm runtime answers one by aborting the
+process that made it, which ended the server and two recordings. `services/asr/isolated.py` puts
+a GPU backend behind the same `AsrBackend` contract, running in `services/asr/worker.py`. A worker
+that dies or hangs is replaced and its pass made again, in about a second. Three crashes in ten
+minutes move the model to the CPU. The server's death is end-of-file on the worker's socket, so
+the worker never outlives it.
+
+**The speech model and a local language model take turns on a shared GPU (D-072).** A
+language-model request waits out the current speech pass, and a speech pass waits up to
+`asr.gpu_turn_wait_s` (4 s, inside the capture queue's 6.4 s of slack) for requests to finish,
+then runs anyway rather than drop audio. `services/gpu/turns.py` holds the state. Every request
+also asks the model not to think (D-073), which keeps the generations short enough to fit inside
+that wait.
+
+**The video recorder cannot outlive the server (D-074).** It is started with a parent-death
+`SIGINT`, which `gst-launch-1.0 -e` turns into a finalised file. Start-up finalises any recorder an
+earlier server left behind.
 
 ## Configuration
 
@@ -256,7 +275,7 @@ transcription. A chat error is an inconvenience; a lost transcript is a ruined s
 |---|---|
 | Eventual packaging — browser plus local server, or a desktop shell | Open. The contract keeps both available; the choice is the user's. |
 | Default ASR model and compute device | Open. Depends on the user's hardware and must be benchmarked locally. A conservative default ships. |
-| Process split for ASR | Deferred. Designed for, not built. Revisit only if soak testing shows capture stalls. |
+| Process split for ASR | **Built (D-071)** — for GPU faults, not capture stalls. The GPU backend runs in a supervised worker process; the mock stays in-process. |
 | Embeddings-based retrieval | Deferred. Keyword search over SQLite FTS5 is expected to be sufficient for single-talk sessions. |
 | Speaker diarisation | Out of scope for v1. The segment model reserves an optional `speaker` field so adding it later is not a migration. |
 

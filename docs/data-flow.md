@@ -193,7 +193,33 @@ GET /api/sessions/{key}/webapp
 
 Nothing in the archive reaches outside it, and nothing in it is a credential. The video is streamed
 a megabyte at a time rather than read whole: a talk is measured in hundreds of megabytes and this
-runs in the same process as the speech model.
+runs in the server process, beside capture and the live pipeline.
+
+## The speech model's process, and the GPU it shares (D-071, D-072)
+
+```text
+asr-worker thread ──► AsrLifecycle.transcribe ──► GpuTurns.speech_pass (≤ 4 s wait, GPU only)
+                                                        │
+                                   IsolatedAsrBackend ──┤  one request at a time
+                                                        ▼
+                              socket (pickled numpy array) ──► worker process: faster-whisper
+                                                        ◄── AsrResult, or ("error", kind, text)
+
+polish · summaries · glossary · chat · dictation tidy
+        └──► OpenAiCompatibleBackend.stream ──► GpuTurns.language_model (when the server is local)
+                    body + chat_template_kwargs.enable_thinking=false  (D-073)
+```
+
+- **A worker that dies mid-pass** is noticed within 0.25 s. A new one loads the same model, and
+  the same audio is sent again, so the engine sees one slow pass. The session emits
+  `asr-worker-restarted`, a warning that says the recording was not affected.
+- **Audio keeps arriving meanwhile.** Capture never waits on the speech model, and the queue holds
+  about 6.4 s, while a restart takes about 1 s. That is also why a speech pass waits at most 4 s
+  for a language model before running alongside it.
+- **Three crashes in ten minutes** reload the model on the CPU (`int8`) for the rest of that load,
+  with `asr-fell-back-to-cpu`.
+- **Nothing crosses the socket but audio, a prompt, and the words back.** Transcript text never
+  enters a log on either side.
 
 ## The two timestamp domains
 

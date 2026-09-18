@@ -39,6 +39,7 @@ conventions in [../skills/planner/SKILL.md](../skills/planner/SKILL.md).
 | [shortcuts-dictation-and-the-open-list.md](shortcuts-dictation-and-the-open-list.md) | Global shortcuts that actually fire, dictation from a keypress to the clipboard and into the focused window, a microphone picker and a native settings window in the tray, and Part 4 of the checklist closed out | **Complete (10 / 10)** |
 | [pause-aligned-batch-and-open-items.md](pause-aligned-batch-and-open-items.md) | Six checklist items closed by code: the batch pass cut at pauses with a pause-aligned checkpoint, a dictation whose tidy overlaps its transcription, a bootstrap so a bare `uv run` cannot break the GPU wheel, single-pass range and search reads, and an export that names its revision | **Complete (7 / 7)** |
 | [editable-rewrite-instructions.md](editable-rewrite-instructions.md) | Both instruction lists that rewrite transcribed speech become settings, with a blank field meaning the text that shipped, and every output guard exposed so an edit is not silently reversed | **Complete (7 / 7)** |
+| [gpu-fault-isolation.md](gpu-fault-isolation.md) | Two recordings killed by a GPU memory fault: the speech model in its own supervised process, turns on a GPU shared with a local language model, no reasoning on any request, and a video recorder that finalises when the server dies | **Complete (5 / 5)** |
 
 ## The multi-mode expansion
 

@@ -108,6 +108,14 @@ class AsrConfig(_Base):
     #: The first line of defence: text that is never decoded cannot be invented.
     vad_filter: bool = True
     hallucination: HallucinationConfig = Field(default_factory=HallucinationConfig)
+    #: Run a GPU speech model in a process of its own (D-071). A GPU memory fault aborts the
+    #: process that made it; isolated, that costs a restarted worker and a few seconds of
+    #: transcript, rather than the server, the recording and the video with it.
+    process_isolation: bool = True
+    #: How long a speech pass waits for a local language model to finish with the GPU (D-072).
+    #: Bounded by the capture queue: about 6.4 s of audio waits there while a pass is held, so a
+    #: longer wait would drop speech. Past it the pass runs anyway, alongside the language model.
+    gpu_turn_wait_s: float = Field(default=4.0, ge=0.0, le=6.0)
 
 
 class StreamingConfig(_Base):
@@ -129,6 +137,10 @@ class LlmLocalConfig(_Base):
     endpoint: str = "http://localhost:11434/v1"
     model: str = ""
     context_window: int = Field(default=8192, ge=512, le=1_000_000)
+    #: Whether this server computes on the GPU the speech model uses, so the two take turns
+    #: (D-072). ``auto`` means yes when the address is this machine. A relay on ``localhost`` that
+    #: forwards elsewhere is misread as local; that costs a moment's wait per request, not a word.
+    shares_gpu: Literal["auto", "yes", "no"] = "auto"
 
 
 class LlmApiConfig(_Base):
@@ -145,6 +157,12 @@ class LlmGenerationConfig(_Base):
 
     temperature: float = Field(default=0.3, ge=0.0, le=2.0)
     max_output_tokens: int = Field(default=1024, ge=16, le=32_000)
+    #: Ask the model not to think before answering, on **every** request this application makes —
+    #: the polish pass, rolling summaries, glossary terms, chat and the dictation tidy (D-073).
+    #: Thinking makes a local model's answer about ten times longer, and a generation that runs
+    #: for half a minute on the GPU the speech model is using is what ended two recordings. The
+    #: client sends the fields and drops them for an endpoint that rejects them.
+    disable_reasoning: bool = True
 
 
 class LlmConfig(_Base):
@@ -192,9 +210,6 @@ class PolishConfig(_Base):
     #: one can appear in the result. Markers are what make a polished stretch traceable back to the
     #: moment it was said; too many turn readable prose into a table of contents.
     timestamp_interval_s: float = Field(default=15.0, ge=5.0, le=300.0)
-    #: Ask the provider not to think before answering. There is no portable field for this, so
-    #: several are sent; a server that rejects unknown fields is retried without them.
-    disable_reasoning: bool = True
     #: The floor on ``returned words ÷ source words``. Below it the result is a summary rather than
     #: a tidy-up, and is discarded in favour of the raw text.
     min_retained_ratio: float = Field(default=0.6, ge=0.0, le=1.0)

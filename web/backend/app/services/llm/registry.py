@@ -13,7 +13,8 @@ from __future__ import annotations
 from typing import Any
 
 from ...config.credentials import CredentialStore
-from ...config.schema import LlmConfig
+from ...config.schema import LlmConfig, LlmLocalConfig
+from ..gpu.turns import GpuTurns, is_loopback, shared_turns
 from .anthropic import DEFAULT_BASE_URL, AnthropicBackend
 from .contract import GenerationOptions, LlmBackend
 from .errors import LlmConfigError
@@ -104,10 +105,14 @@ def build_llm(config: LlmConfig, credentials: CredentialStore | None = None) -> 
             api_key=store.get("local"),
             context_window=config.local.context_window,
             provider_id="local",
+            disable_reasoning=config.generation.disable_reasoning,
+            gpu_turns=_gpu_turns(config.local),
         )
 
     provider = config.api.provider.strip().lower()
     if provider == "anthropic":
+        # Nothing to switch off: extended thinking happens only when a request asks for it, and
+        # this client never does.
         return AnthropicBackend(
             api_key=store.get("anthropic"),
             model=config.api.model,
@@ -129,7 +134,20 @@ def build_llm(config: LlmConfig, credentials: CredentialStore | None = None) -> 
         api_key=store.get(provider),
         context_window=config.api.context_window,
         provider_id=provider,
+        disable_reasoning=config.generation.disable_reasoning,
     )
+
+
+def _gpu_turns(local: LlmLocalConfig) -> GpuTurns | None:
+    """The turns to take with the speech model, when this server shares its GPU (D-072).
+
+    A hosted provider never does, which is why only local mode asks.
+    """
+    if local.shares_gpu == "no":
+        return None
+    if local.shares_gpu == "auto" and not is_loopback(local.endpoint):
+        return None
+    return shared_turns()
 
 
 def generation_options(config: LlmConfig) -> GenerationOptions:

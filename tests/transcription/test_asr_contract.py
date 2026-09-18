@@ -206,9 +206,10 @@ class TestWhisperVadFilter:
         assert self.call_args(vad_filter=False)["vad_filter"] is False
 
     def test_the_setting_reaches_the_backend_from_configuration(self) -> None:
-        from app.services.asr.registry import build_backend
+        # What the worker process builds (D-071); the server itself holds only the proxy.
+        from app.services.asr.registry import build_in_process
 
-        built = build_backend(AsrConfig(backend="faster-whisper", vad_filter=False))
+        built = build_in_process(AsrConfig(backend="faster-whisper", vad_filter=False))
         assert built._vad_filter is False  # noqa: SLF001 - the wiring is the thing under test
 
     def test_repetition_conditioning_stays_off(self) -> None:

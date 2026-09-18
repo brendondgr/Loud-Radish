@@ -47,6 +47,17 @@
       </div>
     </div>
 
+    <div class="field field--switch">
+      <input type="checkbox" id="asr-isolation" data-config="asr.process_isolation" />
+      <label class="field__label field__label--inline" for="asr-isolation">
+        Run the speech model in its own process
+      </label>
+      <p class="field__hint">
+        A GPU fault then restarts the model in about a second, and the recording carries on. Off,
+        a fault ends the whole application. Takes effect the next time the model loads.
+      </p>
+    </div>
+
     <div class="field__row field__row--actions">
       <button type="button" class="button button--primary" data-asr-load>Load model</button>
       <button type="button" class="button" data-asr-unload>Unload</button>

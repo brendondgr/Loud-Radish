@@ -186,7 +186,6 @@ def tidy_one(
         options = GenerationOptions(
             temperature=0.0,
             max_output_tokens=max(256, len(raw.split()) * 6),
-            extra=dict(prompts.NO_REASONING_EXTRAS),
         )
         return await backend.complete([system(prompts.resolve(config)), user(raw)], options)
 
