@@ -100,6 +100,9 @@ class SessionResponse(_Model):
     recording: dict[str, Any] | None = None
     #: The window capture, when `window` mode is recording video (D-022).
     capture: dict[str, Any] | None = None
+    #: The past recording the main screen is showing — ``{key, title, started_at}`` — when the user
+    #: brought one back from Recordings (D-076). ``None`` otherwise, including after a restart.
+    viewing: dict[str, Any] | None = None
 
 
 class SessionStoppedResponse(_Model):

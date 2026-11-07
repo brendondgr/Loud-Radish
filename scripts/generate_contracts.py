@@ -45,6 +45,13 @@ EVENT_NOTES: dict[str, dict[str, str]] = {
             "`finalising` is true when work remains."
         ),
     },
+    "session.viewing": {
+        "action": "set",
+        "note": (
+            "The main screen now shows a past recording ({key, title, started_at}), or none "
+            "(null). Re-read the transcript, conversation and glossary, exactly as on a reload."
+        ),
+    },
     "transcript.committed": {
         "action": "append",
         "note": "Append permanently. Never modify an existing entry. Order by id, not arrival.",

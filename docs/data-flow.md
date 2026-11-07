@@ -137,6 +137,13 @@ Three differences from the live flow, each deliberate:
   at start-up — chosen by the timestamp in the filename rather than by mtime, because a polish pass
   or an export writes into a database long after its talk ended. `storage.reopen_last_session`
   turns it off (**D-041**).
+- **And any past recording can be put back there.** `POST /api/sessions/{key}/open` moves a chosen
+  recording's store into the same retained slot, so the assistant, the transcript routes and the
+  session state read it with no change to any of them; the page re-reads the transcript, the
+  earlier conversation and the glossary exactly as it does on a reload, and new questions are saved
+  into that recording's own database. Only a recording with a transcript opens. A new session
+  starting, `POST /api/sessions/close`, or deleting that recording ends the view, announced as
+  `session.viewing`. The view is not restored after a restart (**D-076**).
 
 ## Where a recording's pieces end up (D-032)
 

@@ -304,6 +304,8 @@ class SessionManager(
                 if self._sink is not None
                 else None
             ),
+            # The past recording the main screen is showing, when one was chosen (D-076).
+            "viewing": self.viewing,
         }
 
     def metrics(self) -> PipelineMetrics:

@@ -1634,7 +1634,7 @@
           "sessions"
         ],
         "summary": "Delete Session",
-        "description": "Delete a past session file.\n\nRefuses the session that is currently recording: deleting the file out from under an open\nconnection loses the talk in progress, which is the one thing this application must not do.",
+        "description": "Delete a past recording: its transcript database **and** its recording folder.\n\n**Both, since D-076.** This used to remove only the database and leave the video and audio\nbehind \u2014 harmless while nothing listed a folder without a database, and wrong once Recordings\ndoes: every deleted recording would have come straight back as \"not transcribed\". The page\nnames what goes before asking.\n\nRefuses the session that is recording, and a recording a pass or an export is reading: deleting\na file out from under an open writer loses the talk in progress, which is the one thing this\napplication must not do. If the recording is the one held open for the main screen, it is\nreleased first, so nothing keeps a handle to a file that no longer exists.",
         "operationId": "delete_session_api_sessions__key__delete",
         "parameters": [
           {
@@ -2173,6 +2173,75 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/{key}/open": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Open Recording",
+        "description": "Show a past recording on the main screen, so the assistant can be asked about it.\n\n**Only one with a transcript.** The assistant answers from the transcript text, so a recording\nwith only audio or video has nothing to answer from yet \u2014 it is transcribed first, and only\nonce the user has approved that (``POST /{key}/transcribe``).",
+        "operationId": "open_recording_api_sessions__key__open_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Open Recording Api Sessions  Key  Open Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/close": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Close Recording",
+        "description": "Stop showing a chosen recording. The main screen is empty afterwards, not some other one.",
+        "operationId": "close_recording_api_sessions_close_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Close Recording Api Sessions Close Post"
                 }
               }
             }
@@ -2758,6 +2827,13 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Config"
+          },
+          "prompt_defaults": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Prompt Defaults"
           }
         },
         "additionalProperties": false,
@@ -2787,6 +2863,13 @@
             },
             "type": "array",
             "title": "Presets"
+          },
+          "prompt_defaults": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Prompt Defaults"
           }
         },
         "additionalProperties": false,
@@ -3256,6 +3339,18 @@
               }
             ],
             "title": "Capture"
+          },
+          "viewing": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Viewing"
           }
         },
         "additionalProperties": false,

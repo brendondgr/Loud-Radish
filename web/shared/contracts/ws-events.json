@@ -51,6 +51,12 @@
       "critical": true,
       "coalescing": false
     },
+    "session.viewing": {
+      "action": "set",
+      "note": "The main screen now shows a past recording ({key, title, started_at}), or none (null). Re-read the transcript, conversation and glossary, exactly as on a reload.",
+      "critical": true,
+      "coalescing": false
+    },
     "transcript.committed": {
       "action": "append",
       "note": "Append permanently. Never modify an existing entry. Order by id, not arrival.",

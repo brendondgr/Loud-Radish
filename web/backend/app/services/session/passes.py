@@ -4,13 +4,15 @@ Split out of ``manager.py`` when that file passed twice its 800-line cap. **Mixi
 :class:`~.manager.SessionManager` — see the note in ``frames.py`` for why that shape was chosen.
 
 Also home to the retention rules from D-031: a finished session's store stays open for reading until
-the next session starts, so the assistant can still be asked about the talk that just ended.
+the next session starts, so the assistant can still be asked about the talk that just ended — and to
+D-076, which puts a *chosen* past recording into the same slot so it can be asked about too.
 """
 
 from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any
 
 from ...config import AppConfig
 from ...models.session import SessionMetadata
@@ -23,6 +25,12 @@ logger = logging.getLogger(__name__)
 
 class TranscriptionPassMixin:
     """See the module docstring: these are methods of ``SessionManager``."""
+
+    #: The past recording the main screen is showing because the user chose it (D-076), as
+    #: ``{key, title, started_at}`` — or ``None`` when the retained store is just the last session,
+    #: or nothing. A class default rather than an ``__init__`` assignment so ``manager.py``, at its
+    #: line cap, does not grow for it.
+    _viewing: dict[str, Any] | None = None
 
     def _has_media(self) -> bool:
         """Whether this session left a file worth offering to export.
@@ -195,7 +203,14 @@ class TranscriptionPassMixin:
         logger.debug("Holding %s open for reading", store.path.name)
 
     def _release_retained(self) -> None:
-        """Close the retained store, if there is one. Safe to call more than once."""
+        """Close the retained store, if there is one. Safe to call more than once.
+
+        Also ends a chosen view (D-076): the view *is* the retained store, so a new session starting
+        — which is what calls this — closes it, and the banner naming it has to go with it.
+        """
+        if self._viewing is not None:
+            self._viewing = None
+            self._emit("session.viewing", {"viewing": None})
         store, self._last_store = self._last_store, None
         if store is None:
             return
@@ -203,6 +218,66 @@ class TranscriptionPassMixin:
             store.close()
         except Exception:  # noqa: BLE001 - a store we are done with must not break a new session
             logger.debug("The retained transcript store did not close cleanly", exc_info=True)
+
+    # -- viewing a past recording (D-076) ---------------------------------------------------
+
+    @property
+    def viewing(self) -> dict[str, Any] | None:
+        """The past recording the main screen is showing, or ``None``."""
+        return self._viewing
+
+    def view_recording(self, path: Path, viewing: dict[str, Any]) -> None:
+        """Make a past recording the one the main screen and the assistant read.
+
+        **The same slot D-031 keeps the last session in, filled with a chosen file.** Every reader —
+        the assistant's ``store_provider``, the transcript routes, :meth:`state`, the session clock
+        — already reads through :attr:`store`, so none of them needed to learn about this. The
+        alternative, a second "viewed" store beside the retained one, would have given each of them
+        two places to look and a precedence rule to get wrong.
+
+        The caller refuses while a session runs or a pass owns a store; this does not re-check,
+        because the route is where the reason a user can act on is phrased.
+
+        Raises whatever opening the database raises, with nothing changed: the new store is opened
+        before the old one is let go, so a file that will not open costs the attempt, not the view.
+        """
+        store = TranscriptStore(path)
+        # Cleared first so replacing one view with another announces the new one only, rather than
+        # a "nothing" the banner would flash through on the way.
+        self._viewing = None
+        self._retain(store)
+        self._viewing = dict(viewing)
+        self._emit("session.viewing", {"viewing": self._viewing})
+        logger.info("Showing %s on the main screen", path.name)
+
+    def close_viewing(self) -> bool:
+        """Stop showing a chosen recording. Returns whether one was being shown.
+
+        Releases the store rather than falling back to some other session: Close means an empty
+        main screen, which is what was asked for. D-041's newest-session reopen is a start-up
+        convenience, not something to resurrect here.
+        """
+        if self._viewing is None:
+            return False
+        self._release_retained()
+        return True
+
+    def release_if_holding(self, path: Path) -> bool:
+        """Release ``path`` if it is the retained store, so it can be deleted. Says whether it was.
+
+        Nothing else may hold it: a running session's store is refused by the delete route, and a
+        pass's store is refused by the same check that refuses deleting a recording being read.
+        """
+        held = self._last_store
+        if held is None or self._store is not None:
+            return False
+        try:
+            same = held.path.resolve() == Path(path).resolve()
+        except OSError:
+            same = False
+        if same:
+            self._release_retained()
+        return same
 
     def _open_store(self, config: AppConfig, session: SessionMetadata) -> TranscriptStore:
         directory = self._session_dir or Path(config.storage.session_dir)

@@ -18,6 +18,9 @@ export const SESSION_RESUMED = "session.resumed";
 /** The session ended and nothing will be transcribed. Every artefact it produced is kept. */
 export const SESSION_CANCELLED = "session.cancelled";
 export const SESSION_STATE = "session.state";
+/** The main screen now shows a past recording, or stopped showing one (D-076). `viewing` is
+ *  `{key, title, started_at}` or `null`. */
+export const SESSION_VIEWING = "session.viewing";
 
 export const TRANSCRIPT_COMMITTED = "transcript.committed";
 export const TRANSCRIPT_HYPOTHESIS = "transcript.hypothesis";

@@ -1,6 +1,6 @@
 # Recordings on the Main Screen: Ask About Any Past Recording
 
-*Written 2026-11-07, revised the same day with the user's answers. Status: **In progress (2 / 6)**.
+*Written 2026-11-07, revised the same day with the user's answers. Status: **In progress (3 / 6)**.
 Runs **alongside** [unified-record-sheet.md](unified-record-sheet.md), which is being implemented at
 the same time in the main checkout. This plan is built in a separate worktree
 (`../TranscriberPrototype-recordings`, branch `feature/recordings-on-main-screen`), so the two never
@@ -180,7 +180,10 @@ Read before starting: `docs/skills/global-project-rules/SKILL.md`, `docs/archite
     - `POST /api/sessions/close`.
     - `DELETE /api/sessions/{key}` releases the store if it is held, then removes the database and
       the recording folder.
-    - The export routes move to `routes/session_exports.py` if `sessions.py` would pass 700 lines.
+    - *As built:* open, close and delete live in a new `routes/session_actions.py` (delete moved out
+      of `sessions.py`), which keeps `sessions.py` at 613 lines and gives Step 4's routes a home.
+    - The `session.viewing` event is registered in `transport/events.py` (critical),
+      `transport/events.js` and `scripts/generate_contracts.py`; contracts regenerated.
 - **Tests**:
   - `tests/api/test_open_recording.py` (**new**): open, then transcript and chat read from it; the
     three refusals; close; delete while held; and start releasing it.

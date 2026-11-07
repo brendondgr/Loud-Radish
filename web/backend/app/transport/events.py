@@ -29,6 +29,10 @@ SESSION_PAUSED: Final = "session.paused"
 SESSION_RESUMED: Final = "session.resumed"
 #: The session ended without a transcription pass. Every artefact it produced is kept.
 SESSION_CANCELLED: Final = "session.cancelled"
+#: The main screen now shows a past recording, or stopped showing one (D-076). ``viewing`` is the
+#: recording's ``{key, title, started_at}``, or ``None``. Critical: a client that missed it would
+#: keep a banner naming a recording the assistant is no longer reading.
+SESSION_VIEWING: Final = "session.viewing"
 
 # -- transcript -----------------------------------------------------------------------
 TRANSCRIPT_COMMITTED: Final = "transcript.committed"
@@ -95,6 +99,7 @@ ALL_EVENTS: Final[tuple[str, ...]] = (
     SESSION_PAUSED,
     SESSION_RESUMED,
     SESSION_CANCELLED,
+    SESSION_VIEWING,
     TRANSCRIPT_COMMITTED,
     TRANSCRIPT_HYPOTHESIS,
     TRANSCRIPT_POLISHED,
@@ -143,6 +148,7 @@ CRITICAL_EVENTS: Final[frozenset[str]] = frozenset(
         SESSION_PAUSED,
         SESSION_RESUMED,
         SESSION_CANCELLED,
+        SESSION_VIEWING,
         # Dropping it leaves the interface claiming capture is still running after the device has
         # been released, which is the one thing this event exists to deny.
         SESSION_CAPTURE_ENDED,
