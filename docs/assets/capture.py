@@ -25,7 +25,8 @@ in the same tree would write its mock sessions next to real ones::
 and the transcript stays empty. With it off, every buffer reaches the mock and the mock replays its
 script regardless of what the microphone heard.
 
-Then press Start recording, ask the assistant one question so the pane has an answer in it, and::
+Then press Start recording, confirm the record sheet with *My microphone* and *While recording*,
+ask the assistant one question so the pane has an answer in it, and::
 
     uv run --no-project --with playwright python docs/assets/capture.py docs/assets
 
@@ -35,13 +36,16 @@ to the project. Nothing here is imported by the application.
 
 from __future__ import annotations
 
+import os
 import sys
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import Page, sync_playwright
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "docs/assets"
-BASE = "http://127.0.0.1:8396"
-CHROMIUM = "/usr/bin/chromium-browser"
+BASE = os.environ.get("CAPTURE_BASE", "http://127.0.0.1:8396")
+#: The system's Chromium by default. `CAPTURE_CHROMIUM` points at another — a Playwright cache
+#: build, say — on a machine without one.
+CHROMIUM = os.environ.get("CAPTURE_CHROMIUM", "/usr/bin/chromium-browser")
 
 #: 1440x900 at 2x. GitHub renders a README at roughly 900px, so a 2880px source stays crisp on a
 #: high-DPI display while the markup constrains the displayed width.
@@ -81,19 +85,30 @@ def main() -> int:
             path=f"{OUT}/recordings.png", clip={"x": 0, "y": 0, "width": 1440, "height": 330}
         )
 
-        page.goto(f"{BASE}/", wait_until="networkidle")
-        page.wait_for_timeout(4000)
-        page.get_by_text("Window", exact=True).first.click()
-        page.wait_for_timeout(2500)
-        # Cropped for the same reason as the archive: below the monitor pane the mode's empty
-        # state is a tall column of nothing, which makes the README's image grid lopsided.
-        page.screenshot(
-            path=f"{OUT}/window-mode.png", clip={"x": 0, "y": 0, "width": 1440, "height": 590}
-        )
+        record_sheet(page)
 
         browser.close()
     print(f"wrote 5 screenshots to {OUT}")
     return 0
+
+
+def record_sheet(page: Page) -> None:
+    """The record sheet (D-075), which replaced the header's Live / Recorded / Window tabs.
+
+    Shot with the microphone chosen and "Both" ticked, because that is the combination the tabs
+    could never offer. Only the dialog is captured: the page behind it is the hero shot again,
+    under a scrim. The configured source must be a microphone, not the file source, or the sheet
+    says it is replaying a file instead of showing the microphone list.
+    """
+    page.goto(f"{BASE}/", wait_until="networkidle")
+    page.wait_for_timeout(3000)
+    page.get_by_role("button", name="Start recording").first.click()
+    page.wait_for_timeout(800)
+    page.locator("[data-record-source][value=microphone]").check()
+    page.locator("[data-record-timing][value=both]").check()
+    page.wait_for_timeout(500)
+    page.locator("[data-record-dialog]").screenshot(path=f"{OUT}/record-sheet.png")
+    page.keyboard.press("Escape")
 
 
 if __name__ == "__main__":

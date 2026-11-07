@@ -34,7 +34,7 @@ class AudioSourceMixin:
         """Which audio this run should capture.
 
         The per-run choice wins. It is the one in front of the user at the moment they press
-        record, and the whole reason the pre-flight sheet exists is that this decision changes from
+        record, and the whole reason the record sheet asks it is that this decision changes from
         recording to recording — a talk playing in a window one minute, narration over it the next.
         """
         options = self._options

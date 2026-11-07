@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-09-18 (a GPU fault ended two recordings — D-071 to D-074)*
+*Last updated: 2026-11-07 (one record sheet replaces the mode switch — D-075)*
 
 The active work list for Loud Radish. Update it whenever a task is finished or new work is
 discovered.
@@ -1115,7 +1115,53 @@ both times during a long local gemma-4 generation on the iGPU faster-whisper was
       candidate for compute preemption faults on gfx1151. It is untested here, and a kernel
       parameter is the user's decision.
 
+## Part 10 — One record sheet replaces the mode switch (D-075)
+
+The header's *Live / Recorded / Window* tabs were reported as confusing: they named implementations,
+and tangled *what am I recording* with *when should it be transcribed*. Plan:
+[plans/unified-record-sheet.md](plans/unified-record-sheet.md).
+
+- [x] Specification and decision (D-075), in `docs/design-system.md` § Capture Modes.
+- [x] Capture options honoured in every mode, and the mode derived from them on the server.
+      Microphone with live text *and* a second pass is possible for the first time.
+- [x] The record sheet: what to record, which microphone or which window audio, when to
+      transcribe, and video for a window. Pre-filled from the last run.
+- [x] *Start recording* opens it for every recording. The tabs are gone, and a label beside the
+      clock says what is running.
+- [x] The tray, the "Record a window" key and `loud_radish_ctl.py arm --source` open it with the
+      right source chosen. The quick-start keys still start immediately.
+- [ ] **Press the real global keys and use the tray against a server running this branch.** Browser
+      QA ran on an isolated server with the mock model; the instance on port 8395 was left alone.
+- [ ] **Record a real window from the sheet.** Window capture was unavailable on the isolated QA
+      server (no GStreamer in its environment), so the window branch was walked with availability
+      forced on, and only up to the point where the desktop's picker would open.
+- [ ] **Recapture the README screenshots.** All five still show the old tabs in the header, and
+      `window-mode.png` is built around them. `docs/assets/capture.py` now shoots
+      `record-sheet.png` in place of `window-mode.png`; swap the README's image when it exists. It
+      could not be taken here: the sandbox the work ran in has neither GStreamer nor PortAudio, so
+      the sheet showed install errors instead of the normal choices. Needs a real session on this
+      machine, with the language-model endpoint from the recipe so the hero shot has its answer.
+- [ ] **Decide whether the header needs a one-click "start with last settings".** Asked in the
+      plan and not yet answered. Today it takes the sheet plus Enter, because Confirm has focus.
+
 ## Discovered work
+
+- [ ] **Record a window's sound and the microphone at the same time.** Raised with the record sheet
+      (D-075) and left out of it on purpose: a session opens exactly one audio source
+      (`services/session/sources.py`), so this needs a mixer, which is a capture change with its own
+      timing risks rather than an interface change.
+
+- [ ] **Recording folders ignore a test server's `storage.session_dir`.** Recordings go to
+      `recording.recording_dir`, default `./data/recordings` in the checkout, so an isolated QA server
+      writes into the real recordings folder unless that is set as well. Found during the record
+      sheet's QA, which removed the one folder it wrote. Worth a line in `docs/workflow.md` beside
+      however a throwaway server is described.
+
+- [ ] **Four tests fail in a full run on this machine and pass alone.** Three Silero voice-detector
+      tests and `test_no_factory_means_no_polish_and_no_complaint`. The log says no Silero model is
+      bundled with the installed faster-whisper, and `uv run` reinstalls three packages on every
+      invocation, which looks like the GPU wheel repair (D-064) swapping them. Seen before and after
+      every step of the record sheet plan, unchanged by it.
 
 - [x] **The assistant's model could not be typed, and a dropdown beside the address rewrote it.**
       Done (D-067). The model field was a `<select>` holding only what the last connection test

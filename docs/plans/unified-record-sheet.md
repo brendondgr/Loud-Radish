@@ -1,6 +1,6 @@
 # Unified Record Sheet — One Button, One Sheet, Every Kind of Recording
 
-*Written 2026-11-07. Status: **In progress (5 / 6)**. The next free decision number is **D-075**.*
+*Written 2026-11-07. Status: **Complete (6 / 6)**. The next free decision number is **D-075**.*
 
 ## 1. Introduction
 
@@ -250,7 +250,8 @@ The Confirm promise is checked end to end in Step 4, where it becomes the only s
 7. Escape returned to idle with nothing started.
 
 One recording folder written by that QA under `data/recordings` (recording folders ignore
-`session_dir`) was removed. The QA configuration now sets `storage.recording_dir`.
+`session_dir`) was removed. The QA configuration now sets `recording.recording_dir`. A first attempt set the wrong
+key, so two more folders leaked in Step 6's final pass; they were removed as well.
 
 - **Locations**:
   - `web/frontend/templates/partials/header.html`: remove the `data-mode-switcher` radiogroup and
@@ -322,6 +323,17 @@ in the browser in Step 4, and the arguments the key runs are checked by tests.
   record sheet with the right source chosen, and the quick-start keys still start immediately.*
 
 ### Step 6: Clean-up, documentation pass, and close-out
+
+**Status: Complete (2026-11-07).**
+- Deleted `preflight.html`, `preflight.js` and `preflight.css`, and swept for the retired names.
+  The only hits left are the "replaced X" notes and historical checklist entries.
+- Added superseded-by notes to both multi-mode plans, additively.
+- Updated the README's feature description.
+- `docs/assets/capture.py` now shoots `record-sheet.png` in place of `window-mode.png`.
+
+**The screenshots were not recaptured.** The sandbox has neither GStreamer nor PortAudio, so the
+sheet showed install errors rather than its normal face. That is logged in `docs/checklist.md`
+Part 10, along with the other open items.
 
 - **Locations**: delete `preflight.html`, `preflight.js`, `preflight.css`, `mode-switcher.js` and
   its CSS if any remain. Then sweep everything for `data-mode-option`, `data-preflight`,

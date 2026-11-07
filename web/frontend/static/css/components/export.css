@@ -1,7 +1,7 @@
 /* The post-recording export window (D-037).
  *
  * Reuses the modal shell — the scrim, the dialog frame, the header, the footer — and describes only
- * what is different: a wider dialog than the pre-flight sheet because it holds a video preview, the
+ * what is different: a wider dialog than the record sheet because it holds a video preview, the
  * preset rows, and the stage list.
  *
  * Every colour and length is a token. The one exception a file like this always wants to make is a

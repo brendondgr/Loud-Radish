@@ -4,6 +4,12 @@
 
 Part two of the five-plan expansion. Depends on [Plan 1](multi-mode-ui-design.md) being complete.
 
+> **Superseded in part, 2026-11-07 (D-075).** The header's three-way mode switch and the window-only
+> pre-flight sheet specified here were replaced by one record sheet behind *Start recording*; the
+> mode is now derived from what the sheet is asked to record. See
+> [unified-record-sheet.md](unified-record-sheet.md). This plan is left as written, as the record
+> of what was built in August.
+
 ## 1. Introduction
 
 Plan 1 decides what the interface says; this plan builds it. The header gains a three-way mode

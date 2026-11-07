@@ -87,10 +87,11 @@ a muted microphone before the transcript comes back empty.
 
 Ten things, and the README used to describe four of them.
 
-- **Three capture modes.** *Live* transcribes continuously while it records. *Recorded* captures
-  first and transcribes the whole file when you stop, which is faster and more accurate when you do
-  not need to read along. *Window* records a window on your desktop, with live transcription, a
-  second pass afterwards, and video each independently optional.
+- **One sheet for every recording.** *Start recording* asks what to record — your microphone, this
+  computer's sound, or a window on your desktop — and when to transcribe it: while recording, so
+  you can read along, after it ends, which is more accurate and runs nothing meanwhile, or both. A
+  window can keep its video too. The sheet remembers your last answers, so the same recording again
+  is two presses of Enter.
 - **Three sources.** A microphone; whatever this machine is playing, which is far cleaner for a
   remote talk than a microphone pointed at a speaker; or a WAV file replayed at real-time speed,
   exactly as if it were live.
@@ -102,7 +103,7 @@ Ten things, and the README used to describe four of them.
   configurable context budget.
 - **Transcript polish.** A language model tidies the committed prose into readable paragraphs, and
   **what it is told to do is a setting you can edit**, not a decision baked into the code.
-- **Two transcription passes, both kept.** A window or recorded session holds the live transcript
+- **Two transcription passes, both kept.** A recording transcribed both ways holds the live transcript
   and the more accurate final one, and every reader — the pane, the exports, the assistant — can be
   pointed at either.
 - **Exports that are actually useful.** Transcript as Markdown, SRT or JSON. The conversation
