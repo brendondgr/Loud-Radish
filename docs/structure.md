@@ -288,7 +288,6 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │                                  #   was restarted is still being joined together (D-036)
 ├── logs/                          # Runtime logs (gitignored)
 │
-├── .github/workflows/ci.yml       # Tests, lint, and the README's own commands on a clean checkout
 ├── .claude/skills/ · .agents/skills/ · .cursor/rules/   # Pointers → docs/skills/
 ├── app.py                         # Launcher: starts everything on port 8395
 ├── pyproject.toml                 # Python project, licence, tool configuration (no extras, D-023)

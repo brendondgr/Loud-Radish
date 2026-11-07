@@ -1029,6 +1029,7 @@ source file moved.
 - [x] README rewritten: hero image, an honest status line, a Why section, and the six capabilities
       it had never mentioned.
 - [x] `.github/workflows/ci.yml` — suite, lint, and the README's own commands on a clean checkout.
+      **Removed 2026-11-07 at the owner's request (D-079)** — nothing runs on a push now.
 - [x] Dead Node section removed from `.gitignore`.
 - [x] `git remote` repointed to `loud-radish`.
 
@@ -1064,7 +1065,7 @@ source file moved.
       first regression CI caught, on its first run, which is the argument for it recorded in
       D-069.
 
-**Recorded as deliberately declined**, so it does not get re-suggested: a CI status badge, profile
+**Recorded as deliberately declined**, so it does not get re-suggested: CI itself (D-079), a CI status badge, profile
 stats cards and trophies, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, issue templates,
 `CODEOWNERS`. Each is either unsupported by evidence as a signal or checkbox theatre on a
 single-owner repository. The reasoning is in D-069 and in [audit/audit-report.md](audit/audit-report.md).
