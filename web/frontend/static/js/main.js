@@ -7,7 +7,8 @@
  */
 
 import { on } from "./core/bus.js";
-import { $ } from "./core/dom.js";
+import { $, $$ } from "./core/dom.js";
+import { applyTextSize, textSize } from "./core/text-size.js";
 import { IDLE, PAUSED, PROCESSING, RECORDING, STOPPING, WINDOW } from "./core/modes.js";
 import * as prefs from "./core/storage.js";
 import { Banners } from "./components/banners.js";
@@ -117,8 +118,8 @@ function boot() {
   });
 
   const glossary = new GlossaryPanel($("[data-glossary-panel]"), {
-    toggleButton: $("[data-glossary-toggle]"),
-    countBadge: $("[data-glossary-count]"),
+    toggleButtons: $$("[data-glossary-toggle]"),
+    countBadges: $$("[data-glossary-count]"),
     onSeek: (seconds) => pane.scrollToTime(seconds),
   });
 
@@ -394,17 +395,9 @@ async function reconcileCapture() {
 
 /** Controls that belong to the page frame rather than to any one component. */
 function wireControls(pane) {
-  // Transcript text size, adjustable independently of the rest of the interface.
-  let size = prefs.get("transcriptSize");
-  applyTextSize(size);
-
-  for (const button of document.querySelectorAll("[data-text-size]")) {
-    button.addEventListener("click", () => {
-      size = Math.max(14, Math.min(28, size + Number(button.dataset.textSize)));
-      applyTextSize(size);
-      prefs.set("transcriptSize", size);
-    });
-  }
+  // Transcript text size, adjustable independently of the rest of the interface. Set in
+  // Settings → Context (`settings/misc.js`); applied here, at load.
+  applyTextSize(textSize());
 
   // Narrow-layout pane tabs.
   for (const tab of document.querySelectorAll("[data-pane-tab]")) {
@@ -438,10 +431,6 @@ function wireControls(pane) {
       }
     }, 200);
   });
-}
-
-function applyTextSize(px) {
-  document.documentElement.style.setProperty("--transcript-size", `${px}px`);
 }
 
 /** Show or hide the monitor pane and its tab, following the current or last run's mode. */

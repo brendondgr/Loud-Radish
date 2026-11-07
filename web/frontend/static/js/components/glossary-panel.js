@@ -14,10 +14,15 @@ import { api } from "../transport/api.js";
 import { GLOSSARY_ADDED } from "../transport/events.js";
 
 export class GlossaryPanel {
-  constructor(root, { toggleButton, countBadge, onSeek } = {}) {
+  /**
+   * `toggleButtons` and `countBadges` are lists: the transcript's toolbar and the assistant's
+   * header each have a Glossary button with its count. Given one element each, only the first
+   * button worked and only the first badge counted (found in redesign Step 6).
+   */
+  constructor(root, { toggleButtons = [], countBadges = [], onSeek } = {}) {
     this.root = root;
-    this.toggleButton = toggleButton;
-    this.countBadge = countBadge;
+    this.toggleButtons = [...toggleButtons];
+    this.countBadges = [...countBadges];
     this.onSeek = onSeek;
 
     this.list = $("[data-glossary-list]", root);
@@ -25,7 +30,7 @@ export class GlossaryPanel {
     /** Terms by casefolded name, so a redefinition replaces rather than duplicates. */
     this.terms = new Map();
 
-    this.toggleButton?.addEventListener("click", () => this.toggle());
+    for (const button of this.toggleButtons) button.addEventListener("click", () => this.toggle());
     $("[data-glossary-close]", root)?.addEventListener("click", () => this.setOpen(false));
 
     on(GLOSSARY_ADDED, (term) => this.add(term, { isNew: true }));
@@ -66,8 +71,10 @@ export class GlossaryPanel {
 
     this.list.replaceChildren(...terms.map((term) => this._build(term)));
     toggle(this.empty, terms.length === 0);
-    setText(this.countBadge, String(terms.length));
-    toggle(this.countBadge, true);
+    for (const badge of this.countBadges) {
+      setText(badge, String(terms.length));
+      toggle(badge, true);
+    }
   }
 
   _build(term) {
@@ -93,7 +100,7 @@ export class GlossaryPanel {
 
   setOpen(open) {
     toggle(this.root, open);
-    this.toggleButton?.setAttribute("aria-expanded", String(open));
+    for (const button of this.toggleButtons) button.setAttribute("aria-expanded", String(open));
     prefs.set("glossaryOpen", open);
   }
 }

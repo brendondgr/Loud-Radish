@@ -102,6 +102,12 @@
   padding: 0;
 }
 
+/* An icon toggle that is on, e.g. "show the raw transcript". */
+.button--icon[aria-pressed="true"] {
+  color: var(--accent-bright);
+  background: var(--accent-wash);
+}
+
 /* The route to every past recording.
  *
  * Deliberately not `--quiet`, and deliberately not icon-only. It was both, and it read as chrome:
@@ -126,41 +132,10 @@
   flex: none;
 }
 
-/* A compact segmented control — the transcript text-size stepper. */
-.segmented {
-  display: flex;
-  align-items: center;
-  border: 1px solid #232829;
-  border-radius: var(--radius);
-  overflow: hidden;
-}
-
-.segmented__button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  min-height: 34px;
-  color: var(--text-muted);
-  background: var(--surface-panel);
-  border: none;
-  cursor: pointer;
-  transition:
-    color var(--duration-fast) ease,
-    background var(--duration-fast) ease;
-}
-
-.segmented__button:hover {
-  color: var(--text-primary);
-  background: #161b1c;
-}
-
-.segmented__button + .segmented__button {
-  border-left: 1px solid #232829;
-}
-
-.segmented__button--serif {
-  font-family: var(--font-transcript);
+/* An icon button carrying a count, e.g. the glossary (redesign Step 6). */
+.button--badged {
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
 }
 
 /* A count attached to a control, e.g. the glossary term count. */

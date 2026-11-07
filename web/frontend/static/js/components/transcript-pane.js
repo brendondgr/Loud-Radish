@@ -295,8 +295,8 @@ export class TranscriptPane {
    */
   _toggleRaw() {
     this.showRaw = !this.showRaw;
+    // An icon button: its name stays, and `aria-pressed` says whether the raw text is showing.
     setAttr(this.rawToggle, "aria-pressed", String(this.showRaw));
-    setText(this.rawToggle, this.showRaw ? "Hide raw" : "Show raw");
     this.list.replaceChildren();
     this.lastTimestampShown = -Infinity;
     this._onTranscriptChanged({ segments: transcript.segments, batch: transcript.segments });

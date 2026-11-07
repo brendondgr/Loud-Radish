@@ -8,6 +8,7 @@
 
 import { $, el, setText } from "../../core/dom.js";
 import { duration } from "../../core/format.js";
+import { setTextSize, textSize } from "../../core/text-size.js";
 import { config } from "../../stores/config.js";
 import { api } from "../../transport/api.js";
 import { session } from "../../stores/session.js";
@@ -16,6 +17,18 @@ import { transcript } from "../../stores/transcript.js";
 export class ContextSettings {
   constructor(root) {
     this.note = $("[data-context-budget-note]", root);
+    this._wireTextSize(root);
+  }
+
+  /** The transcript's text size: a browser preference, applied as the slider moves. */
+  _wireTextSize(root) {
+    const slider = $("[data-text-size-control]", root);
+    const value = $("[data-text-size-value]", root);
+    if (!slider) return;
+    const show = (px) => setText(value, `${px} px`);
+    slider.value = String(textSize());
+    show(textSize());
+    slider.addEventListener("input", () => show(setTextSize(Number(slider.value))));
   }
 
   sync() {

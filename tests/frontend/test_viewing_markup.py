@@ -64,3 +64,12 @@ def test_the_approval_dialogs_one_choice_is_labelled_and_on_by_default(pages) ->
     assert checkbox.label is not None
     assert "main screen" in checkbox.label.text
     assert "checked" in checkbox.attrs
+
+
+def test_the_banner_is_a_card_at_the_top_of_the_transcript_pane(pages) -> None:
+    """Redesign Step 6: inside the pane it names, above the scroller (it was under the header)."""
+    elements = pages["/"]
+    pane = next(i for i, e in enumerate(elements) if "data-transcript-pane" in e.attrs)
+    banner = next(i for i, e in enumerate(elements) if "data-viewing-banner" in e.attrs)
+    scroller = next(i for i, e in enumerate(elements) if "data-transcript-scroller" in e.attrs)
+    assert pane < banner < scroller

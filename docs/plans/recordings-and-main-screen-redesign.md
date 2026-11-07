@@ -1,6 +1,6 @@
 # Recordings and Main Screen Redesign: From the Labs to the Real Pages
 
-*Written 2026-11-07. Status: **In progress (5 / 9)**. Source of truth for the target design: the
+*Written 2026-11-07. Status: **In progress (6 / 9)**. Source of truth for the target design: the
 two labs, `/labs/sessions/` and `/labs/main/` (D-082), at commit `e76a389` on branch
 `labs/sessions-cards`, and the owner's three rounds of exported feedback quoted below. This plan
 takes decisions **D-083 to D-086**. `feature/mixed-audio-steady-video` already holds D-080 and
@@ -420,6 +420,19 @@ available until Step 9 so every step can be compared against them side by side. 
   changes to GitHub stating: Recordings and Main Screen Redesign (6 / 9) Complete: The transcript
   reads with timestamps in the margin, an icon toolbar with a glossary count, and the viewing card
   at its top.*
+
+> **Status: ✅ Complete.** Differences from the plan: **there was no Ctrl +/− shortcut** to keep —
+> the size had only its two buttons — and none was added, because those keys are the browser's
+> zoom; the size is a slider in Settings → Context → Reading, applied by `core/text-size.js` and
+> stored by the browser (the field says so, since the dialog's header says settings are stored by
+> the recorder). **A pre-existing bug was fixed:** the toolbar's glossary button carried
+> `data-toggle-glossary`, which nothing read, and `main.js` passed `GlossaryPanel` the first
+> `[data-glossary-count]` only, so the assistant's badge never counted; both buttons now drive the
+> panel and both badges count. "Show raw" became an icon toggle whose name stays and whose
+> `aria-pressed` changes. Margin timestamps are CSS only (`transcript-pane.js` was unchanged apart
+> from that toggle). QA: a 363-segment recording with stamps in the margin, the viewing card in the
+> pane, both badges at 4, the toolbar's button opening the glossary, and the slider applying and
+> storing the size.
 
 #### Step 7: A details column — video, recording, capture, glossary
 

@@ -1,8 +1,10 @@
 /* A past recording on the main screen (D-076): the banner that names it, the picker that chooses
  * one, the dialog that asks before transcribing one, and the reason a row cannot do either.
  *
- * The banner is accent-washed rather than warning-coloured: viewing a recording is a state the
- * user chose, not a problem, and it must not read like the error banners directly above it. */
+ * The banner is a card at the top of the transcript pane (redesign Step 6): a neutral raised
+ * surface with a radish left edge — the accent as an edge, never a tinted background (D-083).
+ * Viewing a recording is a state the user chose, not a problem, so it must not read like the
+ * error banners under the header. */
 
 .viewing {
   flex: 0 0 auto;
@@ -11,9 +13,13 @@
   justify-content: space-between;
   gap: var(--space-6);
   flex-wrap: wrap;
-  padding: var(--space-5) var(--space-8);
-  background: var(--accent-wash);
-  border-bottom: 1px solid var(--accent-border);
+  margin: var(--space-6) var(--space-8) 0;
+  padding: var(--space-5) var(--space-7);
+  border: 1px solid var(--border-default);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-control);
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-raised);
 }
 
 .viewing[hidden] {

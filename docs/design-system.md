@@ -376,7 +376,7 @@ conspicuous to everyone sitting behind you.
 | Accent | `--accent`, `--accent-bright`, `--accent-dim`, `--accent-wash{,-strong}`, `--accent-border`, `--accent-line`, `--on-accent` | Radish (D-083), and **only** the accent: the primary action, controls that are on, focus, links, a card's edge. Never a surface — a radish-tinted page was tried in the labs and rejected. The wash variants are translucent and composite over whatever is behind them. `--on-accent` is the dark label on a filled accent |
 | Semantic | `--danger`, `--warning`, each with `-text`, `-wash`, `-border`; `--success`, `--success-dim` | Never used alone — see the colour rule below. `--success` is a teal of its own ("healthy": a live input, the level meters, a good realtime factor, local-only privacy); it was the accent's alias until the accent became radish. `--danger` is close to radish, so a destructive control always carries a word and the trash icon |
 | Type | `--font-ui`, `--font-transcript`, `--font-mono` | Local stacks only. A webfont that fails to load would change the transcript's measure mid-session |
-| Type scale | `--text-xs` (10.5px) → `--text-lg` (17px), plus `--transcript-size` | The transcript's size is user-adjustable independently of the chrome |
+| Type scale | `--text-xs` (10.5px) → `--text-lg` (17px), plus `--transcript-size` | The transcript's size is user-adjustable independently of the chrome — Settings → Context → Reading, 14–28px, 16.5px by default (redesign Step 6) |
 | Spacing | `--space-1` (2px) → `--space-12` (30px) | One scale, used everywhere |
 | Radii | `--radius-sm` → `--radius-xl`, `--radius-pill`; `--radius-card` (18px), `--radius-control` (10px) | The redesign's round shapes (D-083): cards and panels, and the buttons and fields inside them |
 | Elevation | `--shadow-pill`, `--shadow-panel`, `--shadow-popover`, `--shadow-raised` | `--shadow-raised` lifts a card: a hairline of light on its top edge and a soft drop |
@@ -513,7 +513,7 @@ pressed; progress then shows in the existing transcription status.
 
 ### Viewing a recording on the main screen
 
-A banner above the transcript pane: **"Viewing *title* · *date*"**, a second line "Starting a new
+A card at the top of the transcript pane (a strip above both panes until redesign Step 6): **"Viewing *title* · *date*"**, a second line "Starting a new
 recording closes this view.", and **Close**. Not a run state: the record control stays idle and
 the header is untouched. The transcript, the earlier conversation and the glossary are re-read from
 the server, exactly as on a reload; new questions continue the conversation and are saved with the
@@ -541,6 +541,22 @@ Settings. Health warnings still arrive as banners, so nothing the bar said is lo
 names are capped at 220px (ellipsised, full text in their tooltip); at 1440px the header is one row
 until every chip is showing, then two. At 900px it is three rows. It never scrolls sideways and the
 primary control is never pushed off the edge.
+
+### The transcript pane
+
+- **Timestamps sit in a margin** (redesign Step 6): a 64px right-aligned column, 18px from the
+  text, with the measure widened by 90px so the text keeps its 68 characters. The column is there
+  for every segment, stamped or not (stamps still come every 30 seconds, FE §4.2), so the text
+  keeps one left edge — which polished prose and the tentative tail share. Below 700px the stamp
+  goes back above the text.
+- **Serif at 16.5px** by default, the owner's "smaller". The size is in Settings → Context →
+  Reading (a slider, 14–28px, kept by the browser); the toolbar's two A buttons are gone. There is
+  no keyboard shortcut of its own: Ctrl + and Ctrl − stay the browser's zoom.
+- **The toolbar is icons with names**: the version switch (Live · Final, when there are two), Open
+  a past recording, Show the raw transcript (`aria-pressed`, when there is polished prose), search,
+  and the glossary — a book with its count as a badge, named "Glossary *N*".
+- **Viewing a past recording is a card at the top of the pane** it names: a raised graphite card
+  with a radish left edge, under the toolbar, above the scroller. It was a strip under the header.
 
 ## Quality Brief
 

@@ -14,10 +14,22 @@
   scrollbar-gutter: stable;
 }
 
+/* Timestamps sit in a margin to the left of the text (redesign Step 6), so the measure is widened
+ * by the margin and the text keeps its 68 characters. Polished prose and the tentative tail start
+ * at the same left edge as a segment's text, though neither has a margin stamp of its own. */
 .transcript__column {
-  max-width: var(--transcript-measure);
+  --stamp-col: 64px;
+  --stamp-gap: 18px;
+  --stamp-indent: calc(var(--stamp-col) + var(--stamp-gap));
+
+  max-width: calc(var(--transcript-measure) + 90px);
   margin: 0 auto;
   padding: 0 var(--space-10);
+}
+
+.transcript__polished,
+.hypothesis {
+  margin-left: var(--stamp-indent);
 }
 
 /* -- committed segments ------------------------------------------------------------------
@@ -25,6 +37,10 @@
  */
 
 .segment {
+  display: grid;
+  grid-template-columns: var(--stamp-col) minmax(0, 1fr);
+  column-gap: var(--stamp-gap);
+  align-items: baseline;
   margin-bottom: var(--space-10);
 }
 
@@ -33,8 +49,7 @@
   font-size: var(--text-xs);
   letter-spacing: 0.04em;
   color: var(--text-dim);
-  margin-bottom: var(--space-3);
-  display: block;
+  text-align: right;
   background: none;
   border: none;
   padding: 0;
@@ -42,9 +57,10 @@
 }
 
 /* Timestamps appear at intervals, not on every segment: one per line is a wall of noise
- * (FE §4.2). The JS adds this class to segments that should show one. */
+ * (FE §4.2). The JS adds this class to segments that should show one. The column stays either
+ * way, so every segment's text starts at the same edge. */
 .segment:not(.segment--timed) .segment__time {
-  display: none;
+  visibility: hidden;
 }
 
 .segment__text {
@@ -470,15 +486,30 @@
   .transcript__column {
     padding: 0 var(--space-5);
   }
-}
 
-/* At the narrowest supported width the transcript must still not scroll sideways, so the text-size
- * stepper goes too — it is a comfort control, not one needed mid-talk. */
-@media (max-width: 480px) {
-  .segmented {
+  /* A phone has no room for a margin: the stamp goes back above the text it dates. */
+  .segment {
+    display: block;
+  }
+
+  .segment__time {
+    display: block;
+    margin-bottom: var(--space-3);
+    text-align: left;
+  }
+
+  .segment:not(.segment--timed) .segment__time {
     display: none;
   }
 
+  .transcript__polished,
+  .hypothesis {
+    margin-left: 0;
+  }
+}
+
+/* At the narrowest supported width the transcript must still not scroll sideways. */
+@media (max-width: 480px) {
   /* The pane tab above already says which pane this is, so the heading is pure duplication at
      this width — and dropping it gives the search field and glossary button room to fit. */
   .pane-transcript .pane-header__group:first-child {

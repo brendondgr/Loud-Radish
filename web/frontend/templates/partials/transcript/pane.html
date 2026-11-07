@@ -5,6 +5,10 @@
 <section class="pane-transcript" data-transcript-pane aria-label="Transcript">
   {% include "partials/transcript/toolbar.html" %}
 
+  {# Which past recording this is (D-076), as a card at the top of the transcript it names —
+     redesign Step 6; it was a strip under the header, across both panes. #}
+  {% include "partials/viewing_banner.html" %}
+
   <div class="pane-transcript__body">
     <div class="pane-transcript__scroller-wrap">
       <div class="transcript__scroller" data-transcript-scroller tabindex="0">

@@ -62,4 +62,4 @@ All five are complete. Plan 5's animation is specified by [../motion-spec.md](..
 supplied 2026-08-15. Two things are recorded as outstanding rather than claimed: the tray's
 StatusNotifierItem export, and the CPU-contention measurement, both in
 [../checklist.md](../checklist.md).
-| [recordings-and-main-screen-redesign.md](recordings-and-main-screen-redesign.md) | The designs chosen in the two labs built into the real pages: radish accent only, model-written titles, the Recordings page as wide cards, and a main screen with header health chips, a details column and a pop-up for quick questions — then the labs removed | In progress (5 / 9) |
+| [recordings-and-main-screen-redesign.md](recordings-and-main-screen-redesign.md) | The designs chosen in the two labs built into the real pages: radish accent only, model-written titles, the Recordings page as wide cards, and a main screen with header health chips, a details column and a pop-up for quick questions — then the labs removed | In progress (6 / 9) |

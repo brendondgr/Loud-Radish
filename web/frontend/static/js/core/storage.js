@@ -8,10 +8,11 @@
 
 const PREFIX = "seminar.";
 
-const DEFAULTS = {
+export const DEFAULTS = {
   chatCollapsed: false,
   glossaryOpen: false,
-  transcriptSize: 19,
+  // The owner's "smaller" from the main-screen lab (redesign Step 6); it was 19.
+  transcriptSize: 16.5,
   activePane: "transcript",
   // The record sheet's last answers: source, timing, a window's audio, video (D-075). A
   // *preference*, not configuration: it pre-fills a sheet that is always shown, so it decides

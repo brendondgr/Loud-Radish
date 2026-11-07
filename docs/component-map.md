@@ -109,7 +109,7 @@ browser owns is genuinely its own — pane widths, text size, which pane is show
 | `ScrollController` | Follow-the-live-edge behaviour | Stops following the instant the user scrolls |
 | `TranscriptSelection` | "Ask about this", copy-with-timestamp | Positions from the selection rectangle, reads the time from the enclosing segment |
 | `ChatPane` | Conversation, quick actions, composer, streaming | Mutates the streaming message in place rather than re-rendering |
-| `GlossaryPanel` | Terms, sorted by first appearance | Each term navigates the transcript |
+| `GlossaryPanel` | Terms, sorted by first appearance | Each term navigates the transcript. Takes every `[data-glossary-toggle]` and `[data-glossary-count]` — the transcript toolbar's and the assistant's — as lists; given one of each, the toolbar's button did nothing and its badge was the only one that counted (fixed in redesign Step 6) |
 | `StatusBar` | Level, speech state, real-time factor, lag, discarded, source, connection — drawn as chips in the header (`[data-status-bar]`), no longer a bar | Never colour alone — every state carries an icon and a word. Moved into the header by redesign Step 5 with every hook kept, so the class is unchanged |
 | `Banners` | The three error tiers | Never a modal; a modal during a talk covers the transcript |
 | `SettingsModal` | The seven tabs, presets, save | The one modal in the application |

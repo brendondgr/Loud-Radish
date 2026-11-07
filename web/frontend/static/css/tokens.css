@@ -115,7 +115,7 @@
 
   /* Transcript size is user-adjustable independently of the rest of the interface, because
    * it is the text read for two hours (FE §13). Set on :root by the size control. */
-  --transcript-size: 19px;
+  --transcript-size: 16.5px;
   --transcript-leading: 1.62;
   --transcript-measure: 68ch;
 
