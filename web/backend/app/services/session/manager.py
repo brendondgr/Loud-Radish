@@ -15,6 +15,7 @@ import logging
 import threading
 import uuid
 from collections.abc import Callable
+from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -45,9 +46,11 @@ from ..recording import (
 from ..streaming.guards import Severity
 from ..transcript import TranscriptStore
 from ..vad import SpeechGate, build_gate
-from . import degradation, modes
+from . import degradation
+from . import plan as run_plan
 from .background import BackgroundWorkMixin
 from .frames import FramePathMixin
+from .hold import HoldMixin
 from .metrics import PipelineMetrics
 from .passes import TranscriptionPassMixin
 from .shapes import (
@@ -70,10 +73,11 @@ class SessionManager(
     WindowCaptureMixin,
     TranscriptionPassMixin,
     AudioSourceMixin,
+    HoldMixin,
 ):
     """Owns the running session and everything it is made of.
 
-    **The five bases are this class, split across files, not five collaborators.** ``manager.py``
+    **The six bases are this class, split across files, not five collaborators.** ``manager.py``
     had reached 1782 lines against an 800-line cap, and every feature in
     ``docs/plans/tray-restart-clutter-and-interruptible-work.md`` edits it. The methods moved out
     read and write this object's attributes exactly as they did when they were written here; the
@@ -251,11 +255,6 @@ class SessionManager(
         return store.stats().duration_seconds if store is not None else 0.0
 
     @property
-    def is_paused(self) -> bool:
-        """Whether a running session is being held. False when nothing is running."""
-        return self._paused and self.is_running
-
-    @property
     def silence_seconds(self) -> float:
         """How long the speaker has currently been silent, from the VAD gate.
 
@@ -286,6 +285,8 @@ class SessionManager(
             # reconciles against, and it is the same one every transcript timestamp comes from.
             "recorded_seconds": round(self.session_seconds, 2),
             "session": self._metadata.as_dict() if self._metadata else None,
+            # What the record sheet asked for (D-075), so a reload can say what is running.
+            "options": asdict(self._options) if self._options and self._metadata else None,
             "asr": self._asr.status(),
             "stats": stats.as_dict() if stats else None,
             "metrics": self.metrics().as_event(),
@@ -369,7 +370,13 @@ class SessionManager(
 
         config = self._config.resolve()
         session = metadata or SessionMetadata(session_id=uuid.uuid4().hex[:12])
-        self._options = options if session.mode == modes.WINDOW else None
+        # Every run has options now (D-075). A caller that passed none — a test, or anything that
+        # predates the record sheet — gets its mode's preset, so what follows reads one shape.
+        try:
+            session.mode, self._options = run_plan.resolve(session.mode, options)
+        except run_plan.OptionsConflict as exc:
+            raise SessionError(str(exc)) from exc
+        plan = run_plan.plan_run(self._options)
         session.session_prompt = config.asr.session_prompt
         session.config = config.model_dump(mode="json")
 
@@ -393,22 +400,13 @@ class SessionManager(
             on_fallback=lambda why: self._emit_failure(degradation.voice_detector_fell_back(why)),
         )
 
-        # The engine is what makes a session transcribe as it goes, so `recorded` mode simply does
-        # not build one. That is the mode: no inference while capturing, which is what makes it
-        # cheap enough to run for two hours on a laptop.
-        if session.mode == modes.RECORDED:
-            self._sink = self._open_sink(config, session)
-            self._engine = None
-        elif session.mode == modes.WINDOW:
-            # Three independent switches, which is the whole substance of the mode. The audio file
-            # is written whenever a second pass is wanted; the engine runs whenever live text is;
-            # the recorder runs whenever video is. None of them implies another.
-            options = self._options or CaptureOptions()
-            if options.post_transcription:
-                self._sink = self._open_sink(config, session)
-            self._engine = self._build_engine(config) if options.live_transcription else None
-        else:
-            self._engine = self._build_engine(config)
+        # Three independent switches, decided in `plan.py` (D-075). The audio file is written
+        # whenever a second pass is wanted; the engine runs whenever live text is; the recorder runs
+        # whenever video is. None of them implies another. `recorded` with no live text is the
+        # mode that runs no inference while capturing, which is what makes it cheap enough to run
+        # for two hours on a laptop.
+        self._sink = self._open_sink(config, session) if plan.sink else None
+        self._engine = self._build_engine(config) if plan.engine else None
 
         self._queue.clear()
         self._meter.reset()
@@ -417,7 +415,7 @@ class SessionManager(
         self._start_status_thread()
 
         try:
-            self._source = self._open_source(config, session.mode)
+            self._source = self._open_source(config, self._options.source)
             self._source.start(self._on_frame, self._on_source_error)
             logger.info(
                 "Session %s (%s) is recording audio from: %s",
@@ -439,7 +437,7 @@ class SessionManager(
         # After the audio source is up, deliberately. The portal shows a dialog and waits for a
         # human; doing that first would leave the microphone unopened for as long as they take,
         # and the first words of a talk are said while someone is still choosing a window.
-        if session.mode == modes.WINDOW and (self._options or CaptureOptions()).video:
+        if plan.video:
             try:
                 self._start_window_capture(config, session)
             except PortalDeclined as exc:
@@ -464,6 +462,7 @@ class SessionManager(
                 "key": self._session_key(),
                 "started_at": session.started_at.isoformat(),
                 "mode": session.mode,
+                "options": asdict(self._options),
                 "config": session.config,
                 "source": self._source_info.describe() if self._source_info else "",
             },
@@ -475,66 +474,6 @@ class SessionManager(
             self._source_info,
         )
         return session
-
-    def pause(self) -> None:
-        """Hold the capture. The recording stops growing and the clock stops with it.
-
-        **Pause removes time from the recording rather than recording silence (D-044).** Frames are
-        dropped at `_on_frame`, so the WAV stops growing, the engine consumes nothing and its
-        `session_seconds` — which is where every transcript timestamp comes from — stops advancing.
-        A ten-minute talk held for five minutes produces ten minutes of audio whose last timestamp
-        is 10:00.
-
-        The alternative, writing silence, was rejected twice over: it makes the transcript claim
-        time in which nothing was said, and it makes pausing cost exactly as much disk and exactly
-        as much inference as not pausing, which is not what the word means. What is given up is that
-        timestamps no longer correspond to time of day once a session has been paused — and nothing
-        reads them that way. The polish pass, the assistant's citations and the exported page's
-        video sync are all recording-relative.
-
-        The device stays open. Closing and reopening it would change the stream, the clock origin
-        and possibly the sink, and in `window` mode would ask the portal again.
-
-        Raises:
-            SessionError: if nothing is recording.
-        """
-        if not self.is_running:
-            raise SessionError("No session is recording.")
-        if self._paused:
-            return
-
-        self._paused = True
-        self._pause_window_capture()
-        self._emit(
-            "session.paused",
-            {
-                "session_id": self._metadata.session_id if self._metadata else "",
-                "at_seconds": round(self.session_seconds, 2),
-            },
-        )
-        logger.info("Session held at %.1f s", self.session_seconds)
-
-    def resume(self) -> None:
-        """Continue a held capture, in the same session, file and store.
-
-        Raises:
-            SessionError: if nothing is recording.
-        """
-        if not self.is_running:
-            raise SessionError("No session is recording.")
-        if not self._paused:
-            return
-
-        self._paused = False
-        self._resume_window_capture_after_pause()
-        self._emit(
-            "session.resumed",
-            {
-                "session_id": self._metadata.session_id if self._metadata else "",
-                "at_seconds": round(self.session_seconds, 2),
-            },
-        )
-        logger.info("Session resumed at %.1f s", self.session_seconds)
 
     async def cancel(self) -> SessionStats:
         """End the session and transcribe nothing. Keeps every artefact it produced.

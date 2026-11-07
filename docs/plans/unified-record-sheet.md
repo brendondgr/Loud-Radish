@@ -1,6 +1,6 @@
 # Unified Record Sheet — One Button, One Sheet, Every Kind of Recording
 
-*Written 2026-11-07. Status: **In progress (1 / 6)**. The next free decision number is **D-075**.*
+*Written 2026-11-07. Status: **In progress (2 / 6)**. The next free decision number is **D-075**.*
 
 ## 1. Introduction
 
@@ -132,6 +132,17 @@ in for the mockup.
   the three-way mode switch, and recorded why D-020's switch is retired.*
 
 ### Step 2: Honour capture options in every mode (backend)
+
+**Status: Complete (2026-11-07).** As planned, with three additions:
+- `resolve()` lives in `plan.py` beside `plan_run()`, and the manager calls it too, so a caller
+  passing no options (tests, older code) gets the mode's preset.
+- `GET /api/session` and `session.started` now carry the resolved `options`, which Step 4's header
+  label needs after a reload.
+- Pause and resume moved into a new `hold.py` mixin, which brought `manager.py` from 796 to 735
+  lines.
+
+`MODE_STATES` is left for Step 4, which changes both copies together. The tray icon still picks its
+picture by mode, so "microphone, both" draws as *recording* rather than *live*. That is Step 5's.
 
 - **Locations**:
   - `web/backend/app/schemas/api.py`: `CaptureOptions` gains `source`

@@ -265,3 +265,80 @@ async def test_the_session_state_reports_the_mode(manager) -> None:
         assert session.state()["session"]["mode"] == modes.LIVE
     finally:
         await session.stop()
+
+
+# -- the record sheet: the mode is derived from what was asked for (D-075) ---------------
+
+
+def test_a_mode_that_contradicts_the_options_is_refused(client: TestClient) -> None:
+    """One of the two is a mistake, and guessing which would record the wrong thing."""
+    response = client.post(
+        "/api/session/start",
+        json={
+            "mode": modes.LIVE,
+            "options": {
+                "source": "window",
+                "live_transcription": True,
+                "post_transcription": False,
+                "video": True,
+            },
+        },
+    )
+    assert response.status_code == 422
+    error = response.json()["detail"]["error"]
+    assert error["code"] == "options-conflict"
+    assert "window" in error["message"]
+
+
+def test_a_microphone_with_nothing_transcribed_records_nothing(client: TestClient) -> None:
+    """Video does not rescue an audio source: a microphone has no picture to keep."""
+    response = client.post(
+        "/api/session/start",
+        json={
+            "options": {
+                "source": "microphone",
+                "live_transcription": False,
+                "post_transcription": False,
+                "video": True,
+            }
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["detail"]["error"]["code"] == "records-nothing"
+
+
+@pytest.mark.anyio
+async def test_the_microphone_can_be_transcribed_live_and_again_afterwards(manager) -> None:
+    """The combination no tab offered: live text *and* an audio file for a second pass."""
+    from app.models.session import SessionMetadata
+    from app.services.session import CaptureOptions
+
+    session, recorder = manager
+    options = CaptureOptions(source="microphone", live_transcription=True, post_transcription=True)
+    await session.start(SessionMetadata(session_id="both", mode=modes.RECORDED), options=options)
+    try:
+        state = session.state()
+        assert state["session"]["mode"] == modes.RECORDED
+        assert state["options"]["source"] == "microphone"
+        assert state["recording"] is not None, "no audio file was opened for the second pass"
+        assert recorder.wait_for("transcript.committed"), "no live text alongside the recording"
+    finally:
+        await session.stop()
+
+
+@pytest.mark.anyio
+async def test_a_start_with_no_options_gets_its_modes_preset(manager) -> None:
+    """A global shortcut sending only `--mode recorded` records exactly what it always did."""
+    from app.models.session import SessionMetadata
+
+    session, recorder = manager
+    await session.start(SessionMetadata(session_id="preset", mode=modes.RECORDED))
+    try:
+        state = session.state()
+        assert state["options"]["source"] == "microphone"
+        assert state["options"]["live_transcription"] is False
+        assert state["recording"] is not None
+        started = recorder.of("session.started")
+        assert started and started[0]["options"]["post_transcription"] is True
+    finally:
+        await session.stop()

@@ -124,3 +124,62 @@ def is_valid_mode(mode: str) -> bool:
 def is_busy(state: str) -> bool:
     """Whether a session in ``state`` is doing something that must not be interrupted."""
     return state in BUSY_STATES
+
+
+# -- capture sources and the mode they imply (D-075) ------------------------------------
+
+#: What a recording listens to, as the record sheet asks it. **Sources are the user's question;
+#: modes are the pipeline's answer.** The sheet asks what to record and when to transcribe it, and
+#: the mode follows from those two answers rather than being chosen from a tab.
+MICROPHONE: Final = "microphone"
+#: Everything this machine is playing, reached through a tap (D-030). Never the microphone.
+SYSTEM: Final = "system"
+#: A window chosen in the desktop's picker. Video, and whichever audio the sheet chose for it.
+WINDOW_SOURCE: Final = "window"
+
+CaptureSource = Literal["microphone", "system", "window"]
+CAPTURE_SOURCES: Final[tuple[CaptureSource, ...]] = (MICROPHONE, SYSTEM, WINDOW_SOURCE)
+
+#: What a request naming only a mode means. These are the three combinations the header's tabs used
+#: to offer, kept so that a global shortcut sending `toggle --mode recorded` records exactly what it
+#: always did. An empty ``audio_source`` defers to ``capture.audio_source`` in configuration, which
+#: is what a window request without options has always done.
+MODE_PRESETS: Final[dict[CaptureMode, dict[str, object]]] = {
+    LIVE: {
+        "source": MICROPHONE,
+        "live_transcription": True,
+        "post_transcription": False,
+        "video": False,
+        "audio_source": "",
+    },
+    RECORDED: {
+        "source": MICROPHONE,
+        "live_transcription": False,
+        "post_transcription": True,
+        "video": False,
+        "audio_source": "",
+    },
+    WINDOW: {
+        "source": WINDOW_SOURCE,
+        "live_transcription": True,
+        "post_transcription": True,
+        "video": True,
+        "audio_source": "",
+    },
+}
+
+
+def derive_mode(source: str, *, post_transcription: bool) -> CaptureMode:
+    """The mode a set of record-sheet answers runs as.
+
+    A window is always ``window``: only it can have video, a portal, and a monitor pane. For the
+    two audio sources the mode follows the second pass, because that is what ``recorded`` has
+    always meant to the rest of the application — a session whose finished transcript arrives
+    after it stops. Live text alongside it is now allowed, so "microphone, both" is ``recorded``
+    with an engine running, and the session keeps both passes as two revisions (D-022).
+    """
+    if source == WINDOW_SOURCE:
+        return WINDOW
+    if source not in CAPTURE_SOURCES:
+        raise ValueError(f"Unknown capture source: {source!r}")
+    return RECORDED if post_transcription else LIVE

@@ -41,16 +41,19 @@ class ErrorResponse(_Model):
 
 
 class CaptureOptions(_Model):
-    """Per-run switches collected before capture begins (D-020).
+    """Per-run answers collected by the record sheet before capture begins (D-020, D-075).
 
     Deliberately per-run rather than configuration: a user who recorded one window without video
-    should not silently get no video the next time. Only ``window`` mode reads them; the other two
-    have nothing to choose.
+    should not silently get no video the next time. Every mode reads them now; the mode itself is
+    derived from ``source`` and the two transcription switches.
 
-    All three false records nothing and is refused. The interface refuses it as a courtesy — this
-    is the rule.
+    Nothing transcribed and no video records nothing and is refused. The interface refuses it as a
+    courtesy — this is the rule.
     """
 
+    #: What to record. Absent means the source the request's ``mode`` implies, so a client that
+    #: predates the record sheet keeps working unchanged.
+    source: Literal["microphone", "system", "window"] | None = None
     live_transcription: bool = True
     post_transcription: bool = True
     video: bool = True
@@ -61,7 +64,8 @@ class CaptureOptions(_Model):
 
     @property
     def records_nothing(self) -> bool:
-        return not (self.live_transcription or self.post_transcription or self.video)
+        video = self.video and self.source in (None, "window")
+        return not (self.live_transcription or self.post_transcription or video)
 
 
 class StartSessionRequest(_Model):
@@ -70,10 +74,11 @@ class StartSessionRequest(_Model):
     title: str = ""
     venue: str = ""
     speaker: str = ""
-    #: Which capture mode to run (D-020). Defaults to the original behaviour, so a client that
-    #: predates capture modes keeps working unchanged.
-    mode: CaptureMode = "live"
-    #: Only meaningful for ``window``. Absent means the defaults above.
+    #: Which capture mode to run (D-020). Optional since D-075: with ``options`` present the mode
+    #: is derived from them, and a ``mode`` that contradicts them is refused. With neither, the
+    #: original behaviour, ``live``.
+    mode: CaptureMode | None = None
+    #: What to record and when to transcribe it. Absent means the mode's preset.
     options: CaptureOptions | None = None
 
 
@@ -89,6 +94,9 @@ class SessionResponse(_Model):
     #: session is paused, and is what the page's clock reconciles against on a reload.
     recorded_seconds: float = 0.0
     session: dict[str, Any] | None = None
+    #: The running session's record-sheet answers — source, the two transcription switches,
+    #: video and audio choice (D-075). Absent when nothing is running.
+    options: dict[str, Any] | None = None
     asr: dict[str, Any] = Field(default_factory=dict)
     stats: dict[str, Any] | None = None
     metrics: dict[str, Any] = Field(default_factory=dict)
