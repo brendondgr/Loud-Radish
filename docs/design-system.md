@@ -120,6 +120,11 @@ buttons and without a second dialog primitive.
   card, because an install command does not fit a card. On a phone, three cards stay three across,
   and the four timing cards (a window's) go two by two.
 - **The microphone question is one row**: the label on the left, the dropdown filling the rest.
+  It is also asked for a window whose sound is *My microphone*, directly under that choice and
+  without a step number, because there it is a follow-up rather than a step. Without it, narrating
+  over a window could only ever use whichever microphone was last configured. *My microphone*
+  records the microphone **instead of** the window's sound, not alongside it: a session has one
+  audio source, and mixing two is logged in `docs/checklist.md`.
 - **Choosing a microphone here writes the configuration** through `POST /api/audio/device`. It does
   not add a per-run override. The tray's microphone picker reads the same value, so there is one
   answer to "which microphone".

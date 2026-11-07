@@ -49,6 +49,12 @@
   color: var(--text-primary);
 }
 
+/* Hidden for the microphone row under a window's "My microphone", where it is a follow-up rather
+ * than a step. The badge's own `display` would otherwise beat the `hidden` attribute. */
+.record-sheet__step[hidden] {
+  display: none;
+}
+
 .record-sheet__legend--label {
   margin-bottom: 0;
 }

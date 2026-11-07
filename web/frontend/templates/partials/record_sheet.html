@@ -78,21 +78,6 @@
         <p class="record-sheet__note-line" data-record-window-reason hidden></p>
       </fieldset>
 
-      {# 2. Which input — the microphone list. Choosing one here writes the same setting the
-         Audio tab and the tray write, so there is one answer to "which microphone". #}
-      <div class="record-sheet__section" data-record-section="microphone" hidden>
-        {# One row: the question on the left, its answer on the right. #}
-        <div class="record-sheet__row">
-          <label class="record-sheet__legend record-sheet__legend--label" for="record-device">
-            <span class="record-sheet__step" aria-hidden="true">2</span>Which microphone
-          </label>
-          <select class="field__control record-sheet__select" id="record-device" data-record-device>
-            <option value="">System default</option>
-          </select>
-        </div>
-        <p class="record-sheet__note-line" data-record-device-note></p>
-      </div>
-
       {# 2. Which input — a window's audio. Chosen per recording: the same person records a talk
          playing in a window one minute and their own commentary over it the next. #}
       <fieldset class="record-sheet__section" data-record-section="window-audio" hidden>
@@ -132,6 +117,25 @@
           </span>
         </label>
       </fieldset>
+
+      {# 2. Which input — the microphone list. Choosing one here writes the same setting the
+         Audio tab and the tray write, so there is one answer to "which microphone".
+
+         Also shown for a window whose sound is "My microphone", which is why it comes *after*
+         the window's audio choices: there it answers a follow-up to that choice, not a step of
+         its own, so its step number is hidden. #}
+      <div class="record-sheet__section" data-record-section="microphone" hidden>
+        {# One row: the question on the left, its answer on the right. #}
+        <div class="record-sheet__row">
+          <label class="record-sheet__legend record-sheet__legend--label" for="record-device">
+            <span class="record-sheet__step" aria-hidden="true" data-record-device-step>2</span>Which microphone
+          </label>
+          <select class="field__control record-sheet__select" id="record-device" data-record-device>
+            <option value="">System default</option>
+          </select>
+        </div>
+        <p class="record-sheet__note-line" data-record-device-note></p>
+      </div>
 
       {# The file source wins in every mode. Saying so beats offering a choice that is ignored. #}
       <p class="record-sheet__file-note" data-record-file-note hidden>

@@ -53,6 +53,7 @@ export class RecordSheet {
     this.video = $("[data-record-video]", root);
     this.device = $("[data-record-device]", root);
     this.deviceNote = $("[data-record-device-note]", root);
+    this.deviceStep = $("[data-record-device-step]", root);
     this.fileNote = $("[data-record-file-note]", root);
     this.fileName = $("[data-record-file-name]", root);
     this.timingNone = $("[data-record-timing-none]", root);
@@ -163,7 +164,13 @@ export class RecordSheet {
     const isWindow = choice.source === WINDOW;
     const fileSource = config.get("audio.source_type") === "file";
 
-    toggle(this.sections.get("microphone"), choice.source === "microphone" && !fileSource);
+    // The microphone list answers two questions: "which microphone" for a microphone recording,
+    // and the follow-up to a window recorded with "My microphone" as its sound. Without the second,
+    // a window narrated over could only ever use whatever microphone was last configured.
+    const windowMic = isWindow && choice.audio_source === "microphone";
+    const asksMicrophone = choice.source === "microphone" || windowMic;
+    toggle(this.sections.get("microphone"), asksMicrophone && !fileSource);
+    toggle(this.deviceStep, !windowMic);
     toggle(this.sections.get("window-audio"), isWindow && !fileSource);
     toggle(this.sections.get("video"), isWindow);
     toggle(this.sections.get("window-note"), isWindow && !fileSource);
@@ -246,7 +253,7 @@ export class RecordSheet {
 
     // The microphone is configuration, not a per-run override: the Audio tab and the tray read the
     // same value, and two answers to "which microphone" would disagree (D-075).
-    if (choice.source === "microphone" && this.device && !this.sections.get("microphone")?.hidden) {
+    if (this.device && !this.sections.get("microphone")?.hidden) {
       const wanted = this.device.value || null;
       if (wanted !== (config.get("audio.device_id") ?? null)) {
         try {
