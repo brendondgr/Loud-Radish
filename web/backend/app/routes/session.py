@@ -33,7 +33,8 @@ from ..services.audio import (
     probe,
 )
 from ..services.audio.probe import probe_device
-from ..services.session import CaptureOptions, SessionError, modes
+from ..services.session import CaptureOptions, SessionError
+from ..services.session import plan as run_plan
 
 router = APIRouter(prefix="/api", tags=["session"])
 
@@ -58,14 +59,15 @@ def _error(code: str, message: str, severity: str = "warning") -> dict[str, Any]
 def _capture_options(body: StartSessionRequest) -> CaptureOptions | None:
     """Translate the request's options into the pipeline's own vocabulary.
 
-    Two types for three booleans is deliberate: `schemas/` is the HTTP validation boundary and
+    Two types for the same answers is deliberate: `schemas/` is the HTTP validation boundary and
     `services/` must not import it, or the pipeline ends up depending on the shape of a request.
+    Absent options stay absent, so :func:`plan.resolve` can tell "the mode's preset" from "these
+    switches, chosen".
     """
-    if body.mode != modes.WINDOW:
-        return None
     if body.options is None:
-        return CaptureOptions()
+        return None
     return CaptureOptions(
+        source=body.options.source or "",
         live_transcription=body.options.live_transcription,
         post_transcription=body.options.post_transcription,
         video=body.options.video,
@@ -108,12 +110,19 @@ async def start_session(request: Request, body: StartSessionRequest) -> dict[str
             ),
         )
 
-    if body.mode in _UNIMPLEMENTED_MODES:
+    # The mode is settled before anything else is checked, because every later refusal is about
+    # the mode the request *resolves to*, not the one it happened to name (D-075).
+    try:
+        mode, options = run_plan.resolve(body.mode, _capture_options(body))
+    except run_plan.OptionsConflict as exc:
+        raise HTTPException(status_code=422, detail=_error("options-conflict", str(exc))) from exc
+
+    if mode in _UNIMPLEMENTED_MODES:
         # 501 rather than 409: the request is valid and the state is fine — this build simply does
         # not have the feature, which is a different problem with a different remedy.
         raise HTTPException(
             status_code=501,
-            detail=_error("mode-unavailable", _UNIMPLEMENTED_MODES[body.mode]),
+            detail=_error("mode-unavailable", _UNIMPLEMENTED_MODES[mode]),
         )
 
     metadata = SessionMetadata(
@@ -121,10 +130,10 @@ async def start_session(request: Request, body: StartSessionRequest) -> dict[str
         title=body.title,
         venue=body.venue,
         speaker=body.speaker,
-        mode=body.mode,
+        mode=mode,
     )
     try:
-        await manager.start(metadata, options=_capture_options(body))
+        await manager.start(metadata, options=options)
     except SessionError as exc:
         # 409: the request is well-formed, it just conflicts with the current state or environment.
         raise HTTPException(

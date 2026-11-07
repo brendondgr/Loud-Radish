@@ -413,8 +413,8 @@ class ShortcutsConfig(_Base):
     which is the sanctioned route and the one that can be revoked from System Settings.
 
     The distinction the brief asks for lives in the action names rather than in a branch: `toggle_*`
-    starts or stops immediately, and `arm_window` opens the options sheet first, because window
-    capture has three switches that must be answered before anything is captured.
+    starts or stops immediately, and `arm_window` opens the record sheet first with a window chosen,
+    because a window recording has choices that must be answered before anything is captured.
     """
 
     enabled: bool = True

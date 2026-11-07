@@ -106,7 +106,11 @@ device ──► capture ──► VAD (meter only, gates nothing)
 
 Three differences from the live flow, each deliberate:
 
-- **The streaming engine is absent.** No inference runs while capturing. That is the mode.
+- **The streaming engine is absent.** No inference runs while capturing. That is the mode — unless
+  the record sheet asked for both (D-075), in which case the engine runs exactly as in the live
+  flow above, the sink is fed alongside it, and the pass writes revision 1 beside the live
+  revision 0. Which of engine, sink and recorder a run starts is decided once, from its options,
+  in `services/session/plan.py`; the audio source is chosen from `options.source`, not the mode.
 - **The sink is fed from the capture thread, not from the drop-oldest queue.** The queue discards
   audio to protect inference latency, and audio discarded from a recording is a hole in the only
   copy of the talk.

@@ -74,8 +74,9 @@ const EMPTY_COPY = {
     variant: "idle",
     title: "Nothing recorded yet",
     body:
-      "Press <strong>Start recording</strong> and the talk will appear here as it is spoken, a " +
-      "paragraph at a time. Text still being decided shows in italics until it settles.",
+      "Press <strong>Start recording</strong> and choose what to record. Transcribed while you " +
+      "record, the talk appears here a paragraph at a time; text still being decided shows in " +
+      "italics until it settles.",
     hint: "Check your input device first — it is the one check worth doing every time.",
   },
   [`${RECORDED}:${IDLE}`]: {
@@ -399,9 +400,16 @@ export class TranscriptPane {
    * Each mode explains its own silence.
    */
   _renderEmptyCopy() {
-    const key = `${modeStore.mode}:${modeStore.state}`;
+    // Idle has one message whatever the last run was: the next one is chosen in the record sheet,
+    // so a mode-specific invitation would describe a choice that has not been made yet (D-075).
+    // While recording, a run transcribing live says what live says, whichever mode it derived to:
+    // "microphone, both" is `recorded`, and telling it nothing is being transcribed would be false.
+    const live = modeStore.options?.live_transcription;
+    const shown =
+      modeStore.state === IDLE || (modeStore.state === RECORDING && live) ? LIVE : modeStore.mode;
+    const key = `${shown}:${modeStore.state}`;
     const copy =
-      EMPTY_COPY[key] ?? EMPTY_COPY[`${modeStore.mode}:${IDLE}`] ?? EMPTY_COPY[`${LIVE}:${IDLE}`];
+      EMPTY_COPY[key] ?? EMPTY_COPY[`${shown}:${IDLE}`] ?? EMPTY_COPY[`${LIVE}:${IDLE}`];
 
     this.emptyState?.setAttribute("data-variant", copy.variant);
     setText(this.emptyTitle, copy.title);

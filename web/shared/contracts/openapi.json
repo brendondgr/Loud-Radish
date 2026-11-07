@@ -2769,6 +2769,22 @@
       },
       "CaptureOptions": {
         "properties": {
+          "source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "microphone",
+                  "system",
+                  "window"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
           "live_transcription": {
             "type": "boolean",
             "title": "Live Transcription",
@@ -2798,7 +2814,7 @@
         "additionalProperties": false,
         "type": "object",
         "title": "CaptureOptions",
-        "description": "Per-run switches collected before capture begins (D-020).\n\nDeliberately per-run rather than configuration: a user who recorded one window without video\nshould not silently get no video the next time. Only ``window`` mode reads them; the other two\nhave nothing to choose.\n\nAll three false records nothing and is refused. The interface refuses it as a courtesy \u2014 this\nis the rule."
+        "description": "Per-run answers collected by the record sheet before capture begins (D-020, D-075).\n\nDeliberately per-run rather than configuration: a user who recorded one window without video\nshould not silently get no video the next time. Every mode reads them now; the mode itself is\nderived from ``source`` and the two transcription switches.\n\nNothing transcribed and no video records nothing and is refused. The interface refuses it as a\ncourtesy \u2014 this is the rule."
       },
       "ChatHistoryResponse": {
         "properties": {
@@ -3389,6 +3405,18 @@
             ],
             "title": "Session"
           },
+          "options": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options"
+          },
           "asr": {
             "additionalProperties": true,
             "type": "object",
@@ -3507,14 +3535,20 @@
             "default": ""
           },
           "mode": {
-            "type": "string",
-            "enum": [
-              "live",
-              "recorded",
-              "window"
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "live",
+                  "recorded",
+                  "window"
+                ]
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Mode",
-            "default": "live"
+            "title": "Mode"
           },
           "options": {
             "anyOf": [

@@ -13,10 +13,10 @@ const DEFAULTS = {
   glossaryOpen: false,
   transcriptSize: 19,
   activePane: "transcript",
-  // Which capture mode the selector last showed. A *preference*, not configuration: it records
-  // which button was last pressed, not how the pipeline behaves, so it does not belong in
-  // /api/config. Re-selected on load only if that mode is still available (D-020).
-  captureMode: "live",
+  // The record sheet's last answers: source, timing, a window's audio, video (D-075). A
+  // *preference*, not configuration: it pre-fills a sheet that is always shown, so it decides
+  // nothing on its own and does not belong in /api/config. Null until the first recording.
+  lastRecordOptions: null,
 };
 
 /** Read one preference, falling back to its default. */

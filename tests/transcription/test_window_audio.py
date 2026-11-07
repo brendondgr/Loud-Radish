@@ -207,7 +207,7 @@ def test_window_mode_opens_the_machines_output_not_a_microphone(tmp_path, monkey
 
 
 def test_the_other_modes_still_open_a_microphone(tmp_path, monkeypatch) -> None:
-    """Live and recorded sessions are someone speaking into a microphone. Nothing changes there."""
+    """A microphone source is someone speaking into a microphone, whatever the mode (D-075)."""
     opened: list[str] = []
     monkeypatch.setattr(
         "app.services.session.sources.MonitorSource",
@@ -219,8 +219,8 @@ def test_the_other_modes_still_open_a_microphone(tmp_path, monkeypatch) -> None:
     )
     manager, config = _manager(tmp_path)
 
-    manager._open_source(config, modes.LIVE)
-    manager._open_source(config, modes.RECORDED)
+    manager._open_source(config, modes.MICROPHONE)
+    manager._open_source(config, modes.MICROPHONE)
 
     assert opened == ["device", "device"]
 

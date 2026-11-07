@@ -154,3 +154,14 @@ def test_arm_opens_the_browser_at_the_arming_url(monkeypatch, capsys) -> None:
 
     assert ctl.main(["arm", "--mode", "window"]) == 0
     assert opened and opened[0].endswith("/?arm=window")
+
+
+def test_arm_can_preselect_what_to_record(monkeypatch) -> None:
+    """The record sheet opens with a window chosen when the key that opened it meant one (D-075)."""
+    opened: list[str] = []
+    import webbrowser
+
+    monkeypatch.setattr(webbrowser, "open", opened.append)
+
+    assert ctl.main(["arm", "--mode", "window", "--source", "window"]) == 0
+    assert opened[0].endswith("/?arm=window&source=window")

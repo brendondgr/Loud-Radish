@@ -26,6 +26,9 @@ class SessionStore {
     //: The capture mode this session is running in (D-020). The server is authoritative: a reload
     //: mid-recording must show what is being recorded, not what this browser last selected.
     this.mode = "live";
+    //: What the record sheet asked for, as the server resolved it (D-075). Null for a session that
+    //: predates it or before any has run.
+    this.options = null;
   }
 
   start(payload) {
@@ -36,6 +39,7 @@ class SessionStore {
     this.pausedAt = null;
     this.heldSeconds = 0;
     this.mode = payload.mode ?? this.mode;
+    this.options = payload.options ?? null;
     this.config = payload.config ?? this.config;
     emit(SESSION_CHANGED, this);
   }
@@ -103,6 +107,8 @@ class SessionStore {
     this.heldSeconds = _heldFrom(state, this.startedAt, this.stoppedAt);
     this.title = session?.title ?? "";
     this.mode = session?.mode ?? this.mode;
+    // Kept across a stop: the label beside the clock still describes the pass that follows it.
+    if (state?.options) this.options = state.options;
     this.stats = state?.stats ?? null;
     emit(SESSION_CHANGED, this);
   }

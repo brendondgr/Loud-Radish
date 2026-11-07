@@ -4,6 +4,12 @@
 
 Part one of the five-plan expansion. See [README.md](README.md) for the set and the order they run in.
 
+> **Superseded in part, 2026-11-07 (D-075).** The header's three-way mode switch and the window-only
+> pre-flight sheet specified here were replaced by one record sheet behind *Start recording*; the
+> mode is now derived from what the sheet is asked to record. See
+> [unified-record-sheet.md](unified-record-sheet.md). This plan is left as written, as the record
+> of what was built in August.
+
 ## 1. Introduction
 
 The application today has exactly one thing it can be doing: capturing a live microphone and

@@ -14,7 +14,7 @@
  * exactly the fault being repaired — the reported seminar asked for a 720p ceiling at capture and
  * recorded at 2560 x 1532.
  *
- * `show()` returns a promise, as the pre-flight sheet's does, because this is a sequence: look,
+ * `show()` returns a promise, as the record sheet's does, because this is a sequence: look,
  * perhaps choose and watch, then close. The caller gets `{ job, deleted }`: the export job when one
  * covers this recording, and whether the recording was deleted from inside the window.
  */

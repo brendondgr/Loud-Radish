@@ -34,7 +34,7 @@ class AudioSourceMixin:
         """Which audio this run should capture.
 
         The per-run choice wins. It is the one in front of the user at the moment they press
-        record, and the whole reason the pre-flight sheet exists is that this decision changes from
+        record, and the whole reason the record sheet asks it is that this decision changes from
         recording to recording — a talk playing in a window one minute, narration over it the next.
         """
         options = self._options
@@ -42,10 +42,16 @@ class AudioSourceMixin:
             return options.audio_source
         return config.capture.audio_source
 
-    def _open_source(self, config: AppConfig, mode: str = modes.LIVE) -> AudioSource:
+    def _open_source(self, config: AppConfig, source: str = modes.MICROPHONE) -> AudioSource:
         """Build the audio source this session should capture from.
 
-        **`window` mode reads the machine's output, not the microphone.** The point of the mode is
+        Decided by what the record sheet said to record (D-075), not by the mode: a microphone, this
+        computer's sound, or a window — and for a window, which of its audio choices.
+
+        **This computer's sound is a tap, never the microphone**, for the reason given below for a
+        window's: it is the same audio reached by the same route.
+
+        **A window reads the machine's output, not the microphone.** The point of the mode is
         the window's sound; recording the person watching it was the reported fault. The portal
         carries video only (D-022) so this was always a separate capture — it was simply capturing
         the wrong thing. `capture.audio_source` moves it back to the microphone for anyone who
@@ -66,11 +72,16 @@ class AudioSourceMixin:
                 frame_ms=config.audio.frame_ms,
                 speed=config.audio.file_speed,
             )
-        choice = self._audio_choice(config)
-        if mode == modes.WINDOW and choice == "application":
+        if source == modes.MICROPHONE:
+            choice = "microphone"
+        elif source == modes.SYSTEM:
+            choice = "system"
+        else:
+            choice = self._audio_choice(config)
+        if choice == "application":
             return self._open_application_tap(config)
 
-        if mode == modes.WINDOW and choice == "system":
+        if choice == "system":
             # **Also through a tap.** Recording the default sink's monitor directly is the obvious
             # implementation and it does not work here: `pw-record --target=<sink>.monitor` failed
             # to resolve against this machine's Bluetooth sink and, because an unresolved target

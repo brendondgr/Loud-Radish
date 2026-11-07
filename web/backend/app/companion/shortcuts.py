@@ -48,10 +48,11 @@ COMPONENT_LABEL: Final = branding.APP_TITLE
 ACTIONS: Final[dict[str, tuple[str, list[str]]]] = {
     "toggle_live": ("Start or stop live transcription", ["toggle", "--mode", "live"]),
     "toggle_recorded": ("Start or stop a recording", ["toggle", "--mode", "recorded"]),
-    # Not `toggle`: window capture has three switches that must be answered before anything is
-    # captured, so the key opens the sheet rather than starting a recording.
-    "arm_window": ("Record a window…", ["arm", "--mode", "window"]),
+    # Not `toggle`: a window recording has choices that must be answered before anything is
+    # captured, so the key opens the record sheet with a window already chosen (D-075).
+    "arm_window": ("Record a window…", ["arm", "--mode", "window", "--source", "window"]),
     "stop": ("Stop recording", ["stop"]),
+    # Opens the record sheet as it was last left, which is the one screen every recording starts at.
     "open_app": (f"Open {branding.APP_NAME}", ["arm", "--mode", "live"]),
     "dictate": ("Dictate into the focused window", ["dictate"]),
 }

@@ -61,6 +61,7 @@ def read_state(base: str) -> Snapshot:
 
     session = payload.get("session") or {}
     job = payload.get("transcription") or {}
+    options = payload.get("options") or {}
 
     if payload.get("running"):
         state = "recording"
@@ -77,6 +78,9 @@ def read_state(base: str) -> Snapshot:
         # carried separately rather than folded into `state`.
         running_pass=bool(payload.get("polishing")),
         dictation=read_dictation(base),
+        live_text=(
+            bool(options["live_transcription"]) if "live_transcription" in options else None
+        ),
     )
 
 
@@ -312,7 +316,7 @@ class Companion:
             "stop": ["stop"],
             "start-live": ["start", "--mode", "live"],
             "start-recorded": ["start", "--mode", "recorded"],
-            "arm-window": ["arm", "--mode", "window"],
+            "arm-window": ["arm", "--mode", "window", "--source", "window"],
         }
         if item_id not in commands:
             return f"unknown item: {item_id}"

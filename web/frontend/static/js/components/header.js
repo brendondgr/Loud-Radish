@@ -1,5 +1,5 @@
 /**
- * The header: capture mode, run state, elapsed clock, the primary control, and identity.
+ * The header: run state, elapsed clock, what is running, the primary control, and identity.
  *
  * The control used to flip a boolean. It now renders six run states from `stores/mode.js` and asks
  * that store what pressing it means, rather than working the rules out itself (D-020). Everything
@@ -27,7 +27,7 @@ import { SESSION_CHANGED, session } from "../stores/session.js";
  */
 const PRESENTATION = {
   [IDLE]: { label: "Not recording", button: "Start recording", state: "idle", enabled: true },
-  [ARMING]: { label: "Choosing a window…", button: "Cancel", state: "arming", enabled: true },
+  [ARMING]: { label: "Choosing what to record…", button: "Cancel", state: "arming", enabled: true },
   [RECORDING]: { label: "Recording", button: "Stop", state: "recording", enabled: true },
   [PAUSED]: { label: "Paused", button: "Stop", state: "paused", enabled: true },
   [STOPPING]: { label: "Stopping…", button: "Stopping…", state: "stopping", enabled: false },
@@ -35,10 +35,26 @@ const PRESENTATION = {
   [ERROR]: { label: "Recording failed", button: "Start recording", state: "error", enabled: true },
 };
 
+/** How the label beside the clock names each source. */
+const SOURCE_NAMES = { microphone: "Microphone", system: "Computer sound", window: "Window" };
+
+/** States in which a run exists to be described. */
+const DESCRIBED = new Set([RECORDING, PAUSED, STOPPING, PROCESSING]);
+
+/** "Microphone · live + after" — what is being captured, and when it is transcribed. */
+export function describeRun(options) {
+  if (!options) return "";
+  const parts = [];
+  if (options.video) parts.push("video");
+  if (options.live_transcription) parts.push("live");
+  if (options.post_transcription) parts.push("after");
+  const source = SOURCE_NAMES[options.source] ?? "";
+  return [source, parts.join(" + ")].filter(Boolean).join(" · ");
+}
+
 export class Header {
-  constructor(root, { onStart, onArm, onStop, onPause, onResume, onOpenSettings }) {
+  constructor(root, { onArm, onStop, onPause, onResume, onOpenSettings }) {
     this.root = root;
-    this.onStart = onStart;
     this.onArm = onArm;
     this.onStop = onStop;
     this.onPause = onPause;
@@ -47,6 +63,7 @@ export class Header {
     this.state = $("[data-record-state]", root);
     this.stateLabel = $("[data-record-label]", root);
     this.clock = $("[data-clock]", root);
+    this.runChip = $("[data-run-chip]", root);
     this.toggle = $("[data-session-toggle]", root);
     this.hold = $("[data-session-hold]", root);
     this.privacy = $("[data-privacy]", root);
@@ -79,12 +96,7 @@ export class Header {
     // instead was tried and is wrong twice over: a sentence naming a file path stretches the
     // header until the primary control is pushed off a narrow screen, and it duplicates what the
     // banner directly below is already saying and already announcing.
-    setText(
-      this.stateLabel,
-      modeStore.state === PROCESSING && recording.totalSeconds > 0
-        ? `Transcribing ${recording.percent}%`
-        : shown.label
-    );
+    setText(this.stateLabel, this._stateLabel(shown));
     setAttr(this.state, "title", modeStore.state === ERROR ? modeStore.message : "");
 
     // The one state whose label carries a number. A pass over a long recording can run for half
@@ -104,6 +116,7 @@ export class Header {
     }
 
     this._renderHold();
+    this._renderRunChip();
     this.renderClock();
     this.renderIdentity();
   }
@@ -122,6 +135,27 @@ export class Header {
     this.hold.hidden = !available;
     setText(this.hold, held ? "Resume" : "Pause");
     setAttr(this.hold, "aria-pressed", String(held));
+  }
+
+  _stateLabel(shown) {
+    if (modeStore.state === PROCESSING && recording.totalSeconds > 0) {
+      return `Transcribing ${recording.percent}%`;
+    }
+    // Arming has two halves: the sheet is open, then — for a window with video — the desktop's
+    // picker is. The second is the one worth naming, because it is a different program's dialog.
+    if (modeStore.state === ARMING && modeStore.options) {
+      return modeStore.options.video ? "Choosing a window…" : "Starting…";
+    }
+    return shown.label;
+  }
+
+  _renderRunChip() {
+    if (!this.runChip) return;
+    const text = DESCRIBED.has(modeStore.state) ? describeRun(modeStore.options) : "";
+    setText(this.runChip, text);
+    // The label truncates on a narrow header, so the whole of it is also on the title.
+    setAttr(this.runChip, "title", text ? `This recording: ${text}` : "");
+    this.runChip.hidden = !text;
   }
 
   renderClock() {
@@ -148,9 +182,6 @@ export class Header {
     setText(this.privacyLabel, local ? "Fully local" : "Sending data off this machine");
   }
 
-  /**
-   * One control, six states. What pressing it means comes from the store, not from a boolean here.
-   */
   /** Pause holds the capture; resume continues the same session, file and store. */
   async _onHold() {
     if (modeStore.state === PAUSED) {
@@ -160,13 +191,11 @@ export class Header {
     if (modeStore.state === RECORDING) await this.onPause?.();
   }
 
+  /** One control, every state. What pressing it means comes from the store, not a boolean here. */
   async _onToggle() {
     switch (modeStore.action) {
       case "arm":
-        await this.onArm?.(modeStore.mode);
-        return;
-      case "start":
-        await this.onStart?.(modeStore.mode);
+        await this.onArm?.();
         return;
       case "stop":
         // Arming has captured nothing yet, so cancelling it costs nothing and asking would be

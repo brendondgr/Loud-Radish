@@ -75,58 +75,98 @@ upload-and-poll job states this paragraph once listed are gone — see Decision 
 
 ## Capture Modes
 
-*Specified 2026-08-15 (D-020). The vocabulary is `web/backend/app/services/session/modes.py` and its
-mirror `web/frontend/static/js/core/modes.js`; this section is the interface built on it.*
+*Specified 2026-08-15 (D-020); the header switch was replaced by the record sheet on 2026-11-07
+(D-075). The vocabulary is `web/backend/app/services/session/modes.py` and its mirror
+`web/frontend/static/js/core/modes.js`; this section is the interface built on it.*
 
-The application has three capture modes and each recording passes through some subset of six run
-states. **These are two different questions and they get two different controls.**
+The application has three capture modes, and each recording passes through some subset of seven run
+states. **These are two different questions and they still get two different controls**, but the
+mode is no longer chosen from a tab in the header. It is *derived* from what the person asks for in
+the record sheet.
 
 | | Answers | Control | Changeable while running |
 |---|---|---|---|
-| **Capture mode** | What kind of recording this will be | A three-way `radiogroup` in the header | No |
+| **What to record, and when to transcribe it** | What kind of recording this will be | The record sheet, opened by *Start recording* | No |
 | **Run state** | Where this recording has got to | The primary record control | It *is* the run state |
 
-One control doing both was considered and rejected. A single button that cycles
-*idle → recording → stopping → idle → next mode* changes what it means depending on how many times
-it has already been pressed, which means a user cannot know what pressing it will do without reading
-its current label — and the label is what changes. The two controls sit adjacent so the pair still
-reads as one unit.
+**Why the three-way switch went (D-075).** The switch named implementations, not choices. *Live*
+meant "microphone, transcribe as you go", *Recorded* meant "microphone, transcribe when it ends",
+and *Window* meant "a window, with either or both, plus video". Two questions were tangled into
+one row of tabs: *what am I recording* and *when should it be transcribed*. Neither could be
+answered in one place. Only Window had a sheet of options, and the microphone was chosen in a
+settings tab two screens away. Reported as confusing by the person who uses it. The one-control
+rejection from D-020 still stands: the record control does not cycle through modes.
+
+### The record sheet
+
+*Start recording* always opens the sheet. Its sections appear in order, and each one appears only
+when the section above it has an answer. That reads as stepping through, without Back and Next
+buttons and without a second dialog primitive.
+
+| # | Section | Choices | Shown when |
+|---|---|---|---|
+| 1 | **What to record** | My microphone · This computer's sound · A window | Always |
+| 2 | **Which input** | Microphone: the device list, with the configured one selected. Window: the window's sound · only this application's sound · my microphone | Microphone or A window |
+| 3 | **When to transcribe** | While recording · After it ends · Both | Always |
+| 4 | **Video** | Record what the window shows (on/off) | A window |
+
+- **Choosing a microphone here writes the configuration** through `POST /api/audio/device`. It does
+  not add a per-run override. The tray's microphone picker reads the same value, so there is one
+  answer to "which microphone".
+- **The file source wins.** When the audio source is a file, section 2 says which file is being
+  replayed and links to Audio settings. It does not offer a microphone list that would be ignored.
+- **An unavailable source is disabled and carries its reason**, never hidden. A disabled option
+  naming the install command is actionable; one that has vanished looks like a feature that does
+  not exist. Only *A window* has a hard requirement (`window_capture`).
+- **The sheet remembers the last run** and opens pre-filled. D-020 made window options per-run so
+  that nobody silently got no video. That fault came from options that were applied without being
+  shown. Every choice here is on screen at the moment of confirming, so pre-filling hides nothing.
+  A remembered source that is no longer available falls back to the microphone.
+- **Confirm says what happens next**: *Start recording*, or *Choose a window…* when the desktop's
+  window picker comes after. The confirm button takes focus, so pressing Enter twice starts a
+  recording the same way as last time.
+- **Refused combinations** show their reason beside the confirm button, not as an alert:
+  - No transcription and no video records nothing.
+  - "Transcribe: neither" is offered only with video, so it can only be chosen for a window.
+
+### How a choice becomes a mode
+
+The server derives the mode (`derive_mode` in `services/session/modes.py`). The names stay because
+global shortcuts, the tray, stored session metadata and the vocabulary test all use them.
+
+| What to record | When to transcribe | Video | Derived mode | Notes |
+|---|---|---|---|---|
+| Microphone | While recording | — | `live` | The original behaviour |
+| Microphone | After it ends | — | `recorded` | No inference while capturing |
+| Microphone | Both | — | `recorded` | **New.** Live text *and* a second pass, kept as two revisions |
+| This computer's sound | Any | — | `live` or `recorded`, by the same rule | Taps every playing stream; never falls back to the microphone |
+| A window | Any, or neither | On/off | `window` | The desktop's picker follows if video is on |
+
+A request that still sends `mode` alone gets that mode's preset: `live` is microphone, while
+recording; `recorded` is microphone, after; `window` is a window with all three switches on. A
+request whose `mode` contradicts its options is refused with a message that names the conflict.
 
 ### The modes
 
 | Mode | What it does | Reachable states |
 |---|---|---|
-| **Live** | Continuous capture, transcribed as it arrives. The original behaviour. | idle, recording, stopping, error |
-| **Recorded** | Captures to a file with no inference; transcribes the whole file on stop. | idle, recording, stopping, **processing**, error |
-| **Window** | A chosen window, with live transcription, post-process transcription, and video each switchable first. | idle, **arming**, recording, stopping, processing, error |
+| **Live** | Continuous capture, transcribed as it arrives. | idle, arming, recording, paused, stopping, error |
+| **Recorded** | Captures to a file; transcribes the whole file on stop, and live as well if asked. | idle, arming, recording, paused, stopping, **processing**, error |
+| **Window** | A chosen window, with live transcription, post-process transcription, and video each switchable first. | idle, arming, recording, paused, stopping, processing, error |
 
-**All three are always visible.** A mode whose requirements are missing is *disabled and carries the
-reason*, never hidden — a feature that disappears when its dependency is absent is indistinguishable
-from a feature that does not exist, whereas a disabled one naming the install command is actionable.
-This mirrors how `GET /api/health` already reports optional dependency groups.
+**`arming` is reachable in every mode now**, because every recording starts from the sheet.
+A global shortcut that starts a recording directly (`toggle_live`, `toggle_recorded`) skips it.
 
-**But a mode is only gated on what it genuinely cannot do without.** Only `window` has a hard
-requirement. The two audio modes were first gated on the capture-device backend, and running it
-showed why that is wrong: a plain `uv sync` has no `sounddevice`, and the file source replaces a
-capture device entirely — so all three modes were struck through on a machine transcribing perfectly
-well. A missing device is an *input source* problem with an existing remedy path (the audio settings
-tab, and a start failure that opens it). Disabling the mode as well tells the same failure twice,
-once wrongly.
-
-Unavailable is drawn as dimmed **and** struck through: colour is never the only signal, and the
-reason is on the control's `title` as well as in the disabled state.
-
-**The selector is disabled whenever the run state is not `idle`.** Switching capture mode mid-session
-would mean rebuilding the pipeline underneath a transcript that is still accumulating, and there is
-no user need for it. Changing mode while idle does **not** clear the transcript: the transcript is
-cleared on `session.started` and nowhere else.
+While a recording runs, a quiet chip beside the clock says what is running, for example
+*Microphone · live + after*. That answers "which mode is this?", which the disabled radiogroup used
+to answer.
 
 ### The record control's seven states
 
 | State | Label | Dot | Enabled | Announced |
 |---|---|---|---|---|
 | `idle` | *Start recording* | `--text-dim` | Yes | — |
-| `arming` | *Choose a window…* | `--accent` | Yes — cancels | "Waiting for a window to be chosen" |
+| `arming` | *Cancel* | `--accent` | Yes — cancels | "Choosing what to record", or "Waiting for a window to be chosen" once the desktop's picker is up |
 | `recording` | *Stop* | `--danger` | Yes | "Recording" |
 | `paused` | *Stop* | `--warning` | Yes | "Paused" |
 | `stopping` | *Stopping…* | `--danger`, dimmed | **No** | "Stopping" |
@@ -167,33 +207,13 @@ Rules that fall out of the table:
   than sat in front of. Its six state hues are the same ones this table uses, so the two indicators
   agree on what each state looks like even though only one of them moves.
 
-### Pre-flight options
+### Sheet mechanics
 
-Some modes need options answered *before* capture begins. They are **per-run**, not settings: a user
-who recorded one window without video should not silently get no video next time.
-
-| Mode | Opens a pre-flight | Why |
-|---|---|---|
-| Live | No | Nothing to choose |
-| Recorded | No | Nothing to choose |
-| Window | **Always** | Three toggles, and the desktop's window picker follows |
-
-The window pre-flight carries exactly three toggles:
-
-| Toggle | Default | Off means |
-|---|---|---|
-| **Live transcription** | On | No transcript until the recording ends |
-| **Post-process transcription** | On | The live transcript is the only one |
-| **Video capture** | On | Audio is recorded and transcribed; no video file |
-
-**All three off is refused** — it would record nothing — with the reason shown next to the confirm
-button rather than as an alert. Every other combination is valid, including video with no
-transcription and transcription with no video. The refusal is enforced on the server as well; the
-client check is a courtesy and the server check is the rule.
-
-The sheet is a focus-trapped dialog reusing `a11y/focus-trap.js` and the existing modal styling — not
-a new dialog primitive, because focus trapping and restoration are the accessibility behaviour most
-easily got wrong twice. `Escape` cancels and starts nothing.
+The record sheet is a focus-trapped dialog reusing `a11y/focus-trap.js` and the existing modal
+styling, not a new dialog primitive: focus trapping and restoration are the accessibility behaviour
+most easily got wrong twice. `Escape` and the scrim cancel and start nothing, which is why `arming`
+is a run state of its own. The refusal is enforced on the server as well; the client check is a
+courtesy and the server check is the rule.
 
 **The window is chosen after the sheet is confirmed, by the desktop's own picker, not inside the
 sheet.** Under Wayland an application cannot enumerate windows (see D-022 and
@@ -202,10 +222,9 @@ must therefore never imply it can: no thumbnail grid, no window list, no pre-sel
 confirm button says *Choose a window…* so the next thing that happens is the thing the button
 promised.
 
-The sheet also states, in text, that **audio is the machine's, not that window's** — the screen-cast
-portal carries video only. A user who assumes per-window audio and records the wrong source has lost
-the recording, and that sentence is the entire defence against it.
-
+The sheet also states, in text, that **a window's audio is captured separately from its picture**:
+the screen-cast portal carries video only. A user who assumes per-window audio and records the wrong
+source has lost the recording, and that sentence is the entire defence against it.
 ### The recording monitor
 
 Window capture gets a **third pane**, peer to the transcript and the assistant, shown only in that

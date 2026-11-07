@@ -15,7 +15,7 @@ Server-rendered from `web/frontend/templates/` by `web/backend/app/routes/pages.
 
 | Path | Purpose | Template | Status |
 |---|---|---|---|
-| `/` | The live application — transcript pane, header, status bar | `pages/app.html` | **Implemented** |
+| `/` | The live application — transcript pane, header, status bar. `?arm=<mode>` opens the record sheet on load, and `&source=microphone\|system\|window` preselects what it records (D-075). `?arm=window` alone also preselects a window. The query is cleared at once, so a reload does not reopen it | `pages/app.html` | **Implemented** |
 | `/sessions` | Recordings — every past session, what it holds, and its exports | `pages/sessions.html` | **Implemented** |
 
 ## WebSocket
@@ -50,16 +50,23 @@ Served by `web/backend/app/routes/`. All paths are prefixed `/api`.
 | `GET` | `/api/session` | Current session state and metadata | **Implemented** |
 | `GET` | `/api/session/list` | — superseded by `/api/sessions`, below | Removed |
 
-**Capture mode on start (D-020).** `POST /api/session/start` takes `mode` — `live`, `recorded`, or
-`window` — defaulting to `live` so a client written before capture modes keeps working. `window`
-also takes `options`, three per-run booleans: `live_transcription`, `post_transcription`, `video`.
+**Capture mode on start (D-020, D-075).** `POST /api/session/start` takes `options`, the record
+sheet's answers: `source` (`microphone`, `system` or `window`), `live_transcription`,
+`post_transcription`, `video`, and `audio_source` (a window's audio). **The mode is derived from
+them** by `plan.resolve` in `services/session/plan.py`: a window is `window`, and an audio source is
+`recorded` when a second pass is wanted and `live` otherwise. `mode` is still accepted. Sent alone it
+means that mode's preset, so `toggle --mode recorded` from a global shortcut records exactly what it
+always did. Sent with options it must agree with them. With neither, the session is `live`, so a
+client written before capture modes keeps working. Video is dropped, not refused, for an audio
+source. `GET /api/session` and the `session.started` event both carry the resolved `options`.
 
-Three refusals, in the order they are checked:
+Four refusals, in the order they are checked:
 
 | Condition | Status | Code |
 |---|---|---|
-| A mode outside the vocabulary | `422` | Pydantic validation |
-| All three options false | `422` | `records-nothing` |
+| A mode or source outside the vocabulary | `422` | Pydantic validation |
+| Nothing transcribed and no video (video counts only for a window) | `422` | `records-nothing` |
+| A `mode` that contradicts the options | `422` | `options-conflict` |
 | A mode this build does not implement | `501` | `mode-unavailable` |
 
 `501` rather than `409` is deliberate: the request is valid and the session state is fine, the build

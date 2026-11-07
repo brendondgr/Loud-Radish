@@ -153,7 +153,10 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   │       ├── store.py       # Append-only writes, the four queries, search
 │   │   │       └── export.py      # Text, Markdown, SRT, VTT, JSON
 │   │   │   └── session/           # Wiring, workers, health, degradation
-│   │   │       ├── modes.py       # Capture modes and run states (D-020); mirrored in the frontend
+│   │   │       ├── modes.py       # Capture modes, run states and sources (D-020, D-075); mirrored
+│   │   │                          #   in the frontend
+│   │   │       ├── plan.py        # A start request settled into one mode and the pieces it starts
+│   │   │                          #   (engine, sink, recorder). Pure; the record sheet's table (D-075)
 │   │   │       ├── workers.py     # Drop-oldest queue and the threads draining it
 │   │   │       ├── metrics.py     # Pipeline health, gathered in one place
 │   │   │       ├── degradation.py # What each failure means and what to do
@@ -166,8 +169,9 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   │       │                  #   and a chosen past recording put in that slot (D-076)
 │   │   │       ├── past_pass.py   # Planning and starting an approved pass over a past recording
 │   │   │       ├── sources.py     # What a session listens to, and proving it is listening
+│   │   │       ├── hold.py        # Pause and resume (D-044)
 │   │   │       └── manager.py     # capture → VAD → engine → store → transport. Owns the
-│   │   │                          #   lifecycle; the five modules above are the rest of this one
+│   │   │                          #   lifecycle; the six modules above are the rest of this one
 │   │   │                          #   class, split across files (D-039)
 │   │   │   └── gpu/               # The GPU shared between the speech and language models
 │   │   │       └── turns.py       # They take turns; the speech model's wait is bounded (D-072)
@@ -244,12 +248,13 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   │   ├── base.html          # Document shell; loads the stylesheets and the entry module
 │   │   │   ├── pages/app.html     # The live application
 │   │   │   ├── macros/icons.html  # Inline SVG icons, inheriting currentColor
-│   │   │   └── partials/          # header, status_bar, banners, preflight,
+│   │   │   └── partials/          # header, status_bar, banners, record_sheet,
 │   │   │                          #   transcript/, chat/, monitor/, settings/
 │   │   └── static/
 │   │       ├── brand/radish.svg   # The mark — tab icon, header, export, desktop entry (D-038)
 │   │       ├── css/               # tokens, base, layout + one file per component
-│   │       └── js/                # main + core/, transport/, stores/, components/, a11y/
+│   │       └── js/                # main, session-start (the record sheet → start request,
+│   │                              #   D-075) + core/, transport/, stores/, components/, a11y/
 │   │           └── core/modes.js  # Mirror of services/session/modes.py; kept identical by test
 │   └── shared/contracts/          # Generated: openapi.json, ws-events.json
 │

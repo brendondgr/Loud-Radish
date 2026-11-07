@@ -1,71 +1,36 @@
-/* The capture-mode selector and the six-state record indicator (D-020).
+/* The record indicator's seven states (D-020) and the label saying what is running (D-075).
  *
- * Split out of header.css because the header is now three separate controls sharing a row, and one
+ * Split out of header.css because the header is several separate controls sharing a row, and one
  * stylesheet describing all of them would be the file nobody wants to edit.
  *
  * No new tokens. Every state reuses a colour already measured in docs/design-system.md, and every
  * one pairs that colour with a word — the colour-is-never-the-only-signal rule.
  */
 
-/* -- mode selector ---------------------------------------------------------------------------
- * A segmented radiogroup rather than a <select>: three options that change what the primary
- * control does are worth seeing without opening anything.
+/* -- what is running (D-075) -------------------------------------------------------------------
+ * Replaces the mode selector's job of answering "which mode is this?". Quiet on purpose: it is
+ * read once, at a glance, and the run state beside it is what changes.
  */
 
-.mode-switcher {
-  display: flex;
-  align-items: stretch;
-  padding: 2px;
-  gap: 2px;
-  border: 1px solid var(--border-control);
+.run-chip {
+  /* The one thing in the row allowed to give way. It is read once, at a glance, and truncating it
+   * is better than pushing the Stop control under the identity group beside it — which is what an
+   * unshrinkable label did at 1024 px. The full text is on the element's title. */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius);
-  background: var(--surface-control);
-}
-
-.mode-switcher__option {
-  /* 44px tall including the group's padding, meeting the touch-target floor. */
-  min-height: 40px;
-  padding: 0 var(--space-5);
-  font-family: var(--font-ui);
-  font-size: var(--text-sm);
-  font-weight: 500;
+  font-size: var(--text-xs);
   letter-spacing: 0.02em;
-  color: var(--text-muted);
-  background: none;
-  border: none;
-  border-radius: calc(var(--radius) - 2px);
-  cursor: pointer;
+  color: var(--text-secondary);
   white-space: nowrap;
-  transition: background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease);
 }
 
-.mode-switcher__option:hover:not([disabled]) {
-  color: var(--text-primary);
-  background: var(--surface-control-hover);
-}
-
-.mode-switcher__option[aria-checked="true"] {
-  color: var(--text-primary);
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-pill);
-}
-
-/* Unavailable is *disabled with a reason*, never hidden — a feature that vanishes when its
- * dependency is missing is indistinguishable from one that does not exist. The strike-through is
- * the second signal alongside the dimmed colour.
- */
-.mode-switcher__option[disabled] {
-  cursor: not-allowed;
-  color: var(--text-dim);
-}
-
-.mode-switcher__option--unavailable {
-  text-decoration: line-through;
-  text-decoration-thickness: 1px;
-}
-
-.mode-switcher[aria-disabled="true"] .mode-switcher__option {
-  cursor: not-allowed;
+.run-chip[hidden] {
+  display: none;
 }
 
 /* -- the six run states ------------------------------------------------------------------------
@@ -143,30 +108,14 @@
 }
 
 /* -- narrow chrome ---------------------------------------------------------------------------
- * Below 700px the header already sheds the model identity and the privacy wording. The mode
- * selector survives, because which mode is about to be recorded is not something to discover
- * afterwards — but its labels shrink to fit alongside the clock and the primary control.
+ * Below 560px the label beside the clock goes: the state label and the clock already fill the row,
+ * and what the run is was chosen seconds ago in the record sheet.
  *
  * Lives here rather than in layout.css: component stylesheets load later, a media query adds no
  * specificity, and a responsive rule written there is silently overridden by the base rules above.
  */
-@media (max-width: 700px) {
-  .mode-switcher__option {
-    /* The 44 px touch floor from docs/design-system.md. Applied at the widths where a finger is
-     * the likely input rather than everywhere, so the desktop header keeps its proportions. */
-    min-height: 44px;
-    padding: 0 var(--space-4);
-    font-size: var(--text-xs);
-  }
-}
-
-@media (max-width: 420px) {
-  .mode-switcher {
-    order: -1;
-    width: 100%;
-  }
-
-  .mode-switcher__option {
-    flex: 1 1 0;
+@media (max-width: 560px) {
+  .run-chip {
+    display: none;
   }
 }

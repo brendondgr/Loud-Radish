@@ -1,6 +1,6 @@
 # Component Map
 
-*Last updated: 2026-09-09 (the Rewriting tab — D-068)*
+*Last updated: 2026-11-07 (the record sheet replaces the mode switch — D-075)*
 
 > **Status: implemented.** Update this file in the same change that adds, moves, or renames a
 > component.
@@ -23,7 +23,8 @@ web/frontend/
 │   ├── macros/icons.html       inline SVG, inheriting currentColor
 │   └── partials/               one file per region of the interface
 │       ├── header.html, banners.html, status_bar.html
-│       ├── preflight.html      the per-run capture options sheet
+│       ├── record_sheet.html   the record sheet: what to record, which input, when to
+│       │                       transcribe, and video (D-075)
 │       ├── recording_window.html  one window per recording (D-077): an overview of what it
 │       │                       holds and every export, with the web-app export's preview and
 │       │                       presets on one face and the pipeline's stages on another
@@ -40,6 +41,7 @@ web/frontend/
     │   └── components/         one stylesheet per component
     └── js/
         ├── main.js             the application page's entry point
+        ├── session-start.js    opening the record sheet and starting what it chose (D-075)
         ├── sessions.js         the recordings page's entry point — the list, the media
         │                       chips, and each row's action (bring back / transcribe), Open…
         │                       and Delete; everything else is in the recording window
@@ -106,24 +108,32 @@ browser owns is genuinely its own — pane widths, text size, which pane is show
 | `RecordingPicker` | "Open a recording…": recordings with the one action each can take | Opened by any `[data-open-recording]` control — the transcript toolbar, the empty state, the banner. The action and its refusal come from `media.openable` / `.transcribable` / `.reason`, through `primaryAction`, which the Recordings rows and the recording window's Ask section use too. A refusal is shown as text, not only as a disabled button's title (D-076) |
 | `TranscribeConsent` | Approving a transcription of a recording with no transcript | Reads `GET …/transcribe/plan` and lists exactly what will run; nothing starts until Transcribe. One checkbox: open it on the main screen when it finishes, on by default. Used on both pages (D-076) |
 
-### The multi-mode expansion (D-020)
+### The multi-mode expansion (D-020), and the record sheet (D-075)
+
+> The header's `ModeSwitcher` and the window-only `Preflight` were replaced by one `RecordSheet`
+> behind *Start recording* ([plans/unified-record-sheet.md](plans/unified-record-sheet.md)). The
+> mode is derived from the sheet's choices rather than picked. `static/js/session-start.js` connects
+> the two: it opens the sheet, then asks the server to start what it chose.
 
 Specified in `docs/design-system.md` § Capture Modes; built by
 [plans/multi-mode-ui-implementation.md](plans/multi-mode-ui-implementation.md).
 
 | Component | Owns | Notes |
 |---|---|---|
-| `ModeSwitcher` | The three-way capture-mode `radiogroup` | Separate from `Header` so the header stays a renderer rather than a controller. One tab stop for the group; arrows move within and skip unavailable options rather than landing on one and refusing. Disabled whenever the run state is not `idle` |
-| `Preflight` | The window pre-flight sheet's three toggles | Reuses `FocusTrap` and the modal styling rather than adding a second dialog primitive. `show()` returns a promise, because arming is a sequence. Refuses the all-off combination; the server refuses it again |
+| `RecordSheet` | The record sheet: source, microphone or window audio, transcription timing, video | Replaced `Preflight` (D-075). Reuses `FocusTrap` and the modal styling. `show(preset)` returns a promise of the start request's `options`, or `null` on cancel. Opens pre-filled from the last run (`lastRecordOptions`), focuses Confirm, and writes a changed microphone to `audio.device_id` rather than holding a per-run override. A disabled source carries its reason. Refuses nothing-to-record; the server refuses it again |
 | `RecordingMonitor` | The third pane's contents: preview, elapsed, output size, active options | Pulls the preview as a still image on a timer, stopped whenever nobody is looking. The socket never carries video, because transcript events on it are undroppable. Distinguishes its degraded states — no capture, no encoder, window closed, recorder failed — because a black rectangle and a broken capture look identical |
 
 `Header` keeps the record control but no longer derives its appearance from a boolean: it renders
-the six run states from a presentation table and asks `stores/mode.js` what pressing the control
-means. The error message goes to the banner and the `title`, never into the state label — a sentence
+the seven run states from a presentation table and asks `stores/mode.js` what pressing the control
+means — from `idle`, always "arm", which opens the record sheet. Beside the clock it shows what is
+running, for example *Microphone · live + after*, the job the mode tabs used to do by being visibly
+selected. That label is the one element in the row allowed to truncate. The error message goes to the banner and the `title`, never into the state label — a sentence
 there stretches the header until the primary control is pushed off a narrow screen.
 
 `TranscriptPane` grows a mode-specific empty state, because `recorded` mode genuinely has no
-transcript while it records and a blank pane reads as a transcriber that has stopped working. Once a
+transcript while it records and a blank pane reads as a transcriber that has stopped working. It
+keys on the run's *options* as well as its mode: a `recorded` run with live text on says what live
+says, and idle has one message whatever the last run was. Once a
 session can hold two transcription passes it also grows a Live/Final revision switch (Plan 4).
 
 ## Stores
@@ -132,11 +142,11 @@ session can hold two transcription passes it also grows a Live/Final revision sw
 |---|---|---|
 | `transcript` | Committed segments from **one** transcription pass, and the single hypothesis. A segment from another pass is dropped rather than appended — merging the post-capture pass into the live one shows the talk twice (D-022) | `store.transcript.changed` |
 | `polish` | Finished minutes rewritten for reading, and which segments they cover | `store.polish.changed` |
-| `session` | Whether recording, for how long, resolved config | `store.session.changed` |
+| `session` | Whether recording, for how long, resolved config, and the options the server resolved | `store.session.changed` |
 | `health` | Level, speech, RTF, latency, connection | `store.health.changed`, throttled to ~4 Hz |
 | `config` | The backend's resolved configuration | `config:changed` |
 | `chat` | Settled messages plus the streaming one | `store.chat.changed`, `store.chat.stream` |
-| `mode` | Selected capture mode, current run state, per-mode availability, the pending run's options | `store.mode.changed` |
+| `mode` | The current or last run's mode (derived, never selected — D-075), current run state, per-mode availability, and the record sheet's options for that run | `store.mode.changed` |
 | `recording` | Bytes and duration captured, and the post-capture pass's progress. Authoritative from the server, because the pass outlives the page (D-021) | `store.recording.changed` |
 | `capture` | The window recording's state. Also server-authoritative: the recorder is a subprocess the browser has no view of (D-022) | `store.capture.changed` |
 

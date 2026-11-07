@@ -235,3 +235,51 @@ def test_a_decorative_glyph_is_hidden_from_the_reader(pages) -> None:
     hidden = [element for element in pages["/"] if element.attrs.get("aria-hidden") == "true"]
 
     assert hidden, "nothing is marked decorative, which is unlikely in a page with icons"
+
+
+def _record_sheet(elements: list[Element]) -> list[Element]:
+    """The record sheet's elements, in document order (D-075). The parser is flat, so this slices
+    from the sheet's root to the next modal."""
+    start = next(i for i, e in enumerate(elements) if "data-record-sheet" in e.attrs)
+    end = next(
+        (
+            i
+            for i, e in enumerate(elements[start + 1 :], start + 1)
+            if "modal" in e.attrs.get("class", "").split()
+        ),
+        len(elements),
+    )
+    return elements[start:end]
+
+
+def test_the_record_sheet_is_a_labelled_modal_dialog(pages) -> None:
+    sheet = _record_sheet(pages["/"])
+    [dialog] = [element for element in sheet if element.attrs.get("role") == "dialog"]
+
+    assert dialog.attrs.get("aria-modal") == "true"
+    title = dialog.attrs.get("aria-labelledby")
+    assert any(element.attrs.get("id") == title for element in sheet)
+
+
+def test_every_group_in_the_record_sheet_has_a_legend(pages) -> None:
+    """A radio group without a legend reads as loose options with no question asked."""
+    sheet = _record_sheet(pages["/"])
+
+    assert len(of(sheet, "legend")) == len(of(sheet, "fieldset")) >= 3
+
+
+def test_the_record_sheet_offers_every_source(pages) -> None:
+    """A source this machine cannot use is disabled with its reason at runtime, never left out."""
+    sheet = _record_sheet(pages["/"])
+    sources = {e.attrs["value"] for e in sheet if "data-record-source" in e.attrs}
+
+    assert sources == {"microphone", "system", "window"}
+
+
+def test_the_record_sheets_step_numbers_are_not_read_aloud(pages) -> None:
+    """The numbers picture a sequence. Read aloud, they are noise before every legend."""
+    steps = [
+        e for e in _record_sheet(pages["/"]) if "record-sheet__step" in e.attrs.get("class", "")
+    ]
+
+    assert steps and all(step.attrs.get("aria-hidden") == "true" for step in steps)

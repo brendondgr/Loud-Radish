@@ -54,12 +54,19 @@ QUEUE_CAPACITY = 200
 
 @dataclass(frozen=True)
 class CaptureOptions:
-    """The three per-run switches a `window` session was armed with (D-020).
+    """The per-run answers a session was started with (D-020, D-075).
+
+    Every run has them now, not only `window`: the record sheet asks every recording what to
+    record and when to transcribe it, and a request naming only a mode is given that mode's preset
+    by :func:`.plan.resolve`.
 
     A plain dataclass rather than the request schema: `services/` must not import `schemas/`, which
     is a validation boundary for HTTP and not a vocabulary for the pipeline.
     """
 
+    #: What the run listens to: `microphone`, `system` or `window` (:data:`.modes.CAPTURE_SOURCES`).
+    #: Empty means not stated, which :func:`.plan.resolve` settles from the mode.
+    source: str = ""
     live_transcription: bool = True
     post_transcription: bool = True
     video: bool = True
@@ -71,7 +78,10 @@ class CaptureOptions:
 
     @property
     def records_nothing(self) -> bool:
-        return not (self.live_transcription or self.post_transcription or self.video)
+        # Video only counts where there is a picture. An unstated source is a pre-sheet window
+        # request, which is the only kind that ever sent these switches.
+        video = self.video and self.source in ("", "window")
+        return not (self.live_transcription or self.post_transcription or video)
 
 
 @dataclass
