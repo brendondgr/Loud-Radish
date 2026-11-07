@@ -1,6 +1,6 @@
 # Unified Record Sheet — One Button, One Sheet, Every Kind of Recording
 
-*Written 2026-11-07. Status: **In progress (2 / 6)**. The next free decision number is **D-075**.*
+*Written 2026-11-07. Status: **In progress (3 / 6)**. The next free decision number is **D-075**.*
 
 ## 1. Introduction
 
@@ -181,6 +181,22 @@ picture by mode, so "microphone, both" draws as *recording* rather than *live*. 
   the microphone can be transcribed live and again afterwards.*
 
 ### Step 3: Build the record sheet (frontend component)
+
+**Status: Complete (2026-11-07).** Built and mounted where the pre-flight sheet was. The header's
+Window tab opens it with a window preselected, and its options go to the server **without** a
+`mode`, so the server derives the mode. The old `preflight.*` files are unreferenced and deleted in
+Step 6. The microphone is written through `config.patch({"audio.device_id"})`, the same call the
+Audio tab makes, rather than `POST /api/audio/device`.
+
+**Browser QA** ran against an isolated server on port 8411 with the mock model and a file source,
+not the instance on 8395, because the launcher takes over its port. Checked:
+- defaults, step numbering, and the file-source note
+- a disabled window option carrying its reason (GStreamer was missing in that environment)
+- the window branch, the refusal, and the confirm label
+- Escape
+- 375 px with no horizontal scroll
+
+The Confirm promise is checked end to end in Step 4, where it becomes the only start path.
 
 - **Locations**:
   - `web/frontend/templates/partials/record_sheet.html` (**new**, replacing `preflight.html`).

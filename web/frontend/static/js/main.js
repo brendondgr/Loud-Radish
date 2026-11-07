@@ -16,7 +16,7 @@ import { ExportDialog } from "./components/export-dialog.js";
 import { GlossaryPanel } from "./components/glossary-panel.js";
 import { Header } from "./components/header.js";
 import { ModeSwitcher } from "./components/mode-switcher.js";
-import { Preflight } from "./components/preflight.js";
+import { RecordSheet } from "./components/record-sheet.js";
 import { RecordingMonitor } from "./components/recording-monitor.js";
 import { TranscriptSelection } from "./components/selection.js";
 import { SettingsModal } from "./components/settings-modal.js";
@@ -96,7 +96,7 @@ function boot() {
     },
   });
 
-  const preflight = new Preflight($("[data-preflight]"), {
+  const preflight = new RecordSheet($("[data-record-sheet]"), {
     onOpenSettings: (section) => settings.show(section),
   });
 
@@ -498,7 +498,7 @@ async function arm(captureMode, preflight, banners, settings) {
   if (preflight.isOpen) return;
 
   mode.setState(ARMING);
-  const options = await preflight.show();
+  const options = await preflight.show(captureMode === WINDOW ? { source: WINDOW } : {});
   if (!options) {
     mode.setState(IDLE);
     return;
@@ -618,7 +618,9 @@ async function refreshRevisions(pane) {
 
 async function start(captureMode, options, banners, settings) {
   try {
-    await api.startSession(options ? { mode: captureMode, options } : { mode: captureMode });
+    // With options the server derives the mode from them (D-075); sending one beside them only
+    // invites a refusal when the sheet chose a different source from the tab that opened it.
+    await api.startSession(options ? { options } : { mode: captureMode });
   } catch (error) {
     mode.fail(error.message);
 

@@ -243,7 +243,7 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   │   ├── base.html          # Document shell; loads the stylesheets and the entry module
 │   │   │   ├── pages/app.html     # The live application
 │   │   │   ├── macros/icons.html  # Inline SVG icons, inheriting currentColor
-│   │   │   └── partials/          # header, status_bar, banners, preflight,
+│   │   │   └── partials/          # header, status_bar, banners, record_sheet,
 │   │   │                          #   transcript/, chat/, monitor/, settings/
 │   │   └── static/
 │   │       ├── brand/radish.svg   # The mark — tab icon, header, export, desktop entry (D-038)

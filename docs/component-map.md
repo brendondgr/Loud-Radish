@@ -23,7 +23,8 @@ web/frontend/
 │   ├── macros/icons.html       inline SVG, inheriting currentColor
 │   └── partials/               one file per region of the interface
 │       ├── header.html, banners.html, status_bar.html
-│       ├── preflight.html      the per-run capture options sheet
+│       ├── record_sheet.html   the record sheet: what to record, which input, when to
+│       │                       transcribe, and video (D-075)
 │       ├── export.html         the post-recording export window: preview and presets on one
 │       │                       face, the pipeline's stages on the other
 │       ├── transcript/         pane, toolbar, hypothesis, empty state, glossary panel…
@@ -113,7 +114,7 @@ Specified in `docs/design-system.md` § Capture Modes; built by
 | Component | Owns | Notes |
 |---|---|---|
 | `ModeSwitcher` | The three-way capture-mode `radiogroup` | Separate from `Header` so the header stays a renderer rather than a controller. One tab stop for the group; arrows move within and skip unavailable options rather than landing on one and refusing. Disabled whenever the run state is not `idle` |
-| `Preflight` | The window pre-flight sheet's three toggles | Reuses `FocusTrap` and the modal styling rather than adding a second dialog primitive. `show()` returns a promise, because arming is a sequence. Refuses the all-off combination; the server refuses it again |
+| `RecordSheet` | The record sheet: source, microphone or window audio, transcription timing, video | Replaced `Preflight` (D-075). Reuses `FocusTrap` and the modal styling. `show(preset)` returns a promise of the start request's `options`, or `null` on cancel. Opens pre-filled from the last run (`lastRecordOptions`), focuses Confirm, and writes a changed microphone to `audio.device_id` rather than holding a per-run override. A disabled source carries its reason. Refuses nothing-to-record; the server refuses it again |
 | `RecordingMonitor` | The third pane's contents: preview, elapsed, output size, active options | Pulls the preview as a still image on a timer, stopped whenever nobody is looking. The socket never carries video, because transcript events on it are undroppable. Distinguishes its degraded states — no capture, no encoder, window closed, recorder failed — because a black rectangle and a broken capture look identical |
 
 `Header` keeps the record control but no longer derives its appearance from a boolean: it renders

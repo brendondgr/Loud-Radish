@@ -1,0 +1,259 @@
+/* The record sheet (D-075).
+ *
+ * Grown from the pre-flight sheet it replaces. Reuses the modal shell — the scrim, the dialog
+ * frame, the header — and describes only what is different: numbered sections, the three sources
+ * as a row of cards, the timing choices, and the window note.
+ */
+
+.record-sheet__dialog {
+  width: min(600px, 100%);
+  max-height: min(760px, 100%);
+}
+
+.record-sheet__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-9);
+  padding: var(--space-9);
+  overflow-y: auto;
+}
+
+.record-sheet__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.record-sheet__section[hidden],
+.record-sheet__file-note[hidden],
+.record-sheet__warning[hidden],
+.record-sheet__timing[hidden] {
+  display: none;
+}
+
+/* A visible legend this time: the sheet's sections are the steps, and the numbers are what make a
+ * single scrolling sheet read as a sequence. */
+.record-sheet__legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0;
+  margin-bottom: var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+}
+
+.record-sheet__legend--label {
+  margin-bottom: 0;
+}
+
+.record-sheet__step {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--surface-control);
+  border: 1px solid var(--border-control);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+/* -- choices ------------------------------------------------------------------------------ */
+
+.record-sheet__sources,
+.record-sheet__timings {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+
+/* The fourth timing ("Don't transcribe") wraps onto its own row rather than squeezing four. */
+.record-sheet__timings {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.record-sheet__source,
+.record-sheet__timing,
+.record-sheet__option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-5);
+  /* 44px minimum including padding, meeting the touch-target floor. */
+  min-height: 44px;
+  padding: var(--space-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--surface-control);
+  cursor: pointer;
+}
+
+.record-sheet__source:hover,
+.record-sheet__timing:hover,
+.record-sheet__option:hover {
+  border-color: var(--border-control);
+  background: var(--surface-control-hover);
+}
+
+/* The chosen card is marked by its border as well as its radio: the radio alone is a 16px dot in
+ * a card three times its width, and the card is what the eye lands on. */
+.record-sheet__source:has(input:checked),
+.record-sheet__timing:has(input:checked) {
+  border-color: var(--accent);
+}
+
+.record-sheet__source:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.record-sheet__source:has(input:disabled) .record-sheet__option-name {
+  text-decoration: line-through;
+}
+
+.record-sheet__source input,
+.record-sheet__timing input,
+.record-sheet__option input {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+  cursor: inherit;
+}
+
+.record-sheet__option-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.record-sheet__option-name {
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.record-sheet__option-hint {
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.record-sheet__select {
+  width: 100%;
+}
+
+.record-sheet__note-line {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.record-sheet__note-line:empty {
+  display: none;
+}
+
+/* -- notes -------------------------------------------------------------------------------- */
+
+.record-sheet__file-note {
+  margin: 0;
+  padding: var(--space-5) var(--space-6);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+/* Warning-toned rather than neutral, because a user who assumes a window's own sound is being
+ * captured and finds out afterwards has lost the recording. */
+.record-sheet__warning {
+  margin: 0;
+  padding: var(--space-5) var(--space-6);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius);
+  background: var(--warning-wash);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.record-sheet__warning strong {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--warning-text);
+}
+
+.record-sheet__link {
+  padding: 0;
+  font: inherit;
+  color: var(--accent-bright);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* -- footer ------------------------------------------------------------------------------- */
+
+.record-sheet__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+  padding: var(--space-7) var(--space-9);
+  border-top: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+}
+
+.record-sheet__refusal {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--warning-text);
+}
+
+.record-sheet__refusal[hidden] {
+  display: none;
+}
+
+.record-sheet__actions {
+  display: flex;
+  gap: var(--space-5);
+  margin-left: auto;
+}
+
+@media (max-width: 560px) {
+  .record-sheet__body {
+    gap: var(--space-8);
+    padding: var(--space-6);
+  }
+
+  /* Three cards side by side do not fit a phone; stacked, each hint stays readable. */
+  .record-sheet__sources,
+  .record-sheet__timings {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .record-sheet__footer {
+    padding: var(--space-6);
+  }
+
+  .record-sheet__actions {
+    width: 100%;
+  }
+
+  .record-sheet__actions .button {
+    flex: 1 1 0;
+  }
+}
