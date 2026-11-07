@@ -225,4 +225,20 @@ export const api = {
   exportResultUrl: (key) => `/api/sessions/${encodeURIComponent(key)}/export/result`,
   /** The recording itself, for the window's preview player. */
   sessionMediaUrl: (key) => `/api/sessions/${encodeURIComponent(key)}/media`,
+
+  // -- what a recording card shows (D-082, redesign Step 2) ---------------------------
+  /** The stored preview, or with `seconds` the frame at that moment, `width` pixels wide. */
+  thumbnailUrl: (key, { seconds, width } = {}) => {
+    const query = new URLSearchParams();
+    if (seconds != null) query.set("t", seconds.toFixed(1));
+    if (width != null) query.set("w", String(width));
+    const tail = query.toString();
+    return `/api/sessions/${encodeURIComponent(key)}/thumbnail${tail ? `?${tail}` : ""}`;
+  },
+  /** The video or the audio, as a download named after the recording. */
+  fileUrl: (key, kind) => `/api/sessions/${encodeURIComponent(key)}/file/${encodeURIComponent(kind)}`,
+  /** Open the folder in the file manager. Answers `{ path, opened }`. */
+  revealFolder: (key) => post(`/api/sessions/${encodeURIComponent(key)}/reveal`),
+  /** Opening words, first summary and keywords for up to 60 recordings, keyed by session. */
+  glances: (keys) => get(`/api/sessions/glance?keys=${keys.map(encodeURIComponent).join(",")}`),
 };

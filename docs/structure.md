@@ -74,13 +74,15 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   │   ├── transcript.py      # Replay, ranges, search, summaries, export
 │   │   │   ├── recordings.py      # List, re-run, and delete captured audio (D-021)
 │   │   │   ├── sessions.py        # Past sessions: list, read, export, web-app export
+│   │   │   ├── session_media.py   # A recording's picture or frame, named downloads, opening its
+│   │   │   │                      #   folder, and glances — what a card needs (D-082)
 │   │   │   ├── session_actions.py # One past recording: open on the main screen, close, delete,
 │   │   │   │                      #   and transcribe on the user's approval (D-076)
 │   │   │   ├── chat.py            # Ask, cancel, history, the read mark
 │   │   │   ├── llm.py             # Language-model probing and credentials
 │   │   │   ├── capture.py         # The window capture's preview frame and state (D-022)
-│   │   │   ├── labs.py            # Prototype pages and the little they need that the sessions
-│   │   │   │                      #   API lacks: frames, named downloads, open folder (D-082)
+│   │   │   ├── labs.py            # Prototype pages, plus aliases of the media routes until the
+│   │   │   │                      #   labs are retired (D-082)
 │   │   │   ├── pages.py           # The two server-rendered pages
 │   │   │   └── config.py          # Read, patch with hot-swap cost, presets, save
 │   │   ├── transport/             # The push channel — separate from routes/

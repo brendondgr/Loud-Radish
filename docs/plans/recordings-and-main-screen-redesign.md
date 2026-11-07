@@ -1,6 +1,6 @@
 # Recordings and Main Screen Redesign: From the Labs to the Real Pages
 
-*Written 2026-11-07. Status: **In progress (1 / 9)**. Source of truth for the target design: the
+*Written 2026-11-07. Status: **In progress (2 / 9)**. Source of truth for the target design: the
 two labs, `/labs/sessions/` and `/labs/main/` (D-082), at commit `e76a389` on branch
 `labs/sessions-cards`, and the owner's three rounds of exported feedback quoted below. This plan
 takes decisions **D-083 to D-086**. `feature/mixed-audio-steady-video` already holds D-080 and
@@ -217,6 +217,11 @@ available until Step 9 so every step can be compared against them side by side. 
 - *Action: Undergo the verification/tests/validation process for this phase. Once validated, push
   changes to GitHub stating: Recordings and Main Screen Redesign (2 / 9) Complete: Recording
   pictures, frames, named downloads and opening the folder are part of the sessions API.*
+
+> **Status: ✅ Complete.** In a new `routes/session_media.py` (`sessions.py` is already 613
+> lines), registered before `sessions` so `/api/sessions/glance` is not read as a key. The lab
+> routes are hidden aliases of the new handlers. The lab's page tests moved into the same test file
+> under a section Step 9 deletes.
 
 #### Step 3: Short titles written by the model
 

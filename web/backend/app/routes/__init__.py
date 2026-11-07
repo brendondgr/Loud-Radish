@@ -19,6 +19,7 @@ from . import (
     recordings,
     session,
     session_actions,
+    session_media,
     sessions,
     transcript,
 )
@@ -33,6 +34,8 @@ def build_router() -> APIRouter:
     router.include_router(config.router)
     router.include_router(llm.router)
     router.include_router(chat.router)
+    # Before sessions: `/api/sessions/glance` must not be read as a session called "glance".
+    router.include_router(session_media.router)
     router.include_router(sessions.router)
     router.include_router(session_actions.router)
     router.include_router(recordings.router)

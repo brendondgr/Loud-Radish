@@ -167,6 +167,7 @@ Response `200 OK`:
         "transcript": true,
         "audio_file": false,
         "recording_bytes": 264518912,
+        "preview": true,
         "exportable": true
       },
       "problem": "",

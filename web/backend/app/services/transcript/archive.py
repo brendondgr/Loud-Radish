@@ -65,6 +65,9 @@ class SessionMedia:
     video_sound: bool = False
     #: Whether an interrupted pass left a checkpoint it can continue from (D-045).
     resumable: bool = False
+    #: Whether the capture left a ``preview.jpg``, so a card asks for a picture only when there is
+    #: one (D-082); frames of the video can still be asked for when ``video`` is true.
+    preview: bool = False
 
     # -- what can be done with it (D-076) -----------------------------------------------------
     #
@@ -120,6 +123,7 @@ class SessionMedia:
             "transcript": self.transcript,
             "audio_file": self.audio_file,
             "recording_bytes": self.recording_bytes,
+            "preview": self.preview,
             "exportable": self.exportable,
             "openable": self.openable,
             "transcribable": self.transcribable,
@@ -464,6 +468,7 @@ def media_for(
             recording_bytes=layout.size_bytes(),
             video_sound=muxed or (needs_probe and has_sound(video)),
             resumable=resumable,
+            preview=layout.preview.is_file(),
         )
     except OSError:
         logger.warning("Could not read the recording folder for %s", key)

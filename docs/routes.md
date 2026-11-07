@@ -123,6 +123,10 @@ minutes ago.
 | `GET` | `/api/sessions/{key}?revision=` | One session's transcript, summaries, glossary, and conversation. The latest pass unless `revision` names another; `revisions` lists them (D-066) | **Implemented** |
 | `GET` | `/api/sessions/{key}/export?fmt=&include_chat=&revision=` | Text, Markdown, SRT, VTT, or JSON. `include_chat` defaults to **false**; `revision` names a pass, the latest by default, and an unknown one is `404 unknown-revision` (D-066) | **Implemented** |
 | `GET` | `/api/sessions/{key}/chat?fmt=` | The conversation on its own — Markdown or JSON | **Implemented** |
+| `GET` | `/api/sessions/{key}/thumbnail?t=&w=` | The recording's stored `preview.jpg`, or with `t` the frame at that second as a JPEG `w` pixels wide (64–1280). Seconds rather than a fraction, because a live-written WebM has no duration in its header. Cached an hour. `routes/session_media.py` (D-082) | **Implemented** |
+| `GET` | `/api/sessions/{key}/file/{video\|audio}` | The video, or the WAV while it still exists, as a download named `<key>-<kind><suffix>` | **Implemented** |
+| `POST` | `/api/sessions/{key}/reveal` | Open the recording's folder in the system file manager. Returns `{path, opened}`, so a page can offer to copy the path when nothing answered | **Implemented** |
+| `GET` | `/api/sessions/glance?keys=` | For up to 60 recordings: opening words, first summary sentence, and the transcript's most-used words — what a card shows until a title is written. Registered before `/{key}` so "glance" is never read as a key | **Implemented** |
 | `GET` | `/api/sessions/{key}/webapp?include_chat=` | The recording as a self-contained web application, as a ZIP. `include_chat` defaults to **false** | **Implemented** |
 | `GET` | `/api/sessions/{key}/media` | The recording itself, with range support, for the export window's preview | **Implemented** |
 | `POST` | `/api/sessions/{key}/transcribe/resume` | Pick up a transcription pass this session was in the middle of — held on purpose, or interrupted by the process ending (D-045). Everything it needs is in the session's own checkpoint | **Implemented** |
@@ -271,15 +275,9 @@ state is a second place for it to drift.
 
 ### Labs
 
-What the recordings lab needs that the sessions API does not answer yet (D-082). Read-only except
-for opening a folder, and every `{key}` is resolved on the server as it is above.
-
-| Method | Path | Purpose | Status |
-|---|---|---|---|
-| `GET` | `/api/labs/sessions/{key}/thumbnail?t=&w=` | The recording's stored `preview.jpg`, or with `t` the frame at that second as a JPEG `w` pixels wide. Seconds rather than a fraction, because a live-written WebM has no duration in its header | **Prototype** |
-| `GET` | `/api/labs/sessions/{key}/file/{video\|audio}` | The video, or the WAV while it still exists, as a download named after the recording | **Prototype** |
-| `POST` | `/api/labs/sessions/{key}/reveal` | Open the recording's folder in the system file manager. Returns the path and whether anything answered | **Prototype** |
-| `GET` | `/api/labs/sessions/glance?keys=` | For up to 60 recordings: opening words, first summary sentence, and the transcript's most-used words | **Prototype** |
+The labs' pages call their media routes by the old paths `/api/labs/sessions/{key}/thumbnail`,
+`/file/{kind}`, `/reveal` and `/api/labs/sessions/glance`, which are aliases of the four under
+*Past sessions* (hidden from the schema) until the labs are retired.
 
 ## Conventions
 
