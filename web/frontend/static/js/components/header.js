@@ -11,7 +11,7 @@
  */
 
 import { on } from "../core/bus.js";
-import { $, setAttr, setText } from "../core/dom.js";
+import { $, setAttr, setText, toggle } from "../core/dom.js";
 import { timestamp } from "../core/format.js";
 import { ARMING, ERROR, IDLE, PAUSED, PROCESSING, RECORDING, STOPPING } from "../core/modes.js";
 import { HEALTH_CHANGED, health } from "../stores/health.js";
@@ -74,6 +74,8 @@ export class Header {
     this.clock = $("[data-clock]", root);
     this.runChip = $("[data-run-chip]", root);
     this.toggle = $("[data-session-toggle]", root);
+    this.toggleLabel = $("[data-session-toggle-label]", root) ?? this.toggle;
+    this.toggleIcon = $("[data-session-toggle-icon]", root);
     this.hold = $("[data-session-hold]", root);
     this.privacy = $("[data-privacy]", root);
     this.privacyLabel = $("[data-privacy-label]", root);
@@ -116,7 +118,9 @@ export class Header {
         ? `Transcribing… ${recording.percent}%`
         : shown.button;
 
-    setText(this.toggle, label);
+    setText(this.toggleLabel, label);
+    // The dot says "record"; on Stop, Cancel or a percentage it would say the wrong thing.
+    toggle(this.toggleIcon, modeStore.state === IDLE);
     if (this.toggle) {
       this.toggle.disabled = !shown.enabled;
       // Danger styling only while there is something to lose. `stopping` has already been asked

@@ -1,13 +1,19 @@
-/* The header: recording state, elapsed time, the one primary control, and identity. */
+/* The header: recording state, elapsed time, the one primary control, the recording's health,
+ * and identity.
+ *
+ * It wraps rather than overflowing: with the status bar folded in (redesign Step 5) there is more
+ * here than one row holds on a small laptop, and a second row is better than a control pushed off
+ * the right edge. */
 
 .header {
   flex: 0 0 auto;
-  height: var(--header-height);
+  min-height: var(--header-height);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-10);
-  padding: 0 var(--space-9);
+  gap: var(--space-4) var(--space-10);
+  padding: var(--space-3) var(--space-9);
   border-bottom: 1px solid var(--border-default);
   background: var(--surface-raised);
 }
@@ -88,6 +94,126 @@
   color: var(--text-primary);
 }
 
+/* -- the record pill (D-083) ------------------------------------------------------------- */
+
+.button--record {
+  gap: var(--space-3);
+  padding: 0 var(--space-8) 0 var(--space-6);
+  border-radius: var(--radius-pill);
+}
+
+/* -- the recording's health, as chips (redesign Step 5) -------------------------------------
+ * What the status bar along the bottom used to say. Every indicator pairs its colour with a word
+ * or an icon; real-time factor below 1.0 turns red **and** shows a warning icon (FE §6.2, §13).
+ */
+
+.header__health {
+  flex: 1 1 auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.health-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 26px;
+  padding: 0 var(--space-5);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  background: var(--surface-control);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.health-chip[hidden] {
+  display: none;
+}
+
+.health-chip > svg {
+  flex: 0 0 auto;
+  display: block;
+}
+
+.health-chip__value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.health-chip__source {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-faint);
+}
+
+.health-chip__source:empty {
+  display: none;
+}
+
+.health-chip--rtf .health-chip__value[data-health="bad"] {
+  color: var(--danger);
+}
+
+.health-chip--rtf .health-chip__value[data-health="good"] {
+  color: var(--success-dim);
+}
+
+.health-chip__warning {
+  display: inline-flex;
+  color: var(--danger);
+}
+
+.health-chip__warning[hidden] {
+  display: none;
+}
+
+/* A flat line means no audio is arriving — the difference between "working, nobody is talking"
+ * and "broken". */
+.level-meter {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+}
+
+.level-meter__bar {
+  width: 3px;
+  height: 3px;
+  background: var(--success);
+  opacity: 0.25;
+  transition:
+    height 180ms linear,
+    opacity 180ms linear;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  flex: 0 0 auto;
+  transition: background var(--duration-fast) linear;
+}
+
+.status-dot[data-state="active"] {
+  background: var(--success);
+}
+
+.status-dot[data-state="warning"] {
+  background: var(--warning);
+}
+
+.status-dot[data-state="error"] {
+  background: var(--danger);
+}
+
 /* -- identity and privacy -------------------------------------------------------------------
  * The privacy indicator lives here rather than in settings because it is what a user needs to
  * confirm at a glance before pressing record in a room full of people (FE §7.6).
@@ -147,6 +273,10 @@
 .model-identity {
   flex: 0 1 auto;
   min-width: 0;
+  /* Capped, because the header wraps on each group's full width before anything shrinks: an
+   * uncapped model name sent the right-hand group to a second row on its own at 1440px once the
+   * health chips joined the header (redesign Step 5). The full names are in its tooltip. */
+  max-width: 220px;
   overflow: hidden;
 }
 

@@ -1,4 +1,5 @@
-/* The application frame: header, two panes, status bar.
+/* The application frame: the header (which carries the recording's health since redesign Step 5),
+ * then the panes.
  *
  * The transcript is the document and the chat is a tool, so the transcript takes the flexible
  * space and the chat a fixed column (FE §P1). Below 900px the two-pane layout stops working and

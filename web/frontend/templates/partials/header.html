@@ -43,7 +43,67 @@
        thing done to a recording in progress, and hidden with it outside one. #}
     {% include "partials/sound_panel.html" %}
 
-    <button type="button" class="button button--primary" data-session-toggle>Start recording</button>
+    {# The radish pill (D-083). Its dot sits in an icon box, so it is centred on the words rather
+       than a line box's height above them (measured 1.5px off in the main-screen lab). #}
+    <button type="button" class="button button--primary button--record" data-session-toggle>
+      <span class="icon" data-session-toggle-icon>{{ icons.icon("record", 14) }}</span>
+      <span data-session-toggle-label>Start recording</span>
+    </button>
+  </div>
+
+  {# Recording health, as chips (redesign Step 5). These were a status bar along the bottom of
+     the window; the owner chose them here, which gives the transcript its height
+     back. Every hook the status bar had is kept, so `components/status-bar.js` renders into them
+     unchanged. Every indicator pairs its colour with a word or an icon (FE §13). #}
+  <div class="header__health" data-status-bar role="group" aria-label="Recording health">
+    <span class="health-chip" title="Input level from the selected device">
+      {{ icons.icon("mic", 13) }}
+      <span class="level-meter" data-level-meter role="img" aria-label="Input level">
+        <span class="level-meter__bar"></span>
+        <span class="level-meter__bar"></span>
+        <span class="level-meter__bar"></span>
+        <span class="level-meter__bar"></span>
+        <span class="level-meter__bar"></span>
+      </span>
+      <span class="health-chip__source" data-source-label></span>
+    </span>
+
+    <span class="health-chip">
+      <span class="status-dot" data-vad-dot aria-hidden="true"></span>
+      <span data-vad-label>Silent</span>
+    </span>
+
+    <span
+      class="health-chip health-chip--rtf"
+      title="Audio seconds processed per second of wall clock. Below 1.0 means it is falling behind."
+    >
+      <span class="health-chip__warning" data-rtf-icon hidden>{{ icons.warning(12) }}</span>
+      <span class="health-chip__value" data-rtf data-health="unknown">—</span>
+      <span>realtime</span>
+    </span>
+
+    <span class="health-chip" title="Time from speech to committed text">
+      <span>lag</span>
+      <span class="health-chip__value" data-latency>—</span>
+    </span>
+
+    {# Hidden while zero, which is the normal state. It appears only once something has been
+       discarded, because a count climbing steadily while someone is talking is how a user finds
+       out the thresholds are too tight — and that is the one failure this filter can cause. #}
+    <span
+      class="health-chip"
+      data-suppressed-item
+      title="Passages discarded as text the speech model invented rather than heard. Adjust in Settings → Speech model."
+      hidden
+    >
+      <span class="health-chip__value" data-suppressed>0</span>
+      <span>discarded</span>
+    </span>
+
+    <span class="health-chip" title="The connection to the transcriber">
+      <span class="status-dot" data-connection-dot aria-hidden="true"></span>
+      <span data-connection-label>Connecting…</span>
+    </span>
   </div>
 
   <div class="header__group">

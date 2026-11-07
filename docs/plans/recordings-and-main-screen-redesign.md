@@ -1,6 +1,6 @@
 # Recordings and Main Screen Redesign: From the Labs to the Real Pages
 
-*Written 2026-11-07. Status: **In progress (4 / 9)**. Source of truth for the target design: the
+*Written 2026-11-07. Status: **In progress (5 / 9)**. Source of truth for the target design: the
 two labs, `/labs/sessions/` and `/labs/main/` (D-082), at commit `e76a389` on branch
 `labs/sessions-cards`, and the owner's three rounds of exported feedback quoted below. This plan
 takes decisions **D-083 to D-086**. `feature/mixed-audio-steady-video` already holds D-080 and
@@ -374,6 +374,14 @@ available until Step 9 so every step can be compared against them side by side. 
 - *Action: Undergo the verification/tests/validation process for this phase. Once validated, push
   changes to GitHub stating: Recordings and Main Screen Redesign (5 / 9) Complete: Level, speed,
   lag and connection are chips in the header, and the status bar is gone.*
+
+> **Status: ✅ Complete.** The chips are a labelled group (`role="group"`, "Recording health") that
+> keeps the `data-status-bar` hook, so `main.js` and `status-bar.js` are unchanged apart from a
+> comment. The header now always wraps, and the model names are capped at 220px: a one-row rule
+> above 1240px was tried and pushed Settings off the edge at 1440px once every chip was showing.
+> The record button's label and dot are separate spans (`data-session-toggle-label`,
+> `data-session-toggle-icon`); the dot shows only when idle. Measured: dot and label centred to the
+> pixel; one row at 1440px idle, two with every chip, three at 900px, no overflow at any width.
 
 #### Step 6: The transcript pane — margin timestamps, icon toolbar, viewing card
 

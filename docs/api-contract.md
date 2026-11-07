@@ -73,7 +73,7 @@ can make — and those carry `opens_settings` instead, naming the settings tab w
 A failure with `remedy_label` but neither of the two renders as text with nothing to click, so one
 of them must be set whenever a label is.
 
-`severity` is `info`, `warning`, or `critical`, and the frontend presents each differently: status-bar
+`severity` is `info`, `warning`, or `critical`, and the frontend presents each differently: header health
 text, a dismissible inline banner, or a banner with an explicit recovery action. Never a modal — a
 modal during a live talk blocks the transcript.
 
@@ -88,7 +88,7 @@ modal during a live talk blocks the transcript.
 
 The socket is disposable by design.
 
-1. The client detects the disconnect and shows it in the status bar. **It does not clear the transcript.**
+1. The client detects the disconnect and shows it in the header's connection chip. **It does not clear the transcript.**
 2. It reconnects with exponential backoff.
 3. On reconnect it sends `hello` with the last segment id it received.
 4. The server replays every committed segment after that id, then every polished block, then

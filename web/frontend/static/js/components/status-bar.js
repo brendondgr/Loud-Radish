@@ -1,5 +1,5 @@
 /**
- * The status bar.
+ * The recording's health, as chips in the header (redesign Step 5; it was a status bar).
  *
  * Real-time factor gets special treatment because it is the pipeline's most important health
  * number. Below 1.0 it turns red **and** gains a warning icon — a user who does not understand the

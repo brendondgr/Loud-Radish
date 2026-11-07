@@ -522,6 +522,26 @@ recording. The view does not survive a restart.
 **Open a recording…** sits in the transcript pane's empty state and in the banner. It lists recent
 recordings with the same primary action as their row.
 
+## The Main Screen
+
+Chosen in the main-screen lab (D-082, third round, the owner's "PReferences" combination and
+notes) and built by [plans/recordings-and-main-screen-redesign.md](plans/recordings-and-main-screen-redesign.md).
+
+### The header
+
+Left to right: the mark, the record state, the clock, the run chip, Pause and Sound while
+recording, and **Start recording** — a radish pill with its dot in an icon box, so the dot and the
+words share a centre line (it was 1.5px high). Then **the recording's health as chips**, which were
+a status bar along the bottom of the window until redesign Step 5: microphone level with the
+source, speaking or silent, the realtime factor (red with a warning icon below 1.0), lag, the
+discarded count (only above zero), and the connection. Then privacy, the model names, Recordings and
+Settings. Health warnings still arrive as banners, so nothing the bar said is lost.
+
+**It wraps rather than overflowing.** Wrapping is decided on each group's full width, so the model
+names are capped at 220px (ellipsised, full text in their tooltip); at 1440px the header is one row
+until every chip is showing, then two. At 900px it is three rows. It never scrolls sideways and the
+primary control is never pushed off the edge.
+
 ## Quality Brief
 
 The interface should look considered rather than defaulted. Concretely:
