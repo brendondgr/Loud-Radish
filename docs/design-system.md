@@ -344,6 +344,72 @@ Every state carries an icon or a word as well as a colour. Real-time factor belo
 italic and labelled as well as dimmer. This is a WCAG requirement and also simply what works in a
 darkened room on a projector.
 
+## Recordings and the Main Screen
+
+Specified by [plans/recordings-on-the-main-screen.md](plans/recordings-on-the-main-screen.md)
+(D-076, D-077). A past recording can be brought back to the main screen so the assistant can be
+asked about it. Nothing is transcribed without the user approving it first.
+
+### What a recording can do
+
+Decided on the server (`SessionMedia.openable`, `.transcribable`, `.reason`) so the row, the
+recording window and the main-screen picker can never disagree.
+
+| The recording holds | Result | What the control says |
+|---|---|---|
+| A transcript (any pass) | **Open** | "Bring to main screen" |
+| No transcript, an interrupted pass with its checkpoint | **Resume on approval** | "Transcribe…" — the dialog says it continues from where it stopped |
+| No transcript, the WAV (`audio.wav`) | **Transcribe on approval** | "Transcribe…" |
+| No transcript, a video with sound (muxed, or a raw video with an audio stream) | **Extract, then transcribe, on approval** | "Transcribe…" — the dialog says the sound is taken from the video first |
+| No transcript, a video with no sound track | Refused | "This video has no sound to transcribe." |
+| No transcript, no audio, no video | Refused | "There is nothing in this recording to transcribe." |
+| Unreadable database | Refused | The existing `problem` text |
+| Anything, while a session is recording | Refused (temporarily) | "Stop the current recording first." |
+| Anything, while a transcription runs | Refused (temporarily) | "Wait for the running transcription to finish." |
+
+A folder in the recordings directory with **no transcript database** is listed as its own row
+("Not transcribed"), titled from the time in its key. It follows the same table.
+
+### The row
+
+Media chips (video · audio · transcript), then: the primary action — **Bring to main screen** or
+**Transcribe…**, disabled with its reason in `title` when refused — then **Open…** and a quiet
+**Delete**. Nothing else: every export lives in the recording window.
+
+### The recording window
+
+One modal, three faces. **Overview** is what opens; **choosing** and **watching** are the web-app
+export's two faces (D-037), reached from the overview's Web app section and returning to it.
+
+The overview's sections, in order, each shown only where it applies:
+
+1. **Summary** — title, date, duration, the media chips.
+2. **Ask about it** — the primary action from the table above, with its reason. "On the main screen
+   now" when this is the recording the main screen is showing.
+3. **Transcript** — format, the pass to export when there are two (D-066), **Download**.
+4. **Your conversation** — **Download**, only when there are messages.
+5. **Web app** — **Set up export…**, only when the recording has video, sound and a transcript.
+6. **Delete** — names what goes: the transcript, the conversation, and the video and audio files.
+
+### The consent dialog
+
+Opened by **Transcribe…**. Says what will run and nothing more: "Take the sound from the video"
+(only for a video), then "Transcribe *N* minutes of audio with *model*". When no speech model is
+loaded it says so and the confirm is disabled. One checkbox, on by default: **Open on the main
+screen when it finishes**. Buttons: **Cancel**, **Transcribe**. Nothing runs until Transcribe is
+pressed; progress then shows in the existing transcription status.
+
+### Viewing a recording on the main screen
+
+A banner above the transcript pane: **"Viewing *title* · *date*"**, a second line "Starting a new
+recording closes this view.", and **Close**. Not a run state: the record control stays idle and
+the header is untouched. The transcript, the earlier conversation and the glossary are re-read from
+the server, exactly as on a reload; new questions continue the conversation and are saved with the
+recording. The view does not survive a restart.
+
+**Open a recording…** sits in the transcript pane's empty state and in the banner. It lists recent
+recordings with the same primary action as their row.
+
 ## Quality Brief
 
 The interface should look considered rather than defaulted. Concretely:
