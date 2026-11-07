@@ -95,6 +95,10 @@
       "critical": true,
       "coalescing": false
     },
+    "mix.changed": {
+      "critical": true,
+      "coalescing": false
+    },
     "export.progress": {
       "critical": false,
       "coalescing": true

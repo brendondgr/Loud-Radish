@@ -25,7 +25,7 @@ from ...models.session import SessionMetadata, SessionStats
 from ..asr import AsrLifecycle, LoadProgress, PromptBuilder
 from ..asr.contract import AsrLoadError
 from ..audio import LevelMeter
-from ..audio.sources import AudioSource, SourceInfo
+from ..audio.sources import AudioSource, MixedSource, SourceInfo
 from ..audio.tap import ApplicationTap
 from ..capture import (
     CaptureSupport,
@@ -52,6 +52,7 @@ from .background import BackgroundWorkMixin
 from .frames import FramePathMixin
 from .hold import HoldMixin
 from .metrics import PipelineMetrics
+from .mixing import MixingMixin
 from .passes import TranscriptionPassMixin
 from .shapes import (
     QUEUE_CAPACITY,
@@ -73,6 +74,7 @@ class SessionManager(
     WindowCaptureMixin,
     TranscriptionPassMixin,
     AudioSourceMixin,
+    MixingMixin,
     HoldMixin,
 ):
     """Owns the running session and everything it is made of.
@@ -145,6 +147,9 @@ class SessionManager(
         #: The application audio tap, when window mode was asked for one. Closed in teardown —
         #: a leaked null sink shows up in the user's output picker and survives until they notice.
         self._tap: ApplicationTap | None = None
+        #: The running mix, and each input's own track when they are kept (D-081).
+        self._mix: MixedSource | None = None
+        self._input_tracks: dict[str, WavSink] = {}
         #: Whether this run's tap narrows to the chosen window. Held so the periodic re-link
         #: applies the same rule the tap was opened with.
         self._tap_match = False
@@ -287,6 +292,8 @@ class SessionManager(
             "session": self._metadata.as_dict() if self._metadata else None,
             # What the record sheet asked for (D-075), so a reload can say what is running.
             "options": asdict(self._options) if self._options and self._metadata else None,
+            # Each input's volume, mute and level, so a reload redraws the sound panel (D-081).
+            "mix": self.mix_state(),
             "asr": self._asr.status(),
             "stats": stats.as_dict() if stats else None,
             "metrics": self.metrics().as_event(),
@@ -408,6 +415,7 @@ class SessionManager(
         # mode that runs no inference while capturing, which is what makes it cheap enough to run
         # for two hours on a laptop.
         self._sink = self._open_sink(config, session) if plan.sink else None
+        self._open_input_tracks(config, session)
         self._engine = self._build_engine(config) if plan.engine else None
 
         self._queue.clear()
@@ -465,6 +473,7 @@ class SessionManager(
                 "started_at": session.started_at.isoformat(),
                 "mode": session.mode,
                 "options": asdict(self._options),
+                "mix": self.mix_state(),
                 "config": session.config,
                 "source": self._source_info.describe() if self._source_info else "",
             },
@@ -551,6 +560,7 @@ class SessionManager(
         # Both files are closed by now — the recorder finalised its container above, and the sink
         # is about to. Muxing needs both complete, which is why it is here and not in either.
         self._mux_if_wanted()
+        self._close_input_tracks()
         if self._store is not None:
             self._store.write_metadata(self._metadata)
 
@@ -712,6 +722,8 @@ class SessionManager(
         if self._sink is not None:
             self._sink.discard()
             self._sink = None
+        self._close_input_tracks(keep=False)
+        self._mix = None
 
         # Same for the video, and for the portal session behind it — an abrupt shutdown that left
         # the portal open would leave the compositor telling the user they are still sharing.

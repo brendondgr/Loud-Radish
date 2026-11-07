@@ -60,13 +60,25 @@ always did. Sent with options it must agree with them. With neither, the session
 client written before capture modes keeps working. Video is dropped, not refused, for an audio
 source. `GET /api/session` and the `session.started` event both carry the resolved `options`.
 
+**Two sounds at once (D-081).** `options.audio_inputs` names what the run's sound is made of, mixed:
+one or two of `window` (only the matched window's playback), `system` (everything the computer
+plays) and `microphone`. `options.levels` sets each one's starting volume, 0–100. Absent, the inputs
+are the source's own sound — or `audio_source` for a window — so every older request records what it
+did. Refused with `options-conflict`: `window` with `system` (one is part of the other), `window`
+without a window, a microphone or computer-sound recording that leaves out its own sound, the same
+input twice, and a level for an input not being recorded or outside 0–100. More than two inputs, an
+empty list, or an unknown name is a validation error. `GET /api/session` and `session.started` carry
+`mix`: `inputs`, `primary` (the input keeping time) and, per input, `volume`, `muted`, `level` and
+`alive`. With `storage.retain_audio` on, a two-input run also keeps `audio.<input>.wav` per input
+beside `audio.wav`.
+
 Four refusals, in the order they are checked:
 
 | Condition | Status | Code |
 |---|---|---|
 | A mode or source outside the vocabulary | `422` | Pydantic validation |
 | Nothing transcribed and no video (video counts only for a window) | `422` | `records-nothing` |
-| A `mode` that contradicts the options | `422` | `options-conflict` |
+| A `mode` that contradicts the options, or audio inputs that cannot be recorded together | `422` | `options-conflict` |
 | A mode this build does not implement | `501` | `mode-unavailable` |
 
 `501` rather than `409` is deliberate: the request is valid and the session state is fine, the build

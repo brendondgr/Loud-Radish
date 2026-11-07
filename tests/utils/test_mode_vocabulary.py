@@ -172,6 +172,14 @@ def test_capture_sources_match(js: str) -> None:
     assert _resolve(_string_array(js, "CAPTURE_SOURCES"), constants) == list(modes.CAPTURE_SOURCES)
 
 
+def test_audio_inputs_match(js: str) -> None:
+    """The names a mix's inputs go by (D-081): sent by the sheet, read by the sound panel."""
+    constants = _string_constants(js)
+    assert _resolve(_string_array(js, "AUDIO_INPUTS"), constants) == list(modes.AUDIO_INPUTS)
+    match = re.search(r"export const MAX_AUDIO_INPUTS = (\d+);", js)
+    assert match and int(match.group(1)) == modes.MAX_AUDIO_INPUTS
+
+
 def test_derive_mode_is_mirrored(js: str) -> None:
     """The JavaScript copy is read, not run: its two branches must name the modes Python returns."""
     body = re.search(r"export function deriveMode\(.*?\n\}", js, re.DOTALL)

@@ -64,6 +64,10 @@ TRANSCRIPTION_CANCELLED: Final = "transcription.cancelled"
 #: missed the window-closed frame would keep showing a live preview of a capture that ended.
 CAPTURE_STATE: Final = "capture.state"
 
+#: A mix input's volume or mute changed, or one stopped delivering (D-081). Critical: two tabs that
+#: disagree about whether the microphone is muted are worse than one that is late.
+MIX_CHANGED: Final = "mix.changed"
+
 # -- export (D-037) ---------------------------------------------------------------------
 #: One export's stages, weighted progress, and estimated time. Coalescing: only the newest frame
 #: means anything, exactly as `transcription.progress` is.
@@ -108,6 +112,7 @@ ALL_EVENTS: Final[tuple[str, ...]] = (
     TRANSCRIPTION_DONE,
     TRANSCRIPTION_FAILED,
     CAPTURE_STATE,
+    MIX_CHANGED,
     EXPORT_PROGRESS,
     EXPORT_DONE,
     EXPORT_FAILED,
@@ -158,6 +163,7 @@ CRITICAL_EVENTS: Final[frozenset[str]] = frozenset(
         TRANSCRIPTION_CANCELLED,
         TRANSCRIPTION_FAILED,
         CAPTURE_STATE,
+        MIX_CHANGED,
         # An export that finished and never said so leaves a window watching an encode that ended,
         # with no way to reach the file it produced.
         EXPORT_DONE,

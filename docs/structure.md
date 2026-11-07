@@ -171,6 +171,7 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   │       │                  #   and a chosen past recording put in that slot (D-076)
 │   │   │       ├── past_pass.py   # Planning and starting an approved pass over a past recording
 │   │   │       ├── sources.py     # What a session listens to, and proving it is listening
+│   │   │       ├── mixing.py      # The run's mixer, each input's own track, a lost input (D-081)
 │   │   │       ├── hold.py        # Pause and resume (D-044)
 │   │   │       └── manager.py     # capture → VAD → engine → store → transport. Owns the
 │   │   │                          #   lifecycle; the six modules above are the rest of this one

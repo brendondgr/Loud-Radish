@@ -1,6 +1,6 @@
 # Mixed Audio and Steady Video
 
-**Status:** In progress (2 / 7 phases). Branch: `feature/mixed-audio-steady-video`.
+**Status:** In progress (3 / 7 phases). Branch: `feature/mixed-audio-steady-video`.
 
 ## 1. Introduction
 
@@ -214,6 +214,20 @@ recording; the set of inputs is fixed when recording starts.
   > audio inputs with per-input volume and mute, tolerating drift and the loss of one input.*
 
 ### Phase 3 — A session with two audio inputs
+
+> **Status: ✅ Complete.** Differences from the plan:
+> - **Each input's own track follows `storage.retain_audio`** instead of a new
+>   `recording.keep_input_tracks` setting. A user who chose not to keep audio must not find their
+>   microphone kept on its own, and two settings for "keep my audio" would disagree.
+> - **Two faults found by the tests and fixed in `MixedSource`.** When a file reached its end,
+>   the silent second input took over the clock and kept writing frames. And the silent stand-in
+>   was unpaced, so it starved the file of the interpreter. Now a file's end ends the whole mix,
+>   and the stand-in runs at real time.
+> - **`mix.changed` is registered as a never-dropped event now** (the plan had it in Phase 4),
+>   because losing an input already emits it. The contracts are regenerated.
+> - **Checked on the QA server (:8412):** a computer-sound + microphone run through
+>   `POST /api/session/start` reported its `mix`, then wrote `audio.wav`, `audio.system.wav` and
+>   `audio.microphone.wav`, all 5.02 s. With retention off it wrote neither track.
 
 - **Locations:**
   - `web/backend/app/services/session/shapes.py`:

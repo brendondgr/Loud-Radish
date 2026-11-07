@@ -72,6 +72,8 @@ def _capture_options(body: StartSessionRequest) -> CaptureOptions | None:
         post_transcription=body.options.post_transcription,
         video=body.options.video,
         audio_source=body.options.audio_source,
+        audio_inputs=tuple(body.options.audio_inputs or ()),
+        levels=dict(body.options.levels),
     )
 
 

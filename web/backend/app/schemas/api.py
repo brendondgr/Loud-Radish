@@ -61,6 +61,14 @@ class CaptureOptions(_Model):
     #: records a talk playing in a window one minute and their own commentary over it the next, and
     #: a setting two screens away is one nobody changes and everybody is surprised by.
     audio_source: Literal["system", "microphone", "application"] = "system"
+    #: What the run's sound is made of, mixed (D-081): one or two of `window`, `system`,
+    #: `microphone`. Absent means the source's own sound, or `audio_source` for a window — what
+    #: every request before the mixer meant.
+    audio_inputs: list[Literal["window", "system", "microphone"]] | None = Field(
+        default=None, min_length=1, max_length=2
+    )
+    #: Starting volume per input, in percent.
+    levels: dict[Literal["window", "system", "microphone"], int] = Field(default_factory=dict)
 
     @property
     def records_nothing(self) -> bool:
@@ -97,6 +105,9 @@ class SessionResponse(_Model):
     #: The running session's record-sheet answers — source, the two transcription switches,
     #: video and audio choice (D-075). Absent when nothing is running.
     options: dict[str, Any] | None = None
+    #: The running mix: each input's volume, mute, level and whether it is still delivering
+    #: (D-081). Absent when nothing is running.
+    mix: dict[str, Any] | None = None
     asr: dict[str, Any] = Field(default_factory=dict)
     stats: dict[str, Any] | None = None
     metrics: dict[str, Any] = Field(default_factory=dict)

@@ -282,10 +282,13 @@ def test_losing_every_input_ends_the_source() -> None:
 
 
 def test_a_file_reaching_its_end_ends_the_mix() -> None:
-    """The file is the talk being replayed; when it ends, so does the recording."""
+    """The file is the talk being replayed; when it ends, so does the recording — and nothing
+    else takes over the clock to keep writing frames after it."""
     mixer, sources, out, errors = build(("window", "file"), ("microphone", "microphone"))
     sources["window"].end(None)
     assert errors == [None]
+    sources["microphone"].push(tone(0.5))
+    assert out == []
 
 
 def test_an_unknown_input_cannot_be_set() -> None:

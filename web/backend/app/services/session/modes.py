@@ -144,6 +144,34 @@ WINDOW_SOURCE: Final = "window"
 CaptureSource = Literal["microphone", "system", "window"]
 CAPTURE_SOURCES: Final[tuple[CaptureSource, ...]] = (MICROPHONE, SYSTEM, WINDOW_SOURCE)
 
+# -- audio inputs (D-081) -------------------------------------------------------------------
+
+#: What a run's sound is made of. A run hears one or two of these, mixed, each with its own volume
+#: and mute. **Inputs are not sources**: a window is one *source* (what the recording is of) whose
+#: sound can be its own, the whole computer's, the microphone's, or its own and the microphone's.
+#:
+#: Only the matched window's playback, tapped additively (D-027); a window run only.
+INPUT_WINDOW: Final = "window"
+#: Everything the machine plays, through a tap. Never the microphone (D-030).
+INPUT_SYSTEM: Final = "system"
+#: The configured microphone, `audio.device_id`.
+INPUT_MICROPHONE: Final = "microphone"
+
+AudioInput = Literal["window", "system", "microphone"]
+AUDIO_INPUTS: Final[tuple[AudioInput, ...]] = (INPUT_WINDOW, INPUT_SYSTEM, INPUT_MICROPHONE)
+
+#: The most inputs one run mixes. Two is what the record sheet offers; the mixer itself takes any
+#: number, and a later plan can raise this without reshaping anything.
+MAX_AUDIO_INPUTS: Final = 2
+
+#: The record sheet's older single answer, `audio_source`, as the input it names.
+LEGACY_AUDIO_SOURCE: Final[dict[str, AudioInput]] = {
+    "application": INPUT_WINDOW,
+    "system": INPUT_SYSTEM,
+    "microphone": INPUT_MICROPHONE,
+}
+
+
 #: What a request naming only a mode means. These are the three combinations the header's tabs used
 #: to offer, kept so that a global shortcut sending `toggle --mode recorded` records exactly what it
 #: always did. An empty ``audio_source`` defers to ``capture.audio_source`` in configuration, which

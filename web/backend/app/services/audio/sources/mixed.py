@@ -385,9 +385,17 @@ class MixedSource(AudioSource):
             lane.queue.clear()
             lane.queued = 0
             # A file reaching its end is the recording reaching its end: the file *is* the talk
-            # being replayed, and the mix keeps its time.
+            # being replayed, and the mix keeps its time. Nothing else may take the clock over —
+            # found by a test, where the silent stand-in for a second input did exactly that and
+            # kept writing frames of nothing after the talk had finished.
             ends_mix = error is None and lane.input.kind == "file" and name == self._primary
-            if name == self._primary:
+            if ends_mix:
+                for other in self._lanes.values():
+                    other.alive = False
+                    other.queue.clear()
+                    other.queued = 0
+                self._primary = ""
+            elif name == self._primary:
                 self._primary = self._choose_primary(exclude=name)
             remaining = self._primary
         if not self.is_running:

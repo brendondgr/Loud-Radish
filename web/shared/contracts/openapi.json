@@ -2809,6 +2809,41 @@
             ],
             "title": "Audio Source",
             "default": "system"
+          },
+          "audio_inputs": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "window",
+                    "system",
+                    "microphone"
+                  ]
+                },
+                "type": "array",
+                "maxItems": 2,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Inputs"
+          },
+          "levels": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "enum": [
+                "window",
+                "system",
+                "microphone"
+              ]
+            },
+            "type": "object",
+            "title": "Levels"
           }
         },
         "additionalProperties": false,
@@ -3416,6 +3451,18 @@
               }
             ],
             "title": "Options"
+          },
+          "mix": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mix"
           },
           "asr": {
             "additionalProperties": true,
