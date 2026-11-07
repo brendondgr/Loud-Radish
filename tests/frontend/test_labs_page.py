@@ -1,4 +1,4 @@
-"""The recordings lab page (D-080), as served.
+"""The recordings lab page (D-082), as served.
 
 There is no build step, so a misspelt import is found by a browser and nobody else. These check
 that every module the lab imports exists, that every stylesheet the page links is served, and that

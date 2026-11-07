@@ -1,5 +1,5 @@
 /**
- * The recordings lab, `/labs/sessions/` (D-080): today's recordings as cards, in six layouts, with
+ * The recordings lab, `/labs/sessions/` (D-082): today's recordings as cards, in six layouts, with
  * a panel of options and a way to send the user's verdict back as text.
  *
  * A prototype beside the real Recordings page, not a replacement for it. It reads the same

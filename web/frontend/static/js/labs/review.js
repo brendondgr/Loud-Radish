@@ -1,5 +1,5 @@
 /**
- * One lab's review in progress (D-080): its settings, a verdict and a note per layout, a note per
+ * One lab's review in progress (D-082): its settings, a verdict and a note per layout, a note per
  * section of options, saved combinations, a decision on the round, and a general note.
  *
  * Shared by every lab page so each one is customised, judged and exported the same way. Kept in

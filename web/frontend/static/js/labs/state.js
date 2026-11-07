@@ -1,5 +1,5 @@
 /**
- * The recordings lab's review (D-080) — one instance of `review.js`, under the storage key the
+ * The recordings lab's review (D-082) — one instance of `review.js`, under the storage key the
  * first round used, so a review already in progress carries over.
  */
 

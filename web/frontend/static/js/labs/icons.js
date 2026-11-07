@@ -1,5 +1,5 @@
 /**
- * The lab's icons, as SVG source (D-080).
+ * The lab's icons, as SVG source (D-082).
  *
  * Fixed strings written here, never built from data, so inserting them as markup is safe. Every
  * one is decorative: the button or label around it carries the accessible name.

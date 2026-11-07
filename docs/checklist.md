@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-11-07 (the recordings lab — D-080)*
+*Last updated: 2026-11-07 (the recordings lab — D-082)*
 
 The active work list for Loud Radish. Update it whenever a task is finished or new work is
 discovered.
@@ -1175,7 +1175,7 @@ approval**. Plan: [plans/recordings-on-the-main-screen.md](plans/recordings-on-t
       takes (seconds for a talk on this machine, by the decode rate measured). If an hour-long
       video makes that wait uncomfortable, move extraction into the runner as a first stage.
 
-## Part 12 — The recordings lab (D-080)
+## Part 12 — The recordings lab (D-082)
 
 Requested 2026-11-07: the Recordings page looks wrong — rows, an "Open…" window that is mostly
 blank, a header that takes too much room, titles that say nothing and dates that are off. Asked for
@@ -1203,15 +1203,18 @@ as text to paste back.
       plus their notes: the record button's dot centred (every lab icon was a line box tall),
       no text-size button, the glossary's count inside its button, the video and details in a
       column of their own, quick questions in a pop-up, Ask as an icon.
+- [x] **The plan:** [plans/recordings-and-main-screen-redesign.md](plans/recordings-and-main-screen-redesign.md),
+      nine steps from the labs' chosen designs to the real pages (D-083 to D-086).
 - [ ] **The owner's decision on round two/three**, for both labs. Then the chosen designs replace
       `/sessions` and the main screen, and the labs are deleted rather than kept beside them.
 - [ ] **Short titles from the model.** The lab's titles are keywords or opening words — the
       stand-in. The real version asks the language model for four to six words when a transcription
       finishes, and stores it as the session's title.
-- [ ] **Stored titles carry the wrong time.** "Session on 07 Nov 2026, 17:11" was written in UTC
-      for a 12:11 PM recording; older ones were written in local time. Whatever replaces
-      `/sessions` should show `started_at` in local time, and the stored default titles should
-      stop carrying a time at all.
+- [x] **"The dates are off" — already fixed, not yet running.** A default title is not stored; it
+      is built from `started_at` by `archive._default_title`, which formatted UTC until D-076 made
+      it local. The owner's instance on :8395 is a process from before that, so it still shows
+      "17:11" for a 12:11 PM recording; a restart corrects it. (Corrected 2026-11-07: an earlier
+      line here said the titles were stored in UTC.)
 
 ## Discovered work
 

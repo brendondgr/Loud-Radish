@@ -1,4 +1,4 @@
-"""One still frame from a recording's video, as a JPEG (D-080).
+"""One still frame from a recording's video, as a JPEG (D-082).
 
 The recordings lab shows each recording as a card with a picture of what was on screen, and lets a
 pointer drag across the card to look at other moments. The capture pipeline already writes one

@@ -1,5 +1,5 @@
 /**
- * The lab's header (D-080): title, search, filters, sort, layout, verdict, customize.
+ * The lab's header (D-082): title, search, filters, sort, layout, verdict, customize.
  *
  * Two rows of controls in the DOM. "One slim bar" lays both rows out as one line, "Two thin rows"
  * keeps them apart, and "Floating dock" moves the whole thing to a pill at the bottom of the

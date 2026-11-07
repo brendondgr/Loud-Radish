@@ -1,5 +1,5 @@
 /**
- * How a recording is named and dated on a lab card (D-080).
+ * How a recording is named and dated on a lab card (D-082).
  *
  * **Dates are always read from `started_at`, never from the stored title.** Stored titles were
  * written as "Session on 07 Nov 2026, 17:11" in UTC at the moment a session began, so on a machine

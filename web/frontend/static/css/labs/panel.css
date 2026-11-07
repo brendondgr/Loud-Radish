@@ -1,4 +1,4 @@
-/* The recordings lab (D-080): the customize panel — options, verdicts, notes, saved
+/* The recordings lab (D-082): the customize panel — options, verdicts, notes, saved
  * combinations and the feedback export. It sits outside the page's flow on the right and the page
  * makes room for it (`.lab[data-panel="true"]`), so the cards stay visible while being judged.
  */

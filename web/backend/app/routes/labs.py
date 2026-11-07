@@ -1,4 +1,4 @@
-"""The labs: prototype pages for trying out a redesign before it replaces the real one (D-080).
+"""The labs: prototype pages for trying out a redesign before it replaces the real one (D-082).
 
 ``/labs/sessions/`` is a card-based Recordings page with a panel of layout options and a way to
 export the user's preferences as text; ``/labs/main/`` draws the main screen in the style chosen

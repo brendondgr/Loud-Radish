@@ -1,4 +1,4 @@
-/* The labs' shared look (D-080): the accent and the corners.
+/* The labs' shared look (D-082): the accent and the corners.
  *
  * Both lab pages put `.lab` on their root and read the surface variables below rather than the
  * application's tokens directly. They map straight back to today's graphite surfaces: the owner

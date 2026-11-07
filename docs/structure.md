@@ -80,7 +80,7 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   │   ├── llm.py             # Language-model probing and credentials
 │   │   │   ├── capture.py         # The window capture's preview frame and state (D-022)
 │   │   │   ├── labs.py            # Prototype pages and the little they need that the sessions
-│   │   │   │                      #   API lacks: frames, named downloads, open folder (D-080)
+│   │   │   │                      #   API lacks: frames, named downloads, open folder (D-082)
 │   │   │   ├── pages.py           # The two server-rendered pages
 │   │   │   └── config.py          # Read, patch with hot-swap cost, presets, save
 │   │   ├── transport/             # The push channel — separate from routes/
@@ -140,7 +140,7 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   │       ├── chunks.py      # Cuts a finished file into pieces that each end in a pause,
 │   │   │       │                  #   so no boundary falls mid-word (D-061)
 │   │   │       ├── extract.py     # A video's sound out to the WAV the pass reads, via PyAV (D-076)
-│   │   │       ├── frames.py      # One frame of a video as a JPEG, by the second, cached (D-080)
+│   │   │       ├── frames.py      # One frame of a video as a JPEG, by the second, cached (D-082)
 │   │   │       ├── job.py         # One pass's state, progress, and the one-at-a-time rule
 │   │   │       └── runner.py      # Runs it on a thread, outliving the session that made the file
 │   │   │   └── polish/            # The minute-by-minute clean-up pass (D-018)
@@ -154,7 +154,7 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   │       ├── schema.sql     # SQLite tables, FTS5 index, its triggers, and where a
 │   │   │                          #   transcription pass got to (D-045)
 │   │   │       ├── store.py       # Append-only writes, the four queries, search
-│   │   │       ├── glance.py      # Opening words, first summary and keywords, for a card (D-080)
+│   │   │       ├── glance.py      # Opening words, first summary and keywords, for a card (D-082)
 │   │   │       └── export.py      # Text, Markdown, SRT, VTT, JSON
 │   │   │   └── session/           # Wiring, workers, health, degradation
 │   │   │       ├── modes.py       # Capture modes, run states and sources (D-020, D-075); mirrored
@@ -252,7 +252,7 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   │   ├── base.html          # Document shell; loads the stylesheets and the entry module
 │   │   │   ├── pages/app.html     # The live application
 │   │   │   ├── pages/labs/        # Prototypes to judge before they replace a page: sessions.html
-│   │   │   │                      #   (the recordings lab), main.html (the main screen) (D-080)
+│   │   │   │                      #   (the recordings lab), main.html (the main screen) (D-082)
 │   │   │   ├── macros/icons.html  # Inline SVG icons, inheriting currentColor
 │   │   │   └── partials/          # header, status_bar, banners, record_sheet,
 │   │   │                          #   transcript/, chat/, monitor/, settings/
@@ -261,7 +261,7 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │       ├── css/               # tokens, base, layout + one file per component; labs/
 │   │       └── js/                # main, session-start (the record sheet → start request,
 │   │                              #   D-075) + core/, transport/, stores/, components/, a11y/,
-│   │                              #   labs/ (the recordings lab, D-080)
+│   │                              #   labs/ (the recordings lab, D-082)
 │   │           └── core/modes.js  # Mirror of services/session/modes.py; kept identical by test
 │   └── shared/contracts/          # Generated: openapi.json, ws-events.json
 │
@@ -327,7 +327,7 @@ listed them has been removed rather than left describing work that has landed.
 | `web/backend/app/routes/` | HTTP endpoint definitions only. Thin — they delegate to services. |
 | `web/backend/app/transport/` | The WebSocket hub and its event envelopes. Separate from `routes/` because it is a push channel with its own reconnection semantics. |
 | `web/backend/app/services/` | The pipeline. One sub-package per stage, so each is independently testable. |
-| `web/frontend/templates/pages/labs/` | Prototypes of a redesign, served beside the page they would replace so they can be compared on real data and argued about before anything is replaced (D-080). A lab page is allowed to be rough; it is not allowed to pretend — every button on it does the real thing. |
+| `web/frontend/templates/pages/labs/` | Prototypes of a redesign, served beside the page they would replace so they can be compared on real data and argued about before anything is replaced (D-082). A lab page is allowed to be rough; it is not allowed to pretend — every button on it does the real thing. |
 | `tests/frontend/` | Accessibility over what the server actually renders: structural rules via `html.parser`, and WCAG contrast over the design tokens. No browser, no build step, no dependency (D-054). |
 | `scripts/radish` | The `radish` terminal command: start the server and tray icon in the background, stop them, say what they are doing. Symlinked into `~/.local/bin` (D-056). |
 | `scripts/_bootstrap.py` | What every script does first: put `web/backend` on `sys.path` and make the same GPU-wheel repair `app.py` makes on launch, so a bare `uv run` of a script cannot break the server's next model load (D-064). A test asserts every script imports it. |

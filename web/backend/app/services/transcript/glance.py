@@ -1,4 +1,4 @@
-"""What a recording is about, in a line, without a language model (D-080).
+"""What a recording is about, in a line, without a language model (D-082).
 
 The recordings lab tries out cards that name a recording by its content rather than by the moment
 it started — 316 recordings titled "Session on <date>" cannot be told apart. The real version will

@@ -1,4 +1,4 @@
-"""The recordings lab's routes (D-080): a picture of each recording, named downloads, opening the
+"""The recordings lab's routes (D-082): a picture of each recording, named downloads, opening the
 folder, and a line saying what a recording is about.
 
 Each is checked against what the lab's cards rely on: the stored preview when there is one, a real

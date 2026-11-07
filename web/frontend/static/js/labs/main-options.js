@@ -1,5 +1,5 @@
 /**
- * The main-screen lab's options (D-080), as data — read by the shared customizer, the page and
+ * The main-screen lab's options (D-082), as data — read by the shared customizer, the page and
  * the feedback export, exactly as `options.js` is for the recordings lab.
  *
  * The look section repeats the recordings lab's so the two pages are judged in one style; its

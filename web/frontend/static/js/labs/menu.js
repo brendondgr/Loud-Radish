@@ -1,5 +1,5 @@
 /**
- * The ⋯ menu on a card (D-080): whatever the card has no room for, one click away.
+ * The ⋯ menu on a card (D-082): whatever the card has no room for, one click away.
  *
  * One menu open at a time. It closes on a choice, on Escape, and on a click anywhere else.
  */

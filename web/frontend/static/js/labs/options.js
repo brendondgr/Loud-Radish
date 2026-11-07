@@ -1,5 +1,5 @@
 /**
- * Every knob the recordings lab offers (D-080), as data.
+ * Every knob the recordings lab offers (D-082), as data.
  *
  * The customizer draws its controls from this list, the page reads the chosen values from it, and
  * the feedback export names each choice by the same labels the user saw — so a line pasted back

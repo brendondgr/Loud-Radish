@@ -1,5 +1,5 @@
 /**
- * The panel of options, verdicts and notes beside a lab page (D-080).
+ * The panel of options, verdicts and notes beside a lab page (D-082).
  *
  * Drawn from the lab's review spec, so an option added there appears here, applies to the page,
  * and is named in the export without anything else changing. Every control applies at once; the

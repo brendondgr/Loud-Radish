@@ -20,7 +20,7 @@ web/frontend/
 ├── templates/          server-rendered structure — the shell, never the data
 │   ├── base.html               <head>, stylesheet list, module entry point
 │   ├── pages/                  one per URL: app.html, sessions.html, and labs/ —
-│   │                           prototypes beside a real page, not instead of it (D-080)
+│   │                           prototypes beside a real page, not instead of it (D-082)
 │   ├── macros/icons.html       inline SVG, inheriting currentColor
 │   └── partials/               one file per region of the interface
 │       ├── header.html, banners.html, status_bar.html
@@ -41,7 +41,7 @@ web/frontend/
     │   ├── layout.css          the application frame and standalone pages
     │   ├── components/         one stylesheet per component
     │   └── labs/               theme (accent and corners, shared), then each lab's sheets
-    │                           (D-080)
+    │                           (D-082)
     └── js/
         ├── main.js             the application page's entry point
         ├── session-start.js    opening the record sheet and starting what it chose (D-075)
@@ -57,7 +57,7 @@ web/frontend/
         ├── stores/             state: transcript, polish, session, mode, health, config, chat,
         │                       capture, export
         ├── components/         one class per region, plus settings/ per tab
-        ├── labs/               the labs (D-080): review.js (settings, verdicts, notes, the
+        ├── labs/               the labs (D-082): review.js (settings, verdicts, notes, the
         │                       decision) and the customize panel and export, shared; then
         │                       each lab's options as data and its renderers — sessions.js
         │                       for the recordings lab, main.js for the main screen

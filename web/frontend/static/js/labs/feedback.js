@@ -1,5 +1,5 @@
 /**
- * A lab's review, as text to paste back into a conversation (D-080).
+ * A lab's review, as text to paste back into a conversation (D-082).
  *
  * Written for a reader who has not seen the screen: the decision on the round, every choice by
  * the label the user saw (marked when it was left as the lab started it), the verdict on each

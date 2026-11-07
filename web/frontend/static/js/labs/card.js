@@ -1,5 +1,5 @@
 /**
- * One recording as a card, in whichever arrangement the lab is set to (D-080).
+ * One recording as a card, in whichever arrangement the lab is set to (D-082).
  *
  * The DOM is the same for every layout — picture, then body — and the layout is a class on the
  * page. That keeps six layouts to one renderer, and means switching between them while comparing

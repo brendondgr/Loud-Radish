@@ -1,5 +1,5 @@
 /**
- * The main screen, drawn in the lab's style (D-080) — header, viewing banner, transcript,
+ * The main screen, drawn in the lab's style (D-082) — header, viewing banner, transcript,
  * assistant, video, status — from one of the user's own recordings.
  *
  * **Look-only.** Nothing here records, asks or searches: every control carries `data-mock`, and

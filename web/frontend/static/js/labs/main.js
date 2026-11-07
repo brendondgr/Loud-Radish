@@ -1,5 +1,5 @@
 /**
- * The main-screen lab, `/labs/main/` (D-080): the live application's screen redrawn in the style
+ * The main-screen lab, `/labs/main/` (D-082): the live application's screen redrawn in the style
  * chosen in the recordings lab, in four arrangements, with the same customize panel and export.
  *
  * It shows one of the user's past recordings as though it were open on the main screen — the one

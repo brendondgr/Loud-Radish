@@ -17,8 +17,8 @@ Server-rendered from `web/frontend/templates/` by `web/backend/app/routes/pages.
 |---|---|---|---|
 | `/` | The live application — transcript pane, header, status bar. `?arm=<mode>` opens the record sheet on load, and `&source=microphone\|system\|window` preselects what it records (D-075). `?arm=window` alone also preselects a window. The query is cleared at once, so a reload does not reopen it | `pages/app.html` | **Implemented** |
 | `/sessions` | Recordings — every past session, what it holds, and its exports | `pages/sessions.html` | **Implemented** |
-| `/labs/main/` | The main-screen lab: the main screen redrawn in the style chosen in the recordings lab, in four arrangements, from one of the user's own recordings. **Look-only** — its controls are drawn, not wired (D-080) | `pages/labs/main.html` | **Prototype** |
-| `/labs/sessions/` | The recordings lab: the same recordings as cards in six layouts, a customize panel, and a feedback export (D-080). `/labs/sessions` redirects here. Served by `routes/labs.py` | `pages/labs/sessions.html` | **Prototype** |
+| `/labs/main/` | The main-screen lab: the main screen redrawn in the style chosen in the recordings lab, in four arrangements, from one of the user's own recordings. **Look-only** — its controls are drawn, not wired (D-082) | `pages/labs/main.html` | **Prototype** |
+| `/labs/sessions/` | The recordings lab: the same recordings as cards in six layouts, a customize panel, and a feedback export (D-082). `/labs/sessions` redirects here. Served by `routes/labs.py` | `pages/labs/sessions.html` | **Prototype** |
 
 ## WebSocket
 
@@ -257,7 +257,7 @@ state is a second place for it to drift.
 
 ### Labs
 
-What the recordings lab needs that the sessions API does not answer yet (D-080). Read-only except
+What the recordings lab needs that the sessions API does not answer yet (D-082). Read-only except
 for opening a folder, and every `{key}` is resolved on the server as it is above.
 
 | Method | Path | Purpose | Status |

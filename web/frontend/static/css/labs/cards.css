@@ -1,4 +1,4 @@
-/* The recordings lab (D-080): cards in each layout, their buttons and menu, and the detail view.
+/* The recordings lab (D-082): cards in each layout, their buttons and menu, and the detail view.
  *
  * One card markup — `.lc-thumb` then `.lc-body` — and six layouts, each a set of overrides keyed
  * on `.lab[data-layout]`. Read top to bottom: the gallery card, then what each layout changes.

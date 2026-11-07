@@ -1,4 +1,4 @@
-/* The recordings lab (D-080): the page, its header, and the groups and timeline tiles.
+/* The recordings lab (D-082): the page, its header, and the groups and timeline tiles.
  *
  * Cards are in cards.css, the detail view in detail.css, the customize panel in panel.css. Every option the panel offers is a data attribute
  * on `.lab`, and the rules below and in cards.css read them; nothing is styled from JavaScript.
