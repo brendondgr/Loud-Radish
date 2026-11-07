@@ -88,6 +88,10 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.choice-cards--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .choice-card {
   position: relative;
   display: flex;
@@ -176,7 +180,106 @@
   text-decoration: line-through;
 }
 
-/* -- the remaining option rows (a window's audio, video) ------------------------------------ */
+/* -- several may be chosen (Which sound, D-081) ----------------------------------------------
+ * The same card, as a checkbox. A box in the corner — empty, then ticked — is what says "these
+ * can both be on" where the radio cards above say "pick one"; the outline and glow alone would
+ * read the same for both.
+ */
+
+.choice-card__check {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--border-control);
+  border-radius: 4px;
+  background: var(--surface-raised);
+  color: transparent;
+  transition:
+    background var(--duration-fast) var(--ease),
+    border-color var(--duration-fast) var(--ease),
+    color var(--duration-fast) var(--ease);
+}
+
+.choice-card:has(.choice-card__input:checked) .choice-card__check {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--surface-base);
+}
+
+/* Fixed on: this computer's sound, when that is what is being recorded. Not a disabled choice —
+ * an included one — so it keeps its colour and loses only the pointer, never gaining the
+ * strike-through a choice this machine cannot make is given. */
+.choice-card--fixed,
+.choice-card--fixed:has(.choice-card__input:disabled) {
+  cursor: default;
+  opacity: 1;
+}
+
+.choice-card--fixed:has(.choice-card__input:disabled) .choice-card__title {
+  text-decoration: none;
+}
+
+.choice-card--fixed:has(.choice-card__input:disabled):hover {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--text-primary);
+}
+
+/* "Only this app / Everything playing": a refinement of the window's sound, so smaller than the
+ * cards and directly under them. */
+.record-sheet__scope {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.record-sheet__scope[hidden] {
+  display: none;
+}
+
+.record-sheet__pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--space-6);
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--surface-control);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.record-sheet__pill input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+.record-sheet__pill:hover {
+  border-color: var(--border-control);
+  color: var(--text-primary);
+}
+
+.record-sheet__pill:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--text-primary);
+}
+
+.record-sheet__pill:has(input:focus-visible) {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 2px;
+}
+
+/* -- the remaining option rows (video) ------------------------------------------------------ */
 
 .record-sheet__option {
   display: flex;
@@ -334,7 +437,8 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .choice-cards:has(> .choice-card:nth-child(4):not([hidden])) {
+  .choice-cards:has(> .choice-card:nth-child(4):not([hidden])),
+  .choice-cards--two {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 

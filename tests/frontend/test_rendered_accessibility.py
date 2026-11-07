@@ -283,3 +283,23 @@ def test_the_record_sheets_step_numbers_are_not_read_aloud(pages) -> None:
     ]
 
     assert steps and all(step.attrs.get("aria-hidden") == "true" for step in steps)
+
+
+def test_the_sound_cards_are_checkboxes_with_names(pages) -> None:
+    """Which sound (D-081): several may be on, so checkboxes, each named by its own label."""
+    sheet = _record_sheet(pages["/"])
+    sounds = [e for e in sheet if "data-record-sound" in e.attrs]
+
+    assert {e.attrs["data-record-sound"] for e in sounds} == {"own", "microphone"}
+    assert all(e.tag == "input" and e.attrs.get("type") == "checkbox" for e in sounds)
+    assert all(e.label is not None and e.label.named for e in sounds)
+
+
+def test_the_window_sound_scope_is_a_named_radio_group(pages) -> None:
+    sheet = _record_sheet(pages["/"])
+    [group] = [e for e in sheet if "data-record-scope" in e.attrs]
+    scopes = [e for e in sheet if "data-record-audio" in e.attrs]
+
+    assert group.attrs.get("role") == "radiogroup" and group.attrs.get("aria-label")
+    assert {e.attrs["value"] for e in scopes} == {"application", "system"}
+    assert all(e.attrs.get("type") == "radio" and e.label and e.label.named for e in scopes)

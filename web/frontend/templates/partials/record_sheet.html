@@ -78,52 +78,66 @@
         <p class="record-sheet__note-line" data-record-window-reason hidden></p>
       </fieldset>
 
-      {# 2. Which input — a window's audio. Chosen per recording: the same person records a talk
-         playing in a window one minute and their own commentary over it the next. #}
-      <fieldset class="record-sheet__section" data-record-section="window-audio" hidden>
+      {# 2. Which sound — for a window or this computer's sound (D-081). Cards like section 1, but
+         checkboxes: the window's sound and the microphone can both be on, mixed, each with its own
+         volume while recording. A check mark in the corner as well as the outline says "several
+         may be chosen" where the radio cards above say "pick one".
+
+         For this computer's sound its own card is fixed on — the recording is of that sound — and
+         only the microphone is optional. "Only this app / Everything playing" is the older
+         `application`/`system` choice, now a refinement of the window's sound. #}
+      <fieldset class="record-sheet__section" data-record-section="sound" hidden>
         <legend class="record-sheet__legend"><span class="record-sheet__step" aria-hidden="true">2</span>Which sound</legend>
-
-        <label class="record-sheet__option">
-          <input type="radio" name="record-audio" value="system" data-record-audio />
-          <span class="record-sheet__option-text">
-            <span class="record-sheet__option-name">The window's sound</span>
-            <span class="record-sheet__option-hint">
-              Everything this machine is playing, which is the window's own audio whenever it is
-              the thing making sound. Your microphone is not recorded.
+        <div class="choice-cards choice-cards--two">
+          <label class="choice-card choice-card--check" title="What the window plays." data-record-sound-card>
+            <input class="choice-card__input" type="checkbox" data-record-sound="own" />
+            <span class="choice-card__check" aria-hidden="true">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.5l4.5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
             </span>
-          </span>
-        </label>
-
-        <label class="record-sheet__option">
-          <input type="radio" name="record-audio" value="application" data-record-audio />
-          <span class="record-sheet__option-text">
-            <span class="record-sheet__option-name">Only this application's sound</span>
-            <span class="record-sheet__option-hint">
-              Taps the chosen application directly, so other programs playing at the same time are
-              left out. Matching an application to a window is a guess, so this falls back to the
-              window's sound when nothing matches.
+            <svg class="choice-card__icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" />
+              <path d="M15.5 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11" />
+            </svg>
+            <span class="choice-card__title" data-record-sound-own-title>The window's sound</span>
+          </label>
+          <label class="choice-card choice-card--check" title="Your own voice, mixed in. Its volume can be changed while recording.">
+            <input class="choice-card__input" type="checkbox" data-record-sound="microphone" />
+            <span class="choice-card__check" aria-hidden="true">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2 5 8.5l4.5-5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
             </span>
-          </span>
-        </label>
+            <svg class="choice-card__icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="9" y="3" width="6" height="11" rx="3" />
+              <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" />
+            </svg>
+            <span class="choice-card__title">My microphone</span>
+          </label>
+        </div>
 
-        <label class="record-sheet__option">
-          <input type="radio" name="record-audio" value="microphone" data-record-audio />
-          <span class="record-sheet__option-text">
-            <span class="record-sheet__option-name">My microphone</span>
-            <span class="record-sheet__option-hint">
-              For narrating over a window rather than capturing what it plays. The window's own
-              sound is not recorded.
-            </span>
-          </span>
-        </label>
+        {# Which of the window's sound. Matching an application to a window is a guess, so "only
+           this app" falls back to everything playing when nothing matches. #}
+        <div class="record-sheet__scope" role="radiogroup" aria-label="Which of the window's sound" data-record-scope>
+          <label class="record-sheet__pill" title="Only the window's application. Other programs playing at the same time are left out.">
+            <input type="radio" name="record-audio" value="application" data-record-audio />
+            <span>Only this app</span>
+          </label>
+          <label class="record-sheet__pill" title="Everything this machine plays — the window's sound whenever it is the thing making sound.">
+            <input type="radio" name="record-audio" value="system" data-record-audio />
+            <span>Everything playing</span>
+          </label>
+        </div>
+
+        <p class="record-sheet__note-line" data-record-headphones hidden>
+          Use headphones. Through speakers your microphone hears the other sound too, and it is
+          recorded twice, a moment apart.
+        </p>
       </fieldset>
 
       {# 2. Which input — the microphone list. Choosing one here writes the same setting the
          Audio tab and the tray write, so there is one answer to "which microphone".
 
-         Also shown for a window whose sound is "My microphone", which is why it comes *after*
-         the window's audio choices: there it answers a follow-up to that choice, not a step of
-         its own, so its step number is hidden. #}
+         Also shown whenever "My microphone" is ticked under Which sound, which is why it comes
+         *after* that section: there it answers a follow-up to that choice, not a step of its
+         own, so its step number is hidden. #}
       <div class="record-sheet__section" data-record-section="microphone" hidden>
         {# One row: the question on the left, its answer on the right. #}
         <div class="record-sheet__row">

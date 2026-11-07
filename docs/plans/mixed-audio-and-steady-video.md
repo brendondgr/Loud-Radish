@@ -1,6 +1,6 @@
 # Mixed Audio and Steady Video
 
-**Status:** In progress (4 / 7 phases). Branch: `feature/mixed-audio-steady-video`.
+**Status:** In progress (5 / 7 phases). Branch: `feature/mixed-audio-steady-video`.
 
 ## 1. Introduction
 
@@ -325,6 +325,23 @@ recording; the set of inputs is fixed when recording starts.
   > can be changed while recording, and every open page is told.*
 
 ### Phase 5 — The record sheet: choosing both
+
+> **Status: ✅ Complete.** As planned, plus:
+> - **Each sound's starting volume is remembered** in the browser (`lastMixLevels`), filtered to
+>   the inputs being recorded and to 0–100. The sound panel (Phase 6) is what writes it.
+> - **A remembered choice from before the cards is migrated**: `audio_source: "microphone"` becomes
+>   "the window's sound off, the microphone on".
+> - **With the file source the microphone is not mixed in**, because it would be a second input
+>   of silence the sheet cannot make honest.
+> - **Checked in the browser (:8412):**
+>   - computer's sound with its card fixed on, plus the microphone, with the headphones hint and
+>     the unnumbered microphone row;
+>   - a window with *Only this app* and the microphone; the request carried
+>     `audio_inputs: ["window", "microphone"]` and the remembered levels, with an out-of-range
+>     one dropped;
+>   - switching sources keeps every choice;
+>   - at 375 px there is no sideways scroll. The two cards used to fill only two of three
+>     columns there; fixed.
 
 - **Locations:**
   - `web/frontend/templates/partials/record_sheet.html`: the "Which sound" radio rows become
