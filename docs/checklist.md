@@ -1115,7 +1115,39 @@ both times during a long local gemma-4 generation on the iGPU faster-whisper was
       candidate for compute preemption faults on gfx1151. It is untested here, and a kernel
       parameter is the user's decision.
 
+## Part 10 — Past recordings on the main screen (D-076 to D-078)
+
+Requested 2026-11-07: bring a recording back to the main screen so the assistant can be asked about
+it — only with a transcript, and with a transcription of audio or video **only on the user's
+approval**. Plan: [plans/recordings-on-the-main-screen.md](plans/recordings-on-the-main-screen.md).
+
+- [x] One recording window replaces the row's Export link, Conversation link and Export… button;
+      the web-app export is a face inside it (D-077).
+- [x] A recording with a transcript opens on the main screen — from its row, the recording window,
+      or "Open recording…" on the main screen — with its earlier conversation, which new questions
+      continue. Close empties the screen; a new session ends the view; it is not restored after a
+      restart (D-076).
+- [x] Recording folders with no database are listed, and any recording without a transcript can be
+      transcribed after an approval dialog that says exactly what will run. A video's sound is
+      taken out with PyAV first (D-078). Opening when done is the dialog's checkbox.
+- [x] Delete removes the recording folder as well as the database.
+- [x] Verified in the browser against seeded mock recordings, the mock speech model and the local
+      language model: open, ask, reload, close, transcribe a WAV-only and a video-only recording,
+      the refusal for a silent video, 375 px, keyboard focus in the window.
+- [ ] **Confirm against real recordings with the real speech model.** Everything above ran on the
+      mock model and generated media. The two unfinished recordings of 2026-09-18 (Part 9) are the
+      natural first test: they now appear with **Transcribe…**, and nothing runs until approved.
+- [ ] **A long video's extraction blocks its request.** Taking the sound out runs before the pass
+      registers itself, inside the approval request; the dialog says "Starting…" for as long as it
+      takes (seconds for a talk on this machine, by the decode rate measured). If an hour-long
+      video makes that wait uncomfortable, move extraction into the runner as a first stage.
+
 ## Discovered work
+
+- [ ] **Three files fail `ruff format --check` on `main`, before this work.**
+      `tests/transcription/test_recorder_lifetime.py`, `web/backend/app/services/dictation/prompts.py`
+      and `web/backend/app/services/polish/prompts.py`. Found while verifying D-076; left alone
+      because reformatting them is unrelated to it.
 
 - [x] **The assistant's model could not be typed, and a dropdown beside the address rewrote it.**
       Done (D-067). The model field was a `<select>` holding only what the last connection test

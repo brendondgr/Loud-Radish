@@ -62,6 +62,7 @@ build step.
 | Desktop integration | ✅ D-024 — toggle endpoint and CLI, autostart, tray companion drawing the Aperture microphone ([motion-spec.md](motion-spec.md)), global keybinds, settings tab |
 | Dictation and the batch pass at pauses | ✅ D-061–D-063 — a dictation and a recorded session are both cut where the speaker paused, never on a clock; the checkpoint records those cuts; a dictation's tidy runs while the next chunk transcribes |
 | The open list, closed by code | ✅ D-064–D-066 — every script and the companion repair the GPU wheel on launch, range reads serve one pass, and an export names its revision from the API and from the recordings page ([plans/pause-aligned-batch-and-open-items.md](plans/pause-aligned-batch-and-open-items.md)) |
+| Past recordings on the main screen | ✅ D-076–D-078 — any recording with a transcript can be brought back and asked about; one without is transcribed only on approval, a video's sound taken out first; one recording window holds every export ([plans/recordings-on-the-main-screen.md](plans/recordings-on-the-main-screen.md)) |
 
 Open work is tracked in [checklist.md](checklist.md); phase status in
 [plans/live-seminar-transcriber.md](plans/live-seminar-transcriber.md).

@@ -1,6 +1,6 @@
 # Recordings on the Main Screen: Ask About Any Past Recording
 
-*Written 2026-11-07, revised the same day with the user's answers. Status: **In progress (5 / 6)**.
+*Written 2026-11-07, revised the same day with the user's answers. Status: **Complete (6 / 6)**.
 Runs **alongside** [unified-record-sheet.md](unified-record-sheet.md), which is being implemented at
 the same time in the main checkout. This plan is built in a separate worktree
 (`../TranscriberPrototype-recordings`, branch `feature/recordings-on-main-screen`), so the two never
