@@ -1,6 +1,6 @@
 # Recordings and Main Screen Redesign: From the Labs to the Real Pages
 
-*Written 2026-11-07. Status: **In progress (8 / 9)**. Source of truth for the target design: the
+*Written 2026-11-07. Status: **✅ Complete (9 / 9)**. Source of truth for the target design: the
 two labs, `/labs/sessions/` and `/labs/main/` (D-082), at commit `e76a389` on branch
 `labs/sessions-cards`, and the owner's three rounds of exported feedback quoted below. This plan
 takes decisions **D-083 to D-086**. `feature/mixed-audio-steady-video` already holds D-080 and
@@ -556,6 +556,16 @@ available until Step 9 so every step can be compared against them side by side. 
 - *Action: Undergo the verification/tests/validation process for this phase. Once validated, push
   changes to GitHub stating: Recordings and Main Screen Redesign (9 / 9) Complete: The labs are
   removed now that both designs are the real pages.*
+
+> **Status: ✅ Complete.** Deleted as planned; the lab-only layout pictograms went from
+> `core/icons.js` too. The `labs-qa` launch entry (renamed `redesign-qa` while this plan was built)
+> is removed from the main checkout's uncommitted `.claude/launch.json`. Last browser pass on a
+> restarted server: `/labs/sessions/`, `/labs/main/` and `/api/labs/…` answer 404; `/sessions` and
+> the main screen show the chosen designs.
+>
+> **Every step's commit is on `feature/redesign-from-labs`; nothing was pushed.** The Action lines
+> above say "push changes to GitHub"; the owner asked for each step to be committed, and pushing is
+> left to them.
 
 ## 4. Deliverables Table
 

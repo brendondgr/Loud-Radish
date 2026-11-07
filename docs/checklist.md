@@ -1175,7 +1175,11 @@ approval**. Plan: [plans/recordings-on-the-main-screen.md](plans/recordings-on-t
       takes (seconds for a talk on this machine, by the decode rate measured). If an hour-long
       video makes that wait uncomfortable, move extraction into the runner as a first stage.
 
-## Part 12 — The recordings lab (D-082)
+## Part 12 — The recordings lab (D-082) — ✅ closed
+
+*Closed 2026-11-07: both designs were built into the real pages by
+[plans/recordings-and-main-screen-redesign.md](plans/recordings-and-main-screen-redesign.md)
+(D-083 to D-086) and the labs were deleted. The ⌘1–⌘5 follow-up below stays open.*
 
 Requested 2026-11-07: the Recordings page looks wrong — rows, an "Open…" window that is mostly
 blank, a header that takes too much room, titles that say nothing and dates that are off. Asked for
@@ -1205,15 +1209,16 @@ as text to paste back.
       column of their own, quick questions in a pop-up, Ask as an icon.
 - [x] **The plan:** [plans/recordings-and-main-screen-redesign.md](plans/recordings-and-main-screen-redesign.md),
       nine steps from the labs' chosen designs to the real pages (D-083 to D-086).
-- [ ] **The owner's decision on round two/three**, for both labs. Then the chosen designs replace
-      `/sessions` and the main screen, and the labs are deleted rather than kept beside them.
+- [x] **The owner's decision on round two/three.** Taken as their saved combinations and notes
+      (they asked for the plan to be built); the chosen designs replaced `/sessions` and the main
+      screen, and the labs were deleted.
 - [x] **Short titles from the model** (D-084, redesign Step 3). Written once a transcript is
       finished; older recordings are named from the Recordings page's "Name *N* untitled…", which
       asks first; any title can be renamed in the compact window.
 - [x] **The redesign, Steps 1–8** on `feature/redesign-from-labs`: radish accent (D-083), the
       sessions API's media routes, model titles (D-084), the Recordings page as wide cards
       (D-085), header health chips, the transcript pane, the details column (D-086), and the
-      assistant's pop-up. Step 9 removes the labs.
+      assistant's pop-up; Step 9 removed the labs.
 - [ ] **The quick questions' ⌘1–⌘5 hints do nothing.** The configured prompts carry them
       (`config/defaults.py`) and the pop-up shows them, but no code has ever handled the keys, and
       Ctrl + a number is the browser's tab switching on Linux and Windows. Wire them to another

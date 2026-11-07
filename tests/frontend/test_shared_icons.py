@@ -20,8 +20,7 @@ ENTRY = re.compile(r"""^\s*"?([\w-]+)"?:\s*'(.*)',$""", re.M)
 
 
 def module_paths() -> dict[str, str]:
-    found = ENTRY.findall(MODULE.read_text())
-    return {name: body for name, body in found if not name.startswith("layout-")}
+    return dict(ENTRY.findall(MODULE.read_text()))
 
 
 def macro_paths() -> dict[str, str]:

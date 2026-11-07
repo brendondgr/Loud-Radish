@@ -1,6 +1,6 @@
 """What a recording card needs beyond the listing: a picture, files, its folder, a glance (D-082).
 
-Promoted from the recordings lab (``routes/labs.py``) for the redesigned Recordings page and the
+Promoted from the recordings lab (D-082, since removed) for the redesigned Recordings page and the
 main screen's details column:
 
 - a picture of the recording — the stored ``preview.jpg``, or a frame of the video by the second;

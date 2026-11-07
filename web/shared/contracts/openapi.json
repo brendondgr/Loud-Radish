@@ -3059,50 +3059,6 @@
         }
       }
     },
-    "/labs/sessions/": {
-      "get": {
-        "tags": [
-          "labs"
-        ],
-        "summary": "Labs Sessions Page",
-        "description": "The card-based recordings prototype.",
-        "operationId": "labs_sessions_page_labs_sessions__get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "text/html": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/labs/main/": {
-      "get": {
-        "tags": [
-          "labs"
-        ],
-        "summary": "Labs Main Page",
-        "description": "The main screen redrawn in the recordings lab's style. Look-only.",
-        "operationId": "labs_main_page_labs_main__get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "text/html": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/": {
       "get": {
         "tags": [

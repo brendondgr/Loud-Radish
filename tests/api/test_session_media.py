@@ -190,26 +190,3 @@ def test_the_listing_says_whether_a_recording_has_a_preview(client, dirs) -> Non
     assert media()["preview"] is False
     (folder / "preview.jpg").write_bytes(JPEG + b"rest")
     assert media()["preview"] is True
-
-
-# -- the labs, until Step 9 retires them: their page and their old paths ----------------------
-
-
-def test_the_page_renders_and_its_bare_path_redirects(client) -> None:
-    page = client.get("/labs/sessions/")
-    assert page.status_code == 200
-    assert "data-lab" in page.text and "/static/js/labs/sessions.js" in page.text
-
-    bare = client.get("/labs/sessions", follow_redirects=False)
-    assert bare.status_code == 307
-    assert bare.headers["location"] == "/labs/sessions/"
-
-
-def test_the_old_lab_paths_answer_as_the_sessions_api_does(client, dirs) -> None:
-    write_talk(dirs[0])
-
-    old = client.get("/api/labs/sessions/glance", params={"keys": KEY}).json()
-    new = client.get("/api/sessions/glance", params={"keys": KEY}).json()
-
-    assert old == new and KEY in new["glances"]
-    assert client.get(f"/api/labs/sessions/{KEY}/thumbnail").status_code == 404

@@ -82,8 +82,6 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   │   ├── chat.py            # Ask, cancel, history, the read mark
 │   │   │   ├── llm.py             # Language-model probing and credentials
 │   │   │   ├── capture.py         # The window capture's preview frame and state (D-022)
-│   │   │   ├── labs.py            # Prototype pages, plus aliases of the media routes until the
-│   │   │   │                      #   labs are retired (D-082)
 │   │   │   ├── pages.py           # The two server-rendered pages
 │   │   │   └── config.py          # Read, patch with hot-swap cost, presets, save
 │   │   ├── transport/             # The push channel — separate from routes/
@@ -259,18 +257,16 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   ├── templates/
 │   │   │   ├── base.html          # Document shell; loads the stylesheets and the entry module
 │   │   │   ├── pages/app.html     # The live application
-│   │   │   ├── pages/labs/        # Prototypes to judge before they replace a page: sessions.html
-│   │   │   │                      #   (the recordings lab), main.html (the main screen) (D-082)
 │   │   │   ├── macros/icons.html  # Inline SVG icons, inheriting currentColor
 │   │   │   └── partials/          # header (with the health chips), banners, record_sheet,
 │   │   │                          #   transcript/, chat/, details/ (D-086), settings/
 │   │   └── static/
 │   │       ├── brand/radish.svg   # The mark — tab icon, header, export, desktop entry (D-038)
-│   │       ├── css/               # tokens, base, layout + one file per component; labs/
+│   │       ├── css/               # tokens, base, layout + one file per component
 │   │       └── js/                # main, session-start (the record sheet → start request,
 │   │                              #   D-075), sessions (the Recordings page) + core/, transport/,
 │   │                              #   stores/, components/, a11y/, recordings/ (the Recordings
-│   │                              #   page's cards and compact window, D-085), labs/ (D-082)
+│   │                              #   page's cards and compact window, D-085)
 │   │           └── core/modes.js  # Mirror of services/session/modes.py; kept identical by test
 │   └── shared/contracts/          # Generated: openapi.json, ws-events.json
 │
@@ -338,7 +334,6 @@ listed them has been removed rather than left describing work that has landed.
 | `web/backend/app/routes/` | HTTP endpoint definitions only. Thin — they delegate to services. |
 | `web/backend/app/transport/` | The WebSocket hub and its event envelopes. Separate from `routes/` because it is a push channel with its own reconnection semantics. |
 | `web/backend/app/services/` | The pipeline. One sub-package per stage, so each is independently testable. |
-| `web/frontend/templates/pages/labs/` | Prototypes of a redesign, served beside the page they would replace so they can be compared on real data and argued about before anything is replaced (D-082). A lab page is allowed to be rough; it is not allowed to pretend — every button on it does the real thing. |
 | `tests/frontend/` | Accessibility over what the server actually renders: structural rules via `html.parser`, and WCAG contrast over the design tokens. No browser, no build step, no dependency (D-054). |
 | `scripts/radish` | The `radish` terminal command: start the server and tray icon in the background, stop them, say what they are doing. Symlinked into `~/.local/bin` (D-056). |
 | `scripts/_bootstrap.py` | What every script does first: put `web/backend` on `sys.path` and make the same GPU-wheel repair `app.py` makes on launch, so a bare `uv run` of a script cannot break the server's next model load (D-064). A test asserts every script imports it. |
