@@ -1,52 +1,58 @@
 /**
- * The review, as text to paste back into a conversation (D-080).
+ * A lab's review, as text to paste back into a conversation (D-080).
  *
- * Written for a reader who has not seen the screen: every choice by the label the user saw, the
- * verdict on each layout, each note beside what it is about, the combinations worth keeping, and
- * the raw settings at the end so the exact arrangement can be rebuilt.
+ * Written for a reader who has not seen the screen: the decision on the round, every choice by
+ * the label the user saw (marked when it was left as the lab started it), the verdict on each
+ * layout, each note beside what it is about, the combinations worth keeping, and the raw settings
+ * at the end so the exact arrangement can be rebuilt.
  */
 
-import { DEFAULTS, LAYOUTS, SECTIONS, describeValue } from "./options.js";
-
 const VERDICTS = { love: "Love it", ok: "It's OK", no: "Not this one" };
+export const DECISIONS = {
+  approve: "Approved — build it",
+  changes: "Approved with the changes below",
+  no: "Not yet — another round",
+};
 
-function settingsLines(settings, { onlyChanged = false } = {}) {
+function settingsLines(review, settings, { onlyChanged = false } = {}) {
+  const { sections, defaults } = review.spec;
   const lines = [];
-  for (const section of SECTIONS) {
+  for (const section of sections) {
     for (const option of section.options) {
       const value = settings[option.id];
-      const changed = JSON.stringify(value) !== JSON.stringify(DEFAULTS[option.id]);
+      const changed = JSON.stringify(value) !== JSON.stringify(defaults[option.id]);
       if (onlyChanged && !changed) continue;
-      // "(default)" says the user left it alone, which is not the same as choosing it.
-      const mark = !onlyChanged && !changed ? " (default)" : "";
-      lines.push(`- ${section.label} → ${option.label}: ${describeValue(option.id, value)}${mark}`);
+      // Left as the lab started it — which, from the second round on, is the previous round's
+      // choice — is not the same as choosing it again.
+      const mark = !onlyChanged && !changed ? " (unchanged)" : "";
+      lines.push(`- ${section.label} → ${option.label}: ${review.describeValue(option.id, value)}${mark}`);
     }
   }
   return lines;
 }
 
-export function feedbackMarkdown(lab, { count = 0 } = {}) {
-  const out = [];
-  out.push("## Recordings lab feedback");
-  out.push("");
-  out.push(
-    `From /labs/sessions/ on ${new Date().toLocaleString()} — ${count} recordings on screen.`,
-  );
+export function feedbackMarkdown(review, { count = null } = {}) {
+  const { lab, spec } = review;
+  const out = [`## ${spec.title}`, ""];
+  const where = count === null ? "" : ` — ${count} recordings on screen`;
+  out.push(`From ${spec.page} on ${new Date().toLocaleString()}${where}.`);
+
+  if (lab.decision) out.push("", `**Decision:** ${DECISIONS[lab.decision]}`);
 
   out.push("", "### What I picked");
-  out.push(...settingsLines(lab.settings));
+  out.push(...settingsLines(review, lab.settings));
 
-  const verdicts = LAYOUTS.filter((layout) => lab.verdicts[layout.id]?.score || lab.verdicts[layout.id]?.note);
-  if (verdicts.length) {
+  const layouts = spec.layouts.filter((layout) => lab.verdicts[layout.id]?.score || lab.verdicts[layout.id]?.note);
+  if (layouts.length) {
     out.push("", "### Layouts");
-    for (const layout of verdicts) {
+    for (const layout of layouts) {
       const { score = "", note = "" } = lab.verdicts[layout.id];
       const verdict = VERDICTS[score] ?? "No verdict";
       out.push(`- **${layout.label}** — ${verdict}${note.trim() ? `: ${note.trim()}` : ""}`);
     }
   }
 
-  const notes = SECTIONS.filter((section) => lab.notes[section.id]?.trim());
+  const notes = spec.sections.filter((section) => lab.notes[section.id]?.trim());
   if (notes.length) {
     out.push("", "### Notes on each part");
     for (const section of notes) out.push(`- **${section.label}:** ${lab.notes[section.id].trim()}`);
@@ -56,7 +62,7 @@ export function feedbackMarkdown(lab, { count = 0 } = {}) {
     out.push("", "### Combinations I saved");
     lab.combos.forEach((combo, index) => {
       out.push("", `${index + 1}. **${combo.name}**${combo.note?.trim() ? ` — ${combo.note.trim()}` : ""}`);
-      const changed = settingsLines(combo.settings, { onlyChanged: true });
+      const changed = settingsLines(review, combo.settings, { onlyChanged: true });
       out.push(...(changed.length ? changed : ["- (all defaults)"]).map((line) => `   ${line}`));
     });
   }

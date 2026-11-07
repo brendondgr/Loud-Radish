@@ -251,7 +251,8 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   ├── templates/
 │   │   │   ├── base.html          # Document shell; loads the stylesheets and the entry module
 │   │   │   ├── pages/app.html     # The live application
-│   │   │   ├── pages/labs/        # Prototypes to judge before they replace a page (D-080)
+│   │   │   ├── pages/labs/        # Prototypes to judge before they replace a page: sessions.html
+│   │   │   │                      #   (the recordings lab), main.html (the main screen) (D-080)
 │   │   │   ├── macros/icons.html  # Inline SVG icons, inheriting currentColor
 │   │   │   └── partials/          # header, status_bar, banners, record_sheet,
 │   │   │                          #   transcript/, chat/, monitor/, settings/

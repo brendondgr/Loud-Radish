@@ -1,7 +1,8 @@
 """The labs: prototype pages for trying out a redesign before it replaces the real one (D-080).
 
 ``/labs/sessions/`` is a card-based Recordings page with a panel of layout options and a way to
-export the user's preferences as text. Everything it reads comes from the ordinary sessions API;
+export the user's preferences as text; ``/labs/main/`` draws the main screen in the style chosen
+there. Everything it reads comes from the ordinary sessions API;
 the routes here are only what that API has no answer for yet — a picture of each recording, a file
 download with a proper name, opening the folder, and a line saying what a recording is about.
 
@@ -64,6 +65,17 @@ async def labs_sessions_redirect() -> RedirectResponse:
 async def labs_sessions_page(request: Request) -> HTMLResponse:
     """The card-based recordings prototype."""
     return _templates(request).TemplateResponse(request, "pages/labs/sessions.html", {})
+
+
+@router.get("/labs/main", include_in_schema=False)
+async def labs_main_redirect() -> RedirectResponse:
+    return RedirectResponse("/labs/main/", status_code=307)
+
+
+@router.get("/labs/main/", response_class=HTMLResponse)
+async def labs_main_page(request: Request) -> HTMLResponse:
+    """The main screen redrawn in the recordings lab's style. Look-only."""
+    return _templates(request).TemplateResponse(request, "pages/labs/main.html", {})
 
 
 # -- what the sessions API does not say yet ---------------------------------------------------

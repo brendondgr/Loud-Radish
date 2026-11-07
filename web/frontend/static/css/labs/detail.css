@@ -9,7 +9,7 @@
   flex-direction: column;
   gap: 14px;
   padding: 16px;
-  background: var(--surface-panel);
+  background: var(--lab-panel);
   color: var(--text-primary);
   cursor: default;
 }
@@ -43,8 +43,8 @@
   gap: 6px;
   aspect-ratio: auto;
   min-height: 92px;
-  border: 1px dashed var(--border-control);
-  background: var(--surface-raised);
+  border: 1px dashed var(--lab-line-control);
+  background: var(--lab-raised);
   color: var(--text-faint);
   font-size: 12px;
 }
@@ -59,11 +59,11 @@
   gap: 1px;
   margin: 0;
   overflow: hidden;
-  border: 1px solid var(--border-default);
+  border: 1px solid var(--lab-line);
   border-radius: 8px;
-  background: var(--border-default);
+  background: var(--lab-line);
 }
-.ld-facts > div { padding: 7px 10px; background: var(--surface-raised); }
+.ld-facts > div { padding: 7px 10px; background: var(--lab-raised); }
 .ld-facts dt { color: var(--text-faint); font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; }
 .ld-facts dd { margin: 2px 0 0; font: 13px var(--font-mono); }
 
@@ -110,7 +110,7 @@
   bottom: 0;
   width: min(460px, 100vw);
   overflow-y: auto;
-  border-left: 1px solid var(--border-control);
+  border-left: 1px solid var(--lab-line-control);
   box-shadow: var(--shadow-panel);
   animation: ld-in 0.16s ease-out;
 }
@@ -124,7 +124,7 @@
   max-height: calc(100dvh - 48px);
   overflow-y: auto;
   transform: translate(-50%, -50%);
-  border: 1px solid var(--border-control);
+  border: 1px solid var(--lab-line-control);
   border-radius: 14px;
   box-shadow: var(--shadow-panel);
 }

@@ -1192,8 +1192,14 @@ as text to paste back.
 - [x] Verified in the browser on a copy of the owner's 316 sessions and 52 video recordings at
       1440 × 900: every layout, every detail mode, the floating dock, hover-skimming, the ⋯ menu,
       the export text, and "Bring to main screen" landing on the main screen with its banner.
-- [ ] **The owner's verdict.** The next step is their pasted feedback; then the chosen design
-      replaces `/sessions` and the lab is deleted rather than kept beside it.
+- [x] **First verdict (2026-11-07):** wide cards, "It's OK", with a saved combination and one note
+      — hover buttons belong bottom-right. Applied; the combination is the second round's start.
+- [x] **Second round:** `/labs/main/` — the main screen in the same style, four arrangements,
+      look-only, from the owner's busiest recording. Radish is the accent only (a radish-tinted
+      background was tried and rejected). Each round ends with an approve / changes / not-yet
+      decision in the export.
+- [ ] **The owner's decision on round two**, for both labs. Then the chosen designs replace
+      `/sessions` and the main screen, and the labs are deleted rather than kept beside them.
 - [ ] **Short titles from the model.** The lab's titles are keywords or opening words — the
       stand-in. The real version asks the language model for four to six words when a transcription
       finishes, and stores it as the session's title.

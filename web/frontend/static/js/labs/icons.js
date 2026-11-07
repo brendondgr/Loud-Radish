@@ -37,6 +37,15 @@ const PATHS = {
   "layout-timeline": '<path d="M3 1.5v13"/><circle cx="3" cy="4" r="1.2" fill="currentColor"/><circle cx="3" cy="11" r="1.2" fill="currentColor"/><rect x="6" y="2" width="3.5" height="4" rx=".8"/><rect x="11" y="2" width="3.5" height="4" rx=".8"/><rect x="6" y="9" width="3.5" height="4" rx=".8"/>',
   "layout-split": '<rect x="1.5" y="2" width="13" height="12" rx="1.4"/><path d="M8.5 2v12M3.5 5h3M3.5 8h3M3.5 11h3"/>',
   "layout-list": '<rect x="1.5" y="2.5" width="3" height="2.5" rx=".6"/><rect x="1.5" y="6.8" width="3" height="2.5" rx=".6"/><rect x="1.5" y="11" width="3" height="2.5" rx=".6"/><path d="M6.5 3.7h8M6.5 8h8M6.5 12.3h8"/>',
+  gear: '<circle cx="8" cy="8" r="2.3"/><path d="M8 1.4v1.8M8 12.8v1.8M1.4 8h1.8M12.8 8h1.8M3.3 3.3l1.3 1.3M11.4 11.4l1.3 1.3M12.7 3.3l-1.3 1.3M4.6 11.4l-1.3 1.3"/>',
+  book: '<path d="M2.5 3.2c1.8-.8 3.7-.8 5.5.4 1.8-1.2 3.7-1.2 5.5-.4v9.6c-1.8-.8-3.7-.8-5.5.4-1.8-1.2-3.7-1.2-5.5-.4z"/><path d="M8 3.6v9.6"/>',
+  record: '<circle cx="8" cy="8" r="4.2" fill="currentColor" stroke="none"/>',
+  mic: '<rect x="5.6" y="1.8" width="4.8" height="8" rx="2.4"/><path d="M3.4 7.6a4.6 4.6 0 0 0 9.2 0M8 12.2v2"/>',
+  shield: '<path d="M8 1.6 13 3.4v3.9c0 3-2.1 5.2-5 6.2-2.9-1-5-3.2-5-6.2V3.4z"/>',
+  grid: '<rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/>',
+  chevron: '<path d="m6 3.5 4.5 4.5L6 12.5"/>',
+  text: '<path d="M2.5 13 6 3.5 9.5 13M3.7 10h4.6M11 13l2-5.5 2 5.5M11.6 11.4h2.8"/>',
+  send: '<path d="M2 8h10.5M8.5 3.8 12.8 8l-4.3 4.2"/>',
   play: '<path d="M5 3.2v9.6L12.6 8z" fill="currentColor" stroke="none"/>',
 };
 

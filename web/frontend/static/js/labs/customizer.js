@@ -1,27 +1,15 @@
 /**
- * The panel of options, verdicts and notes beside the cards (D-080).
+ * The panel of options, verdicts and notes beside a lab page (D-080).
  *
- * Drawn from `options.js`, so an option added there appears here, applies to the cards, and is
- * named in the export without anything else changing. Every control applies at once; the cards
- * redraw behind the panel so a choice is judged by looking, not by imagining.
+ * Drawn from the lab's review spec, so an option added there appears here, applies to the page,
+ * and is named in the export without anything else changing. Every control applies at once; the
+ * page redraws behind the panel so a choice is judged by looking, not by imagining. Shared by
+ * every lab, which is why each function is handed the review it works on.
  */
 
 import { el } from "../core/dom.js";
-import { feedbackMarkdown } from "./feedback.js";
+import { DECISIONS, feedbackMarkdown } from "./feedback.js";
 import { iconNode } from "./icons.js";
-import { LAYOUTS, SECTIONS } from "./options.js";
-import {
-  applySettings,
-  lab,
-  removeCombo,
-  resetReview,
-  saveCombo,
-  setGeneral,
-  setNote,
-  setSetting,
-  setVerdict,
-  setVerdictNote,
-} from "./state.js";
 
 const VERDICTS = [
   ["love", "heart", "Love it"],
@@ -30,7 +18,8 @@ const VERDICTS = [
 ];
 
 /** Love / OK / No for one layout, plus a one-line note. Used here and in the toolbar. */
-export function verdictButtons(layoutId, { withNote = false } = {}) {
+export function verdictButtons(review, layoutId, { withNote = false } = {}) {
+  const { lab } = review;
   const current = lab.verdicts[layoutId] ?? {};
   const row = el("div", { className: "lz-verdict" });
   for (const [score, icon, label] of VERDICTS) {
@@ -41,7 +30,7 @@ export function verdictButtons(layoutId, { withNote = false } = {}) {
     });
     button.addEventListener("click", (event) => {
       event.stopPropagation();
-      setVerdict(layoutId, score);
+      review.setVerdict(layoutId, score);
     });
     row.append(button);
   }
@@ -50,13 +39,13 @@ export function verdictButtons(layoutId, { withNote = false } = {}) {
       className: "lz-input lz-verdict__note",
       attrs: { type: "text", placeholder: "Why?", value: current.note ?? "", "aria-label": "Note on this layout" },
     });
-    note.addEventListener("change", () => setVerdictNote(layoutId, note.value));
+    note.addEventListener("change", () => review.setVerdictNote(layoutId, note.value));
     row.append(note);
   }
   return row;
 }
 
-function chips(option, value) {
+function chips(review, option, value) {
   const multi = option.kind === "multi";
   return el("div", {
     className: "lz-chips",
@@ -75,57 +64,58 @@ function chips(option, value) {
         },
       });
       chip.addEventListener("click", () => {
-        if (!multi) return setSetting(option.id, choice.id);
+        if (!multi) return review.setSetting(option.id, choice.id);
         const next = on ? value.filter((v) => v !== choice.id) : [...value, choice.id];
-        return setSetting(option.id, next);
+        return review.setSetting(option.id, next);
       });
       return chip;
     }),
   });
 }
 
-function control(option) {
-  const value = lab.settings[option.id];
+function control(review, option) {
+  const value = review.lab.settings[option.id];
   if (option.kind === "toggle") {
     const input = el("input", { attrs: { type: "checkbox", checked: value } });
-    input.addEventListener("change", () => setSetting(option.id, input.checked));
+    input.addEventListener("change", () => review.setSetting(option.id, input.checked));
     return el("label", { className: "lz-toggle", children: [input, el("span", { text: option.label })] });
   }
   return el("div", {
     className: "lz-option",
     children: [
       el("p", { className: "lz-option__label", text: option.label }),
-      chips(option, value),
+      chips(review, option, value),
       option.hint ? el("p", { className: "lz-hint", text: option.hint }) : null,
     ],
   });
 }
 
-function layoutVerdicts() {
+function layoutVerdicts(review) {
+  const { lab } = review;
   return el("div", {
     className: "lz-layouts",
-    children: LAYOUTS.map((layout) =>
+    children: review.spec.layouts.map((layout) =>
       el("div", {
         className: "lz-layout",
         attrs: { "data-current": String(lab.settings.layout === layout.id) },
         children: [
           el("p", { className: "lz-layout__name", text: layout.label }),
           el("p", { className: "lz-hint", text: layout.hint }),
-          verdictButtons(layout.id, { withNote: true }),
+          verdictButtons(review, layout.id, { withNote: true }),
         ],
       }),
     ),
   });
 }
 
-function noteField(section) {
-  const existing = lab.notes[section.id] ?? "";
+function noteField(review, section) {
+  const existing = review.lab.notes[section.id] ?? "";
   const area = el("textarea", {
     className: "lz-input lz-note",
     text: existing,
     attrs: { rows: "2", placeholder: `What you like or don't about ${section.label.toLowerCase()}…` },
   });
-  area.addEventListener("change", () => setNote(section.id, area.value));
+  area.addEventListener("change", () => review.setNote(section.id, area.value));
   return el("details", {
     className: "lz-note__wrap",
     attrs: { open: existing ? true : null },
@@ -133,7 +123,7 @@ function noteField(section) {
   });
 }
 
-function section(def, openIds) {
+function section(review, def, openIds) {
   return el("details", {
     className: "lz-section",
     attrs: { open: openIds.has(def.id) ? true : null, "data-section": def.id },
@@ -142,30 +132,31 @@ function section(def, openIds) {
       el("div", {
         className: "lz-section__body",
         children: [
-          ...def.options.map(control),
-          def.id === "layout" ? layoutVerdicts() : null,
-          noteField(def),
+          ...def.options.map((option) => control(review, option)),
+          def.id === "layout" ? layoutVerdicts(review) : null,
+          noteField(review, def),
         ],
       }),
     ],
   });
 }
 
-function combos() {
+function combos(review) {
+  const { lab } = review;
   const name = el("input", { className: "lz-input", attrs: { type: "text", placeholder: "Name this combination" } });
   const add = el("button", { className: "lz-button", text: "Save", attrs: { type: "button" } });
-  add.addEventListener("click", () => saveCombo(name.value.trim()));
+  add.addEventListener("click", () => review.saveCombo(name.value.trim()));
   const list = el("ol", {
     className: "lz-combos",
     children: lab.combos.map((combo, index) => {
       const apply = el("button", { className: "lz-link", text: combo.name, attrs: { type: "button", title: "Use this combination" } });
-      apply.addEventListener("click", () => applySettings(combo.settings));
+      apply.addEventListener("click", () => review.applySettings(combo.settings));
       const remove = el("button", {
         className: "lz-link lz-link--muted",
         attrs: { type: "button", "aria-label": `Remove ${combo.name}` },
         children: [iconNode("close", { size: 12 })],
       });
-      remove.addEventListener("click", () => removeCombo(index));
+      remove.addEventListener("click", () => review.removeCombo(index));
       return el("li", { children: [apply, remove] });
     }),
   });
@@ -180,13 +171,14 @@ function combos() {
   });
 }
 
-function exporter(report, count) {
+function exporter(review, report, count) {
+  const { lab } = review;
   const general = el("textarea", {
     className: "lz-input lz-note",
     text: lab.general ?? "",
     attrs: { rows: "3", placeholder: "Anything else — what to keep, what to drop, what's missing…" },
   });
-  general.addEventListener("change", () => setGeneral(general.value));
+  general.addEventListener("change", () => review.setGeneral(general.value));
 
   const copy = el("button", {
     className: "lz-button lz-button--primary",
@@ -194,8 +186,8 @@ function exporter(report, count) {
     children: [iconNode("copy", { size: 14 }), el("span", { text: "Copy feedback" })],
   });
   copy.addEventListener("click", async () => {
-    setGeneral(general.value);
-    const text = feedbackMarkdown(lab, { count: count() });
+    review.setGeneral(general.value);
+    const text = feedbackMarkdown(review, { count: count() });
     try {
       await navigator.clipboard.writeText(text);
       report("Feedback copied — paste it into the chat.");
@@ -206,8 +198,8 @@ function exporter(report, count) {
   });
   const download = el("button", { className: "lz-button", text: "Download .md", attrs: { type: "button" } });
   download.addEventListener("click", () => {
-    setGeneral(general.value);
-    const blob = new Blob([feedbackMarkdown(lab, { count: count() })], { type: "text/markdown" });
+    review.setGeneral(general.value);
+    const blob = new Blob([feedbackMarkdown(review, { count: count() })], { type: "text/markdown" });
     const link = el("a", { attrs: { href: URL.createObjectURL(blob), download: "recordings-lab-feedback.md" } });
     link.click();
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
@@ -215,17 +207,33 @@ function exporter(report, count) {
   const text = el("pre", { className: "lz-preview" });
   const preview = el("details", { className: "lz-note__wrap", children: [el("summary", { text: "Preview the text" }), text] });
   preview.addEventListener("toggle", () => {
-    if (preview.open) text.textContent = feedbackMarkdown(lab, { count: count() });
+    if (preview.open) text.textContent = feedbackMarkdown(review, { count: count() });
   });
   const reset = el("button", { className: "lz-link lz-link--muted", text: "Start the review over", attrs: { type: "button" } });
   reset.addEventListener("click", () => {
-    if (window.confirm("Clear every setting, verdict, note and saved combination?")) resetReview();
+    if (window.confirm("Clear every setting, verdict, note and saved combination?")) review.resetReview();
+  });
+
+  const decision = el("div", {
+    className: "lz-chips",
+    attrs: { role: "radiogroup", "aria-label": "Your decision on this round" },
+    children: Object.entries(DECISIONS).map(([id, label]) => {
+      const chip = el("button", {
+        className: `lz-chip lz-chip--${id}`,
+        text: label,
+        attrs: { type: "button", role: "radio", "aria-checked": String(lab.decision === id) },
+      });
+      chip.addEventListener("click", () => review.setDecision(id));
+      return chip;
+    }),
   });
 
   return el("section", {
     className: "lz-block lz-block--export",
     children: [
       el("h3", { className: "lz-block__title", text: "Send it back" }),
+      el("p", { className: "lz-option__label", text: "Your decision on this round" }),
+      decision,
       general,
       el("div", { className: "lz-row", children: [copy, download] }),
       preview,
@@ -240,7 +248,7 @@ function exporter(report, count) {
  * @param {HTMLElement} root
  * @param {{ report: (message: string) => void, count: () => number, onClose: () => void }} hooks
  */
-export function renderCustomizer(root, { report, count, onClose }) {
+export function renderCustomizer(root, review, { report, count = () => null, onClose }) {
   const openIds = new Set(
     [...root.querySelectorAll(".lz-section[open]")].map((node) => node.dataset.section),
   );
@@ -256,7 +264,7 @@ export function renderCustomizer(root, { report, count, onClose }) {
 
   const body = el("div", {
     className: "lz-scroll",
-    children: [...SECTIONS.map((def) => section(def, openIds)), combos(), exporter(report, count)],
+    children: [...review.spec.sections.map((def) => section(review, def, openIds)), combos(review), exporter(review, report, count)],
   });
   root.replaceChildren(
     el("header", {

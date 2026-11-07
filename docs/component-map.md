@@ -40,7 +40,8 @@ web/frontend/
     │   ├── base.css            resets and element defaults
     │   ├── layout.css          the application frame and standalone pages
     │   ├── components/         one stylesheet per component
-    │   └── labs/               the recordings lab: page, cards, detail, panel (D-080)
+    │   └── labs/               theme (accent and corners, shared), then each lab's sheets
+    │                           (D-080)
     └── js/
         ├── main.js             the application page's entry point
         ├── session-start.js    opening the record sheet and starting what it chose (D-075)
@@ -56,8 +57,10 @@ web/frontend/
         ├── stores/             state: transcript, polish, session, mode, health, config, chat,
         │                       capture, export
         ├── components/         one class per region, plus settings/ per tab
-        ├── labs/               the recordings lab (D-080): options as data, the card and
-        │                       detail renderers, the customize panel, the feedback export
+        ├── labs/               the labs (D-080): review.js (settings, verdicts, notes, the
+        │                       decision) and the customize panel and export, shared; then
+        │                       each lab's options as data and its renderers — sessions.js
+        │                       for the recordings lab, main.js for the main screen
         └── a11y/               the focus trap
 ```
 

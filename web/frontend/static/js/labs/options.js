@@ -301,59 +301,33 @@ export const SECTIONS = [
   },
 ];
 
+/**
+ * The owner's first-round choice ("My Actual Preference", 2026-11-07) — the starting point for
+ * the second round. Radish is the accent only; surfaces stay graphite.
+ */
 export const DEFAULTS = {
-  layout: "gallery",
-  size: "m",
-  density: "cozy",
-  group: "none",
+  layout: "wide",
+  size: "s",
+  density: "airy",
+  group: "day",
   header: "slim",
   stickyHeader: true,
   title: "keywords",
   date: "smart",
-  datePlace: "under",
+  datePlace: "image",
   snippet: false,
-  thumb: "preview",
+  thumb: "strip",
   scrub: true,
-  noVideo: "words",
-  ratio: "wide",
+  noVideo: "tint",
+  ratio: "photo",
   mediaStyle: "overlay",
   showMissing: true,
-  stats: ["duration"],
-  actionStyle: "bar",
+  stats: ["duration", "words", "size"],
+  actionStyle: "hover",
   primaryLabel: "main",
   quick: ["transcript", "folder"],
-  detail: "drawer",
-  accent: "teal",
-  surface: "outline",
-  radius: "soft",
+  detail: "sheet",
+  accent: "radish",
+  surface: "raised",
+  radius: "round",
 };
-
-/** Every option by id, for looking up a label from a stored value. */
-export const OPTIONS = Object.fromEntries(
-  SECTIONS.flatMap((section) => section.options.map((option) => [option.id, { ...option, section }])),
-);
-
-/** "Keywords from the transcript" for `title=keywords`; joined labels for a multi. */
-export function describeValue(id, value) {
-  const option = OPTIONS[id];
-  if (!option) return String(value);
-  if (option.kind === "toggle") return value ? "On" : "Off";
-  const label = (choice) => option.choices.find((c) => c.id === choice)?.label ?? choice;
-  if (option.kind === "multi") return value.length ? value.map(label).join(", ") : "None";
-  return label(value);
-}
-
-/** Stored settings, with anything missing or no longer offered put back to its default. */
-export function sanitize(stored = {}) {
-  const settings = { ...DEFAULTS };
-  for (const [id, value] of Object.entries(stored ?? {})) {
-    const option = OPTIONS[id];
-    if (!option) continue;
-    if (option.kind === "toggle" && typeof value === "boolean") settings[id] = value;
-    if (option.kind === "choice" && option.choices.some((c) => c.id === value)) settings[id] = value;
-    if (option.kind === "multi" && Array.isArray(value)) {
-      settings[id] = value.filter((v) => option.choices.some((c) => c.id === v));
-    }
-  }
-  return settings;
-}

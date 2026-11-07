@@ -10,7 +10,7 @@ import { el } from "../core/dom.js";
 import { verdictButtons } from "./customizer.js";
 import { iconNode } from "./icons.js";
 import { LAYOUTS } from "./options.js";
-import { lab, setSetting } from "./state.js";
+import { lab, review, setSetting } from "./state.js";
 
 export const FILTERS = [
   ["all", "All"],
@@ -119,7 +119,7 @@ export function renderToolbar(root, view, hooks) {
         brand,
         el("span", { className: "lt-spacer" }),
         layouts,
-        el("span", { className: "lt-rate", attrs: { title: "Your verdict on this layout" }, children: [verdictButtons(lab.settings.layout)] }),
+        el("span", { className: "lt-rate", attrs: { title: "Your verdict on this layout" }, children: [verdictButtons(review, lab.settings.layout)] }),
         customize,
       ],
     }),

@@ -17,14 +17,14 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  border: 1px solid var(--border-default);
+  border: 1px solid var(--lab-line);
   border-radius: var(--r);
-  background: var(--surface-raised);
+  background: var(--lab-raised);
   cursor: pointer;
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
 }
-.lc-card:hover { border-color: var(--border-strong); }
+.lc-card:hover { border-color: var(--lab-line-strong); }
 .lc-card:focus-visible { box-shadow: 0 0 0 2px var(--lab-accent); }
 .lc-card:focus-within { z-index: 2; }
 .lc-card[data-selected="true"] {
@@ -34,14 +34,14 @@
 
 .lab[data-surface="raised"] .lc-card {
   border-color: transparent;
-  background: var(--surface-panel);
+  background: var(--lab-panel);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 10px 28px rgba(0, 0, 0, 0.38);
 }
 .lab[data-surface="flat"] .lc-card {
   border-color: transparent;
   background: transparent;
 }
-.lab[data-surface="flat"] .lc-card:hover { background: var(--surface-raised); }
+.lab[data-surface="flat"] .lc-card:hover { background: var(--lab-raised); }
 
 /* -- the picture ------------------------------------------------------------------------------- */
 
@@ -104,7 +104,7 @@ img.lc-thumb__art,
   place-items: start;
   padding: 14px 16px;
   padding-top: 14px;
-  background: linear-gradient(170deg, #161b1d, #0c0f10);
+  background: linear-gradient(170deg, var(--lab-control), var(--lab-raised));
 }
 .lc-placeholder--words p {
   margin: 0;
@@ -114,7 +114,7 @@ img.lc-thumb__art,
   mask-image: linear-gradient(180deg, #000 55%, transparent 98%);
 }
 .lc-placeholder--wave {
-  background: radial-gradient(120% 90% at 50% 100%, var(--lab-accent-wash), transparent 70%), #0c1011;
+  background: radial-gradient(120% 90% at 50% 100%, var(--lab-accent-wash), transparent 70%), var(--lab-raised);
   color: color-mix(in srgb, var(--lab-accent) 70%, transparent);
 }
 .lc-placeholder--wave svg { width: 82%; height: 58%; }
@@ -125,7 +125,7 @@ img.lc-thumb__art,
 .lc-placeholder--icon {
   background:
     repeating-linear-gradient(135deg, transparent 0 9px, rgba(255, 255, 255, 0.018) 9px 10px),
-    #0e1213;
+    var(--lab-raised);
 }
 
 .lc-thumb__media {
@@ -237,20 +237,20 @@ img.lc-thumb__art,
   gap: 6px;
   height: 30px;
   padding: 0 10px;
-  border: 1px solid var(--border-control);
+  border: 1px solid var(--lab-line-control);
   border-radius: min(var(--r), 8px);
-  background: var(--surface-control);
+  background: var(--lab-control);
   color: var(--text-secondary);
   font: 500 12px var(--font-ui);
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
 }
-.lc-btn:hover { background: var(--surface-control-hover); color: var(--text-primary); }
+.lc-btn:hover { background: var(--lab-control-hover); color: var(--text-primary); }
 .lc-btn:focus-visible { outline: 2px solid var(--lab-accent); outline-offset: 1px; }
 .lc-btn--icon { width: 30px; padding: 0; }
 .lc-btn--icon:not(.lc-btn--primary) { border-color: transparent; background: transparent; color: var(--text-muted); }
-.lc-btn--icon:not(.lc-btn--primary):hover { background: var(--surface-control-hover); color: var(--text-primary); }
+.lc-btn--icon:not(.lc-btn--primary):hover { background: var(--lab-control-hover); color: var(--text-primary); }
 .lc-btn--compact { height: 28px; padding: 0 9px; font-size: 11.5px; }
 .lc-btn--primary {
   border-color: var(--lab-accent-line);
@@ -268,7 +268,7 @@ img.lc-thumb__art,
 .lc-btn[aria-disabled="true"]:hover {
   background: transparent;
   color: var(--text-faint);
-  border-color: var(--border-default);
+  border-color: var(--lab-line);
   cursor: not-allowed;
 }
 
@@ -281,11 +281,12 @@ img.lc-thumb__art,
   font-weight: 600;
 }
 
-/* "Icons appear on hover": the whole row floats over the picture's top-right corner. */
+/* "Icons appear on hover": the whole row floats in the card's bottom-right corner, clear of the
+ * title and of the icons on the picture (the owner's note on the first review). */
 .lab[data-actions="hover"] .lc-actions {
   position: absolute;
-  top: 7px;
-  right: 7px;
+  right: 8px;
+  bottom: 8px;
   margin: 0;
   padding: 3px;
   gap: 2px;
@@ -310,9 +311,9 @@ img.lc-thumb__art,
   z-index: 30;
   min-width: 216px;
   padding: 5px;
-  border: 1px solid var(--border-control);
+  border: 1px solid var(--lab-line-control);
   border-radius: 10px;
-  background: var(--surface-panel);
+  background: var(--lab-panel);
   box-shadow: var(--shadow-popover);
   cursor: default;
 }
@@ -340,10 +341,10 @@ img.lc-thumb__art,
   cursor: pointer;
 }
 .lc-menu__item:hover,
-.lc-menu__item:focus-visible { outline: none; background: var(--surface-control-hover); color: var(--text-primary); }
+.lc-menu__item:focus-visible { outline: none; background: var(--lab-control-hover); color: var(--text-primary); }
 .lc-menu__item--danger { color: var(--danger-text); }
 .lc-menu__item[aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
-.lc-menu__rule { margin: 5px 2px; border: 0; border-top: 1px solid var(--border-default); }
+.lc-menu__rule { margin: 5px 2px; border: 0; border-top: 1px solid var(--lab-line); }
 
 /* -- Tiles: the picture is the card ------------------------------------------------------------- */
 
@@ -392,15 +393,24 @@ img.lc-thumb__art,
   border-radius: calc(var(--r) - 1px) 0 0 calc(var(--r) - 1px);
 }
 .lab[data-layout="wide"] .lc-snippet { -webkit-line-clamp: 4; }
+/* Three side-by-side frames in a picture this narrow are three slivers; one large and two small
+ * keeps each recognisable. */
+.lab[data-layout="wide"] .lc-strip {
+  grid-template-columns: 2fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+.lab[data-layout="wide"] .lc-strip img:first-child { grid-row: 1 / 3; }
+/* The hover buttons sit over the text side; keep the last lines of text clear of them. */
+.lab[data-layout="wide"][data-actions="hover"] .lc-body { padding-bottom: 46px; }
 
 /* -- Slim list: today's rows, done properly ----------------------------------------------------- */
 
 .lab[data-layout="list"] .lg-grid {
   grid-template-columns: 1fr;
   gap: 0;
-  border: 1px solid var(--border-default);
+  border: 1px solid var(--lab-line);
   border-radius: var(--r);
-  background: var(--surface-raised);
+  background: var(--lab-raised);
 }
 .lab[data-layout="list"] .lc-card {
   flex-direction: row;
@@ -408,14 +418,14 @@ img.lc-thumb__art,
   gap: 14px;
   padding: 7px 10px;
   border: 0;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--lab-line-subtle);
   border-radius: 0;
   background: transparent;
   box-shadow: none;
 }
 .lab[data-layout="list"] .lc-card:last-child { border-bottom: 0; }
-.lab[data-layout="list"] .lc-card:hover { background: var(--surface-panel); }
-.lab[data-layout="list"] .lc-card[data-selected="true"] { box-shadow: inset 2px 0 0 var(--lab-accent); background: var(--surface-panel); }
+.lab[data-layout="list"] .lc-card:hover { background: var(--lab-panel); }
+.lab[data-layout="list"] .lc-card[data-selected="true"] { box-shadow: inset 2px 0 0 var(--lab-accent); background: var(--lab-panel); }
 .lab[data-layout="list"] .lc-thumb { flex: none; width: 92px; aspect-ratio: 16 / 9; border-radius: 6px; }
 .lab[data-layout="list"] .lc-thumb__media,
 .lab[data-layout="list"] .lc-thumb__length,
@@ -429,7 +439,7 @@ img.lc-thumb__art,
 .lab[data-layout="list"] .lc-snippet { display: none; }
 .lab[data-layout="list"] .lc-stats { flex: none; width: 140px; }
 .lab[data-layout="list"] .lc-actions { flex: none; margin: 0; padding: 0; }
-.lab[data-layout="list"][data-actions="hover"] .lc-actions { top: 50%; transform: translateY(-50%); }
+.lab[data-layout="list"][data-actions="hover"] .lc-actions { bottom: 50%; transform: translateY(50%); }
 
 @media (max-width: 860px) {
   .lab[data-layout="list"] .lc-body { flex-wrap: wrap; gap: 4px 12px; }

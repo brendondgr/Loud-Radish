@@ -16,7 +16,7 @@ import { renderCustomizer } from "./customizer.js";
 import { renderDetail } from "./detail.js";
 import { cardTitle, groupOf, startedAt } from "./describe.js";
 import { LAYOUTS } from "./options.js";
-import { lab, setSetting, subscribe } from "./state.js";
+import { lab, review, setSetting, subscribe } from "./state.js";
 import { FILTERS, matchesFilter, renderToolbar } from "./toolbar.js";
 
 const root = $("[data-lab]");
@@ -270,7 +270,7 @@ function togglePanel() {
 }
 
 function drawPanel() {
-  renderCustomizer(panel, { report, count: () => visible().length, onClose: togglePanel });
+  renderCustomizer(panel, review, { report, count: () => visible().length, onClose: togglePanel });
 }
 
 // -- what each recording is about, fetched as cards come into view ------------------------------
