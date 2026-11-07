@@ -45,6 +45,8 @@ Served by `web/backend/app/routes/`. All paths are prefixed `/api`.
 | `POST` | `/api/session/stop` | End the session and return final statistics | **Implemented** |
 | `POST` | `/api/session/pause` | Hold the capture; the recording and the clock stop together (D-044) | **Implemented** |
 | `POST` | `/api/session/resume` | Continue a held capture, in the same session, file and store | **Implemented** |
+| `GET` | `/api/session/mix` | The running mix: each input's volume, mute, level, and whether it is delivering (D-081). `409 no-session` when nothing records | **Implemented** |
+| `PATCH` | `/api/session/mix` | Change inputs' volume (0–100) or mute while recording: `{"inputs": {"microphone": {"volume": 40}, "window": {"muted": true}}}`. All or nothing; `422 unknown-input` for a sound the run does not have; takes effect on the next 32 ms frame, ramped | **Implemented** |
 | `POST` | `/api/session/cancel` | End the session and transcribe nothing; every artefact is kept | **Implemented** |
 | `POST` | `/api/session/toggle` | Start if idle, stop if running — one call, because a keystroke cannot know which (D-024) | **Implemented** |
 | `GET` | `/api/session` | Current session state and metadata | **Implemented** |

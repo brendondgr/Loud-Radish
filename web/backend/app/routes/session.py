@@ -17,6 +17,7 @@ from ..schemas.api import (
     AsrModelsResponse,
     DeviceListResponse,
     LoadModelRequest,
+    MixChangeRequest,
     SelectDeviceRequest,
     SessionPromptRequest,
     SessionResponse,
@@ -176,6 +177,33 @@ async def stop_session(request: Request) -> dict[str, Any]:
     except SessionError as exc:
         raise HTTPException(status_code=409, detail=_error("no-session", str(exc))) from exc
     return {"session_id": session_id, "stats": stats.as_dict()}
+
+
+@router.get("/session/mix")
+async def get_mix(request: Request) -> dict[str, Any]:
+    """The running mix: each input's volume, mute, level and whether it is delivering (D-081)."""
+    state = _manager(request).mix_state()
+    if state is None:
+        raise HTTPException(
+            status_code=409, detail=_error("no-session", "No session is recording.")
+        )
+    return state
+
+
+@router.patch("/session/mix")
+async def change_mix(request: Request, body: MixChangeRequest) -> dict[str, Any]:
+    """Change inputs' volume or mute while recording. Takes effect on the next frame, ramped."""
+    manager = _manager(request)
+    changes = {name: change.model_dump(exclude_none=True) for name, change in body.inputs.items()}
+    try:
+        return manager.set_levels(changes)
+    except SessionError as exc:
+        raise HTTPException(status_code=409, detail=_error("no-session", str(exc))) from exc
+    except KeyError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=_error("unknown-input", f"This recording has no {exc.args[0]} sound to change."),
+        ) from exc
 
 
 @router.post("/session/pause", response_model=SessionResponse)

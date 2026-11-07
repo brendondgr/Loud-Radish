@@ -76,6 +76,19 @@ class CaptureOptions(_Model):
         return not (self.live_transcription or self.post_transcription or video)
 
 
+class MixInputChange(_Model):
+    """One input's new setting. Either field may be left out to keep what it is."""
+
+    volume: int | None = Field(default=None, ge=0, le=100)
+    muted: bool | None = None
+
+
+class MixChangeRequest(_Model):
+    """Volume and mute changes for a running mix, by input name (D-081)."""
+
+    inputs: dict[Literal["window", "system", "microphone"], MixInputChange] = Field(min_length=1)
+
+
 class StartSessionRequest(_Model):
     """Optional metadata for a new session. Everything else comes from configuration."""
 

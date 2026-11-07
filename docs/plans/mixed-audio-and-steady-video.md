@@ -1,6 +1,6 @@
 # Mixed Audio and Steady Video
 
-**Status:** In progress (3 / 7 phases). Branch: `feature/mixed-audio-steady-video`.
+**Status:** In progress (4 / 7 phases). Branch: `feature/mixed-audio-steady-video`.
 
 ## 1. Introduction
 
@@ -283,6 +283,17 @@ recording; the set of inputs is fixed when recording starts.
   > sound and a microphone together, keeping the mix and each input's own track.*
 
 ### Phase 4 — Live sound controls in the API
+
+> **Status: ✅ Complete.** As planned, plus:
+> - **The event wiring lives in a new `static/js/mixing.js`** rather than in `main.js`, which is at
+>   700 lines.
+> - **`mix.levels` is retracted on stop or cancel**, like the other live figures, so a page opened
+>   afterwards is not shown a moving meter for a recording that has ended.
+> - **Measured in the tests:** muting mid-run silences everything after that point in both
+>   `audio.wav` and that input's track, and a volume of 25 % measured 25 % (within 10 %).
+> - **Checked in the browser (:8412):** the store adopted the mix on `session.started` and the
+>   meters moved. Three quick changes went out as two `PATCH`es and arrived with the final value
+>   (20 %, muted). The store cleared itself on stop.
 
 - **Locations:**
   - `web/backend/app/routes/session.py`:

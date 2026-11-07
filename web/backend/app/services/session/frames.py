@@ -126,6 +126,11 @@ class FramePathMixin:
             return
         self._last_level_emit = now
         self._emit("audio.level", self._meter.update(frame).as_event())
+        # Each input's own meter, on the same throttle, when there is more than one to tell apart
+        # (D-081). With one input `audio.level` already is its meter.
+        mix = self._mix
+        if mix is not None and len(mix.names) > 1:
+            self._emit("mix.levels", {"levels": mix.levels()})
 
     def _handle_frame(self, frame: CapturedFrame) -> None:
         """Called on the ASR worker thread. This is the expensive one, and it may block."""

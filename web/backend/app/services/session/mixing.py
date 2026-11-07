@@ -18,6 +18,7 @@ from ..audio.mixer import InputLevel
 from ..audio.sources import MixedSource, MixInput
 from ..recording import SinkError, WavSink, layout_for
 from . import degradation
+from .shapes import SessionError
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +100,33 @@ class MixingMixin:
         """One input stopped and the rest are still recording. Said once, plainly."""
         self._emit_failure(degradation.audio_input_lost(name, str(error) if error else ""))
         self._emit("mix.changed", self.mix_state() or {})
+
+    # -- changing it while recording ------------------------------------------------------
+
+    def set_levels(self, changes: dict[str, dict[str, Any]]) -> dict[str, Any]:
+        """Change inputs' volume or mute mid-recording, and tell every open page (D-081).
+
+        All or nothing: every input is checked before any is changed, so a request naming one
+        input the run does not have changes none of them — half a change is a mix nobody asked for.
+
+        Raises:
+            SessionError: when nothing is recording.
+            KeyError: for an input this run does not have.
+        """
+        mix = self._mix
+        if mix is None or not self.is_running:
+            raise SessionError("No session is recording.")
+        unknown = [name for name in changes if name not in mix.names]
+        if unknown:
+            raise KeyError(unknown[0])
+        for name, change in changes.items():
+            level = mix.set_level(name, volume=change.get("volume"), muted=change.get("muted"))
+            logger.info(
+                "Mix input %s set to %d%%%s", name, level.volume, " (muted)" if level.muted else ""
+            )
+        state = self.mix_state() or {}
+        self._emit("mix.changed", state)
+        return state
 
     # -- what the interface reads --------------------------------------------------------
 

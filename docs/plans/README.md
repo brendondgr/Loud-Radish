@@ -42,7 +42,7 @@ conventions in [../skills/planner/SKILL.md](../skills/planner/SKILL.md).
 | [gpu-fault-isolation.md](gpu-fault-isolation.md) | Two recordings killed by a GPU memory fault: the speech model in its own supervised process, turns on a GPU shared with a local language model, no reasoning on any request, and a video recorder that finalises when the server dies | **Complete (5 / 5)** |
 | [unified-record-sheet.md](unified-record-sheet.md) | The Live / Recorded / Window switch replaced by one record sheet behind Start recording: what to record, which input, when to transcribe, and video — with capture options honoured in every mode | **Complete (6 / 6)** |
 | [recordings-on-the-main-screen.md](recordings-on-the-main-screen.md) | Bring a past recording back to the main screen to ask about it; transcribe audio- or video-only recordings (and media folders with no database) only on the user's approval; one recording window in place of several Export buttons | **Complete (6 / 6)** |
-| [mixed-audio-and-steady-video.md](mixed-audio-and-steady-video.md) | A window's sound and the microphone recorded together, with live 0–100 % volume and mute per input; and one fixed video canvas so resizing or moving a window no longer stalls the recording | In progress (3 / 7) |
+| [mixed-audio-and-steady-video.md](mixed-audio-and-steady-video.md) | A window's sound and the microphone recorded together, with live 0–100 % volume and mute per input; and one fixed video canvas so resizing or moving a window no longer stalls the recording | In progress (4 / 7) |
 
 ## The multi-mode expansion
 

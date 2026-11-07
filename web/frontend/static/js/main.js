@@ -23,6 +23,7 @@ import { SettingsModal } from "./components/settings-modal.js";
 import { StatusBar } from "./components/status-bar.js";
 import { TranscriptPane } from "./components/transcript-pane.js";
 import { ApiError, api } from "./transport/api.js";
+import { wireMix } from "./mixing.js";
 import { wireViewing } from "./viewing.js";
 import {
   ASR_PROGRESS,
@@ -134,6 +135,7 @@ function boot() {
   wireHealth();
   wireRecording(banners);
   wireExport();
+  wireMix();
   wireSession(header);
   wireControls(pane);
   wireChat(chatPane);
