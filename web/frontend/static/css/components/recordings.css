@@ -1,0 +1,624 @@
+/* The Recordings page (D-085): the slim bar, the day groups, and the wide cards.
+ *
+ * Ported from the recordings lab (D-082) with only the owner's choices kept: wide cards, small and
+ * airy, grouped by day, a filmstrip that skims, a colour for the time of day where there is no
+ * video, the media icons and the date on the picture, and the buttons on hover in the card's
+ * bottom-right corner. Radish is the accent only; every surface is the graphite it always was.
+ */
+
+.recordings {
+  --card-min: 200px;
+  --gap: 24px;
+  --pad: 16px;
+
+  scrollbar-gutter: stable;
+  background: var(--surface-base);
+  font-family: var(--font-ui);
+}
+
+/* -- the bar --------------------------------------------------------------------------------- */
+
+.rbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 9px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--surface-base) 88%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+/* The drawn controls sit in the bar's own row, after the heading. */
+.rbar__controls {
+  display: contents;
+}
+
+.rbar__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.rbar__brand img {
+  padding: 1px;
+  border-radius: 50%;
+  background: var(--brand-cream);
+}
+
+.rbar__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.rbar__count {
+  font: var(--text-xs) var(--font-mono);
+  color: var(--text-faint);
+}
+
+.rbar__spacer {
+  flex: 1;
+}
+
+.rbar__search {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 1 200px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-control);
+  background: var(--surface-input);
+  color: var(--text-faint);
+}
+
+.rbar__search:focus-within {
+  border-color: var(--accent-line);
+}
+
+.rbar__search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: 12.5px var(--font-ui);
+  outline: none;
+}
+
+.rbar__filters {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: var(--surface-raised);
+}
+
+.rbar__filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  font: 500 12px var(--font-ui);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.rbar__filter:hover {
+  color: var(--text-primary);
+}
+
+.rbar__filter[aria-checked="true"] {
+  background: var(--surface-control-hover);
+  color: var(--text-primary);
+}
+
+.rbar__filter:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.rbar__filter-count {
+  font: 10.5px var(--font-mono);
+  color: var(--text-faint);
+}
+
+.rbar__sort {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-control);
+  background: var(--surface-input);
+  color: var(--text-secondary);
+  font: 12px var(--font-ui);
+}
+
+/* -- groups ------------------------------------------------------------------------------------ */
+
+.recordings__list {
+  padding: 16px 20px 48px;
+}
+
+.rgroup + .rgroup {
+  margin-top: 26px;
+}
+
+.rgroup__label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.rgroup__count {
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-control);
+  color: var(--text-faint);
+  font: 10.5px/18px var(--font-mono);
+}
+
+.rgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(var(--card-min) * 1.9)), 1fr));
+  gap: var(--gap);
+}
+
+.recordings__empty {
+  margin: 48px auto;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.recordings__status {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  z-index: 60;
+  max-width: min(520px, calc(100vw - 40px));
+  margin: 0;
+  padding: 9px 13px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-control);
+  background: var(--surface-control);
+  box-shadow: var(--shadow-popover);
+  color: var(--text-primary);
+  font-size: 12.5px;
+}
+
+/* -- the card ---------------------------------------------------------------------------------- */
+
+.rcard {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-card);
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-raised);
+  cursor: pointer;
+  outline: none;
+  transition: border-color var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+}
+
+.rcard:hover {
+  border-color: var(--border-strong);
+}
+
+.rcard:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent), var(--shadow-raised);
+}
+
+.rcard:focus-within {
+  z-index: 2;
+}
+
+/* -- its picture: 40% of the card, as tall as the card ------------------------------------------- */
+
+.rcard__thumb {
+  position: relative;
+  flex: none;
+  align-self: stretch;
+  width: 40%;
+  min-height: 150px;
+  overflow: hidden;
+  border-radius: calc(var(--radius-card) - 1px) 0 0 calc(var(--radius-card) - 1px);
+  background: #050607;
+}
+
+img.rcard__art,
+.rcard__strip img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+}
+
+/* Three side-by-side frames in a picture this narrow are three slivers; one large and two small
+ * keeps each recognisable. */
+.rcard__strip {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 1px;
+  height: 100%;
+}
+
+.rcard__strip img:first-child {
+  grid-row: 1 / 3;
+}
+
+.rcard__skim {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.14);
+  opacity: 0;
+  transition: opacity var(--duration-fast) ease;
+}
+
+.rcard__skim::after {
+  content: "";
+  position: absolute;
+  left: var(--at, 6.25%);
+  width: 12.5%;
+  height: 100%;
+  transform: translateX(-50%);
+  background: var(--accent);
+}
+
+.rcard__thumb:hover .rcard__skim {
+  opacity: 1;
+}
+
+/* No video: a colour for the time of day, dawn amber to night blue. */
+.rcard__tint {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(140deg, hsl(var(--hue) 32% 22%), hsl(calc(var(--hue) + 35) 26% 11%));
+  color: hsl(var(--hue) 45% 74%);
+}
+
+.rcard__media {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+}
+
+.rcard__media .rmedia {
+  gap: 7px;
+  padding: 4px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(7, 9, 10, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.rcard__media .rmedia__item {
+  color: #f1eee7;
+}
+
+.rcard__length,
+.rcard__date {
+  position: absolute;
+  bottom: 8px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(7, 9, 10, 0.78);
+  color: #f1eee7;
+  font-size: 11px;
+}
+
+.rcard__length {
+  right: 8px;
+  font-family: var(--font-mono);
+}
+
+.rcard__date {
+  left: 8px;
+}
+
+/* -- what the card says ------------------------------------------------------------------------ */
+
+.rmedia {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.rmedia__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+}
+
+.rmedia__item[data-present="false"] {
+  opacity: 0.3;
+}
+
+.rcard__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  /* The hover buttons sit over the text side; the last lines stay clear of them. */
+  padding: var(--pad) var(--pad) 46px;
+}
+
+.rcard__title {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.32;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.rcard__auto {
+  margin-right: 5px;
+  color: var(--accent);
+  vertical-align: -1px;
+}
+
+.rcard__badge {
+  align-self: flex-start;
+  padding: 3px 9px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-pill);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.rcard__said {
+  display: -webkit-box;
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.rcard__said--problem {
+  color: var(--warning-text);
+}
+
+.rcard__stats {
+  margin: 0;
+  color: var(--text-faint);
+  font: 11px var(--font-mono);
+}
+
+/* -- buttons: on hover, in the card's bottom-right corner (the owner's note) ------------------ */
+
+.rcard__actions {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-control);
+  background: rgba(7, 9, 10, 0.82);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: opacity var(--duration-fast) ease;
+}
+
+.rcard:hover .rcard__actions,
+.rcard:focus-within .rcard__actions {
+  opacity: 1;
+}
+
+/* Touch screens have no hover: the buttons are always there. */
+@media (hover: none) {
+  .rcard__actions {
+    opacity: 1;
+  }
+}
+
+.rbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border-control);
+  border-radius: 8px;
+  background: var(--surface-control);
+  color: var(--text-secondary);
+  font: 500 12px var(--font-ui);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.rbtn:hover {
+  background: var(--surface-control-hover);
+  color: var(--text-primary);
+}
+
+.rbtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.rbtn--icon {
+  width: 30px;
+  padding: 0;
+}
+
+.rbtn--icon:not(.rbtn--primary) {
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.rcard__actions .rbtn--icon:not(.rbtn--primary) {
+  color: #e9e6df;
+}
+
+.rbtn--icon:not(.rbtn--primary):hover {
+  background: var(--surface-control-hover);
+  color: var(--text-primary);
+}
+
+.rbtn--compact {
+  height: 28px;
+  padding: 0 9px;
+  font-size: 11.5px;
+}
+
+.rbtn--primary {
+  border-color: var(--accent-line);
+  background: var(--accent-wash);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.rbtn--primary:hover {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.rbtn--danger:hover {
+  border-color: var(--danger-border);
+  background: var(--danger-wash);
+  color: var(--danger-text);
+}
+
+.rbtn[aria-disabled="true"],
+.rbtn[aria-disabled="true"]:hover {
+  border-color: var(--border-default);
+  background: transparent;
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+/* -- the ⋯ menu -------------------------------------------------------------------------------- */
+
+.rmenu__wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.rmenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  min-width: 216px;
+  padding: 5px;
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-control);
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-popover);
+  cursor: default;
+}
+
+.rmenu[data-up="true"] {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
+.rmenu__heading {
+  margin: 4px 9px 3px;
+  color: var(--text-faint);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rmenu__item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-secondary);
+  font: 12.5px var(--font-ui);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.rmenu__item:hover,
+.rmenu__item:focus-visible {
+  outline: none;
+  background: var(--surface-control-hover);
+  color: var(--text-primary);
+}
+
+.rmenu__item--danger {
+  color: var(--danger-text);
+}
+
+.rmenu__item[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.rmenu__rule {
+  margin: 5px 2px;
+  border: 0;
+  border-top: 1px solid var(--border-default);
+}
+
+/* -- narrow windows ---------------------------------------------------------------------------- */
+
+@media (max-width: 860px) {
+  .rbar,
+  .recordings__list {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .rbar__filters {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .rcard {
+    flex-direction: column;
+  }
+
+  .rcard__thumb {
+    width: 100%;
+    min-height: 0;
+    aspect-ratio: 16 / 9;
+    border-radius: calc(var(--radius-card) - 1px) calc(var(--radius-card) - 1px) 0 0;
+  }
+}

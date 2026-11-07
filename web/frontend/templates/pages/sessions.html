@@ -1,33 +1,35 @@
 {% extends "base.html" %}
 
+{# The Recordings page (D-085): every recording as a wide card, grouped by day, under one slim
+   sticky bar. Drawn by /static/js/sessions.js from /api/sessions — the page is the same on a first
+   load and a reload, because every piece of data arrives over the API rather than being baked in
+   here. The markup is only the places it draws into. #}
+
 {% block title %}Recordings · {{ app_name }}{% endblock %}
 {% block entry %}sessions{% endblock %}
 
+{% block styles %}
+<link rel="stylesheet" href="/static/css/components/recordings.css" />
+<link rel="stylesheet" href="/static/css/components/recording-detail.css" />
+{% endblock %}
+
 {% block body %}
-<div class="page">
-  <header class="page__header">
-    <div>
-      <h1 class="page__title">Recordings</h1>
-      <p class="page__subtitle" data-sessions-directory></p>
-    </div>
-    <a class="button" href="/">Back to recording</a>
+<div class="page recordings" data-recordings>
+  <header class="rbar">
+    <a class="rbar__brand" href="/" title="Back to the main screen">
+      <img src="/static/{{ logo_path }}" alt="" width="20" height="20" />
+      <h1 class="rbar__title">Recordings</h1>
+    </a>
+    {# The count, search, filters and sort, drawn by recordings/toolbar.js. #}
+    <div class="rbar__controls" data-recordings-toolbar></div>
   </header>
-
-  <main class="page__body">
-    {# Rendered by JS from /api/sessions. The page is the same on a first load and a reload,
-       because every piece of data arrives over the API rather than being baked in here. #}
-    <div class="sessions" data-sessions-list role="list"></div>
-
-    <p class="sessions__empty" data-sessions-empty hidden>
-      Nothing recorded yet. Recordings appear here as soon as you stop one.
-    </p>
-
-    <p class="sessions__error" data-sessions-error hidden role="status"></p>
-  </main>
+  <main class="recordings__list" data-recordings-list aria-label="Recordings"></main>
 </div>
 
-{# Outside `.page`, so the dialog is not constrained by the layout it opens over. The same
+{# Outside `.page`, so the windows are not constrained by the layout they open over — the same
    arrangement the settings modal and the record sheet have on the live page. #}
+<div class="rdetail-host" data-recording-detail hidden></div>
+<p class="recordings__status" data-recordings-status role="status" hidden></p>
 {% include "partials/recording_window.html" %}
 {% include "partials/transcribe_consent.html" %}
 {% endblock %}

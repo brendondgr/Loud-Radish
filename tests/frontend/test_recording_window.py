@@ -1,9 +1,10 @@
-"""The recording window replaces the recordings row's export controls (D-077).
+"""The web-app export window, on both pages (D-037, D-077, D-085).
 
 Reported: a row could carry an "Export" link (the transcript) and an "Export…" button (the web
-app), two controls with the same name that did different things. These pin the shape that fixed
-it — one window, rendered on both pages, whose footer names its buttons apart — and that nothing
-still loads the component it replaced.
+app), two controls with the same name that did different things. One window fixed it (D-077); its
+overview face has since become the Recordings page's compact window (D-085), and what is left is the
+export itself. These pin that shape — one window, rendered on both pages, whose footer names its
+buttons apart — and that nothing still loads the components it replaced.
 """
 
 from __future__ import annotations
@@ -53,7 +54,8 @@ def test_both_pages_render_the_one_recording_window(pages, path) -> None:
     dialog = next(e for e in window if e.attrs.get("role") == "dialog")
     assert dialog.attrs.get("aria-modal") == "true"
     assert dialog.attrs.get("aria-labelledby")
-    assert any("data-window-overview" in e.attrs for e in window)
+    assert any("data-export-choose" in e.attrs for e in window)
+    assert not any("data-window-overview" in e.attrs for e in window), "the overview face is back"
 
 
 @pytest.mark.parametrize("path", ["/", "/sessions"])
@@ -77,14 +79,14 @@ def test_nothing_still_loads_the_replaced_component() -> None:
         assert "ExportDialog" not in text, script
 
 
-def test_the_recordings_row_no_longer_carries_exports() -> None:
-    """The row's only controls are Open… and Delete; every export is a window section."""
-    page = (FRONTEND / "static/js/sessions.js").read_text(encoding="utf-8")
-    assert "sessionExportUrl" not in page
-    assert "sessionChatUrl" not in page
-    overview = (FRONTEND / "static/js/components/recording-overview.js").read_text(encoding="utf-8")
-    assert "sessionExportUrl" in overview
-    assert "sessionChatUrl" in overview
+def test_the_overview_face_is_gone_and_the_compact_window_carries_the_exports() -> None:
+    """Every export the overview offered is in the compact window (D-085)."""
+    assert not (FRONTEND / "static/js/components/recording-overview.js").exists()
+    for script in (FRONTEND / "static/js").rglob("*.js"):
+        assert "recording-overview.js" not in script.read_text(encoding="utf-8"), script
+    actions = (FRONTEND / "static/js/recordings/actions.js").read_text(encoding="utf-8")
+    assert "sessionExportUrl" in actions
+    assert "sessionChatUrl" in actions
 
 
 def test_the_recordings_page_scrolls_itself() -> None:

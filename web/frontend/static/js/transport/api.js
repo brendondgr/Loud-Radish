@@ -241,4 +241,12 @@ export const api = {
   revealFolder: (key) => post(`/api/sessions/${encodeURIComponent(key)}/reveal`),
   /** Opening words, first summary and keywords for up to 60 recordings, keyed by session. */
   glances: (keys) => get(`/api/sessions/glance?keys=${keys.map(encodeURIComponent).join(",")}`),
+
+  // -- titles (D-084) -----------------------------------------------------------------
+  /** Give a recording the title the owner chose. */
+  renameSession: (key, title) => patch(`/api/sessions/${encodeURIComponent(key)}`, { title }),
+  /** How many recordings have no title, and which model would name them. Starts nothing. */
+  untitledPlan: () => get("/api/sessions/untitled/plan"),
+  /** Name them, one at a time, in the background. */
+  nameUntitled: () => post("/api/sessions/untitled/name"),
 };

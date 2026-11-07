@@ -1,0 +1,237 @@
+/* The Recordings page's compact window (D-085): one recording, in the space it needs.
+ *
+ * Two columns where there is room — the video, and beside it the main button, the numbers and what
+ * was said — with the downloads and file actions in one row underneath. One column on a phone.
+ */
+
+.rdetail-host {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.rdetail-host[hidden] {
+  display: none;
+}
+
+.rdetail-host__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.rdetail {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(880px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  padding: 16px;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius-card);
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-panel);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+}
+
+.rdetail__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.rdetail__head-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.rdetail__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.rdetail__title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.rdetail__name-input {
+  flex: 1 1 260px;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-control);
+  background: var(--surface-input);
+  color: var(--text-primary);
+  font: 15px var(--font-ui);
+}
+
+.rdetail__sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  margin: 5px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.rdetail__top {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+}
+
+.rdetail__player {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-control);
+  background: #000;
+}
+
+.rdetail__player--none {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px dashed var(--border-control);
+  background: var(--surface-raised);
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.rdetail__side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rdetail__use .rbtn--primary {
+  width: 100%;
+  height: 36px;
+  font-size: 13px;
+}
+
+.rdetail__reason {
+  margin: 6px 0 0;
+  color: var(--warning-text);
+  font-size: 12px;
+}
+
+.rdetail__facts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background: var(--border-default);
+}
+
+.rdetail__facts > div {
+  padding: 7px 10px;
+  background: var(--surface-raised);
+}
+
+.rdetail__facts dt {
+  color: var(--text-faint);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.rdetail__facts dd {
+  margin: 2px 0 0;
+  font: 13px var(--font-mono);
+}
+
+.rdetail__keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+.rdetail__keywords span {
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-wash);
+  color: var(--accent-bright);
+  font-size: 11.5px;
+}
+
+.rdetail__said {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-transcript);
+  font: 14.5px/1.55 var(--font-transcript);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+}
+
+.rdetail__said--none {
+  color: var(--text-faint);
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+}
+
+.rdetail__groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+}
+
+.rdetail__group:first-child {
+  flex: 1 1 320px;
+}
+
+.rdetail__group-label {
+  margin: 0 0 6px;
+  color: var(--text-faint);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.rdetail__group-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rdetail__select {
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--border-control);
+  border-radius: 8px;
+  background: var(--surface-input);
+  color: var(--text-secondary);
+  font: 11.5px var(--font-ui);
+}
+
+@media (max-width: 860px) {
+  .rdetail__top {
+    grid-template-columns: 1fr;
+  }
+
+  .rdetail__groups {
+    flex-direction: column;
+  }
+}

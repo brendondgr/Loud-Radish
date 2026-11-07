@@ -1,6 +1,6 @@
 # Recordings and Main Screen Redesign: From the Labs to the Real Pages
 
-*Written 2026-11-07. Status: **In progress (3 / 9)**. Source of truth for the target design: the
+*Written 2026-11-07. Status: **In progress (4 / 9)**. Source of truth for the target design: the
 two labs, `/labs/sessions/` and `/labs/main/` (D-082), at commit `e76a389` on branch
 `labs/sessions-cards`, and the owner's three rounds of exported feedback quoted below. This plan
 takes decisions **D-083 to D-086**. `feature/mixed-audio-steady-video` already holds D-080 and
@@ -332,6 +332,17 @@ available until Step 9 so every step can be compared against them side by side. 
   changes to GitHub stating: Recordings and Main Screen Redesign (4 / 9) Complete: The Recordings
   page is wide cards grouped by day, with pictures, model titles, hover actions and a compact
   window in place of the old one.*
+
+> **Status: ✅ Complete.** Built as planned, with these differences: the bar's heading is in the
+> template (the page needs one server-rendered `h1`) and the rest is drawn; skimming moves the large
+> frame of the filmstrip; buttons are always shown on a touch screen; the compact window also
+> carries the conversation download and the transcript version choice the overview had; a
+> recording that cannot be exported no longer opens the export window when it stops (it had only
+> the overview to show); the picker's media-chip styles moved to `viewing.css` when
+> `components/sessions.css` was deleted; and "Name *N* untitled…" in the bar is the backfill's
+> approval (Step 3). Browser QA on the scratch copy: day groups, skimming, hover buttons
+> bottom-right, the ⋯ menu, the compact window, export, transcribe approval (cancelled), rename,
+> bring to main screen, delete, and 375px.
 
 #### Step 5: The main screen's header absorbs the status bar
 

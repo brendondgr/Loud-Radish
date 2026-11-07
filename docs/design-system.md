@@ -442,8 +442,8 @@ asked about it. Nothing is transcribed without the user approving it first.
 
 ### What a recording can do
 
-Decided on the server (`SessionMedia.openable`, `.transcribable`, `.reason`) so the row, the
-recording window and the main-screen picker can never disagree.
+Decided on the server (`SessionMedia.openable`, `.transcribable`, `.reason`) so the card, the
+compact window and the main-screen picker can never disagree.
 
 | The recording holds | Result | What the control says |
 |---|---|---|
@@ -457,29 +457,51 @@ recording window and the main-screen picker can never disagree.
 | Anything, while a session is recording | Refused (temporarily) | "Stop the current recording first." |
 | Anything, while a transcription runs | Refused (temporarily) | "Wait for the running transcription to finish." |
 
-A folder in the recordings directory with **no transcript database** is listed as its own row
-("Not transcribed"), titled from the time in its key. It follows the same table.
+A folder in the recordings directory with **no transcript database** is listed as its own card
+("Not transcribed yet"). It follows the same table.
 
-### The row
+### The Recordings page (D-085)
 
-Media chips (video · audio · transcript), then: the primary action — **Bring to main screen** or
-**Transcribe…**, disabled with its reason in `title` when refused — then **Open…** and a quiet
-**Delete**. Nothing else: every export lives in the recording window.
+Chosen in the recordings lab (D-082) and built from it. **Wide cards**, small (`--card-min` 200px,
+so a card is at least ~380px) and airy (24px between, 16px inside), **grouped by day** under a
+heading with a count ("Today", "Yesterday", "Monday 3 November"); sorted by length, the groups go.
 
-### The recording window
+- **The bar** is one slim sticky row: the way back and the heading, the count (its tooltip says
+  where recordings are stored), search over titles and what was said, the filters as a radiogroup
+  (All, Video, Text only, To transcribe, Empty — each with its count), and sort. **Name *N*
+  untitled…** appears only while there are untitled recordings and a model to name them (D-084);
+  it asks before anything runs, then reports progress at the foot of the page.
+- **The picture** is 40% of the card and as tall as it. A video is a filmstrip — one large frame and
+  two small ones, from 15%, 50% and 85% in — and **moving the pointer across it skims the video**
+  in the large frame. No video: a colour for the time of day (dawn amber to night blue) with the
+  audio or transcript icon. On the picture: the media icons (video · audio · transcript, the
+  missing ones faded), the smart date ("Today · 12:11 PM", "Mon · 3:04 PM", "Sep 18 · 12:11 PM"),
+  and the length.
+- **The words**: the title the owner or the model gave (D-084), or, until there is one, the
+  transcript's keywords marked with a spark; a badge for "Recording now" or "On the main screen";
+  the first summary or the opening words; then words and size on disk.
+- **The buttons appear on hover in the card's bottom-right corner** (the owner's note), always on a
+  touch screen: the primary action from the table above (icon only, named by its label), download
+  transcript, open folder, and ⋯ with the rest (other downloads, Export web app…, Delete…).
+- **Clicking a card opens the compact window.** Dates are read from `started_at`, never from a title.
 
-One modal, three faces. **Overview** is what opens; **choosing** and **watching** are the web-app
-export's two faces (D-037), reached from the overview's Web app section and returning to it.
+### The compact window
 
-The overview's sections, in order, each shown only where it applies:
+Replaces the recording window's overview face (D-077). A labelled modal, 880px at most, two
+columns: the video (or a "no video" panel) beside the primary action and its reason, six numbers
+(length, words, summaries, glossary, questions, on disk), and what was said — keywords, then the
+first summary or the opening. Underneath, in one row: **Transcript** (the version when there are two
+(D-066), then Markdown, Text, SRT, WebVTT, JSON), **Download** (conversation, video, audio,
+**Export web app…**), **Files** (Open folder, Delete…). **Rename** turns the title into a field
+(Enter saves, Escape cancels). Escape closes the window and puts focus back on its card. One column
+below 860px.
 
-1. **Summary** — title, date, duration, the media chips.
-2. **Ask about it** — the primary action from the table above, with its reason. "On the main screen
-   now" when this is the recording the main screen is showing.
-3. **Transcript** — format, the pass to export when there are two (D-066), **Download**.
-4. **Your conversation** — **Download**, only when there are messages.
-5. **Web app** — **Set up export…**, only when the recording has video, sound and a transcript.
-6. **Delete** — names what goes: the transcript, the conversation, and the video and audio files.
+### The web-app export window
+
+What is left of the recording window (D-037, D-077): **choosing** (preview, presets measured against
+this recording, size ranges) and **watching** (a bar per stage). Opened from the compact window's
+Export web app…, and by the main screen when a recording that can be exported stops. A recording
+that cannot be exported does not open it at all.
 
 ### The consent dialog
 
