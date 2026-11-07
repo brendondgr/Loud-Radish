@@ -1,6 +1,6 @@
 # Mixed Audio and Steady Video
 
-**Status:** In progress (1 / 7 phases). Branch: `feature/mixed-audio-steady-video`.
+**Status:** In progress (2 / 7 phases). Branch: `feature/mixed-audio-steady-video`.
 
 ## 1. Introduction
 
@@ -163,6 +163,11 @@ recording; the set of inputs is fixed when recording starts.
   > on one fixed canvas, so resizing or moving the window no longer stalls the video.*
 
 ### Phase 2 — The mixer, as a pure audio source
+
+> **Status: ✅ Complete.** Built as planned. `MixedSource` also takes an `on_track` callback that
+> receives each input's post-gain frame, which is how Phase 3 writes each input's own track, and
+> `levels()` reports each input's level before gain, so a meter still moves while its input is
+> turned down. 26 tests, including a simulated hour of ±3 % drift and two real generator threads.
 
 - **Locations:**
   - New `web/backend/app/services/audio/mixer.py`, the pure math:

@@ -93,7 +93,9 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   │       ├── level.py       # RMS, peak, clipping for the input meter
 │   │   │       ├── preprocess.py  # High-pass filter and gain normalisation
 │   │   │       ├── devices.py     # Merged microphone + loopback enumeration
-│   │   │       └── sources/       # base, file (real-time WAV), device, synthetic
+│   │   │       ├── mixer.py       # Gain ramp, sum and clip, 0–100 % volume (D-081)
+│   │   │       └── sources/       # base, file (real-time WAV), device, synthetic, and
+│   │   │                          #   mixed — several inputs heard as one (D-081)
 │   │   │   └── vad/               # Speech detection and pause events
 │   │   │       ├── base.py        # The one-question-per-frame detector interface
 │   │   │       ├── energy.py      # Dependency-free default, adaptive noise floor

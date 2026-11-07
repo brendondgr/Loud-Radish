@@ -16,6 +16,15 @@ never uploaded; it is captured locally and consumed in flight.
    Frames go into a bounded ring buffer. If the consumer falls behind, the OLDEST
    audio is overwritten and the drop is counted. Capture never waits. (C5)
 
+1b. MIX                                       services/audio/sources/mixed.py
+   Several inputs (a window's sound, the microphone) become one stream (D-081).
+   One input is the PRIMARY — a file, else the microphone, else a tap — and each
+   of its frames yields one mixed frame; the others are read from queues capped
+   at 200 ms (late → padded with silence, early → oldest dropped). Each input
+   has its own 0–100 % volume and mute, ramped over one frame so a slider never
+   clicks. One input passes through untouched. A lost input is reported and the
+   rest keep recording; a quiet primary hands the clock on after 0.5 s.
+
 2. GATE                                       services/vad/
    Each frame gets a speech flag, with hysteresis so the state does not flicker.
    Silence runs past the threshold emit a PAUSE EVENT — a safe place to cut.
