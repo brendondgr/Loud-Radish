@@ -1,0 +1,205 @@
+/* The recordings lab (D-080): the customize panel — options, verdicts, notes, saved
+ * combinations and the feedback export. It sits outside the page's flow on the right and the page
+ * makes room for it (`.lab[data-panel="true"]`), so the cards stay visible while being judged.
+ */
+
+
+.lz {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  width: var(--lab-panel-w);
+  border-left: 1px solid var(--border-default);
+  background: var(--surface-panel);
+}
+.lz[hidden] { display: none; }
+
+.lz-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--border-default);
+}
+.lz-head > div { flex: 1; }
+.lz-head__title { margin: 0; font-size: 14px; font-weight: 600; }
+
+.lz-scroll { flex: 1; overflow-y: auto; padding-bottom: 32px; }
+
+.lz-section { border-bottom: 1px solid var(--border-subtle); }
+.lz-section__head {
+  display: flex;
+  justify-content: space-between;
+  padding: 11px 16px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  list-style: none;
+}
+.lz-section__head::-webkit-details-marker { display: none; }
+.lz-section__head::after { content: "+"; color: var(--text-faint); }
+.lz-section[open] > .lz-section__head::after { content: "–"; }
+.lz-section__body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 2px 16px 16px;
+}
+
+.lz-option__label {
+  margin: 0 0 6px;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.lz-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.lz-chip {
+  min-height: 26px;
+  padding: 3px 10px;
+  border: 1px solid var(--border-control);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: 12px var(--font-ui);
+  cursor: pointer;
+}
+.lz-chip:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.lz-chip[aria-checked="true"],
+.lz-chip[aria-pressed="true"] {
+  border-color: var(--lab-accent-line);
+  background: var(--lab-accent-wash);
+  color: var(--lab-accent);
+}
+.lz-hint { margin: 6px 0 0; font-size: 11px; line-height: 1.45; color: var(--text-faint); }
+
+.lz-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.lz-toggle input { margin-top: 2px; accent-color: var(--lab-accent); }
+
+.lz-layouts { display: flex; flex-direction: column; gap: 6px; }
+.lz-layout {
+  padding: 8px 10px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+}
+.lz-layout[data-current="true"] { border-color: var(--lab-accent-line); }
+.lz-layout__name { margin: 0; font-size: 12.5px; font-weight: 600; }
+.lz-layout .lz-hint { margin-top: 2px; }
+
+.lz-verdict { display: flex; align-items: center; gap: 4px; }
+.lz-layout .lz-verdict { margin-top: 7px; }
+.lz-verdict__btn {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border-control);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.lz-verdict__btn:hover { color: var(--text-primary); }
+.lz-verdict__btn--love[aria-pressed="true"] { color: #f07a8f; border-color: rgba(240, 122, 143, 0.45); background: rgba(240, 122, 143, 0.14); }
+.lz-verdict__btn--ok[aria-pressed="true"] { color: var(--accent); border-color: var(--accent-border); background: var(--accent-wash); }
+.lz-verdict__btn--no[aria-pressed="true"] { color: var(--warning); border-color: var(--warning-border); background: var(--warning-wash); }
+.lz-verdict__note { flex: 1; height: 26px; }
+
+.lz-input {
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid var(--border-control);
+  border-radius: 7px;
+  background: var(--surface-input);
+  color: var(--text-primary);
+  font: 12px/1.45 var(--font-ui);
+  resize: vertical;
+}
+.lz-input:focus { outline: none; border-color: var(--lab-accent-line); }
+
+.lz-note__wrap summary {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.lz-note__wrap[open] summary { margin-bottom: 6px; }
+
+.lz-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.lz-block__title { margin: 0; font-size: 12.5px; font-weight: 600; }
+.lz-block .lz-hint { margin: -6px 0 0; }
+.lz-row { display: flex; gap: 6px; }
+
+.lz-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border-control);
+  border-radius: 7px;
+  background: var(--surface-control);
+  color: var(--text-secondary);
+  font: 500 12px var(--font-ui);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.lz-button:hover { background: var(--surface-control-hover); color: var(--text-primary); }
+.lz-button--primary {
+  flex: 1;
+  border-color: transparent;
+  background: var(--lab-accent);
+  color: var(--lab-on-accent);
+  font-weight: 600;
+}
+.lz-button--primary:hover { background: var(--lab-accent); color: var(--lab-on-accent); filter: brightness(1.08); }
+
+.lz-preview {
+  max-height: 260px;
+  margin: 0;
+  padding: 10px;
+  overflow: auto;
+  border-radius: 7px;
+  background: var(--surface-input);
+  color: var(--text-secondary);
+  font: 11px/1.5 var(--font-mono);
+  white-space: pre-wrap;
+}
+
+.lz-combos { display: flex; flex-direction: column; gap: 4px; margin: 0; padding-left: 18px; }
+.lz-combos li { font-size: 12px; color: var(--text-faint); }
+.lz-combos li > * { vertical-align: middle; }
+.lz-link {
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--lab-accent);
+  font: 12px var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+.lz-link:hover { text-decoration: underline; }
+.lz-link--muted { color: var(--text-faint); margin-left: 6px; }
+
+/* On a narrow window the panel covers the page rather than squeezing it to nothing. */
+@media (max-width: 860px) {
+  .lz { width: 100%; }
+}

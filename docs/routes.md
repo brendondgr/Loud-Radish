@@ -17,6 +17,7 @@ Server-rendered from `web/frontend/templates/` by `web/backend/app/routes/pages.
 |---|---|---|---|
 | `/` | The live application — transcript pane, header, status bar. `?arm=<mode>` opens the record sheet on load, and `&source=microphone\|system\|window` preselects what it records (D-075). `?arm=window` alone also preselects a window. The query is cleared at once, so a reload does not reopen it | `pages/app.html` | **Implemented** |
 | `/sessions` | Recordings — every past session, what it holds, and its exports | `pages/sessions.html` | **Implemented** |
+| `/labs/sessions/` | The recordings lab: the same recordings as cards in six layouts, a customize panel, and a feedback export (D-080). `/labs/sessions` redirects here. Served by `routes/labs.py` | `pages/labs/sessions.html` | **Prototype** |
 
 ## WebSocket
 
@@ -251,6 +252,19 @@ state is a second place for it to drift.
 | `PATCH` | `/api/config` | Apply dotted-path changes; returns the hot-swap class of the change | **Implemented** |
 | `POST` | `/api/config/preset` | Apply a named preset | **Implemented** |
 | `POST` | `/api/config/save` | Persist runtime changes to the user config file | **Implemented** |
+
+
+### Labs
+
+What the recordings lab needs that the sessions API does not answer yet (D-080). Read-only except
+for opening a folder, and every `{key}` is resolved on the server as it is above.
+
+| Method | Path | Purpose | Status |
+|---|---|---|---|
+| `GET` | `/api/labs/sessions/{key}/thumbnail?t=&w=` | The recording's stored `preview.jpg`, or with `t` the frame at that second as a JPEG `w` pixels wide. Seconds rather than a fraction, because a live-written WebM has no duration in its header | **Prototype** |
+| `GET` | `/api/labs/sessions/{key}/file/{video\|audio}` | The video, or the WAV while it still exists, as a download named after the recording | **Prototype** |
+| `POST` | `/api/labs/sessions/{key}/reveal` | Open the recording's folder in the system file manager. Returns the path and whether anything answered | **Prototype** |
+| `GET` | `/api/labs/sessions/glance?keys=` | For up to 60 recordings: opening words, first summary sentence, and the transcript's most-used words | **Prototype** |
 
 ## Conventions
 

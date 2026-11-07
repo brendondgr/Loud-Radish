@@ -1,6 +1,6 @@
 # Project Checklist
 
-*Last updated: 2026-11-07 (one record sheet replaces the mode switch — D-075)*
+*Last updated: 2026-11-07 (the recordings lab — D-080)*
 
 The active work list for Loud Radish. Update it whenever a task is finished or new work is
 discovered.
@@ -1174,6 +1174,33 @@ approval**. Plan: [plans/recordings-on-the-main-screen.md](plans/recordings-on-t
       registers itself, inside the approval request; the dialog says "Starting…" for as long as it
       takes (seconds for a talk on this machine, by the decode rate measured). If an hour-long
       video makes that wait uncomfortable, move extraction into the runner as a first stage.
+
+## Part 12 — The recordings lab (D-080)
+
+Requested 2026-11-07: the Recordings page looks wrong — rows, an "Open…" window that is mostly
+blank, a header that takes too much room, titles that say nothing and dates that are off. Asked for
+several card-based designs at `/labs/sessions/`, adjustable, with the owner's preferences exportable
+as text to paste back.
+
+- [x] `/labs/sessions/`: six layouts, a customize panel (layout, header, titles and dates, pictures,
+      media icons, buttons, look), a verdict and note per layout and per section, saved
+      combinations, Copy feedback / Download .md. Keys 1–6 switch layout, C opens the panel.
+- [x] Real pictures: the stored `preview.jpg`, or any second of the video through PyAV, which is
+      also how a card is skimmed by moving the pointer across it.
+- [x] Real buttons: bring to the main screen (labelled four ways to choose from), transcribe on
+      approval, transcript in five formats, video, audio, web app, open folder, delete.
+- [x] Verified in the browser on a copy of the owner's 316 sessions and 52 video recordings at
+      1440 × 900: every layout, every detail mode, the floating dock, hover-skimming, the ⋯ menu,
+      the export text, and "Bring to main screen" landing on the main screen with its banner.
+- [ ] **The owner's verdict.** The next step is their pasted feedback; then the chosen design
+      replaces `/sessions` and the lab is deleted rather than kept beside it.
+- [ ] **Short titles from the model.** The lab's titles are keywords or opening words — the
+      stand-in. The real version asks the language model for four to six words when a transcription
+      finishes, and stores it as the session's title.
+- [ ] **Stored titles carry the wrong time.** "Session on 07 Nov 2026, 17:11" was written in UTC
+      for a 12:11 PM recording; older ones were written in local time. Whatever replaces
+      `/sessions` should show `started_at` in local time, and the stored default titles should
+      stop carrying a time at all.
 
 ## Discovered work
 

@@ -2681,6 +2681,239 @@
         }
       }
     },
+    "/labs/sessions/": {
+      "get": {
+        "tags": [
+          "labs"
+        ],
+        "summary": "Labs Sessions Page",
+        "description": "The card-based recordings prototype.",
+        "operationId": "labs_sessions_page_labs_sessions__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/labs/sessions/{key}/thumbnail": {
+      "get": {
+        "tags": [
+          "labs"
+        ],
+        "summary": "Thumbnail",
+        "description": "A picture of the recording: the stored preview, or the frame at ``t`` seconds.",
+        "operationId": "thumbnail_api_labs_sessions__key__thumbnail_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "t",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "T"
+            }
+          },
+          {
+            "name": "w",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1280,
+              "minimum": 64,
+              "default": 480,
+              "title": "W"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/labs/sessions/{key}/file/{kind}": {
+      "get": {
+        "tags": [
+          "labs"
+        ],
+        "summary": "Download File",
+        "description": "The video or the audio, as a download named after the recording.",
+        "operationId": "download_file_api_labs_sessions__key__file__kind__get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kind"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/labs/sessions/{key}/reveal": {
+      "post": {
+        "tags": [
+          "labs"
+        ],
+        "summary": "Reveal Folder",
+        "description": "Open the recording's folder in the system file manager.\n\nReturns the path either way, so the page can offer to copy it when no file manager answers.",
+        "operationId": "reveal_folder_api_labs_sessions__key__reveal_post",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Reveal Folder Api Labs Sessions  Key  Reveal Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/labs/sessions/glance": {
+      "get": {
+        "tags": [
+          "labs"
+        ],
+        "summary": "Glances",
+        "description": "What each named recording is about: its opening words, first summary and keywords.\n\nAsked for in batches as cards scroll into view, rather than for all of them at once.",
+        "operationId": "glances_api_labs_sessions_glance_get",
+        "parameters": [
+          {
+            "name": "keys",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 4000,
+              "title": "Keys"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Glances Api Labs Sessions Glance Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "tags": [

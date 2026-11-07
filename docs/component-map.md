@@ -19,7 +19,8 @@ reload; there is nothing to compile and no second toolchain to keep in step with
 web/frontend/
 ├── templates/          server-rendered structure — the shell, never the data
 │   ├── base.html               <head>, stylesheet list, module entry point
-│   ├── pages/                  one per URL: app.html, sessions.html
+│   ├── pages/                  one per URL: app.html, sessions.html, and labs/ —
+│   │                           prototypes beside a real page, not instead of it (D-080)
 │   ├── macros/icons.html       inline SVG, inheriting currentColor
 │   └── partials/               one file per region of the interface
 │       ├── header.html, banners.html, status_bar.html
@@ -38,7 +39,8 @@ web/frontend/
     │   ├── tokens.css          every colour, size, and duration in the application
     │   ├── base.css            resets and element defaults
     │   ├── layout.css          the application frame and standalone pages
-    │   └── components/         one stylesheet per component
+    │   ├── components/         one stylesheet per component
+    │   └── labs/               the recordings lab: page, cards, detail, panel (D-080)
     └── js/
         ├── main.js             the application page's entry point
         ├── session-start.js    opening the record sheet and starting what it chose (D-075)
@@ -54,6 +56,8 @@ web/frontend/
         ├── stores/             state: transcript, polish, session, mode, health, config, chat,
         │                       capture, export
         ├── components/         one class per region, plus settings/ per tab
+        ├── labs/               the recordings lab (D-080): options as data, the card and
+        │                       detail renderers, the customize panel, the feedback export
         └── a11y/               the focus trap
 ```
 
