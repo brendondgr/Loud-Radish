@@ -1,6 +1,6 @@
 # Recordings on the Main Screen: Ask About Any Past Recording
 
-*Written 2026-11-07, revised the same day with the user's answers. Status: **In progress (1 / 6)**.
+*Written 2026-11-07, revised the same day with the user's answers. Status: **In progress (2 / 6)**.
 Runs **alongside** [unified-record-sheet.md](unified-record-sheet.md), which is being implemented at
 the same time in the main checkout. This plan is built in a separate worktree
 (`../TranscriberPrototype-recordings`, branch `feature/recordings-on-main-screen`), so the two never
@@ -152,8 +152,12 @@ Read before starting: `docs/skills/global-project-rules/SKILL.md`, `docs/archite
   - CSS under `static/css/components/` for the overview.
 - **Rationale**: this removes the duplicate Export labels before new actions crowd the row. It has
   no backend dependency.
-- **Tests**: `tests/frontend/`. The sessions page renders the window partial, the old `data-export`
-  hooks are gone, and no static file still references `export-dialog.js`.
+- **Tests**: `tests/frontend/test_recording_window.py`. Both pages render the one window, no two
+  footer actions share a name, nothing loads `export-dialog.js`, and the row carries no exports.
+  The web-app export's internal `data-export-*` hooks are kept: they still describe that face.
+- **Done (2026-11-07)**: shared descriptions moved to `static/js/core/recording-facts.js`; the
+  overview styles live in `export.css` so `base.html`, which URS edits, is untouched. Focus is kept
+  inside the window when Back hides itself, and returns to the row's Open… on close.
 - **Verification**: `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`. Then
   browser QA on `/sessions`: open the window for a transcript-only recording and for a complete
   one, download each export, check that Escape returns focus, and check a 375 px width.

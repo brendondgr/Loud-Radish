@@ -24,8 +24,9 @@ web/frontend/
 │   └── partials/               one file per region of the interface
 │       ├── header.html, banners.html, status_bar.html
 │       ├── preflight.html      the per-run capture options sheet
-│       ├── export.html         the post-recording export window: preview and presets on one
-│       │                       face, the pipeline's stages on the other
+│       ├── recording_window.html  one window per recording (D-077): an overview of what it
+│       │                       holds and every export, with the web-app export's preview and
+│       │                       presets on one face and the pipeline's stages on another
 │       ├── transcript/         pane, toolbar, hypothesis, empty state, glossary panel…
 │       ├── chat/               pane, composer, quick actions, empty state
 │       ├── monitor/            the recording monitor pane and its states
@@ -40,9 +41,8 @@ web/frontend/
     └── js/
         ├── main.js             the application page's entry point
         ├── sessions.js         the recordings page's entry point — the list, the media
-        │                       chips, the transcript and conversation exports (with a
-        │                       Live/Final choice where a session holds two passes, D-066),
-        │                       and the export window (polled, since this page has no socket)
+        │                       chips, and each row's Open… and Delete; everything else is in
+        │                       the recording window (polled, since this page has no socket)
         ├── core/               DOM helpers, the event bus, formatting, preferences, modes,
         │                       export presets — the last two mirrored from the backend and
         │                       held identical by a test
@@ -99,6 +99,7 @@ browser owns is genuinely its own — pane widths, text size, which pane is show
 | `settings/*` | One tab each, plus `bindings.js` and `combobox.js` — the assistant's model field, a text input that is also a dropdown (D-067) | Controls declare a dotted config path; the binding layer does the rest. `shortcuts.js` adds key capture and reports on the *companion process*, since keys can be set and still do nothing |
 | `RewritingSettings` | The two instruction editors, their Reset controls, and the line saying which text is in force | The one thing the binding layer cannot do: a blank field means the instructions that shipped, so the shipped text is the field's **placeholder** and never its value — seeding it would store a copy on the next change event and freeze this installation on today's wording. Reset writes `""` for the same reason (D-068) |
 | `FocusTrap` | Modal focus containment and restoration | Recomputes candidates per Tab — the dialog changes shape constantly |
+| `RecordingWindow` | One past recording: the overview (`recording-overview.js`) and the web-app export's choosing and watching faces | One modal on both pages, opened from a row's Open… and on its own when a recording with media stops. The overview is built from the same `GET /api/sessions` row the list draws, through `core/recording-facts.js`, so the two cannot describe a recording differently. Each export is a labelled section shown only where the recording has what it exports; a row used to carry two controls named Export (D-077) |
 
 ### The multi-mode expansion (D-020)
 

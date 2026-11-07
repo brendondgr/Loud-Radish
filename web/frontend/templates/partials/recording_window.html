@@ -1,24 +1,22 @@
-{# The post-recording export window (D-037).
+{# The recording window (D-077; the export faces are D-037's).
 
-   Reported: "On recording stop, I want a dedicated window rather than the current minimal flow" —
-   one that previews the recording, offers the video and audio options, shows the projected size for
-   each before committing, and then shows the pipeline running through its stages.
+   One window per recording, holding everything that can be done with it. A row on the recordings
+   page used to carry an "Export" link, a "Conversation" link and an "Export…" button, and two
+   controls with the same name doing different things was reported as confusing. They are now
+   sections of this window's **overview** face.
 
-   Two halves in one dialog, swapped rather than stacked. **Choosing** is a preview, a list of
-   presets each carrying what it would produce for *this* recording, and a size that moves as the
-   choice does. **Watching** is one row per stage, each with its own bar and its own estimate. They
-   are the same window because they are the same task, and because the thing you want to see when an
-   export finishes is what it produced against what it promised.
+   The web-app export keeps its two faces — **choosing** (a preview, presets each carrying what
+   they would produce for *this* recording, and a size that moves with the choice) and **watching**
+   (one row per stage, each with its own bar and estimate) — reached from the overview's Web app
+   section and returning to it with Back. Swapped rather than stacked: they are one task at a time.
 
-   Reuses the modal shell and the focus trap, as the pre-flight sheet does. Focus containment and
-   restoration are the accessibility behaviour most easily got wrong twice; there is one
-   implementation of it and this is the third caller.
+   Reuses the modal shell and the focus trap. Focus containment and restoration are the
+   accessibility behaviour most easily got wrong twice; there is one implementation of it.
 
-   The sizes are **ranges** and say so. A constant-quality encode depends on what is on screen, and
-   this window's whole purpose is deciding whether a file is small enough to send — a figure
-   presented as exact would be wrong in precisely the way that matters. #}
+   The export sizes are **ranges** and say so. A constant-quality encode depends on what is on
+   screen, and a figure presented as exact would be wrong in precisely the way that matters. #}
 
-<div class="modal export" data-export hidden>
+<div class="modal export" data-recording-window hidden>
   <div class="modal__scrim" data-export-close aria-hidden="true"></div>
 
   <div
@@ -29,8 +27,8 @@
     data-export-dialog
   >
     <header class="modal__header">
-      <h2 class="modal__title" id="export-title">Export this recording</h2>
-      <p class="modal__subtitle" data-export-subtitle>Choose how it should look, and how large it should be.</p>
+      <h2 class="modal__title" id="export-title" data-window-title>This recording</h2>
+      <p class="modal__subtitle" data-export-subtitle></p>
       <button
         type="button"
         class="button button--icon button--quiet modal__close"
@@ -44,8 +42,13 @@
     </header>
 
     <div class="modal__body export__body">
+      {# -- overview ------------------------------------------------------------------------ #}
+      {# Built by `recording-overview.js` from the session row, so the window and the list describe
+         a recording from the same facts. #}
+      <div class="overview" data-window-overview></div>
+
       {# -- choosing ------------------------------------------------------------------------ #}
-      <section class="export__choose" data-export-choose>
+      <section class="export__choose" data-export-choose hidden>
         <div class="export__preview">
           {# `preload="metadata"` rather than `auto`: the file is hundreds of megabytes and sits on
              the same disk the encoder is about to read. The first frame and the duration are what
@@ -105,10 +108,11 @@
     <footer class="modal__footer export__footer">
       <p class="export__refusal" data-export-refusal role="alert" hidden></p>
       <div class="export__actions">
+        <button type="button" class="button" data-window-back hidden>Back</button>
         <button type="button" class="button" data-export-close>Close</button>
         <button type="button" class="button" data-export-cancel hidden>Stop</button>
-        <a class="button button--primary" data-export-download download hidden>Download</a>
-        <button type="button" class="button button--primary" data-export-start>Export</button>
+        <a class="button button--primary" data-export-download download hidden>Download web app</a>
+        <button type="button" class="button button--primary" data-export-start hidden>Export web app</button>
       </div>
     </footer>
   </div>

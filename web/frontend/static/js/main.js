@@ -12,7 +12,7 @@ import { ARMING, IDLE, PAUSED, PROCESSING, RECORDING, STOPPING, WINDOW } from ".
 import * as prefs from "./core/storage.js";
 import { Banners } from "./components/banners.js";
 import { ChatPane } from "./components/chat-pane.js";
-import { ExportDialog } from "./components/export-dialog.js";
+import { RecordingWindow } from "./components/recording-window.js";
 import { GlossaryPanel } from "./components/glossary-panel.js";
 import { Header } from "./components/header.js";
 import { ModeSwitcher } from "./components/mode-switcher.js";
@@ -100,7 +100,7 @@ function boot() {
     onOpenSettings: (section) => settings.show(section),
   });
 
-  exportWindow = new ExportDialog($("[data-export]"));
+  exportWindow = new RecordingWindow($("[data-recording-window]"));
 
   const header = new Header($(".header"), {
     onStart: (name) => start(name, null, banners, settings),

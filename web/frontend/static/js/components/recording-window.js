@@ -1,7 +1,9 @@
 /**
- * The post-recording export window (D-037).
+ * The recording window (D-077): one window per recording, opening on an overview of everything
+ * that can be done with it, with the web-app export (D-037) as two further faces inside it.
  *
- * Reported as four things that are really one: no control over output quality or size, no way to
+ * The export faces were reported as four things that are really one:
+ * no control over output quality or size, no way to
  * see what an export would cost before committing to it, no preview of what is about to be
  * exported, and a pipeline that runs as a black box. They are one window because they are one
  * decision followed by one wait.
@@ -12,17 +14,20 @@
  * exactly the fault being repaired — the reported seminar asked for a 720p ceiling at capture and
  * recorded at 2560 x 1532.
  *
- * `show()` returns a promise, as the pre-flight sheet's does, because this is a sequence: choose,
- * then watch, then collect. The caller gets the finished job or `null`.
+ * `show()` returns a promise, as the pre-flight sheet's does, because this is a sequence: look,
+ * perhaps choose and watch, then close. The caller gets `{ job, deleted }`: the export job when one
+ * covers this recording, and whether the recording was deleted from inside the window.
  */
 
 import { FocusTrap } from "../a11y/focus-trap.js";
 import { on } from "../core/bus.js";
 import { $, el, setText, toggle } from "../core/dom.js";
+import { deletionWarning, when } from "../core/recording-facts.js";
 import { duration as formatDuration } from "../core/format.js";
 import { DEFAULT_PRESET } from "../core/export-presets.js";
 import { EXPORT_CHANGED, exportJob } from "../stores/export.js";
 import { api, ApiError } from "../transport/api.js";
+import { renderOverview } from "./recording-overview.js";
 
 /** Bytes as something a person weighing "can I send this" can read at a glance. */
 function size(bytes) {
@@ -46,12 +51,15 @@ function sizeRange(estimate) {
   return `${low.replace(/\s[KMG]B$/, "")}–${high}`;
 }
 
-export class ExportDialog {
+export class RecordingWindow {
   constructor(root) {
     this.root = root;
     if (!root) return;
 
     this.dialog = $("[data-export-dialog]", root);
+    this.title = $("[data-window-title]", root);
+    this.overview = $("[data-window-overview]", root);
+    this.backButton = $("[data-window-back]", root);
     this.subtitle = $("[data-export-subtitle]", root);
     this.choose = $("[data-export-choose]", root);
     this.progress = $("[data-export-progress]", root);
@@ -72,6 +80,10 @@ export class ExportDialog {
 
     this.trap = new FocusTrap(this.dialog ?? root);
     this.key = "";
+    this.session = null;
+    this.deleted = false;
+    /** Extra overview content a page contributes — see `renderOverview`'s `ask`. */
+    this.ask = null;
     this.options = null;
     this.preset = DEFAULT_PRESET;
     this._resolve = null;
@@ -80,6 +92,7 @@ export class ExportDialog {
       button.addEventListener("click", () => this.close());
     }
     this.startButton?.addEventListener("click", () => this.start());
+    this.backButton?.addEventListener("click", () => this._showOverview());
     this.cancelButton?.addEventListener("click", () => this.cancel());
 
     root.addEventListener("keydown", (event) => {
@@ -96,20 +109,84 @@ export class ExportDialog {
     return Boolean(this.root) && !this.root.hidden;
   }
 
-  /** Open for one session and resolve when it is closed. */
-  async show(key, { title = "" } = {}) {
+  /**
+   * Open for one recording and resolve when it is closed.
+   *
+   * `session` is the row from `GET /api/sessions`. Without one — the window opening on its own
+   * when a recording stops — the row is fetched, because the overview is built from the same
+   * facts the recordings list shows.
+   */
+  async show(key, { session = null } = {}) {
     if (!this.root) return null;
     this.key = key;
+    this.session = session;
+    this.deleted = false;
     this.options = null;
     this.preset = DEFAULT_PRESET;
-    setText(this.subtitle, title || "Choose how it should look, and how large it should be.");
     this.root.hidden = false;
-    this.trap.activate(this.startButton);
-    this._showChoosing();
-    await this._load();
-    return new Promise((resolve) => {
+    this.trap.activate(this.root.querySelector("[data-export-close].modal__close"));
+
+    const done = new Promise((resolve) => {
       this._resolve = resolve;
     });
+
+    if (!this.session) {
+      try {
+        const body = await api.sessions();
+        this.session = (body.sessions ?? []).find((row) => row.key === key) ?? null;
+      } catch {
+        this.session = null;
+      }
+    }
+    this._renderHeader();
+
+    // An export may already be running — the window was closed and reopened, or the page was
+    // reloaded mid-encode. Re-attaching beats offering to start a second one that would be refused.
+    if (exportJob.covers(key) && exportJob.isRunning) {
+      this._showProgress();
+    } else {
+      this._showOverview();
+    }
+    return done;
+  }
+
+  /** Re-draw the overview from a fresher row, keeping the window open. */
+  refresh(session) {
+    if (!this.isOpen || !session || session.key !== this.key) return;
+    this.session = session;
+    this._renderHeader();
+    if (!this.overview?.hidden) this._renderOverview();
+  }
+
+  _renderHeader() {
+    setText(this.title, this.session?.title || "This recording");
+    setText(this.subtitle, when(this.session?.started_at));
+  }
+
+  _renderOverview() {
+    if (!this.session) {
+      this.overview?.replaceChildren(
+        el("p", { className: "overview__hint", text: "This recording could not be read." }),
+      );
+      return;
+    }
+    renderOverview(this.overview, this.session, {
+      onWebApp: () => void this._openWebApp(),
+      onDelete: () => void this._delete(),
+      ask: this.ask,
+    });
+  }
+
+  async _delete() {
+    if (!this.session) return;
+    if (!window.confirm(deletionWarning(this.session))) return;
+    try {
+      await api.deleteSession(this.key);
+      this.deleted = true;
+      this.close();
+    } catch (error) {
+      this._refuse(error instanceof ApiError ? error.message : "The recording could not be deleted.");
+    }
   }
 
   close() {
@@ -124,11 +201,16 @@ export class ExportDialog {
     this.root.hidden = true;
     this.trap.release();
     const job = exportJob.covers(this.key) ? exportJob : null;
-    this._resolve?.(job);
+    this._resolve?.({ job, deleted: this.deleted });
     this._resolve = null;
   }
 
   // -- choosing ---------------------------------------------------------------------
+
+  async _openWebApp() {
+    this._showChoosing();
+    await this._load();
+  }
 
   async _load() {
     this._refuse("");
@@ -286,6 +368,7 @@ export class ExportDialog {
     this.stageList?.replaceChildren(...exportJob.stages.map((stage) => this._stageRow(stage)));
 
     toggle(this.cancelButton, exportJob.isRunning);
+    toggle(this.backButton, !exportJob.isRunning);
     toggle(this.startButton, !exportJob.isRunning && !exportJob.isDone);
     toggle(this.download, exportJob.isDone);
     if (exportJob.isDone && this.download) {
@@ -337,24 +420,41 @@ export class ExportDialog {
     });
   }
 
-  // -- the two faces ----------------------------------------------------------------
+  // -- the three faces ---------------------------------------------------------------
 
-  _showChoosing() {
-    toggle(this.choose, true);
-    toggle(this.progress, false);
-    toggle(this.startButton, true);
+  _face(name) {
+    toggle(this.overview, name === "overview");
+    toggle(this.choose, name === "choose");
+    toggle(this.progress, name === "progress");
+    toggle(this.backButton, name !== "overview" && !(name === "progress" && exportJob.isRunning));
+    toggle(this.startButton, name === "choose");
     toggle(this.cancelButton, false);
     toggle(this.download, false);
     toggle(this.result, false);
     this._refuse("");
+    // **Focus stays inside the window when a face changes.** Back hides itself as it is pressed,
+    // and a focused element that disappears hands focus to the page body — where Escape no longer
+    // reaches this dialog's handler and Tab walks the page underneath the scrim.
+    if (!this.root.contains(document.activeElement) || document.activeElement?.closest("[hidden]")) {
+      this.root.querySelector(".modal__close")?.focus();
+    }
+  }
+
+  _showOverview() {
+    // The preview keeps decoding off-screen otherwise, which is the same reason `close` stops it.
+    this.video?.pause();
+    this._face("overview");
+    this._renderOverview();
+  }
+
+  _showChoosing() {
+    this._face("choose");
   }
 
   _showProgress() {
-    toggle(this.choose, false);
-    toggle(this.progress, true);
+    this._face("progress");
     // A refusal left standing beside a finished export says something untrue about it. The same
     // rule the stall banner follows: a message is retracted when it stops being the case.
-    this._refuse("");
     this.renderProgress();
   }
 
