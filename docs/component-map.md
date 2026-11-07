@@ -102,6 +102,11 @@ browser owns is genuinely its own — pane widths, text size, which pane is show
 
 ### The multi-mode expansion (D-020)
 
+> **Being superseded by D-075** ([plans/unified-record-sheet.md](plans/unified-record-sheet.md)).
+> `ModeSwitcher` and `Preflight` are replaced by one `RecordSheet` behind *Start recording*; the
+> mode is derived from the sheet's choices. This table describes the tree until that plan's
+> Step 4 lands.
+
 Specified in `docs/design-system.md` § Capture Modes; built by
 [plans/multi-mode-ui-implementation.md](plans/multi-mode-ui-implementation.md).
 
