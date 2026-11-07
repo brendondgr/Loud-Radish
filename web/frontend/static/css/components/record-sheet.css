@@ -31,7 +31,7 @@
 .record-sheet__section[hidden],
 .record-sheet__file-note[hidden],
 .record-sheet__warning[hidden],
-.record-sheet__timing[hidden] {
+.record-sheet__note-line[hidden] {
   display: none;
 }
 
@@ -66,22 +66,112 @@
   color: var(--text-secondary);
 }
 
-/* -- choices ------------------------------------------------------------------------------ */
+/* -- choice cards ------------------------------------------------------------------------
+ * Sections 1 and 3: a picture and a one-line title per choice, chosen by clicking the card.
+ * The radio is still there, visually hidden, so the keyboard contract of a radio group — one tab
+ * stop, arrows between choices — and the screen-reader name both come from the platform.
+ */
 
-.record-sheet__sources,
-.record-sheet__timings {
+.choice-cards {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
   gap: var(--space-5);
 }
 
-/* The fourth timing ("Don't transcribe") wraps onto its own row rather than squeezing four. */
-.record-sheet__timings {
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+.choice-cards--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.record-sheet__source,
-.record-sheet__timing,
+.choice-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  min-height: 96px;
+  padding: var(--space-6) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  background: var(--surface-control);
+  color: var(--text-secondary);
+  text-align: center;
+  cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease),
+    box-shadow var(--duration-fast) var(--ease),
+    background var(--duration-fast) var(--ease),
+    color var(--duration-fast) var(--ease);
+}
+
+.choice-card[hidden] {
+  display: none;
+}
+
+.choice-card:hover {
+  border-color: var(--border-control);
+  background: var(--surface-control-hover);
+  color: var(--text-primary);
+}
+
+/* Off-screen rather than `display: none`, which would take it out of the tab order and the
+ * accessibility tree along with its label. */
+.choice-card__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.choice-card__icon {
+  flex: 0 0 auto;
+}
+
+.choice-card__title {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+/* The chosen card: an accent outline and a soft glow, plus the wash behind it, so the choice reads
+ * from across the dialog and not only by colour — the outline is a shape change as well. */
+.choice-card:has(.choice-card__input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-wash);
+  color: var(--text-primary);
+  box-shadow:
+    0 0 0 1px var(--accent),
+    0 0 18px var(--accent-wash-strong);
+}
+
+.choice-card:has(.choice-card__input:checked) .choice-card__icon {
+  color: var(--accent-bright);
+}
+
+/* The input is invisible, so its focus ring is drawn on the card. */
+.choice-card:has(.choice-card__input:focus-visible) {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 2px;
+}
+
+.choice-card:has(.choice-card__input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.choice-card:has(.choice-card__input:disabled):hover {
+  border-color: var(--border-subtle);
+  background: var(--surface-control);
+  color: var(--text-secondary);
+}
+
+.choice-card:has(.choice-card__input:disabled) .choice-card__title {
+  text-decoration: line-through;
+}
+
+/* -- the remaining option rows (a window's audio, video) ------------------------------------ */
+
 .record-sheet__option {
   display: flex;
   align-items: flex-start;
@@ -95,31 +185,11 @@
   cursor: pointer;
 }
 
-.record-sheet__source:hover,
-.record-sheet__timing:hover,
 .record-sheet__option:hover {
   border-color: var(--border-control);
   background: var(--surface-control-hover);
 }
 
-/* The chosen card is marked by its border as well as its radio: the radio alone is a 16px dot in
- * a card three times its width, and the card is what the eye lands on. */
-.record-sheet__source:has(input:checked),
-.record-sheet__timing:has(input:checked) {
-  border-color: var(--accent);
-}
-
-.record-sheet__source:has(input:disabled) {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.record-sheet__source:has(input:disabled) .record-sheet__option-name {
-  text-decoration: line-through;
-}
-
-.record-sheet__source input,
-.record-sheet__timing input,
 .record-sheet__option input {
   flex: 0 0 auto;
   margin-top: 2px;
@@ -148,8 +218,20 @@
   color: var(--text-secondary);
 }
 
+/* Section 2 for a microphone: the question and its dropdown share one row. */
+.record-sheet__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.record-sheet__row .record-sheet__legend {
+  flex: 0 0 auto;
+}
+
 .record-sheet__select {
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .record-sheet__note-line {
@@ -239,10 +321,29 @@
     padding: var(--space-6);
   }
 
-  /* Three cards side by side do not fit a phone; stacked, each hint stays readable. */
-  .record-sheet__sources,
-  .record-sheet__timings {
-    grid-template-columns: minmax(0, 1fr);
+  /* Cards stay side by side on a phone — they are a picture and a few words now. Three go three
+   * across; the four timing choices (a window's "Don't transcribe" is showing) go two by two
+   * rather than squeezing a title into 70 px. */
+  .choice-cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .choice-cards:has(> .choice-card:nth-child(4):not([hidden])) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .choice-card {
+    min-height: 84px;
+    padding: var(--space-5) var(--space-3);
+  }
+
+  .record-sheet__row {
+    flex-wrap: wrap;
+    gap: var(--space-4);
+  }
+
+  .record-sheet__select {
+    flex-basis: 100%;
   }
 
   .record-sheet__footer {

@@ -42,49 +42,54 @@
     </header>
 
     <div class="modal__body record-sheet__body">
-      {# 1. What to record. Every source is always present; one this machine cannot use is
-         disabled and says why, because a choice that vanishes is indistinguishable from one
-         that does not exist. #}
+      {# 1. What to record. Cards rather than radio rows (2026-11-07): a picture and a title read
+         at a glance, where three hints of different lengths made the row hard to scan. Each card
+         is still a radio underneath, so arrows move between them and the group has one tab stop.
+         The longer description is on the card's title. Every source is always present; one this
+         machine cannot use is disabled and its reason is shown under the row. #}
       <fieldset class="record-sheet__section">
         <legend class="record-sheet__legend"><span class="record-sheet__step" aria-hidden="true">1</span>What to record</legend>
-        <div class="record-sheet__sources">
-          <label class="record-sheet__source">
-            <input type="radio" name="record-source" value="microphone" data-record-source />
-            <span class="record-sheet__option-text">
-              <span class="record-sheet__option-name">My microphone</span>
-              <span class="record-sheet__option-hint">A talk in the room, a meeting, or you.</span>
-            </span>
+        <div class="choice-cards choice-cards--three">
+          <label class="choice-card" title="A talk in the room, a meeting, or you.">
+            <input class="choice-card__input" type="radio" name="record-source" value="microphone" data-record-source />
+            <svg class="choice-card__icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="9" y="3" width="6" height="11" rx="3" />
+              <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" />
+            </svg>
+            <span class="choice-card__title">My microphone</span>
           </label>
-          <label class="record-sheet__source">
-            <input type="radio" name="record-source" value="system" data-record-source />
-            <span class="record-sheet__option-text">
-              <span class="record-sheet__option-name">This computer's sound</span>
-              <span class="record-sheet__option-hint">
-                Everything this machine plays — a call or a video. Your microphone is not recorded.
-              </span>
-            </span>
+          <label class="choice-card" title="Everything this machine plays — a call or a video. Your microphone is not recorded.">
+            <input class="choice-card__input" type="radio" name="record-source" value="system" data-record-source />
+            <svg class="choice-card__icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="2.5" y="4" width="13" height="10" rx="1.5" />
+              <path d="M6.5 18h5M9 14v4M18.5 7.5a4.5 4.5 0 0 1 0 6M21 5a8 8 0 0 1 0 11" />
+            </svg>
+            <span class="choice-card__title">This computer's sound</span>
           </label>
-          <label class="record-sheet__source">
-            <input type="radio" name="record-source" value="window" data-record-source />
-            <span class="record-sheet__option-text">
-              <span class="record-sheet__option-name">A window</span>
-              <span class="record-sheet__option-hint" data-record-window-hint>
-                Its picture, its sound, or both. You choose the window next.
-              </span>
-            </span>
+          <label class="choice-card" title="Its picture, its sound, or both. You choose the window next." data-record-window-card>
+            <input class="choice-card__input" type="radio" name="record-source" value="window" data-record-source />
+            <svg class="choice-card__icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <path d="M3 9h18M6 6.5h.01M8.5 6.5h.01M11 6.5h.01" />
+            </svg>
+            <span class="choice-card__title">A window</span>
           </label>
         </div>
+        <p class="record-sheet__note-line" data-record-window-reason hidden></p>
       </fieldset>
 
       {# 2. Which input — the microphone list. Choosing one here writes the same setting the
          Audio tab and the tray write, so there is one answer to "which microphone". #}
       <div class="record-sheet__section" data-record-section="microphone" hidden>
-        <label class="record-sheet__legend record-sheet__legend--label" for="record-device">
-          <span class="record-sheet__step" aria-hidden="true">2</span>Which microphone
-        </label>
-        <select class="field__control record-sheet__select" id="record-device" data-record-device>
-          <option value="">System default</option>
-        </select>
+        {# One row: the question on the left, its answer on the right. #}
+        <div class="record-sheet__row">
+          <label class="record-sheet__legend record-sheet__legend--label" for="record-device">
+            <span class="record-sheet__step" aria-hidden="true">2</span>Which microphone
+          </label>
+          <select class="field__control record-sheet__select" id="record-device" data-record-device>
+            <option value="">System default</option>
+          </select>
+        </div>
         <p class="record-sheet__note-line" data-record-device-note></p>
       </div>
 
@@ -134,37 +139,40 @@
         <button type="button" class="record-sheet__link" data-record-settings>Change in audio settings</button>
       </p>
 
-      {# 3. When to transcribe. #}
+      {# 3. When to transcribe — the same cards as section 1. #}
       <fieldset class="record-sheet__section">
         <legend class="record-sheet__legend"><span class="record-sheet__step" aria-hidden="true" data-record-timing-step>3</span>When to transcribe</legend>
-        <div class="record-sheet__timings">
-          <label class="record-sheet__timing">
-            <input type="radio" name="record-timing" value="live" data-record-timing />
-            <span class="record-sheet__option-text">
-              <span class="record-sheet__option-name">While recording</span>
-              <span class="record-sheet__option-hint">Read along and ask questions as it happens.</span>
-            </span>
+        <div class="choice-cards">
+          <label class="choice-card" title="Read along and ask questions as it happens.">
+            <input class="choice-card__input" type="radio" name="record-timing" value="live" data-record-timing />
+            <svg class="choice-card__icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M2.5 12h1.5l1.5-4 2 8 2-6 1.5 2M14 8.5h7.5M14 12h7.5M14 15.5h5" />
+            </svg>
+            <span class="choice-card__title">While recording</span>
           </label>
-          <label class="record-sheet__timing">
-            <input type="radio" name="record-timing" value="after" data-record-timing />
-            <span class="record-sheet__option-text">
-              <span class="record-sheet__option-name">After it ends</span>
-              <span class="record-sheet__option-hint">More accurate, and nothing runs while recording.</span>
-            </span>
+          <label class="choice-card" title="More accurate, and nothing runs while recording.">
+            <input class="choice-card__input" type="radio" name="record-timing" value="after" data-record-timing />
+            <svg class="choice-card__icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="8.5" />
+              <path d="M12 7.5V12l3 2" />
+            </svg>
+            <span class="choice-card__title">After it ends</span>
           </label>
-          <label class="record-sheet__timing">
-            <input type="radio" name="record-timing" value="both" data-record-timing />
-            <span class="record-sheet__option-text">
-              <span class="record-sheet__option-name">Both</span>
-              <span class="record-sheet__option-hint">Live text now, a better transcript when it ends. Both are kept.</span>
-            </span>
+          <label class="choice-card" title="Live text now, a better transcript when it ends. Both are kept.">
+            <input class="choice-card__input" type="radio" name="record-timing" value="both" data-record-timing />
+            <svg class="choice-card__icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="7.5" y="3" width="13" height="15" rx="2" />
+              <path d="M4 7.5V19a2 2 0 0 0 2 2h10M10.5 8h7M10.5 11h7M10.5 14h4" />
+            </svg>
+            <span class="choice-card__title">Both</span>
           </label>
-          <label class="record-sheet__timing" data-record-timing-none hidden>
-            <input type="radio" name="record-timing" value="none" data-record-timing />
-            <span class="record-sheet__option-text">
-              <span class="record-sheet__option-name">Don't transcribe</span>
-              <span class="record-sheet__option-hint">Keep the video only.</span>
-            </span>
+          <label class="choice-card" title="Keep the video only." data-record-timing-none hidden>
+            <input class="choice-card__input" type="radio" name="record-timing" value="none" data-record-timing />
+            <svg class="choice-card__icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="2.5" y="6.5" width="13" height="11" rx="2" />
+              <path d="M15.5 10.5l6-3.5v10l-6-3.5z" />
+            </svg>
+            <span class="choice-card__title">Don't transcribe</span>
           </label>
         </div>
       </fieldset>

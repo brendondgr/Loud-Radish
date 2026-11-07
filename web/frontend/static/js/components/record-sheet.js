@@ -57,8 +57,7 @@ export class RecordSheet {
     this.fileName = $("[data-record-file-name]", root);
     this.timingNone = $("[data-record-timing-none]", root);
     this.timingStep = $("[data-record-timing-step]", root);
-    this.windowHint = $("[data-record-window-hint]", root);
-    this.windowHintText = this.windowHint?.textContent.trim() ?? "";
+    this.windowReason = $("[data-record-window-reason]", root);
     this.sections = new Map($$("[data-record-section]", root).map((n) => [n.dataset.recordSection, n]));
 
     for (const input of [...this.sources, ...this.timings, ...this.audios, this.video]) {
@@ -197,18 +196,21 @@ export class RecordSheet {
     }
   }
 
-  /** A source this machine cannot run is disabled and says why — never hidden. */
+  /**
+   * A source this machine cannot run is disabled and says why — never hidden. The reason goes on
+   * a line under the cards rather than inside one: an install command does not fit a card, and a
+   * card that grows to hold it throws the row out of line.
+   */
   _renderAvailability() {
     const windowInput = this.sources.find((input) => input.value === WINDOW);
     if (!windowInput) return;
     const available = modeStore.isAvailable(WINDOW);
     windowInput.disabled = !available;
-    setText(
-      this.windowHint,
-      available
-        ? this.windowHintText
-        : modeStore.reasonFor(WINDOW) || "Window recording is not available on this machine."
-    );
+    const reason = available
+      ? ""
+      : modeStore.reasonFor(WINDOW) || "Window recording is not available on this machine.";
+    setText(this.windowReason, reason ? `A window: ${reason}` : "");
+    if (this.windowReason) this.windowReason.hidden = !reason;
   }
 
   /** The microphone list, fetched on open rather than on load: devices come and go. */

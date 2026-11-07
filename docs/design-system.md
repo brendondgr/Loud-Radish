@@ -110,6 +110,16 @@ buttons and without a second dialog primitive.
 | 3 | **When to transcribe** | While recording · After it ends · Both | Always |
 | 4 | **Video** | Record what the window shows (on/off) | A window |
 
+- **Sections 1 and 3 are cards, not radio rows** (revised 2026-11-07, at the user's request). Each
+  card is an icon and a one-line title, chosen by clicking the card. The chosen card gets an
+  `--accent` outline, a soft glow and an `--accent-wash` fill, so the shape changes as well as the
+  colour. The first version gave every choice a hint underneath, and hints of different lengths
+  made the row hard to scan; the longer description is now on the card's `title`. The radio is
+  still underneath, visually hidden, so the group keeps one tab stop and arrow keys. Its focus ring
+  is drawn on the card. A disabled source's reason sits on a line under the row, not inside the
+  card, because an install command does not fit a card. On a phone, three cards stay three across,
+  and the four timing cards (a window's) go two by two.
+- **The microphone question is one row**: the label on the left, the dropdown filling the rest.
 - **Choosing a microphone here writes the configuration** through `POST /api/audio/device`. It does
   not add a per-run override. The tray's microphone picker reads the same value, so there is one
   answer to "which microphone".
