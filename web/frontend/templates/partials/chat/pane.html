@@ -19,12 +19,14 @@
     <div class="pane-header__group">
       <button
         type="button"
-        class="button button--icon button--quiet"
+        class="button button--quiet button--badged"
         data-glossary-toggle
         aria-controls="glossary-panel"
+        title="Glossary"
       >
-        <span class="button__label">Glossary</span>
-        <span class="badge badge--muted" data-glossary-count>0</span>
+        <span class="icon">{{ icons.icon("book", 16) }}</span>
+        <span class="visually-hidden">Glossary</span>
+        <span class="badge" data-glossary-count>0</span>
       </button>
 
       <button
@@ -67,7 +69,6 @@
     </div>
   </div>
 
-  {% include "partials/chat/quick_actions.html" %}
   {% include "partials/chat/composer.html" %}
 </aside>
 

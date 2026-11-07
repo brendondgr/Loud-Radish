@@ -1,10 +1,13 @@
+{% import "macros/icons.html" as icons %}
+
 {# The composer.
 
    Enter sends and Shift+Enter starts a new line, which is the convention every chat interface
    uses; getting it backwards here would cost the user a sentence every time.
 
    The send button becomes Stop while an answer is streaming rather than a second control appearing
-   beside it — during a talk there is one thing to do at a time. #}
+   beside it — during a talk there is one thing to do at a time. Both it and the suggested-questions
+   button are icons with names (redesign Step 8). #}
 
 <form class="composer" data-chat-form>
   <div class="composer__quote" data-chat-quote hidden>
@@ -15,6 +18,22 @@
   </div>
 
   <div class="composer__row">
+    <div class="quick-menu" data-quick-menu hidden>
+      <button
+        type="button"
+        class="button button--icon button--quiet composer__icon"
+        data-quick-toggle
+        aria-haspopup="menu"
+        aria-expanded="false"
+        aria-controls="quick-actions-menu"
+        aria-label="Suggested questions"
+        title="Suggested questions"
+      >
+        <span class="icon">{{ icons.icon("spark", 16) }}</span>
+      </button>
+      {% include "partials/chat/quick_actions.html" %}
+    </div>
+
     <label class="visually-hidden" for="chat-input">Ask about the talk</label>
     <textarea
       class="composer__input"
@@ -25,7 +44,15 @@
       autocomplete="off"
     ></textarea>
 
-    <button type="submit" class="button button--primary composer__send" data-chat-send>Ask</button>
+    <button
+      type="submit"
+      class="button button--primary button--icon composer__icon composer__send"
+      data-chat-send
+      aria-label="Ask"
+      title="Ask (Enter)"
+    >
+      <span class="icon" data-chat-send-icon>{{ icons.icon("send", 16) }}</span>
+    </button>
   </div>
 
   <p class="composer__note" data-chat-note role="status" aria-live="polite"></p>

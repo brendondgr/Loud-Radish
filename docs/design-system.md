@@ -583,6 +583,20 @@ appears, the transcript and the assistant stay side by side, and the Details tab
 across the width in their place. Below 900px it is one pane per tab, as before. A Glossary button on
 a narrow screen opens the Details tab first.
 
+### The assistant
+
+- **Your questions sit in neutral bubbles** — graphite, never an accent wash — and answers are plain
+  text beside them.
+- **Suggested questions are in a pop-up** behind a spark icon to the left of the box
+  (`aria-haspopup="menu"`), opening upward: one `menuitem` per configured prompt, with its hint.
+  Arrow keys, Home and End move; Enter or a click asks it and puts focus in the box; Escape closes
+  and returns focus to the button; a click outside or Tab closes it. While an answer streams the
+  button is disabled. They were a row of chips that took a third of the pane's height.
+- **Ask is an icon** (the send arrow, `aria-label="Ask"`), a 38px radish circle; while an answer
+  streams it becomes Stop, its name and picture changing together.
+- The header's Glossary button is the book with its count, as in the transcript's toolbar; it jumps
+  to the glossary in the details column.
+
 ## Quality Brief
 
 The interface should look considered rather than defaulted. Concretely:

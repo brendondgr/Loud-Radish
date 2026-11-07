@@ -1207,9 +1207,17 @@ as text to paste back.
       nine steps from the labs' chosen designs to the real pages (D-083 to D-086).
 - [ ] **The owner's decision on round two/three**, for both labs. Then the chosen designs replace
       `/sessions` and the main screen, and the labs are deleted rather than kept beside them.
-- [ ] **Short titles from the model.** The lab's titles are keywords or opening words — the
-      stand-in. The real version asks the language model for four to six words when a transcription
-      finishes, and stores it as the session's title.
+- [x] **Short titles from the model** (D-084, redesign Step 3). Written once a transcript is
+      finished; older recordings are named from the Recordings page's "Name *N* untitled…", which
+      asks first; any title can be renamed in the compact window.
+- [x] **The redesign, Steps 1–8** on `feature/redesign-from-labs`: radish accent (D-083), the
+      sessions API's media routes, model titles (D-084), the Recordings page as wide cards
+      (D-085), header health chips, the transcript pane, the details column (D-086), and the
+      assistant's pop-up. Step 9 removes the labs.
+- [ ] **The quick questions' ⌘1–⌘5 hints do nothing.** The configured prompts carry them
+      (`config/defaults.py`) and the pop-up shows them, but no code has ever handled the keys, and
+      Ctrl + a number is the browser's tab switching on Linux and Windows. Wire them to another
+      chord (Alt + number), or stop showing them.
 - [x] **"The dates are off" — already fixed, not yet running.** A default title is not stored; it
       is built from `started_at` by `archive._default_title`, which formatted UTC until D-076 made
       it local. The owner's instance on :8395 is a process from before that, so it still shows

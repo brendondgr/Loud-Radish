@@ -1,6 +1,6 @@
 # Recordings and Main Screen Redesign: From the Labs to the Real Pages
 
-*Written 2026-11-07. Status: **In progress (7 / 9)**. Source of truth for the target design: the
+*Written 2026-11-07. Status: **In progress (8 / 9)**. Source of truth for the target design: the
 two labs, `/labs/sessions/` and `/labs/main/` (D-082), at commit `e76a389` on branch
 `labs/sessions-cards`, and the owner's three rounds of exported feedback quoted below. This plan
 takes decisions **D-083 to D-086**. `feature/mixed-audio-steady-video` already holds D-080 and
@@ -520,6 +520,14 @@ available until Step 9 so every step can be compared against them side by side. 
 - *Action: Undergo the verification/tests/validation process for this phase. Once validated, push
   changes to GitHub stating: Recordings and Main Screen Redesign (8 / 9) Complete: Quick questions
   live in a pop-up beside an icon-only Ask, and questions sit in neutral bubbles.*
+
+> **Status: ✅ Complete.** One difference: **⌘1–⌘5 never worked** — the configured prompts carry
+> those hints, but no code handled the keys — so there was nothing to keep working, and none was
+> added here (Ctrl + a number is the browser's tab switching on Linux and Windows). The hints are
+> still shown in the menu; whether to wire or drop them is a follow-up in `docs/checklist.md`. The
+> question bubbles were already graphite, so the change there is the rounder corner. QA: the menu
+> opened by mouse and keyboard, arrow keys moved through the five prompts, Escape closed it and
+> returned focus, an outside click closed it, choosing one asked it, and Enter sent a typed one.
 
 #### Step 9: Retire the labs
 

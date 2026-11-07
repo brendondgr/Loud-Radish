@@ -76,12 +76,13 @@
   overflow-wrap: anywhere;
 }
 
-/* The question, set apart so a scan of the pane reads as a conversation rather than a wall. */
+/* The question, in a bubble, so a scan of the pane reads as a conversation rather than a wall. A
+ * neutral graphite bubble, never an accent wash: radish is the accent only (D-083). */
 .message--user .message__text {
   color: var(--text-primary);
   padding: var(--space-5) var(--space-6);
   background: var(--surface-control);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-control);
 }
 
 .message--assistant .message__text {
@@ -178,50 +179,71 @@
   color: var(--text-faint);
 }
 
-/* -- quick actions --------------------------------------------------------------------------- */
+/* -- suggested questions, in a pop-up (redesign Step 8) -----------------------------------------
+ * They were a row of chips over the composer that took a third of the pane's height. Now a menu
+ * behind an icon beside the box, opening upward over the conversation.
+ */
 
-.quick-actions {
+.quick-menu {
+  position: relative;
   flex: 0 0 auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  padding: var(--space-5) var(--space-8);
-  border-top: 1px solid var(--border-subtle);
 }
 
-.quick-actions:empty {
+.quick-menu[hidden] {
   display: none;
 }
 
-.quick-action {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: 30px;
-  padding: var(--space-2) var(--space-6);
-  font-family: var(--font-ui);
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  background: var(--surface-control);
+.quick-menu__list {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + var(--space-4));
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  width: max-content;
+  min-width: 260px;
+  max-width: min(340px, calc(var(--chat-width) - 40px));
+  padding: var(--space-3);
   border: 1px solid var(--border-control);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-control);
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-popover);
+}
+
+.quick-menu__list[hidden] {
+  display: none;
+}
+
+.quick-menu__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  min-height: 34px;
+  padding: var(--space-3) var(--space-5);
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  font-family: var(--font-ui);
+  font-size: var(--text-md);
+  color: var(--text-secondary);
+  text-align: left;
   cursor: pointer;
-  transition:
-    color var(--duration-fast) ease,
-    background var(--duration-fast) ease;
 }
 
-.quick-action:hover:not(:disabled) {
-  color: var(--text-primary);
+.quick-menu__item:hover:not(:disabled),
+.quick-menu__item:focus-visible {
+  outline: none;
   background: var(--surface-control-hover);
+  color: var(--text-primary);
 }
 
-.quick-action:disabled {
+.quick-menu__item:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 
-.quick-action__hint {
+.quick-menu__hint {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
   color: var(--text-faint);
@@ -267,8 +289,17 @@
   color: var(--text-faint);
 }
 
-.composer__send {
+/* The suggested-questions button and Ask: 38px icon buttons either side of the box. */
+.composer__icon {
   flex: 0 0 auto;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  min-height: 38px;
+}
+
+.composer__send {
+  border-radius: var(--radius-pill);
 }
 
 .composer__note {
@@ -400,11 +431,5 @@
 @media (max-width: 900px) {
   .chat-rail {
     display: none;
-  }
-
-  .quick-actions {
-    /* Scrolls sideways rather than wrapping to three rows and eating the messages. */
-    flex-wrap: nowrap;
-    overflow-x: auto;
   }
 }

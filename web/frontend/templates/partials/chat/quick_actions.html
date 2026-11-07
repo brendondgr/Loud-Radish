@@ -1,7 +1,16 @@
-{# One-tap prompts.
+{# One-tap prompts, in a pop-up beside the box (redesign Step 8).
 
    The questions a listener actually has are predictable — what did I miss, what was that term,
    what is the argument — and typing them out during a talk costs attention the talk needs. Each
-   one is a configured prompt, so the set is editable rather than baked in. #}
+   one is a configured prompt, so the set is editable rather than baked in. They were a row of chips
+   that took a third of the pane's height; the owner chose a menu behind an icon. Filled by
+   `chat-pane.js`, one `menuitem` per prompt. #}
 
-<div class="quick-actions" data-quick-actions aria-label="Suggested questions"></div>
+<div
+  class="quick-menu__list"
+  id="quick-actions-menu"
+  role="menu"
+  aria-label="Suggested questions"
+  data-quick-actions
+  hidden
+></div>

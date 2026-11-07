@@ -13,7 +13,8 @@
  */
 
 import { on } from "../core/bus.js";
-import { $, el, setText, toggle } from "../core/dom.js";
+import { $, el, setAttr, setText, toggle } from "../core/dom.js";
+import { icon } from "../core/icons.js";
 import { renderWithCitations } from "../core/citations.js";
 import * as prefs from "../core/storage.js";
 import { CHAT_CHANGED, CHAT_STREAM_CHANGED, chat } from "../stores/chat.js";
@@ -36,6 +37,9 @@ export class ChatPane {
     this.empty = $("[data-chat-empty]", root);
     this.emptyNote = $("[data-chat-empty-note]", root);
     this.actions = $("[data-quick-actions]", root);
+    this.quickMenu = $("[data-quick-menu]", root);
+    this.quickToggle = $("[data-quick-toggle]", root);
+    this.sendIcon = $("[data-chat-send-icon]", root);
     this.form = $("[data-chat-form]", root);
     this.input = $("[data-chat-input]", root);
     this.send = $("[data-chat-send]", root);
@@ -81,6 +85,8 @@ export class ChatPane {
       const { scrollTop, scrollHeight, clientHeight } = this.scroller;
       this.following = scrollHeight - (scrollTop + clientHeight) <= BOTTOM_SLACK_PX;
     });
+
+    this._wireQuickMenu();
 
     on(CHAT_DELTA, (payload) => this._onDelta(payload));
     on(CHAT_DONE, (payload) => this._onDone(payload));
@@ -269,17 +275,77 @@ export class ChatPane {
     this.actions.replaceChildren(
       ...actions.map((action) => {
         const button = el("button", {
-          className: "quick-action",
-          attrs: { type: "button", title: action.hint || action.prompt },
+          className: "quick-menu__item",
+          attrs: { type: "button", role: "menuitem", tabindex: "-1", title: action.prompt || null },
           children: [
             el("span", { text: action.label }),
-            action.hint ? el("span", { className: "quick-action__hint", text: action.hint }) : null,
+            action.hint ? el("span", { className: "quick-menu__hint", text: action.hint }) : null,
           ],
         });
-        button.addEventListener("click", () => this.runAction(action));
+        button.addEventListener("click", () => {
+          this._closeQuickMenu({ focus: false });
+          this.runAction(action);
+          this.input?.focus();
+        });
         return button;
       })
     );
+    // No prompts configured, no button: an empty menu is a control that explains nothing.
+    toggle(this.quickMenu, actions.length > 0);
+  }
+
+  // -- the suggested-questions pop-up (redesign Step 8) ----------------------------------
+
+  _wireQuickMenu() {
+    this.quickToggle?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (this.actions?.hidden) this._openQuickMenu();
+      else this._closeQuickMenu();
+    });
+    // Arrow keys move between the prompts; Escape closes and puts focus back on the button.
+    this.quickMenu?.addEventListener("keydown", (event) => {
+      if (this.actions?.hidden) {
+        if (event.key === "ArrowUp" && event.target === this.quickToggle) {
+          event.preventDefault();
+          this._openQuickMenu({ last: true });
+        }
+        return;
+      }
+      const items = [...this.actions.querySelectorAll("[role=menuitem]:not(:disabled)")];
+      const at = items.indexOf(document.activeElement);
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        this._closeQuickMenu();
+      } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const step = event.key === "ArrowDown" ? 1 : -1;
+        items[(at + step + items.length) % items.length]?.focus();
+      } else if (event.key === "Home" || event.key === "End") {
+        event.preventDefault();
+        (event.key === "Home" ? items[0] : items.at(-1))?.focus();
+      } else if (event.key === "Tab") {
+        this._closeQuickMenu({ focus: false });
+      }
+    });
+    document.addEventListener("click", (event) => {
+      if (!this.quickMenu?.contains(event.target)) this._closeQuickMenu({ focus: false });
+    });
+  }
+
+  _openQuickMenu({ last = false } = {}) {
+    if (!this.actions || chat.isStreaming) return;
+    this.actions.hidden = false;
+    this.quickToggle?.setAttribute("aria-expanded", "true");
+    const items = this.actions.querySelectorAll("[role=menuitem]");
+    (last ? items[items.length - 1] : items[0])?.focus();
+  }
+
+  _closeQuickMenu({ focus = true } = {}) {
+    if (!this.actions || this.actions.hidden) return;
+    this.actions.hidden = true;
+    this.quickToggle?.setAttribute("aria-expanded", "false");
+    if (focus) this.quickToggle?.focus();
   }
 
   renderIdentity() {
@@ -304,8 +370,13 @@ export class ChatPane {
   // -- plumbing ----------------------------------------------------------------------
 
   _setBusy(busy) {
-    setText(this.send, busy ? "Stop" : "Ask");
+    // An icon button: its name and its picture change together, never its text.
+    setAttr(this.send, "aria-label", busy ? "Stop" : "Ask");
+    setAttr(this.send, "title", busy ? "Stop the answer" : "Ask (Enter)");
+    if (this.sendIcon) this.sendIcon.innerHTML = icon(busy ? "close" : "send", 16);
     this.send?.classList.toggle("button--danger", busy);
+    if (busy) this._closeQuickMenu({ focus: false });
+    if (this.quickToggle) this.quickToggle.disabled = busy;
     for (const button of this.actions?.children ?? []) button.disabled = busy;
   }
 
