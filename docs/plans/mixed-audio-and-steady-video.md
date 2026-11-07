@@ -1,6 +1,6 @@
 # Mixed Audio and Steady Video
 
-**Status:** In progress (6 / 7 phases). Branch: `feature/mixed-audio-steady-video`.
+**Status:** ✅ Complete (7 / 7 phases), with two real-desktop checks recorded as open in `docs/checklist.md`. Branch: `feature/mixed-audio-steady-video`.
 
 ## 1. Introduction
 
@@ -87,7 +87,8 @@ recording; the set of inputs is fixed when recording starts.
   lets a secondary input stall the mix. Following the primary rather than a wall-clock tick keeps
   the file source's faster-than-real-time playback (`audio.file_speed`) working. If the primary
   delivers nothing for 500 ms or fails, the next input is promoted.
-- **No ffmpeg on the dev machine** (memory and `docs/checklist.md`). The mux and the stitch call
+- **No ffmpeg on the dev machine** (memory and `docs/checklist.md`). *Corrected in Phase 7: the
+  host has ffmpeg; only the agent's toolbox container lacks it.* The mux and the stitch call
   ffmpeg, so on this machine a capture restarted after a resize leaves separate pieces. The fixed
   canvas makes restarts rare. Porting `mux.py`/`stitch.py` to PyAV is **out of scope** and is
   logged as discovered work.
@@ -438,6 +439,27 @@ recording; the set of inputs is fixed when recording starts.
   > each input's volume and mute live, with a meter per input.*
 
 ### Phase 7 — Real-desktop verification and close-out
+
+> **Status: ✅ Complete, with two checks left open on purpose.**
+> - **Automated on this machine's real devices.** This branch's server ran on the host
+>   (`flatpak-spawn --host`, port 8413, stand-in speech model so it did not compete with the
+>   resident instance for the GPU). A 440 Hz tone played into a private null sink, inaudible,
+>   while the real microphone recorded the room. Computer sound + microphone: the tap linked the
+>   tone and the browser's streams; the microphone kept time; the microphone was muted after 4 s.
+>   - All three files were 8.00 s.
+>   - The computer-sound track peaked at 440 Hz (RMS 0.212).
+>   - The microphone track had RMS 0.0099 (the room's noise floor) before the mute and exactly 0
+>     after.
+>   - The microphone recording was deleted afterwards, and the null sink removed.
+> - **Not automated:** a resize through the real portal (it needs the screen-sharing dialog
+>   answered) and a 30-minute drift check. Both are open items in `docs/checklist.md`, with the
+>   commands to run.
+> - **Found:** the resident instance on :8395 runs from the main checkout and serves its templates
+>   and static files live, so this plan's branch switch there changed the pages it served without
+>   changing its API. The work moved to a worktree (`../TranscriberPrototype-mixed-audio`), the
+>   main checkout went back to `main`, and the fact is recorded in the checklist.
+> - **Corrected:** §2 said ffmpeg is missing on this machine. It is missing only from the toolbox
+>   container the agent runs in; the host has it, so the mux and the stitch work there.
 
 - **Locations:**
   - `docs/checklist.md`:

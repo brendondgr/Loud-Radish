@@ -1177,11 +1177,49 @@ approval**. Plan: [plans/recordings-on-the-main-screen.md](plans/recordings-on-t
 
 ## Discovered work
 
-- [ ] **Record a window's sound and the microphone at the same time.** Raised with the record sheet
+- [ ] **Resize a real window through the portal once.** D-080 is reproduced and verified against
+      the application's own pipeline (`utils/resize_capture_check.py`), but not against KWin's own
+      renegotiation, which needs the screen-sharing dialog answered by a person. Record a window,
+      drag and resize it for a minute, stop, and run
+      `uv run utils/check_video_frames.py data/recordings/<key>/video.webm`: one frame size, about
+      a minute long. If `pipewiresrc` itself fails the renegotiation, the capture log now names it,
+      and the next step is `pipewiresrc always-copy=true`, measured first.
+
+- [ ] **A long two-input recording on real devices.** The mixer's drift bound is checked over a
+      simulated hour (`tests/transcription/test_audio_mixer.py`) and the mix over 8 s of real
+      devices. A 30-minute call with a window's sound and the microphone is still to be listened to
+      for narration drifting against what it narrates.
+
+- [ ] **Echo cancellation for a microphone mixed with a computer's sound.** Through speakers the
+      microphone hears the other sound and the mix carries it twice, a moment apart; the record
+      sheet says to use headphones. PipeWire's `module-echo-cancel` would remove it.
+
+- [ ] **A volume boost above 100 %** for a quiet microphone next to a loud window (D-081 made volume
+      attenuation only).
+
+- [ ] **Crop-to-fill as a canvas option.** D-080 fits the window with bars; some recordings would
+      rather lose the edges than show bars.
+
+- [ ] **Plan: switching windows during one recording.** Asked for alongside D-080/D-081 and built
+      toward by both: a fixed canvas means a switch can end one segment, ask the portal for another
+      window, and start the next segment at the same size for the existing stitcher to join; the
+      mixer already takes named inputs that a plan could add or re-target mid-recording.
+
+- [ ] **The resident instance runs from the main checkout.** `uv run app.py` on :8395 serves
+      templates and static files straight from the working tree but keeps the Python it started
+      with, so switching that checkout's branch changes what pages it sends without changing the
+      server answering them. Found on 2026-11-07: started at 11:22, it was serving pages from two
+      record-sheet changes later that send fields its own API rejects. Restart it after any switch,
+      or develop in a separate `git worktree` so its checkout never moves.
+
+- [x] **Record a window's sound and the microphone at the same time.** *Done (D-081),
+      [plans/mixed-audio-and-steady-video.md](plans/mixed-audio-and-steady-video.md). Verified on
+      this machine's real devices: a tap carrying a 440 Hz tone and the real microphone, mixed, all
+      three files 8.00 s, and the microphone track exactly silent after a mute mid-run.* Raised with the record sheet
       (D-075) and left out of it on purpose: a session opens exactly one audio source
       (`services/session/sources.py`), so this needs a mixer, which is a capture change with its own
       timing risks rather than an interface change.
-      **Planned:** [plans/mixed-audio-and-steady-video.md](plans/mixed-audio-and-steady-video.md).
+
 
 - [x] **Resizing or moving a window stalls its recording.** *Fixed in code (D-080), reproduced and
       verified by `utils/resize_capture_check.py`; one real-desktop recording with a window dragged

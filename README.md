@@ -85,7 +85,7 @@ a muted microphone before the transcript comes back empty.
 
 ## What it does
 
-Ten things, and the README used to describe four of them.
+Twelve things, and the README used to describe four of them.
 
 - **One sheet for every recording.** *Start recording* asks what to record — your microphone, this
   computer's sound, or a window on your desktop — and when to transcribe it: while recording, so
@@ -95,6 +95,12 @@ Ten things, and the README used to describe four of them.
 - **Three sources.** A microphone; whatever this machine is playing, which is far cleaner for a
   remote talk than a microphone pointed at a speaker; or a WAV file replayed at real-time speed,
   exactly as if it were live.
+- **Two sounds at once, each with its own volume.** A window's sound, or this computer's, can be
+  recorded together with your microphone, so a call keeps both sides and a video keeps your
+  commentary. While recording, the **Sound** button sets each one from 0 to 100 % or mutes it, and
+  a muted sound is not recorded at all.
+- **A window recording survives being resized.** Every frame is fitted to one fixed size (720p,
+  1080p or 1440p), so dragging or resizing the window mid-talk never breaks the video.
 - **An assistant that answers from the transcript and nothing else.** Every claim carries a
   timestamp you can click to jump to what was said. When the speaker has not covered something the
   answer says so rather than inventing it. Four one-key questions are bound to ⌘1–⌘4 — summarise
