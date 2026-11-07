@@ -85,3 +85,18 @@ def test_the_recordings_row_no_longer_carries_exports() -> None:
     overview = (FRONTEND / "static/js/components/recording-overview.js").read_text(encoding="utf-8")
     assert "sessionExportUrl" in overview
     assert "sessionChatUrl" in overview
+
+
+def test_the_recordings_page_scrolls_itself() -> None:
+    """`body` is `overflow: hidden` for the main screen's panes, so `.page` must scroll on its own.
+
+    Reported: with only a `min-height`, a list longer than the window was cut off with no way to
+    reach the rest of it.
+    """
+    import re
+
+    css = (FRONTEND / "static/css/layout.css").read_text(encoding="utf-8")
+    rule = re.search(r"\n\.page \{(.*?)\}", css, re.S)
+    assert rule is not None
+    assert "overflow-y: auto" in rule.group(1)
+    assert re.search(r"(?<!min-)height: 100d?vh", rule.group(1))

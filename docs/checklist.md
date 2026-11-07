@@ -1161,6 +1161,9 @@ approval**. Plan: [plans/recordings-on-the-main-screen.md](plans/recordings-on-t
       transcribed after an approval dialog that says exactly what will run. A video's sound is
       taken out with PyAV first (D-078). Opening when done is the dialog's checkbox.
 - [x] Delete removes the recording folder as well as the database.
+- [x] **The Recordings page did not scroll.** `body` is `overflow: hidden` for the main screen's
+      panes, and `.page` had only a `min-height`, so rows below the window were unreachable — which
+      also hid every row's new actions. `.page` scrolls itself now.
 - [x] Verified in the browser against seeded mock recordings, the mock speech model and the local
       language model: open, ask, reload, close, transcribe a WAV-only and a video-only recording,
       the refusal for a silent video, 375 px, keyboard focus in the window.

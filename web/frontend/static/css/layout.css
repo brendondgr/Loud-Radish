@@ -142,9 +142,14 @@
  * readable measure, and shares nothing with the two-pane layout above.
  */
 
+/* A page that is not the application — Recordings — scrolls itself. `body` is `overflow: hidden`
+ * for the main screen, whose panes each scroll on their own, and that rule reaches this page too:
+ * with only a `min-height` here, a list longer than the window was cut off with no way to reach the
+ * rest of it. Reported. */
 .page {
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
   background: var(--surface-base);
 }
 
