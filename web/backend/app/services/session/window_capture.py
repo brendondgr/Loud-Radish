@@ -103,12 +103,10 @@ class WindowCaptureMixin:
             video_path=str(layout.video_segment(1, support.extension)),
             preview_path=str(layout.preview),
             frame_rate=config.capture.frame_rate,
-            max_height=config.capture.max_height,
             want_preview=config.capture.preview,
-            # What the compositor says it is handing over. Without it the pipeline can only give
-            # the scaler a range to satisfy, and a range is how a recording ended up 480x16.
-            source_width=stream.width,
-            source_height=stream.height,
+            # Fixed for the whole recording, and for every segment of it: a resize cannot reach the
+            # encoder, and a resumed capture joins its predecessor at the same size (D-080).
+            canvas_name=config.capture.canvas,
             quality=config.capture.quality,
         )
         # The source size is worth a line of its own: when a capture records the wrong thing, this
@@ -200,10 +198,8 @@ class WindowCaptureMixin:
             video_path=str(video_path),
             preview_path=str(layout.preview),
             frame_rate=config.capture.frame_rate,
-            max_height=config.capture.max_height,
             want_preview=config.capture.preview,
-            source_width=stream.width,
-            source_height=stream.height,
+            canvas_name=config.capture.canvas,
             quality=config.capture.quality,
         )
         try:

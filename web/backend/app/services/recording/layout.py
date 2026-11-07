@@ -81,6 +81,15 @@ class RecordingLayout:
     def audio(self) -> Path:
         return self.directory / AUDIO_NAME
 
+    def input_track(self, name: str) -> Path:
+        """One mixed input's own copy, ``audio.<name>.wav``, beside the mix (D-081).
+
+        Kept apart from :attr:`audio` on purpose: that is the file the transcription pass reads and
+        deletes, and these are the separate sides of it — what the window played, what the
+        microphone heard — kept for re-transcribing one of them later.
+        """
+        return self.directory / f"{AUDIO_NAME.removesuffix('.wav')}.{name}.wav"
+
     @property
     def sidecar(self) -> Path:
         return self.directory / SIDECAR_NAME

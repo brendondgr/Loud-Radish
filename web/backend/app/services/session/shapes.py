@@ -12,7 +12,7 @@ is the expensive part to reconstruct, and none of it was re-derived during the m
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Final
 
 import numpy as np
@@ -75,6 +75,13 @@ class CaptureOptions:
     #: `capture.audio_source` — the sheet in front of the user at the moment they press record is
     #: more authoritative than a setting they configured once and forgot.
     audio_source: str = "system"
+    #: What the run's sound is made of, mixed (D-081): one or two of `window`, `system`,
+    #: `microphone` (:data:`.modes.AUDIO_INPUTS`). Empty means not stated, and :func:`.plan.resolve`
+    #: settles it from the source and `audio_source` — so every request that predates the mixer
+    #: records exactly what it did.
+    audio_inputs: tuple[str, ...] = ()
+    #: Starting volume per input, 0–100. An input not named starts at 100 %.
+    levels: dict[str, int] = field(default_factory=dict)
 
     @property
     def records_nothing(self) -> bool:

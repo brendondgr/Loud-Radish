@@ -1,0 +1,64 @@
+{# The sound panel (D-081): each sound's volume and mute, while recording.
+
+   A popover from the header rather than a pane or a sheet. The header is on screen in every layout
+   and every run — the monitor pane is not — and a popover leaves the header exactly as wide as it
+   was, which matters: at 1024 px the header has already once pushed Stop under the privacy badge.
+
+   The rows are built from the template below by `components/sound-panel.js`, one per input the
+   running recording has. Nothing here is a setting: closing the recording closes the panel. #}
+
+<div class="sound-panel" data-sound-panel hidden>
+  <button
+    type="button"
+    class="button sound-panel__toggle"
+    data-sound-toggle
+    aria-expanded="false"
+    aria-controls="sound-panel-popover"
+    title="Each sound's volume, and mute"
+  >
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M2.5 6h2.5l3.5-3v10L5 10H2.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
+      <path d="M11 5.5a3.5 3.5 0 0 1 0 5M13 3.5a6.3 6.3 0 0 1 0 9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+    </svg>
+    <span>Sound</span>
+  </button>
+
+  <div
+    class="sound-panel__popover"
+    id="sound-panel-popover"
+    role="dialog"
+    aria-label="Sound"
+    data-sound-popover
+    hidden
+  >
+    <p class="sound-panel__heading">Sound</p>
+    <ul class="sound-panel__rows" data-sound-rows></ul>
+    <p class="sound-panel__hint">Arrow keys move the volume by 5 %. M mutes the sound you are on.</p>
+    <p class="sound-panel__error" data-sound-error role="alert" hidden></p>
+  </div>
+
+  {# One row. Cloned per input; the labels are filled in with the input's name. #}
+  <template data-sound-row-template>
+    <li class="sound-row" data-sound-row>
+      <div class="sound-row__head">
+        <span class="sound-row__name" data-sound-name>Sound</span>
+        <span class="sound-row__value numeric" data-sound-value>100 %</span>
+      </div>
+      <div class="sound-row__controls">
+        <button type="button" class="button button--icon sound-row__mute" data-sound-mute aria-pressed="false" aria-label="Mute">
+          <svg class="sound-row__icon-on" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M2.5 6h2.5l3.5-3v10L5 10H2.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
+            <path d="M11 5.5a3.5 3.5 0 0 1 0 5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+          </svg>
+          <svg class="sound-row__icon-off" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M2.5 6h2.5l3.5-3v10L5 10H2.5z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
+            <path d="M11 6l3.5 4M14.5 6 11 10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+          </svg>
+        </button>
+        <input class="sound-row__slider" type="range" min="0" max="100" step="5" value="100" data-sound-slider aria-label="Volume" />
+      </div>
+      <div class="sound-row__meter" aria-hidden="true"><span class="sound-row__meter-fill" data-sound-meter></span></div>
+      <p class="sound-row__status" data-sound-status></p>
+    </li>
+  </template>
+</div>

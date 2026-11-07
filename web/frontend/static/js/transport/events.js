@@ -47,6 +47,11 @@ export const TRANSCRIPTION_CANCELLED = "transcription.cancelled";
  *  frame leaves a live preview showing for a capture that ended. */
 export const CAPTURE_STATE = "capture.state";
 
+/** A mix input's volume or mute changed, or one stopped delivering (D-081). Never dropped. */
+export const MIX_CHANGED = "mix.changed";
+/** Each mix input's meter, a few times a second. Coalescing. */
+export const MIX_LEVELS = "mix.levels";
+
 /** One export's stages and weighted progress (D-037). Coalescing, like transcription progress. */
 export const EXPORT_PROGRESS = "export.progress";
 /** The export finished and there is a file to collect. */

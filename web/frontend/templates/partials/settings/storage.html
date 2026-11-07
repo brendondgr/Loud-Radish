@@ -102,6 +102,26 @@
     </div>
   </div>
 
+  {# D-080. The one window-video setting in here, because it decides what a recording is written
+     at — the same question as where it goes and how long it may run. #}
+  <div class="settings__group">
+    <h3 class="settings__heading">Window video</h3>
+
+    <div class="field">
+      <label class="field__label" for="capture-canvas">Video frame size</label>
+      <select class="field__control" id="capture-canvas" data-config="capture.canvas">
+        <option value="720p">720p — 1280 × 720, smallest files</option>
+        <option value="1080p">1080p — 1920 × 1080</option>
+        <option value="1440p">1440p — 2560 × 1440, sharpest text</option>
+      </select>
+      <p class="field__hint">
+        Every window recording is written at this one size. The window is fitted inside it, with
+        bars where the shapes differ, so resizing or moving the window while recording never
+        changes the video's size or interrupts it. Applies from the next recording.
+      </p>
+    </div>
+  </div>
+
   {# The recovery path made reachable. A recording only survives here because a pass failed, was
      interrupted, or because retention is on — so this list is mostly a list of things that went
      wrong, which is exactly what it is for (D-021). #}

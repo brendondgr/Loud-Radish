@@ -99,6 +99,10 @@ export const api = {
   pauseSession: () => post("/api/session/pause"),
   resumeSession: () => post("/api/session/resume"),
   cancelSession: () => post("/api/session/cancel"),
+  /** The running mix: each input's volume, mute, level and whether it is delivering (D-081). */
+  mix: () => get("/api/session/mix"),
+  /** Change inputs' volume (0–100) or mute: `{microphone: {volume: 40}, window: {muted: true}}`. */
+  setMix: (inputs) => patch("/api/session/mix", { inputs }),
   pauseTranscription: () => post("/api/recordings/transcription/pause"),
   cancelTranscription: () => post("/api/recordings/transcription/cancel"),
   resumeTranscription: (key) => post(`/api/sessions/${encodeURIComponent(key)}/transcribe/resume`),

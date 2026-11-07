@@ -32,6 +32,18 @@ MIN_DIMENSION: Final = 16
 MAX_DIMENSION: Final = 16384
 
 
+#: The fixed sizes a recording can be written at (D-080), 16:9 because that is the shape of the
+#: screens a recording is watched on. Every frame of a recording is scaled to fit one of these, so a
+#: window resized or moved mid-talk changes what is inside the frame and never the frame itself.
+CANVASES: Final[dict[str, tuple[int, int]]] = {
+    "720p": (1280, 720),
+    "1080p": (1920, 1080),
+    "1440p": (2560, 1440),
+}
+
+DEFAULT_CANVAS: Final = "1080p"
+
+
 class GeometryError(ValueError):
     """The negotiated size cannot be recorded. The message names the value that was wrong."""
 
@@ -104,6 +116,20 @@ def resolve(
     height = even(max(MIN_DIMENSION, round(source_height * scale)))
     width = even(max(MIN_DIMENSION, round(source_width * scale)))
     return Geometry(width=width, height=height, scaled=True)
+
+
+def canvas(name: str) -> Geometry:
+    """The fixed size a recording is written at. An unknown name gets the default.
+
+    **Fixed for the whole recording, and that is the fix for resizing (D-080).** The portal reports
+    no source size on this desktop, so the recording used to be written at whatever size the window
+    first was, with no scaler at all — and a window resized mid-talk then sent frames of a new size
+    to an encoder and a muxer that cannot change resolution mid-stream. The stream stalled, the file
+    lost its index. A canvas chosen before the first frame cannot be changed by anything the window
+    does: the scaler in front of it absorbs every resize.
+    """
+    width, height = CANVASES.get(name, CANVASES[DEFAULT_CANVAS])
+    return Geometry(width=even(width), height=even(height), scaled=True)
 
 
 def describe(source_width: int, source_height: int, geometry: Geometry) -> str:

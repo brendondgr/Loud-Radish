@@ -20,14 +20,10 @@ import logging
 from dataclasses import dataclass
 from typing import Final
 
-from .geometry import GeometryError, describe, resolve
+from .geometry import DEFAULT_CANVAS, canvas
 from .probe import CaptureSupport
 
 logger = logging.getLogger(__name__)
-
-#: Ceiling on the encoded height. Applied only when the negotiated source size is known — the
-#: portal reports none on this desktop, so an unscaled native-size recording is the normal case.
-DEFAULT_MAX_HEIGHT: Final = 720
 
 #: Frames per second. Fifteen is ample for a talk: slides change every thirty seconds and a cursor
 #: moving at 15 fps is perfectly legible. Thirty would double the encoder's work for nothing.
@@ -173,13 +169,16 @@ def build(
     video_path: str,
     preview_path: str,
     frame_rate: int = DEFAULT_FRAME_RATE,
-    max_height: int = DEFAULT_MAX_HEIGHT,
     want_preview: bool = True,
-    source_width: int = 0,
-    source_height: int = 0,
+    canvas_name: str = DEFAULT_CANVAS,
     quality: str = DEFAULT_QUALITY,
 ) -> PipelineSpec:
     """Assemble the launch line for one recording.
+
+    ``fd`` below zero omits the portal's descriptor, so ``pipewiresrc`` reads ``node_id`` from the
+    session's own PipeWire daemon. Nothing in a real capture does that — the portal's node is only
+    reachable through its descriptor — but it is how a resize is reproduced against a test node
+    (``utils/resize_capture_check.py``) without a compositor dialog.
 
     Raises:
         ValueError: if the support verdict says this machine cannot encode. Callers check
@@ -198,7 +197,7 @@ def build(
         # stopped recording is a file with no duration index that many players refuse to seek.
         "-e",
         "pipewiresrc",
-        f"fd={fd}",
+        *([f"fd={fd}"] if fd >= 0 else []),
         f"path={node_id}",
         # The portal's node is live: a late frame should be dropped rather than queued, or the
         # recording drifts behind the clock it is being muxed against.
@@ -247,7 +246,7 @@ def build(
     if include_preview:
         args += ["tee", "name=t", "!", "queue", "!"]
 
-    args += _record_scaler(max_height, source_width, source_height)
+    args += _canvas_stage(canvas_name)
     # **Hardware only, and the distinction is load-bearing.** VA-API encoders want NV12 and will
     # not negotiate to it from every input format on their own. This used to be keyed off
     # `support.parser` as a stand-in for "is hardware", which held only as long as no software
@@ -304,29 +303,27 @@ def build(
     )
 
 
-def _record_scaler(max_height: int, source_width: int, source_height: int) -> list[str]:
-    """The recording branch's scaler, or nothing at all.
+def _canvas_stage(name: str) -> list[str]:
+    """The recording branch's scaler: every frame fitted to one fixed size (D-080).
 
-    **Never asks GStreamer to work a size out.** Every fault this pipeline has had came from doing
-    exactly that. A caps *range* asks `videoscale` to pick, and it picks by fixating against the
-    source's dimensions and pixel-aspect-ratio — which produced a **480x16** recording, and then an
-    outright integer overflow against a source whose aspect ratio made the product too large.
+    **Always present, and that is the whole change.** This used to be omitted whenever the source
+    size was unknown — which on this desktop is always, since the portal reports none — so the
+    window was recorded at whatever size it first was, and a resize sent frames of a new size
+    straight to an encoder and a muxer that cannot change resolution mid-stream. Reproduced against
+    a PipeWire test node (`utils/resize_capture_check.py`): every frame stayed at the first size,
+    and the stream died at the first resize the encoder could not take.
 
-    So the size is decided here, in `geometry.resolve`, from concrete numbers, or not at all. When
-    the negotiated size is unknown or refused there is **no scaler on this branch** and the window
-    is recorded at whatever size it is: a larger file that plays beats a smaller one that does not
-    exist.
+    Both dimensions are stated, never a range: fixation is what produced the 480x16 recording and
+    the scaler overflow, and two concrete numbers need no arithmetic. `add-borders=true` with a
+    square pixel aspect ratio fits the window inside the frame with bars rather than stretching or
+    cropping it — a cropped recording of a slide loses its edges.
     """
-    try:
-        geometry = resolve(source_width, source_height, max_height=max_height)
-    except GeometryError as exc:
-        # Expected whenever the portal reports nothing, which is the normal case on this desktop.
-        logger.debug("Not scaling the recording: %s", exc)
-        return []
-
-    if not geometry.scaled:
-        logger.info("Capture geometry: %s", describe(source_width, source_height, geometry))
-        return []
-
-    logger.info("Capture geometry: %s", describe(source_width, source_height, geometry))
-    return ["videoscale", "!", geometry.caps, "!"]
+    geometry = canvas(name)
+    logger.info("Recording on a fixed %dx%d canvas", geometry.width, geometry.height)
+    return [
+        "videoscale",
+        "add-borders=true",
+        "!",
+        f"{geometry.caps},pixel-aspect-ratio=1/1",
+        "!",
+    ]

@@ -64,6 +64,12 @@ TRANSCRIPTION_CANCELLED: Final = "transcription.cancelled"
 #: missed the window-closed frame would keep showing a live preview of a capture that ended.
 CAPTURE_STATE: Final = "capture.state"
 
+#: A mix input's volume or mute changed, or one stopped delivering (D-081). Critical: two tabs that
+#: disagree about whether the microphone is muted are worse than one that is late.
+MIX_CHANGED: Final = "mix.changed"
+#: Each mix input's meter, a few times a second. Coalescing: only the newest reading means anything.
+MIX_LEVELS: Final = "mix.levels"
+
 # -- export (D-037) ---------------------------------------------------------------------
 #: One export's stages, weighted progress, and estimated time. Coalescing: only the newest frame
 #: means anything, exactly as `transcription.progress` is.
@@ -108,6 +114,8 @@ ALL_EVENTS: Final[tuple[str, ...]] = (
     TRANSCRIPTION_DONE,
     TRANSCRIPTION_FAILED,
     CAPTURE_STATE,
+    MIX_CHANGED,
+    MIX_LEVELS,
     EXPORT_PROGRESS,
     EXPORT_DONE,
     EXPORT_FAILED,
@@ -128,6 +136,7 @@ COALESCING_EVENTS: Final[frozenset[str]] = frozenset(
     {
         TRANSCRIPT_HYPOTHESIS,
         AUDIO_LEVEL,
+        MIX_LEVELS,
         VAD_STATE,
         STATUS,
         RECORDING_PROGRESS,
@@ -158,6 +167,7 @@ CRITICAL_EVENTS: Final[frozenset[str]] = frozenset(
         TRANSCRIPTION_CANCELLED,
         TRANSCRIPTION_FAILED,
         CAPTURE_STATE,
+        MIX_CHANGED,
         # An export that finished and never said so leaves a window watching an encode that ended,
         # with no way to reach the file it produced.
         EXPORT_DONE,
@@ -192,7 +202,9 @@ INVALIDATES: Final[dict[str, frozenset[str]]] = {
     TRANSCRIPTION_PAUSED: frozenset({TRANSCRIPTION_PROGRESS}),
     TRANSCRIPTION_CANCELLED: frozenset({TRANSCRIPTION_PROGRESS}),
     # Capture has ended, so how much of it had been written is no longer a live figure either.
-    SESSION_STOPPED: frozenset({RECORDING_PROGRESS, TRANSCRIPT_HYPOTHESIS}),
+    # And each input's meter: a page opened after the stop would otherwise draw a microphone still
+    # moving for a recording that has ended (D-081).
+    SESSION_STOPPED: frozenset({RECORDING_PROGRESS, TRANSCRIPT_HYPOTHESIS, MIX_LEVELS}),
     # **A pause retracts nothing, and that is deliberate.** It was written the other way first, by
     # analogy with the stop above, and running it showed the analogy is wrong: a stop ends capture,
     # so its last hypothesis and its last byte count are *stale*. A hold does not end anything — the
@@ -200,7 +212,7 @@ INVALIDATES: Final[dict[str, frozenset[str]]] = {
     # long as it is. Retracting them would mean a client that reconnected during a pause saw less
     # than one that stayed connected, and the tentative text vanishing on pause reads as the
     # engine having thrown it away.
-    SESSION_CANCELLED: frozenset({RECORDING_PROGRESS, TRANSCRIPT_HYPOTHESIS}),
+    SESSION_CANCELLED: frozenset({RECORDING_PROGRESS, TRANSCRIPT_HYPOTHESIS, MIX_LEVELS}),
     # **The same retraction, for the same reason, before it can happen again.** An export's last
     # progress frame says `running` too, and a window opened an hour later would otherwise be
     # replayed it and sit watching an encode that finished before it was opened.

@@ -7,6 +7,7 @@ learns which is running.
 from .base import AudioSource, ErrorCallback, FrameCallback, SourceInfo
 from .device import DeviceSource, DeviceUnavailableError
 from .file import WavFileSource
+from .mixed import MixedSource, MixInput
 from .monitor import MonitorSource, probe_peak, record_command
 from .synthetic import Span, SyntheticSource, silence, speech
 
@@ -16,6 +17,8 @@ __all__ = [
     "DeviceUnavailableError",
     "ErrorCallback",
     "FrameCallback",
+    "MixInput",
+    "MixedSource",
     "MonitorSource",
     "SourceInfo",
     "Span",

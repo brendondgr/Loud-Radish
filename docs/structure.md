@@ -95,7 +95,9 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   │       ├── level.py       # RMS, peak, clipping for the input meter
 │   │   │       ├── preprocess.py  # High-pass filter and gain normalisation
 │   │   │       ├── devices.py     # Merged microphone + loopback enumeration
-│   │   │       └── sources/       # base, file (real-time WAV), device, synthetic
+│   │   │       ├── mixer.py       # Gain ramp, sum and clip, 0–100 % volume (D-081)
+│   │   │       └── sources/       # base, file (real-time WAV), device, synthetic, and
+│   │   │                          #   mixed — several inputs heard as one (D-081)
 │   │   │   └── vad/               # Speech detection and pause events
 │   │   │       ├── base.py        # The one-question-per-frame detector interface
 │   │   │       ├── energy.py      # Dependency-free default, adaptive noise floor
@@ -173,6 +175,7 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   │       │                  #   and a chosen past recording put in that slot (D-076)
 │   │   │       ├── past_pass.py   # Planning and starting an approved pass over a past recording
 │   │   │       ├── sources.py     # What a session listens to, and proving it is listening
+│   │   │       ├── mixing.py      # The run's mixer, each input's own track, a lost input (D-081)
 │   │   │       ├── hold.py        # Pause and resume (D-044)
 │   │   │       └── manager.py     # capture → VAD → engine → store → transport. Owns the
 │   │   │                          #   lifecycle; the six modules above are the rest of this one
@@ -267,7 +270,9 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │
 ├── libs/                          # Internal packages with more than one consumer
 ├── utils/                         # Standalone helpers not specific to the web app
-│   └── loud_radish_ctl.py         # Drive recording from outside the browser (D-024)
+│   ├── loud_radish_ctl.py         # Drive recording from outside the browser (D-024)
+│   ├── check_video_frames.py      # A recording's duration and every frame size in it (D-080)
+│   └── resize_capture_check.py    # Resize a "window" mid-recording and check the file (D-080)
 ├── tests/                         # Python tests, grouped by area
 │   ├── api/                       # Routes, transport, audio library
 │   ├── assistant/                 # LLM clients, chat, context, and the polish pass

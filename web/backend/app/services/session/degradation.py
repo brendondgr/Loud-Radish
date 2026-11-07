@@ -425,6 +425,34 @@ def video_ended_early(shortfall_s: float, audio_name: str) -> Failure:
     )
 
 
+#: How the interface names each mix input, for messages about one of them (D-081).
+INPUT_NAMES = {
+    "window": "The window's sound",
+    "system": "This computer's sound",
+    "microphone": "Your microphone",
+}
+
+
+def audio_input_lost(name: str, detail: str = "") -> Failure:
+    """One of a mix's inputs stopped; the others are still recording (D-081).
+
+    A warning, because the recording is still going and still has sound — but it no longer has
+    *that* sound, and someone narrating into a microphone that was unplugged needs to know now
+    rather than when they read a transcript with no narration in it.
+    """
+    who = INPUT_NAMES.get(name, name)
+    reason = f" ({detail})" if detail else ""
+    return Failure(
+        code="audio-input-lost",
+        message=(
+            f"{who} stopped{reason}. The rest is still being recorded; stop and start again to "
+            "bring it back."
+        ),
+        severity=Severity.WARNING,
+        transcription_continues=True,
+    )
+
+
 def window_audio_stopped() -> Failure:
     """Everything the tap was carrying went away while the recording was still running.
 

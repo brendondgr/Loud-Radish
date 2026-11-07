@@ -26,6 +26,8 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import sys
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -192,23 +194,25 @@ def mean_luminance(path) -> float:
 # -- the recording ----------------------------------------------------------------------------
 
 
-def test_a_capture_is_written_at_the_size_it_was_asked_for(tmp_path) -> None:
-    """The regression test for 480x16.
+def build(tmp_path, **overrides):
+    """A spec writing into ``tmp_path``. The 720p canvas keeps these files small and fast."""
+    kwargs = {
+        "node_id": 0,
+        "fd": 0,
+        "video_path": str(tmp_path / "out.webm"),
+        "preview_path": str(tmp_path / "preview.jpg"),
+        "canvas_name": "720p",
+    }
+    return pipeline.build(support(), **{**kwargs, **overrides})
 
-    A 1920x1080 source with a 720 ceiling must produce 1280x720. Before the fix it produced
+
+def test_a_capture_is_written_at_the_canvas_size(tmp_path) -> None:
+    """The regression test for 480x16, and for D-080's canvas.
+
+    A 1920x1080 source on a 720p canvas must produce 1280x720. Before the 480x16 fix it produced
     480x270, because the preview branch's width propagated back through the tee.
     """
-    spec = pipeline.build(
-        support(),
-        node_id=0,
-        fd=0,
-        video_path=str(tmp_path / "out.webm"),
-        preview_path=str(tmp_path / "preview.jpg"),
-        source_width=1920,
-        source_height=1080,
-        max_height=720,
-    )
-    run_pipeline(spec, width=1920, height=1080)
+    run_pipeline(build(tmp_path), width=1920, height=1080)
 
     assert dimensions(tmp_path / "out.webm") == (1280, 720)
 
@@ -219,37 +223,22 @@ def test_the_preview_does_not_shrink_the_recording(tmp_path) -> None:
     This is the fault stated as a property rather than as a number: whatever the preview is, the
     recording is not that.
     """
-    spec = pipeline.build(
-        support(),
-        node_id=0,
-        fd=0,
-        video_path=str(tmp_path / "out.webm"),
-        preview_path=str(tmp_path / "preview.jpg"),
-        source_width=1920,
-        source_height=1080,
-        max_height=720,
-    )
-    run_pipeline(spec, width=1920, height=1080)
+    run_pipeline(build(tmp_path), width=1920, height=1080)
 
     assert dimensions(tmp_path / "out.webm")[0] != pipeline.PREVIEW_WIDTH
     assert dimensions(tmp_path / "preview.jpg")[0] == pipeline.PREVIEW_WIDTH
 
 
-def test_a_window_smaller_than_the_ceiling_keeps_its_own_size(tmp_path) -> None:
-    """Scaling is only ever downward: stretching a small window up loses sharpness for nothing."""
-    spec = pipeline.build(
-        support(),
-        node_id=0,
-        fd=0,
-        video_path=str(tmp_path / "out.webm"),
-        preview_path=str(tmp_path / "preview.jpg"),
-        source_width=640,
-        source_height=480,
-        max_height=720,
-    )
-    run_pipeline(spec, width=640, height=480)
+@pytest.mark.parametrize(("width", "height"), [(640, 480), (1281, 721), (480, 900), (2560, 1440)])
+def test_any_window_is_fitted_to_the_canvas(tmp_path, width: int, height: int) -> None:
+    """Small, odd, tall or large: the file is the canvas's size, never the window's (D-080).
 
-    assert dimensions(tmp_path / "out.webm") == (640, 480)
+    A window is any size a person drags it to, and the encoder takes even dimensions only and the
+    muxer one size per file. The canvas is what stands between them.
+    """
+    run_pipeline(build(tmp_path, want_preview=False), width=width, height=height)
+
+    assert dimensions(tmp_path / "out.webm") == (1280, 720)
 
 
 def test_a_hostile_aspect_ratio_does_not_kill_the_pipeline(tmp_path) -> None:
@@ -261,28 +250,18 @@ def test_a_hostile_aspect_ratio_does_not_kill_the_pipeline(tmp_path) -> None:
     the same arithmetic failing: `videoscale` asked to hit a target while preserving display aspect,
     against a source whose pixel-aspect-ratio makes the product overflow.
 
-    Nothing is asked to fixate any more — the preview names two concrete numbers and letterboxes,
-    and the recording branch has no scaler at all unless both source dimensions are known — so this
-    must simply run. Verified to fail before the change and pass after, against this same source.
+    Nothing is asked to fixate any more — both scalers name two concrete numbers and letterbox — so
+    this must simply run. Verified to fail before the change and pass after, against this same
+    source.
     """
-    spec = pipeline.build(
-        support(),
-        node_id=0,
-        fd=0,
-        video_path=str(tmp_path / "out.webm"),
-        preview_path=str(tmp_path / "preview.jpg"),
-        # Exactly what the portal gives us on this desktop: no size at all.
-        source_width=0,
-        source_height=0,
-    )
+    spec = build(tmp_path, canvas_name="1080p")
     result = run_hostile(spec)
 
     assert result.returncode == 0, result.stderr
     assert "overflow" not in result.stderr.lower()
     assert "negotiation" not in result.stderr.lower()
 
-    width, height = dimensions(tmp_path / "out.webm")
-    assert (width, height) == (1920, 1080), "the source size, unscaled, because it was not known"
+    assert dimensions(tmp_path / "out.webm") == (1920, 1080)
     assert dimensions(tmp_path / "preview.jpg") == (
         pipeline.PREVIEW_WIDTH,
         pipeline.PREVIEW_HEIGHT,
@@ -295,15 +274,7 @@ def test_the_preview_is_always_the_same_two_numbers(tmp_path) -> None:
     Width alone leaves the height to be fixated from the source's aspect, which is the arithmetic
     that failed. Letterboxing is the price and it is worth paying for a thumbnail.
     """
-    spec = pipeline.build(
-        support(),
-        node_id=0,
-        fd=0,
-        video_path=str(tmp_path / "out.webm"),
-        preview_path=str(tmp_path / "preview.jpg"),
-        source_width=0,
-        source_height=0,
-    )
+    spec = build(tmp_path)
     assert "add-borders=true" in spec.args
     run_pipeline(spec, width=640, height=480)
 
@@ -314,37 +285,27 @@ def test_the_preview_is_always_the_same_two_numbers(tmp_path) -> None:
     )
 
 
-def test_an_unknown_size_is_recorded_rather_than_guessed_at(tmp_path) -> None:
-    """No scaler at all when the size is unknown, because every guess so far has been wrong."""
-    args = pipeline.build(
-        support(),
-        node_id=0,
-        fd=0,
-        video_path=str(tmp_path / "out.webm"),
-        preview_path=str(tmp_path / "preview.jpg"),
-        want_preview=False,
-        source_width=0,
-        source_height=0,
-    ).args
+def test_a_window_resized_mid_recording_keeps_one_frame_size(tmp_path) -> None:
+    """The fault D-080 fixes, reproduced end to end rather than inferred from the launch line.
 
-    assert "videoscale" not in args
+    `utils/resize_capture_check.py` runs the real pipeline with its source resized on a timer —
+    what `pipewiresrc` emits when the compositor resizes a window's stream — and decodes every
+    frame. Without the canvas it measured one WebM holding six frame sizes under a header naming
+    the first. Needs a system Python with GStreamer's bindings, which the virtualenv lacks (D-022).
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "utils"))
+    import resize_capture_check as check
 
+    try:
+        check.system_python()
+    except RuntimeError as exc:
+        pytest.skip(str(exc))
 
-def test_a_source_under_the_ceiling_is_not_scaled_either(tmp_path) -> None:
-    """Scaling down a window that is already small is work with a cost and no benefit."""
-    args = pipeline.build(
-        support(),
-        node_id=0,
-        fd=0,
-        video_path=str(tmp_path / "out.webm"),
-        preview_path=str(tmp_path / "preview.jpg"),
-        want_preview=False,
-        source_width=640,
-        source_height=480,
-        max_height=720,
-    ).args
+    result = check.run(6.0, 1.5, "720p", tmp_path / "resized.webm")
 
-    assert "videoscale" not in args
+    assert len(result.resizes) >= 3
+    assert result.problems == []
+    assert set(result.report.sizes) == {(1280, 720)}
 
 
 def test_frames_actually_reach_the_file(tmp_path) -> None:
@@ -355,8 +316,6 @@ def test_frames_actually_reach_the_file(tmp_path) -> None:
         fd=0,
         video_path=str(tmp_path / "out.webm"),
         preview_path=str(tmp_path / "preview.jpg"),
-        source_width=640,
-        source_height=480,
     )
     run_pipeline(spec, width=640, height=480)
 
@@ -375,8 +334,6 @@ def test_the_recording_is_not_a_black_rectangle(tmp_path) -> None:
         fd=0,
         video_path=str(tmp_path / "out.webm"),
         preview_path=str(tmp_path / "preview.jpg"),
-        source_width=640,
-        source_height=480,
     )
     run_pipeline(spec, width=640, height=480)
 
@@ -391,8 +348,6 @@ def test_the_preview_is_a_readable_image(tmp_path) -> None:
         fd=0,
         video_path=str(tmp_path / "out.webm"),
         preview_path=str(tmp_path / "preview.jpg"),
-        source_width=1280,
-        source_height=720,
     )
     run_pipeline(spec, width=1280, height=720)
 
@@ -404,16 +359,7 @@ def test_the_preview_is_a_readable_image(tmp_path) -> None:
 
 def test_a_capture_without_a_preview_still_records(tmp_path) -> None:
     """The preview is the expendable half; declining it must not change the recording."""
-    spec = pipeline.build(
-        support(),
-        node_id=0,
-        fd=0,
-        video_path=str(tmp_path / "out.webm"),
-        preview_path=str(tmp_path / "preview.jpg"),
-        source_width=1280,
-        source_height=720,
-        want_preview=False,
-    )
+    spec = build(tmp_path, want_preview=False)
     run_pipeline(spec, width=1280, height=720)
 
     assert dimensions(tmp_path / "out.webm") == (1280, 720)
@@ -525,9 +471,8 @@ def test_the_chosen_encoder_produces_a_playable_file(tmp_path) -> None:
         fd=0,
         video_path=str(tmp_path / f"out.{verdict.extension}"),
         preview_path=str(tmp_path / "preview.jpg"),
-        source_width=1280,
-        source_height=720,
         want_preview=False,
+        canvas_name="720p",
     )
     run_pipeline(spec, width=1280, height=720)
 

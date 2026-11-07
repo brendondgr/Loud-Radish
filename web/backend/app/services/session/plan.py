@@ -66,6 +66,9 @@ def resolve(mode: str | None, options: CaptureOptions | None) -> tuple[str, Capt
         options = replace(options, video=False)
     options = replace(options, source=source)
 
+    options = replace(options, audio_inputs=_inputs(source, options))
+    options = replace(options, levels=_levels(options))
+
     derived = modes.derive_mode(source, post_transcription=options.post_transcription)
     if mode is not None and mode != derived:
         raise OptionsConflict(
@@ -74,6 +77,59 @@ def resolve(mode: str | None, options: CaptureOptions | None) -> tuple[str, Capt
             f"{_timing(options)} is a '{derived}' recording."
         )
     return derived, options
+
+
+def _inputs(source: str, options: CaptureOptions) -> tuple[str, ...]:
+    """What this run's sound is made of, settled and checked (D-081).
+
+    Unstated, it is what the source always meant: the microphone, the computer's sound, or — for a
+    window — whatever `audio_source` chose, falling back to configuration when that is empty too
+    (`_open_input` reads `capture.audio_source` for that case, as a window preset always has).
+
+    Raises:
+        OptionsConflict: for a combination that cannot be recorded as asked.
+    """
+    inputs = tuple(options.audio_inputs)
+    if not inputs:
+        if source == modes.MICROPHONE:
+            return (modes.INPUT_MICROPHONE,)
+        if source == modes.SYSTEM:
+            return (modes.INPUT_SYSTEM,)
+        legacy = modes.LEGACY_AUDIO_SOURCE.get(options.audio_source)
+        return (legacy,) if legacy else ()
+
+    unknown = [name for name in inputs if name not in modes.AUDIO_INPUTS]
+    if unknown:
+        raise OptionsConflict(f"Unknown audio input: {', '.join(unknown)}.")
+    if len(set(inputs)) != len(inputs):
+        raise OptionsConflict("The same sound was chosen twice.")
+    if len(inputs) > modes.MAX_AUDIO_INPUTS:
+        raise OptionsConflict(f"At most {modes.MAX_AUDIO_INPUTS} sounds can be recorded together.")
+    # Both are taps on the same playback: the window's sound is part of the computer's, so the two
+    # together would record it twice, an echo of itself a few milliseconds apart.
+    if modes.INPUT_WINDOW in inputs and modes.INPUT_SYSTEM in inputs:
+        raise OptionsConflict(
+            "A window's sound is already part of this computer's sound; choose one of them."
+        )
+    if modes.INPUT_WINDOW in inputs and source != modes.WINDOW_SOURCE:
+        raise OptionsConflict("A window's sound can only be recorded with a window.")
+    own = {modes.MICROPHONE: modes.INPUT_MICROPHONE, modes.SYSTEM: modes.INPUT_SYSTEM}.get(source)
+    if own and own not in inputs:
+        raise OptionsConflict(f"Recording {_SOURCE_NAMES[source]} has to include its sound.")
+    return inputs
+
+
+def _levels(options: CaptureOptions) -> dict[str, int]:
+    """Starting volumes for this run's inputs, each 0–100. A level for an absent input is refused:
+    it is a sound the caller thinks is being recorded and is not."""
+    levels = dict(options.levels)
+    stray = [name for name in levels if name not in options.audio_inputs]
+    if stray:
+        raise OptionsConflict(f"A volume was given for a sound not being recorded: {stray[0]}.")
+    for name, volume in levels.items():
+        if not 0 <= int(volume) <= 100:
+            raise OptionsConflict(f"The {name} volume must be between 0 and 100 %.")
+    return {name: int(volume) for name, volume in levels.items()}
 
 
 def plan_run(options: CaptureOptions) -> RunPlan:

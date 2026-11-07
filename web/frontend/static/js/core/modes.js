@@ -98,6 +98,19 @@ export const WINDOW_SOURCE = "window";
 
 export const CAPTURE_SOURCES = Object.freeze([MICROPHONE, SYSTEM, WINDOW_SOURCE]);
 
+// -- audio inputs (D-081) ----------------------------------------------------------------
+// What a run's sound is made of: one or two of these, mixed, each with its own volume and mute.
+
+/** Only the matched window's own sound. A window run only. */
+export const INPUT_WINDOW = "window";
+/** Everything this computer plays. */
+export const INPUT_SYSTEM = "system";
+/** The configured microphone. */
+export const INPUT_MICROPHONE = "microphone";
+
+export const AUDIO_INPUTS = Object.freeze([INPUT_WINDOW, INPUT_SYSTEM, INPUT_MICROPHONE]);
+export const MAX_AUDIO_INPUTS = 2;
+
 /**
  * The mode a set of record-sheet answers runs as — the mirror of `derive_mode` in `modes.py`.
  *

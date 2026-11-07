@@ -67,6 +67,33 @@ STALL_GRACE_S: Final = 20.0
 STDERR_LIMIT: Final = 8_000
 
 
+#: Phrases GStreamer writes when a stream's format changes under it, and what each means to someone
+#: recording. Research §6.3 lists them as the shapes `pipewiresrc` renegotiation failures take on
+#: AMD + KWin + DMA-BUF. The canvas (D-080) keeps a resize from reaching the encoder, so one of
+#: these now means the *source* itself could not follow the window, which a resumed capture
+#: recovers from.
+RENEGOTIATION_FAULTS: Final[tuple[str, ...]] = (
+    "not-negotiated",
+    "unhandled format",
+    "no more input formats",
+    "finish format with error",
+)
+
+
+def explain(stderr: str) -> str:
+    """A sentence naming why GStreamer stopped, or ``""`` when the log says nothing recognisable.
+
+    The raw log is kept as well — it is the account a diagnosis needs — but a banner that pastes
+    GStreamer's debug paragraph at someone mid-talk tells them nothing they can act on.
+    """
+    lowered = stderr.lower()
+    if any(phrase in lowered for phrase in RENEGOTIATION_FAULTS):
+        return "the window changed size or format and the screen capture could not follow it."
+    if "target not found" in lowered:
+        return "the window being recorded went away."
+    return ""
+
+
 class RecorderError(RuntimeError):
     """The video recorder could not be started."""
 
@@ -283,7 +310,9 @@ class WindowRecorder:
             logger.info("The captured window closed; video recording ended.")
         else:
             self.state.failed = True
-            self.state.error = detail or f"The video recorder exited with code {code}."
+            self.state.error = (
+                explain(detail) or detail or f"The video recorder exited with code {code}."
+            )
             logger.error("Video recording failed: %s", self.state.error)
 
         self._close_portal_fd()

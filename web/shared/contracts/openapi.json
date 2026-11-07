@@ -158,6 +158,72 @@
         }
       }
     },
+    "/api/session/mix": {
+      "get": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Get Mix",
+        "description": "The running mix: each input's volume, mute, level and whether it is delivering (D-081).",
+        "operationId": "get_mix_api_session_mix_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Mix Api Session Mix Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "session"
+        ],
+        "summary": "Change Mix",
+        "description": "Change inputs' volume or mute while recording. Takes effect on the next frame, ramped.",
+        "operationId": "change_mix_api_session_mix_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MixChangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Change Mix Api Session Mix Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/session/pause": {
       "post": {
         "tags": [
@@ -3064,6 +3130,41 @@
             ],
             "title": "Audio Source",
             "default": "system"
+          },
+          "audio_inputs": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "window",
+                    "system",
+                    "microphone"
+                  ]
+                },
+                "type": "array",
+                "maxItems": 2,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Inputs"
+          },
+          "levels": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "enum": [
+                "window",
+                "system",
+                "microphone"
+              ]
+            },
+            "type": "object",
+            "title": "Levels"
           }
         },
         "additionalProperties": false,
@@ -3468,6 +3569,64 @@
         "title": "LoadModelRequest",
         "description": "Load a specific model."
       },
+      "MixChangeRequest": {
+        "properties": {
+          "inputs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/MixInputChange"
+            },
+            "propertyNames": {
+              "enum": [
+                "window",
+                "system",
+                "microphone"
+              ]
+            },
+            "type": "object",
+            "minProperties": 1,
+            "title": "Inputs"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "inputs"
+        ],
+        "title": "MixChangeRequest",
+        "description": "Volume and mute changes for a running mix, by input name (D-081)."
+      },
+      "MixInputChange": {
+        "properties": {
+          "volume": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume"
+          },
+          "muted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Muted"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "MixInputChange",
+        "description": "One input's new setting. Either field may be left out to keep what it is."
+      },
       "PolishedBlocksResponse": {
         "properties": {
           "blocks": {
@@ -3671,6 +3830,18 @@
               }
             ],
             "title": "Options"
+          },
+          "mix": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mix"
           },
           "asr": {
             "additionalProperties": true,

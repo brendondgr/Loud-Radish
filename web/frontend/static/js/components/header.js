@@ -41,14 +41,23 @@ const SOURCE_NAMES = { microphone: "Microphone", system: "Computer sound", windo
 /** States in which a run exists to be described. */
 const DESCRIBED = new Set([RECORDING, PAUSED, STOPPING, PROCESSING]);
 
-/** "Microphone · live + after" — what is being captured, and when it is transcribed. */
+/**
+ * "Microphone · live + after" — what is being captured, and when it is transcribed. "Window + mic"
+ * when the microphone is mixed into another source's sound (D-081).
+ */
 export function describeRun(options) {
   if (!options) return "";
   const parts = [];
   if (options.video) parts.push("video");
   if (options.live_transcription) parts.push("live");
   if (options.post_transcription) parts.push("after");
-  const source = SOURCE_NAMES[options.source] ?? "";
+  let source = SOURCE_NAMES[options.source] ?? "";
+  const inputs = options.audio_inputs ?? [];
+  if (source && options.source !== "microphone" && inputs.includes("microphone")) {
+    // A window narrated over with no sound of its own is "Window (mic only)"; with its sound too
+    // it is "Window + mic".
+    source = inputs.length > 1 ? `${source} + mic` : `${source} (mic only)`;
+  }
   return [source, parts.join(" + ")].filter(Boolean).join(" · ");
 }
 
@@ -176,6 +185,13 @@ export class Header {
     const llm = session.config?.llm;
     const llmModel = llm?.mode === "api" ? llm?.api?.model : llm?.local?.model;
     setText(this.llmName, session.llmConfigured ? llmModel : "Assistant not set up");
+    // The names ellipsise when a recording's controls need the room, so the whole of them is on
+    // the button's title as well.
+    setAttr(
+      this.modelName?.closest(".model-identity"),
+      "title",
+      `${this.modelName?.textContent ?? ""} · ${this.llmName?.textContent ?? ""}`
+    );
 
     const local = session.fullyLocal;
     setAttr(this.privacy, "data-state", local ? "local" : "remote");

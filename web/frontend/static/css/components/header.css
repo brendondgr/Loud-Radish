@@ -139,6 +139,23 @@
   color: var(--text-primary);
 }
 
+/* **The first thing to give way when a recording's controls need the room.** A running recording
+ * puts Pause, Sound and Stop beside the clock, and at 1024 px that pushed the header 89 px past the
+ * edge (D-081). The model names are the least needed mid-talk — they live in settings too — so they
+ * shrink and ellipsise rather than the controls being pushed off the right of the screen. */
+.model-identity {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.model-identity > [data-model-name],
+.model-identity > [data-llm-name] {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .model-identity__separator {
   color: var(--text-dim);
 }

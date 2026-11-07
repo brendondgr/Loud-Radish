@@ -106,7 +106,7 @@ buttons and without a second dialog primitive.
 | # | Section | Choices | Shown when |
 |---|---|---|---|
 | 1 | **What to record** | My microphone · This computer's sound · A window | Always |
-| 2 | **Which input** | Microphone: the device list, with the configured one selected. Window: the window's sound · only this application's sound · my microphone | Microphone or A window |
+| 2 | **Which sound** / **Which microphone** | Microphone: the device list, with the configured one selected. A window or this computer's sound: the source's own sound and *My microphone*, either or both (D-081); for a window, *Only this app* or *Everything playing* under its sound | Always, except for a replayed file |
 | 3 | **When to transcribe** | While recording · After it ends · Both | Always |
 | 4 | **Video** | Record what the window shows (on/off) | A window |
 
@@ -119,17 +119,30 @@ buttons and without a second dialog primitive.
   is drawn on the card. A disabled source's reason sits on a line under the row, not inside the
   card, because an install command does not fit a card. On a phone, three cards stay three across,
   and the four timing cards (a window's) go two by two.
+- **Which sound is two cards that can both be on** (D-081): the source's own sound, and *My
+  microphone*, mixed. They are the same cards as sections 1 and 3, but checkboxes. A box in the
+  top-right corner, empty and then ticked on `--accent`, is what says "several may be chosen"
+  where the radio cards say "pick one"; the outline and glow alone would read the same for both.
+  For *This computer's sound* its own card is **fixed on** (`choice-card--fixed`: ticked, not
+  dimmed, not struck through, no pointer). That sound *is* the recording, and only the microphone
+  is optional. What a window had is kept aside and restored when a window is chosen again. For a
+  window, *Only this app* / *Everything playing* sit under the cards as two small pills, shown
+  only while the window's sound is ticked. With both sounds on, one line says to **use
+  headphones**, because through speakers the microphone hears the other sound too and records it
+  a moment later. No sound at all is refused beside the buttons: *Choose at least one sound to
+  record.* On a phone the two cards stay side by side.
 - **The microphone question is one row**: the label on the left, the dropdown filling the rest.
-  It is also asked for a window whose sound is *My microphone*, directly under that choice and
-  without a step number, because there it is a follow-up rather than a step. Without it, narrating
-  over a window could only ever use whichever microphone was last configured. *My microphone*
-  records the microphone **instead of** the window's sound, not alongside it: a session has one
-  audio source, and mixing two is logged in `docs/checklist.md`.
+  It is also asked whenever *My microphone* is ticked under Which sound, directly under the cards
+  and without a step number, because there it is a follow-up rather than a step. Without it,
+  narrating over a window could only ever use whichever microphone was last configured.
+- **The volumes start where they were left.** Each sound's last volume in the sound panel is
+  remembered in the browser (`lastMixLevels`) and sent as the run's starting `levels`.
 - **Choosing a microphone here writes the configuration** through `POST /api/audio/device`. It does
   not add a per-run override. The tray's microphone picker reads the same value, so there is one
   answer to "which microphone".
 - **The file source wins.** When the audio source is a file, section 2 says which file is being
-  replayed and links to Audio settings. It does not offer a microphone list that would be ignored.
+  replayed and links to Audio settings. It does not offer a microphone list, or a microphone to
+  mix in, that would be ignored.
 - **An unavailable source is disabled and carries its reason**, never hidden. A disabled option
   naming the install command is actionable; one that has vanished looks like a feature that does
   not exist. Only *A window* has a hard requirement (`window_capture`).
@@ -240,6 +253,37 @@ promised.
 The sheet also states, in text, that **a window's audio is captured separately from its picture**:
 the screen-cast portal carries video only. A user who assumes per-window audio and records the wrong
 source has lost the recording, and that sentence is the entire defence against it.
+### Sound controls (D-081)
+
+A **Sound** button sits beside Pause while a recording is running or held, and opens a popover
+under it. A popover rather than a pane, because the header is on screen in every layout and every
+run and the monitor pane is not. It also leaves the header as wide as it was. The button carries
+`aria-expanded` and `aria-controls`; the popover is a `role="dialog"` labelled *Sound*.
+
+One row per sound the recording has: *The window's sound*, *This computer's sound*, *Your
+microphone*. Each row has:
+
+- **The name, and its volume in words** (`80 %`, or *Muted* in the warning colour).
+- **A mute button** (`aria-pressed`, named "Mute your microphone" / "Unmute …"). It shows a speaker
+  with waves while the sound is heard, and crossed out on the warning wash while muted.
+- **A 0–100 % slider** in steps of 5, labelled "<sound> volume", whose `aria-valuetext` is "80
+  percent" or "muted".
+- **A thin meter** of that sound's own level, before its volume. A turned-down or muted microphone
+  still shows whether it hears anything, which is how someone knows it is safe to unmute. Muted, the
+  meter dims rather than disappearing.
+- **One line of status when it matters:** *Muted — not being recorded.*, or *Stopped — this sound
+  is no longer arriving.* (the slider and button are then disabled).
+
+**Keyboard:** opening focuses the first slider; arrows move 5 %; **M** mutes the row the focus is
+in; **Escape** closes and returns focus to the button. A click outside closes it. A change applies
+at once on screen and reaches the server within 100 ms; every other open page follows
+`mix.changed`. Each sound's volume is remembered in the browser and the next recording starts
+there. Nothing here is a setting, so closing a recording hides the button.
+
+**The header makes room by shortening the model names**, which ellipsise with the full text on
+their title. With Pause, Sound and Stop all showing, the header measured 89 px too wide at 1024 px
+until they did. The controls are never what gets pushed off the screen.
+
 ### The recording monitor
 
 Window capture gets a **third pane**, peer to the transcript and the assistant, shown only in that

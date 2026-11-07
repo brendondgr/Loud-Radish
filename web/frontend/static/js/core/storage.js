@@ -17,6 +17,9 @@ const DEFAULTS = {
   // *preference*, not configuration: it pre-fills a sheet that is always shown, so it decides
   // nothing on its own and does not belong in /api/config. Null until the first recording.
   lastRecordOptions: null,
+  // The volume each sound was last left at in the sound panel, by input name (D-081). The next
+  // recording starts each one there. A preference for the same reason as the sheet's answers.
+  lastMixLevels: {},
 };
 
 /** Read one preference, falling back to its default. */

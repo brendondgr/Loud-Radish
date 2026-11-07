@@ -17,7 +17,15 @@ import logging
 from ...config import AppConfig
 from ..audio import WavFileSource
 from ..audio.monitor import MonitorUnavailable, default_sink
-from ..audio.sources import AudioSource, DeviceSource, MonitorSource, probe_peak
+from ..audio.sources import (
+    AudioSource,
+    DeviceSource,
+    MixInput,
+    MonitorSource,
+    SyntheticSource,
+    probe_peak,
+    silence,
+)
 from ..audio.tap import ApplicationTap, TapError
 from ..audio.tap import playback_streams as tap_streams
 from ..audio.tap import score as tap_score
@@ -42,46 +50,85 @@ class AudioSourceMixin:
             return options.audio_source
         return config.capture.audio_source
 
+    def _input_names(self, config: AppConfig, source: str) -> list[str]:
+        """The inputs this run mixes, in order (D-081). Settled by `plan.resolve`, except for a
+        window request that named none, which has always deferred to `capture.audio_source`."""
+        options = self._options
+        inputs = list(options.audio_inputs) if options is not None else []
+        if inputs:
+            return inputs
+        if source == modes.MICROPHONE:
+            return [modes.INPUT_MICROPHONE]
+        if source == modes.SYSTEM:
+            return [modes.INPUT_SYSTEM]
+        return [modes.LEGACY_AUDIO_SOURCE.get(self._audio_choice(config), modes.INPUT_SYSTEM)]
+
     def _open_source(self, config: AppConfig, source: str = modes.MICROPHONE) -> AudioSource:
-        """Build the audio source this session should capture from.
+        """Build the audio source this session should capture from: a mix of its inputs (D-081).
 
-        Decided by what the record sheet said to record (D-075), not by the mode: a microphone, this
-        computer's sound, or a window — and for a window, which of its audio choices.
+        Decided by what the record sheet said to record (D-075), not by the mode. **Every run goes
+        through the mixer**, so volume and mute work for every run; one input at 100 % passes
+        through it sample for sample, so a single-input recording is exactly what it always was.
 
-        **This computer's sound is a tap, never the microphone**, for the reason given below for a
-        window's: it is the same audio reached by the same route.
-
-        **A window reads the machine's output, not the microphone.** The point of the mode is
-        the window's sound; recording the person watching it was the reported fault. The portal
-        carries video only (D-022) so this was always a separate capture — it was simply capturing
-        the wrong thing. `capture.audio_source` moves it back to the microphone for anyone who
-        wants both a window and their own commentary.
-
-        The file source still wins outright in every mode: it is the reproducible input the whole
-        pipeline is developed against, and a window session that silently ignored it would make the
-        mode untestable.
+        **The file source still wins outright**: it is the reproducible input the whole pipeline is
+        developed against, and a session that silently ignored it would make every mode
+        untestable. It stands in for the *first* input; any second one is silence, so a two-input
+        run on a test server still exercises the whole mixing path.
         """
+        names = self._input_names(config, source)
         if config.audio.source_type == "file":
             if not config.audio.file_path:
                 raise SessionError(
                     "The file source is selected but no file is set. "
                     "Choose a WAV file, or switch to a microphone."
                 )
-            return WavFileSource(
-                config.audio.file_path,
-                frame_ms=config.audio.frame_ms,
-                speed=config.audio.file_speed,
-            )
-        if source == modes.MICROPHONE:
-            choice = "microphone"
-        elif source == modes.SYSTEM:
-            choice = "system"
+            inputs = [
+                MixInput(
+                    names[0],
+                    WavFileSource(
+                        config.audio.file_path,
+                        frame_ms=config.audio.frame_ms,
+                        speed=config.audio.file_speed,
+                    ),
+                    "file",
+                )
+            ]
+            inputs += [
+                MixInput(
+                    name,
+                    # Paced at real time: unpaced, a looping generator spins as fast as it can and
+                    # starves the file it is meant to accompany of the interpreter.
+                    SyntheticSource(
+                        [silence(1.0)], frame_ms=config.audio.frame_ms, speed=1.0, loop=True
+                    ),
+                    "tap",
+                )
+                for name in names[1:]
+            ]
         else:
-            choice = self._audio_choice(config)
-        if choice == "application":
-            return self._open_application_tap(config)
+            inputs = []
+            try:
+                for name in names:
+                    inputs.append(self._open_input(config, name))
+            except Exception:
+                # A tap built for the first input is a null sink in the user's output picker until
+                # something unloads it; the second input failing must not leak it.
+                tap, self._tap = self._tap, None
+                if tap is not None:
+                    tap.close()
+                raise
+        return self._build_mix(config, inputs)
 
-        if choice == "system":
+    def _open_input(self, config: AppConfig, name: str) -> MixInput:
+        """One named input, opened but not started.
+
+        **This computer's sound is a tap, never the microphone**, and so is a window's: the portal
+        carries video only (D-022), and recording the person watching instead of the window was the
+        reported fault. The microphone is only ever what was asked for by name.
+        """
+        if name == modes.INPUT_WINDOW:
+            return MixInput(name, self._open_application_tap(config), "tap")
+        if name == modes.INPUT_SYSTEM:
             # **Also through a tap.** Recording the default sink's monitor directly is the obvious
             # implementation and it does not work here: `pw-record --target=<sink>.monitor` failed
             # to resolve against this machine's Bluetooth sink and, because an unresolved target
@@ -90,14 +137,16 @@ class AudioSourceMixin:
             # audio by the route that demonstrably works, and one mechanism is easier to keep
             # correct than two.
             try:
-                return self._open_application_tap(config, match=False)
+                return MixInput(name, self._open_application_tap(config, match=False), "tap")
             except MonitorUnavailable as exc:
                 # The microphone is not a silent substitute here — it records the wrong thing, and
-                # the whole point of the mode is that it does not. Naming the remedy is better than
-                # quietly capturing a voice the user did not want recorded.
+                # the whole point of the choice is that it does not.
                 raise SessionError(str(exc)) from exc
-
-        return DeviceSource(device_id=config.audio.device_id, frame_ms=config.audio.frame_ms)
+        return MixInput(
+            name,
+            DeviceSource(device_id=config.audio.device_id, frame_ms=config.audio.frame_ms),
+            "microphone",
+        )
 
     def _open_application_tap(self, config: AppConfig, *, match: bool = True) -> AudioSource:
         """Tap the chosen window's own audio, leaving it playing on the user's speakers.

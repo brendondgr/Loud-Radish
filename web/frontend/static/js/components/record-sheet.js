@@ -16,7 +16,14 @@
 
 import { FocusTrap } from "../a11y/focus-trap.js";
 import { $, $$, el, setText, toggle } from "../core/dom.js";
-import { WINDOW } from "../core/modes.js";
+import {
+  INPUT_MICROPHONE,
+  INPUT_SYSTEM,
+  INPUT_WINDOW,
+  MICROPHONE,
+  SYSTEM,
+  WINDOW,
+} from "../core/modes.js";
 import * as prefs from "../core/storage.js";
 import { config } from "../stores/config.js";
 import { mode as modeStore } from "../stores/mode.js";
@@ -29,8 +36,23 @@ const DEFAULTS = Object.freeze({
   // The window's own sound, not the person watching it. A window recording that captures the
   // viewer's microphone is the fault this default exists to prevent.
   audio_source: "system",
+  // Which sound (D-081): the window's own, and whether the microphone is mixed in with it.
+  window_sound: true,
+  microphone: false,
   video: true,
 });
+
+/** A remembered choice from before the sound cards, as the two switches it meant. */
+function migrate(remembered) {
+  if (remembered.window_sound !== undefined) return remembered;
+  const narrated = remembered.audio_source === "microphone";
+  return {
+    ...remembered,
+    window_sound: !narrated,
+    microphone: narrated,
+    audio_source: narrated ? DEFAULTS.audio_source : (remembered.audio_source ?? "system"),
+  };
+}
 
 const TIMINGS = {
   live: { live_transcription: true, post_transcription: false },
@@ -38,6 +60,21 @@ const TIMINGS = {
   both: { live_transcription: true, post_transcription: true },
   none: { live_transcription: false, post_transcription: false },
 };
+
+/**
+ * The volumes the sound panel last left each input at, for the inputs this run has (D-081).
+ * Remembered per input name, so narrating over a window starts the microphone where it was last
+ * time rather than back at full.
+ */
+function rememberedLevels(inputs) {
+  const saved = prefs.get("lastMixLevels") ?? {};
+  const levels = {};
+  for (const name of inputs) {
+    const volume = Number(saved[name]);
+    if (Number.isInteger(volume) && volume >= 0 && volume <= 100) levels[name] = volume;
+  }
+  return levels;
+}
 
 export class RecordSheet {
   constructor(root, { onOpenSettings } = {}) {
@@ -49,7 +86,16 @@ export class RecordSheet {
     this.refusal = $("[data-record-refusal]", root);
     this.sources = $$("[data-record-source]", root);
     this.timings = $$("[data-record-timing]", root);
+    // "Only this app / Everything playing": which of the window's sound.
     this.audios = $$("[data-record-audio]", root);
+    this.soundOwn = $("[data-record-sound='own']", root);
+    this.soundOwnTitle = $("[data-record-sound-own-title]", root);
+    this.soundOwnCard = $("[data-record-sound-card]", root);
+    this.soundMic = $("[data-record-sound='microphone']", root);
+    this.scope = $("[data-record-scope]", root);
+    this.headphones = $("[data-record-headphones]", root);
+    /** The window's-sound switch as the user left it, kept while the computer's sound fixes it on. */
+    this._windowSound = DEFAULTS.window_sound;
     this.video = $("[data-record-video]", root);
     this.device = $("[data-record-device]", root);
     this.deviceNote = $("[data-record-device-note]", root);
@@ -61,9 +107,13 @@ export class RecordSheet {
     this.windowReason = $("[data-record-window-reason]", root);
     this.sections = new Map($$("[data-record-section]", root).map((n) => [n.dataset.recordSection, n]));
 
-    for (const input of [...this.sources, ...this.timings, ...this.audios, this.video]) {
+    for (const input of [...this.sources, ...this.timings, ...this.audios, this.video, this.soundMic]) {
       input?.addEventListener("change", () => this._render());
     }
+    this.soundOwn?.addEventListener("change", () => {
+      if (this._value(this.sources) === WINDOW) this._windowSound = this.soundOwn.checked;
+      this._render();
+    });
 
     this.trap = new FocusTrap(this.dialog ?? root);
     this._resolve = null;
@@ -102,7 +152,11 @@ export class RecordSheet {
   show(preset = {}) {
     if (!this.root) return Promise.resolve(this._toOptions(DEFAULTS));
 
-    const remembered = { ...DEFAULTS, ...(prefs.get("lastRecordOptions") ?? {}), ...preset };
+    const remembered = migrate({
+      ...DEFAULTS,
+      ...(prefs.get("lastRecordOptions") ?? {}),
+      ...preset,
+    });
     // A remembered source this machine can no longer use falls back to the microphone rather than
     // opening on a disabled choice.
     if (remembered.source === WINDOW && !modeStore.isAvailable(WINDOW)) {
@@ -110,7 +164,10 @@ export class RecordSheet {
     }
     this._check(this.sources, remembered.source);
     this._check(this.timings, remembered.timing);
-    this._check(this.audios, remembered.audio_source);
+    this._check(this.audios, remembered.audio_source === "application" ? "application" : "system");
+    this._windowSound = Boolean(remembered.window_sound);
+    if (this.soundOwn) this.soundOwn.checked = this._windowSound;
+    if (this.soundMic) this.soundMic.checked = Boolean(remembered.microphone);
     if (this.video) this.video.checked = Boolean(remembered.video);
 
     this._renderAvailability();
@@ -133,6 +190,8 @@ export class RecordSheet {
       source: this._value(this.sources) ?? DEFAULTS.source,
       timing: this._value(this.timings) ?? DEFAULTS.timing,
       audio_source: this._value(this.audios) ?? DEFAULTS.audio_source,
+      window_sound: this._windowSound,
+      microphone: Boolean(this.soundMic?.checked),
       video: Boolean(this.video?.checked),
     };
   }
@@ -141,16 +200,44 @@ export class RecordSheet {
   _toOptions(choice) {
     const isWindow = choice.source === WINDOW;
     const timing = TIMINGS[choice.timing] ?? TIMINGS.live;
+    const inputs = this._inputsFor(choice);
     return {
       source: choice.source,
       ...timing,
       video: isWindow && choice.video,
-      audio_source: isWindow ? choice.audio_source : "system",
+      // Still sent: a server from before the mixer reads only this, and it names the first input.
+      audio_source: isWindow
+        ? choice.window_sound
+          ? choice.audio_source
+          : "microphone"
+        : "system",
+      audio_inputs: inputs,
+      levels: rememberedLevels(inputs),
     };
+  }
+
+  /**
+   * What the run's sound is made of (D-081): the source's own sound first, then the microphone.
+   *
+   * **A replayed file stands in for one input only**, so with the file source the microphone is
+   * not added — it would be a second input of silence, which the sheet has no way to make honest.
+   */
+  _inputsFor(choice) {
+    if (choice.source === MICROPHONE) return [INPUT_MICROPHONE];
+    const fileSource = this.root && config.get("audio.source_type") === "file";
+    const inputs = [];
+    if (choice.source === SYSTEM) {
+      inputs.push(INPUT_SYSTEM);
+    } else if (choice.window_sound) {
+      inputs.push(choice.audio_source === "application" ? INPUT_WINDOW : INPUT_SYSTEM);
+    }
+    if (choice.microphone && !(fileSource && inputs.length)) inputs.push(INPUT_MICROPHONE);
+    return inputs;
   }
 
   /** Why this choice cannot be recorded, or an empty string. */
   _refusalFor(options) {
+    if (!options.audio_inputs.length) return "Choose at least one sound to record.";
     if (options.live_transcription || options.post_transcription || options.video) return "";
     return options.source === WINDOW
       ? "With no transcription and no video there is nothing to record."
@@ -164,14 +251,17 @@ export class RecordSheet {
     const isWindow = choice.source === WINDOW;
     const fileSource = config.get("audio.source_type") === "file";
 
+    const isSystem = choice.source === SYSTEM;
+    const asksSound = (isWindow || isSystem) && !fileSource;
+    this._renderSound(isWindow, isSystem, asksSound);
+
     // The microphone list answers two questions: "which microphone" for a microphone recording,
-    // and the follow-up to a window recorded with "My microphone" as its sound. Without the second,
-    // a window narrated over could only ever use whatever microphone was last configured.
-    const windowMic = isWindow && choice.audio_source === "microphone";
-    const asksMicrophone = choice.source === "microphone" || windowMic;
+    // and the follow-up to "My microphone" ticked under Which sound. Without the second, a window
+    // narrated over could only ever use whatever microphone was last configured.
+    const mixedMic = asksSound && Boolean(this.soundMic?.checked);
+    const asksMicrophone = choice.source === MICROPHONE || mixedMic;
     toggle(this.sections.get("microphone"), asksMicrophone && !fileSource);
-    toggle(this.deviceStep, !windowMic);
-    toggle(this.sections.get("window-audio"), isWindow && !fileSource);
+    toggle(this.deviceStep, !mixedMic);
     toggle(this.sections.get("video"), isWindow);
     toggle(this.sections.get("window-note"), isWindow && !fileSource);
     toggle(this.fileNote, fileSource);
@@ -185,7 +275,7 @@ export class RecordSheet {
     if (!isWindow && choice.timing === "none") this._check(this.timings, "live");
 
     // The step numbers follow the sections actually showing, so the sequence never skips one.
-    const hasInput = (choice.source === "microphone" || isWindow) && !fileSource;
+    const hasInput = (choice.source === MICROPHONE || asksSound) && !fileSource;
     setText(this.timingStep, hasInput ? "3" : "2");
     const videoStep = $("[data-record-section='video'] .record-sheet__step", this.root);
     setText(videoStep, hasInput ? "4" : "3");
@@ -201,6 +291,30 @@ export class RecordSheet {
       // Says what happens next: with video on, the desktop's window picker comes first.
       setText(this.confirm, options.video ? "Choose a window…" : "Start recording");
     }
+  }
+
+  /**
+   * Which sound, for a window or this computer's sound (D-081).
+   *
+   * For this computer's sound its own card is fixed on: that sound *is* the recording, and an
+   * unticked one would be a recording of only the microphone, which is the other source. What the
+   * user had chosen for a window is kept aside meanwhile and put back when a window is chosen again.
+   */
+  _renderSound(isWindow, isSystem, asksSound) {
+    toggle(this.sections.get("sound"), asksSound);
+    if (!this.soundOwn) return;
+    this.soundOwn.checked = isSystem ? true : this._windowSound;
+    this.soundOwn.disabled = isSystem;
+    this.soundOwnCard?.classList.toggle("choice-card--fixed", isSystem);
+    setText(this.soundOwnTitle, isSystem ? "This computer's sound" : "The window's sound");
+    if (this.soundOwnCard) {
+      this.soundOwnCard.title = isSystem
+        ? "Everything this machine plays. Always recorded when this is what you chose to record."
+        : "What the window plays. Choose below whether that is only its app or everything playing.";
+    }
+    toggle(this.scope, isWindow && this.soundOwn.checked);
+    // Both sounds through speakers is the one combination that records something twice.
+    toggle(this.headphones, asksSound && this.soundOwn.checked && Boolean(this.soundMic?.checked));
   }
 
   /**

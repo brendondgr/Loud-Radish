@@ -286,7 +286,14 @@ class CaptureConfig(_Base):
     #: Frames per second. Fifteen is ample for a talk — slides change every thirty seconds — and
     #: doubling it doubles the work of a software encoder sharing a CPU with the speech model.
     frame_rate: int = Field(default=15, ge=1, le=60)
-    #: Ceiling on the encoded height. Only ever scales down.
+    #: The fixed size every frame of a window recording is fitted to (D-080). The window is scaled
+    #: to fit inside it with bars where the shapes differ, so a window resized or moved mid-talk
+    #: changes what is inside the frame and never the frame — which is what an encoder and a muxer
+    #: that cannot change resolution mid-stream need.
+    canvas: Literal["720p", "1080p", "1440p"] = "1080p"
+    #: **Superseded by `canvas` (D-080), and never took effect on this desktop**: it only applied
+    #: when the portal reported a window size, which it never did. Kept so an existing config file
+    #: still loads; nothing reads it.
     max_height: int = Field(default=720, ge=240, le=2160)
     #: Draw a low-rate preview for the monitor pane. Costs one small JPEG a second.
     preview: bool = True

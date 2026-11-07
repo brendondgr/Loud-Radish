@@ -1,0 +1,185 @@
+/* The sound panel (D-081): each sound's volume, mute and meter while recording.
+ *
+ * A popover under its button, so the header stays exactly as wide as it was. Rows are a name and a
+ * readout over a mute button and a slider, with a thin meter beneath; a muted row dims its meter
+ * and says in words that nothing of it is being kept.
+ */
+
+.sound-panel {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.sound-panel[hidden] {
+  display: none;
+}
+
+.sound-panel__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.sound-panel__toggle[aria-expanded="true"] {
+  color: var(--accent-bright);
+  background: var(--accent-wash);
+  border-color: var(--accent-border);
+}
+
+.sound-panel__popover {
+  position: absolute;
+  top: calc(100% + var(--space-4));
+  left: 0;
+  z-index: 40;
+  width: min(320px, calc(100vw - 2 * var(--space-6)));
+  padding: var(--space-6);
+  border: 1px solid var(--border-control);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.sound-panel__popover[hidden] {
+  display: none;
+}
+
+.sound-panel__heading {
+  margin: 0 0 var(--space-5);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sound-panel__rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-7);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sound-panel__hint,
+.sound-panel__error {
+  margin: var(--space-6) 0 0;
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.sound-panel__error {
+  color: var(--warning-text);
+}
+
+.sound-panel__error[hidden] {
+  display: none;
+}
+
+/* -- one sound ------------------------------------------------------------------------------ */
+
+.sound-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sound-row__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.sound-row__name {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.sound-row__value {
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.sound-row__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.sound-row__slider {
+  flex: 1 1 auto;
+  min-width: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.sound-row__slider:disabled {
+  cursor: not-allowed;
+}
+
+/* The button shows what the sound is doing now: a speaker with waves while it is heard, crossed
+ * out while muted. */
+.sound-row__icon-off,
+.sound-row.is-muted .sound-row__icon-on {
+  display: none;
+}
+
+.sound-row.is-muted .sound-row__icon-off {
+  display: block;
+}
+
+.sound-row__mute[aria-pressed="true"] {
+  color: var(--warning-text);
+  background: var(--warning-wash);
+  border-color: var(--warning-border);
+}
+
+.sound-row__meter {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--surface-control);
+}
+
+.sound-row__meter-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 120ms linear;
+}
+
+/* Dimmed rather than hidden: the meter still says whether the microphone hears anything, which is
+ * how someone knows it is safe to unmute. */
+.sound-row.is-muted .sound-row__meter-fill,
+.sound-row.is-lost .sound-row__meter-fill {
+  background: var(--text-muted);
+  opacity: 0.45;
+}
+
+.sound-row.is-muted .sound-row__value {
+  color: var(--warning-text);
+}
+
+.sound-row__status {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.sound-row__status:empty {
+  display: none;
+}
+
+.sound-row.is-lost .sound-row__name {
+  color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sound-row__meter-fill {
+    transition: none;
+  }
+}
