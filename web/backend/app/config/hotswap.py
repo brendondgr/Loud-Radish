@@ -57,6 +57,7 @@ RESTART_SESSION_PATHS: frozenset[str] = frozenset(
         "capture.cursor_mode",
         "capture.frame_rate",
         "capture.max_height",
+        "capture.canvas",
         "capture.preview",
         "capture.encoder",
         "capture.quality",

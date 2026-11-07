@@ -357,6 +357,31 @@ against a **real recording** — a synthetic tone cannot answer the question, an
 uv run scripts/measure_capture_cost.py --audio path/to/a/talk.wav
 ```
 
+### Window resizing, automatically (D-080)
+
+Resizing a window while it is recorded used to corrupt the video. This reproduces a resize without
+the portal: the application's own pipeline, with its source swapped for a test pattern whose size
+changes on a timer, then every frame of the result decoded:
+
+```bash
+uv run utils/resize_capture_check.py --seconds 30
+```
+
+It must print `PASSED` and one frame size. `--without-canvas` removes the fix and shows the fault
+(several frame sizes in one file). To check a real recording the same way:
+
+```bash
+uv run utils/check_video_frames.py data/recordings/<key>/video.webm
+```
+
+The rig needs a system Python with GStreamer's introspection bindings (`python3-gobject`), which the
+virtualenv deliberately lacks (D-022). **Inside a toolbox or distrobox container** the system's
+GStreamer lives on the host, and the script runs it through `flatpak-spawn --host` by itself. The
+capture tests that run GStreamer and ffmpeg for real (`tests/transcription/test_capture_output.py`)
+skip in a container unless those tools are on `PATH`; a directory of one-line wrappers
+(`exec flatpak-spawn --host --directory="$PWD" gst-launch-1.0 "$@"`, likewise `gst-inspect-1.0`,
+`ffprobe`, `ffmpeg`) put first on `PATH` makes them run.
+
 ### The export estimator, on your own machine
 
 The export window predicts a size and a duration for every preset before anything is encoded. Both

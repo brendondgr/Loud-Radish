@@ -223,17 +223,53 @@ def test_the_preview_branch_leaks_rather_than_stalling_the_recording() -> None:
 # -- resolution and rate -------------------------------------------------------------------------
 
 
-def test_the_frame_rate_and_height_are_configurable() -> None:
-    spec = build(frame_rate=30, max_height=1080, source_width=3840, source_height=2160)
+def canvas_caps(args: list[str]) -> str:
+    """The recording branch's fixed caps: the canvas every frame is fitted to."""
+    return next(arg for arg in args if arg.startswith("video/x-raw,width=") and "aspect" in arg)
+
+
+def test_the_frame_rate_and_canvas_are_configurable() -> None:
+    spec = build(frame_rate=30, canvas_name="720p")
     assert "video/x-raw,framerate=30/1" in spec.args
-    assert "video/x-raw,width=1920,height=1080" in spec.args
+    assert canvas_caps(spec.args) == "video/x-raw,width=1280,height=720,pixel-aspect-ratio=1/1"
 
 
-def test_scaling_is_only_ever_downward() -> None:
-    """A small window recorded at its own size is sharper than one stretched to a ceiling."""
-    # Preview off, so the only scaler that could appear is the recording branch's own.
-    args = build(source_width=640, source_height=480, max_height=720, want_preview=False).args
-    assert "videoscale" not in args
+def test_the_default_canvas_is_1080p() -> None:
+    assert canvas_caps(build().args).startswith("video/x-raw,width=1920,height=1080,")
+
+
+def test_an_unknown_canvas_falls_back_to_the_default() -> None:
+    """A hand-edited config must not be able to produce a pipeline that will not build."""
+    assert canvas_caps(build(canvas_name="8k").args) == canvas_caps(build().args)
+
+
+def test_the_recording_is_always_fitted_to_the_canvas() -> None:
+    """The fix for a window resized mid-recording (D-080).
+
+    The portal reports no window size on this desktop, and the recording branch used to have **no
+    scaler at all** when the size was unknown — so a resize sent frames of a new size to an encoder
+    and a muxer that cannot change resolution mid-stream. `utils/resize_capture_check.py` measured
+    the result: one WebM holding six frame sizes under a header naming the first. The canvas stage
+    is now there whatever the window is, preview or no preview.
+    """
+    for want_preview in (True, False):
+        args = build(want_preview=want_preview).args
+        start = args.index("videoscale")
+        assert args[start : start + 2] == ["videoscale", "add-borders=true"]
+        assert args[start + 3] == canvas_caps(args)
+
+
+def test_the_window_is_fitted_with_bars_rather_than_stretched() -> None:
+    """Square pixels on the output, so `videoscale` keeps the window's shape and pads the rest."""
+    args = build().args
+    assert "add-borders=true" in args
+    assert canvas_caps(args).endswith(",pixel-aspect-ratio=1/1")
+
+
+def test_the_canvas_comes_before_the_encoder() -> None:
+    """Anywhere after it, and the encoder sees the resize the canvas exists to absorb."""
+    args = build(want_preview=False).args
+    assert args.index(canvas_caps(args)) < args.index("vp8enc")
 
 
 def test_the_preview_does_not_decide_the_recordings_size() -> None:
@@ -246,18 +282,17 @@ def test_the_preview_does_not_decide_the_recordings_size() -> None:
     warning from GStreamer, because nothing about it was invalid. Only watching the file revealed
     it. So each branch owns a scaler, and the recording's size is stated rather than negotiated.
     """
-    spec = build(source_width=1920, source_height=1080)
-    args = spec.args
+    args = build().args
 
     assert args.count("videoscale") == 2
-    assert "video/x-raw,width=1280,height=720" in args
+    assert canvas_caps(args).startswith("video/x-raw,width=1920,height=1080")
     # And the preview still gets its own, unrelated, size.
     assert f"video/x-raw,width={pipeline.PREVIEW_WIDTH},height={pipeline.PREVIEW_HEIGHT}" in args
 
 
 def test_the_recording_branch_scales_after_the_tee() -> None:
     """Position is the whole fix: a scaler before the tee is shared, and sharing is the fault."""
-    args = build(source_width=1920, source_height=1080).args
+    args = build().args
 
     assert args.index("tee") < args.index("videoscale")
 
@@ -266,40 +301,28 @@ def test_no_caps_range_is_ever_asked_of_the_scaler() -> None:
     """A range asks `videoscale` to fixate a size, and fixation is what has failed every time.
 
     Against an ordinary source it picked badly — a 480x16 recording. Against a source with an
-    extreme pixel-aspect-ratio it overflowed outright and the pipeline refused to preroll. There is
-    no size this pipeline asks GStreamer to work out any more: either both numbers are known and
-    stated, or there is no scaler on that branch.
+    extreme pixel-aspect-ratio it overflowed outright and the pipeline refused to preroll. Every
+    canvas states both numbers, so there is no size this pipeline asks GStreamer to work out.
     """
-    for width, height in ((0, 0), (800, 600), (2560, 1440), (1920, 1080)):
-        args = build(source_width=width, source_height=height).args
+    for name in ("720p", "1080p", "1440p"):
+        args = build(canvas_name=name).args
         assert not any("[" in arg for arg in args if arg.startswith("video/x-raw"))
 
 
-def test_a_tall_source_is_capped_at_the_ceiling_and_keeps_its_shape() -> None:
-    args = build(source_width=2560, source_height=1440, max_height=720).args
-
-    assert "video/x-raw,width=1280,height=720" in args
-
-
-def test_odd_dimensions_are_rounded_down_to_even() -> None:
+def test_every_canvas_has_even_dimensions() -> None:
     """VP8, VP9 and H.264 all subsample chroma; an odd edge is rejected or silently rounded."""
-    args = build(source_width=1919, source_height=1081, max_height=1081).args
+    for name in ("720p", "1080p", "1440p"):
+        caps = canvas_caps(build(canvas_name=name).args)
+        width, height = (int(part.split("=")[1]) for part in caps.split(",")[1:3])
+        assert width % 2 == 0
+        assert height % 2 == 0
 
-    caps = next(arg for arg in args if arg.startswith("video/x-raw,width="))
-    width, height = (int(part.split("=")[1]) for part in caps.split(",")[1:3])
-    assert width % 2 == 0
-    assert height % 2 == 0
 
-
-def test_an_unknown_source_size_means_no_scaler_rather_than_a_guess() -> None:
-    """The portal on this desktop reports no size, so this is the ordinary case, not the edge one.
-
-    The ceiling is given up rather than approximated. A recording at the window's own size costs
-    encoder time; a recording produced by guessing cost the recording.
-    """
-    args = build(source_width=0, source_height=0, want_preview=False).args
-
-    assert "videoscale" not in args
+def test_no_descriptor_reads_the_node_from_the_session_daemon() -> None:
+    """How the resize check feeds a test node; a real capture always has the portal's fd."""
+    args = build(fd=-1, node_id=5).args
+    assert not any(arg.startswith("fd=") for arg in args)
+    assert "path=5" in args
 
 
 def test_frames_are_dropped_rather_than_queued() -> None:

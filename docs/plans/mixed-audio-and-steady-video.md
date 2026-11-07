@@ -1,6 +1,6 @@
 # Mixed Audio and Steady Video
 
-**Status:** Not started (0 / 7 phases). Branch: `feature/mixed-audio-steady-video`.
+**Status:** In progress (1 / 7 phases). Branch: `feature/mixed-audio-steady-video`.
 
 ## 1. Introduction
 
@@ -99,6 +99,24 @@ recording; the set of inputs is fixed when recording starts.
 ## 3. Hierarchical Step-by-Step Instructions
 
 ### Phase 1 — Steady video: one canvas for the whole recording
+
+> **Status: ✅ Complete.** What happened, against what was planned:
+> - **Reproduced first.** `utils/resize_capture_check.py` runs the app's own pipeline with its
+>   source swapped for a test pattern resized on a timer. Without the canvas
+>   (`--without-canvas`): one WebM holding **six frame sizes** under a header naming the first.
+>   With it: 30 s, 12 resizes, 450 frames all 1920×1080, letterboxed with the shape kept
+>   (frames checked by eye).
+> - **A fake PipeWire window was tried and dropped.** `pipewiresink` does not renegotiate its
+>   consumer (the recorder kept reading 800×600 while the frames changed size), so it garbled
+>   every recording with or without the fix, and it fails outright near 500×500. The
+>   GStreamer-level rig reproduces the part that broke; `pipewiresrc` against KWin itself stays a
+>   real-desktop check (Phase 7).
+> - **There is no Video settings tab.** No capture option had a control before this. The canvas
+>   select went into a new "Window video" group in Settings → Storage, beside the other
+>   recording settings.
+> - **Tests that need GStreamer and ffmpeg now run here.** The host's tools are reachable from
+>   this toolbox container through `flatpak-spawn --host` (see `docs/workflow.md`). All
+>   26 real-file tests in `test_capture_output.py` pass, including a new end-to-end resize test.
 
 - **Locations:**
   - `web/backend/app/services/capture/geometry.py`: new `CANVASES` table, and `canvas(name)`

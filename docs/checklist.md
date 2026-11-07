@@ -1183,10 +1183,12 @@ approval**. Plan: [plans/recordings-on-the-main-screen.md](plans/recordings-on-t
       timing risks rather than an interface change.
       **Planned:** [plans/mixed-audio-and-steady-video.md](plans/mixed-audio-and-steady-video.md).
 
-- [ ] **Resizing or moving a window stalls its recording.** Every window capture logs
+- [x] **Resizing or moving a window stalls its recording.** *Fixed in code (D-080), reproduced and
+      verified by `utils/resize_capture_check.py`; one real-desktop recording with a window dragged
+      around is still owed (Phase 7 of the plan).* Every window capture logs
       `source 0x0` (the portal reports no size), so `_record_scaler` in
-      `services/capture/pipeline.py` emits no scaler and a resize reaches `vp8enc`/`webmmux`, which
-      cannot change resolution mid-stream. **Planned:** Phase 1 of
+      `services/capture/pipeline.py` emitted no scaler and a resize reached `vp8enc`/`webmmux`, which
+      cannot change resolution mid-stream: one file, several frame sizes. Phase 1 of
       [plans/mixed-audio-and-steady-video.md](plans/mixed-audio-and-steady-video.md).
 
 - [ ] **Recording folders ignore a test server's `storage.session_dir`.** Recordings go to

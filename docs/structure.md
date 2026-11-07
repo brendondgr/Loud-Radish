@@ -260,7 +260,9 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │
 ├── libs/                          # Internal packages with more than one consumer
 ├── utils/                         # Standalone helpers not specific to the web app
-│   └── loud_radish_ctl.py         # Drive recording from outside the browser (D-024)
+│   ├── loud_radish_ctl.py         # Drive recording from outside the browser (D-024)
+│   ├── check_video_frames.py      # A recording's duration and every frame size in it (D-080)
+│   └── resize_capture_check.py    # Resize a "window" mid-recording and check the file (D-080)
 ├── tests/                         # Python tests, grouped by area
 │   ├── api/                       # Routes, transport, audio library
 │   ├── assistant/                 # LLM clients, chat, context, and the polish pass

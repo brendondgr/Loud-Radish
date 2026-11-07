@@ -227,3 +227,36 @@ def test_the_pipeline_is_no_longer_quiet() -> None:
     )
 
     assert "-q" not in spec.args
+
+
+# -- naming why it stopped (D-080) ----------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "log",
+    [
+        "ERROR: from element /GstPipeline:pipeline0/GstPipeWireSrc:pipewiresrc0: Internal data "
+        "stream error.\nstreaming stopped, reason not-negotiated (-4)",
+        "pw.stream: error (-32) no more input formats",
+        "handle_format_change: finish format with error",
+        "stream error: unhandled format",
+    ],
+)
+def test_a_format_change_the_capture_could_not_follow_is_named(log: str) -> None:
+    """The shapes research §6.3 lists for `pipewiresrc` renegotiation failures, said plainly."""
+    from app.services.capture.recorder import explain
+
+    assert "changed size or format" in explain(log)
+
+
+def test_a_window_that_went_away_is_named() -> None:
+    from app.services.capture.recorder import explain
+
+    assert "went away" in explain("stream error: target not found")
+
+
+def test_an_unrecognised_log_is_left_to_speak_for_itself() -> None:
+    """No guess: an unknown failure keeps GStreamer's own words rather than a wrong sentence."""
+    from app.services.capture.recorder import explain
+
+    assert explain("something else entirely") == ""
