@@ -260,6 +260,33 @@ screen is empty afterwards. Both are announced to every client as `session.viewi
 | The database holds no segments | `409` | `needs-transcription` |
 | The database cannot be read | `422` | `unreadable` |
 
+### `GET /api/sessions/{key}/transcribe/plan` and `POST /api/sessions/{key}/transcribe` (D-076)
+
+For a recording with no transcript. **The plan starts nothing**; it is what the approval dialog
+shows: `{key, title, source, seconds, model, model_ready, orphan, refusal}`, where `source` is
+`resume` (an interrupted pass's checkpoint), `wav` (the folder's `audio.wav`) or `video` (the sound
+will be taken out of the video first), and `refusal` is `{code, message}` or `null`. A key that
+names no database and no folder is `404 no-such-recording`.
+
+`POST` is the user's approval, body `{"open_when_done": true}` (the default). It loads the speech
+model if needed, extracts the video's sound when that is the source, creates `<key>.db` for a
+folder that had none, and starts the ordinary batch pass. Returns `{started, source, job}`;
+progress is the usual `transcription.*` events, and with `open_when_done` the recording is put on
+the main screen when the pass finishes (`session.viewing`). Nothing else is run.
+
+| Condition | Status | Code |
+|---|---|---|
+| It already has a transcript | `409` | `already-transcribed` |
+| No WAV, no checkpoint, no video with sound | `409` | `nothing-to-transcribe` |
+| A session is recording / a pass is running | `409` | `session-running` / `transcription-running` |
+| The model would not load | `409` | `model-load-failed` |
+| The video's sound could not be read | `422` | `no-sound` |
+| The checkpoint's audio is gone | `410` | `audio-gone` |
+
+`GET /api/sessions` rows gain `orphan` (a recording folder with no database, listed so it can be
+transcribed) and `media` gains `openable`, `transcribable`, `transcribe_source` and `reason`, the
+one answer the row, the window and the picker all read.
+
 ### `DELETE /api/sessions/{key}`
 
 Removes the transcript database **and** the recording folder (since D-076; it used to leave the

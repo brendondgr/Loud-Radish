@@ -37,6 +37,9 @@ dependencies = [
     "keyring>=25.7.0",
     # D-Bus, for the screen-cast portal that window capture negotiates through (D-022).
     "jeepney>=0.9.0",
+    # Taking a video's sound out to transcribe it (D-076). Already installed by faster-whisper,
+    # which decodes with it; named here because this code imports it directly.
+    "av>=18.1.0",
 ]
 
 [dependency-groups]

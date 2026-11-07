@@ -1,4 +1,4 @@
-"""What can be done to one past recording: bring it to the main screen, close it, delete it.
+"""What can be done to one past recording: bring it to the main screen, transcribe it, delete it.
 
 Split from ``sessions.py``, which reads and exports past sessions and was already past 600 lines.
 These are the routes that *change* something — which store the main screen reads (D-076), or what
@@ -19,8 +19,12 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from starlette.concurrency import run_in_threadpool
 
+from ..schemas.api import TranscribeRecordingRequest
+from ..services.asr.contract import AsrLoadError
 from ..services.recording import resolve_recording
+from ..services.session.past_pass import PassRefused, plan_pass, prepare_audio, start_pass
 from ..services.transcript import archive
 
 router = APIRouter(prefix="/api/sessions", tags=["sessions"])
@@ -123,6 +127,72 @@ async def close_recording(request: Request) -> dict[str, Any]:
     manager = _manager(request)
     manager.close_viewing()
     return manager.state()
+
+
+# -- transcribing, once the user approves (D-076) ------------------------------------------------
+
+
+def _refused(refusal: PassRefused) -> HTTPException:
+    return HTTPException(status_code=refusal.status, detail=_error(refusal.code, refusal.message))
+
+
+#: The HTTP status each planning refusal is answered with when the user approves anyway.
+_REFUSAL_STATUS = {"unreadable": 422}
+
+
+@router.get("/{key}/transcribe/plan")
+async def transcription_plan(request: Request, key: str) -> dict[str, Any]:
+    """What approving would do: the source, its length, the model, or why it cannot run.
+
+    Read by the approval dialog before anything is started, so the user agrees to a described
+    piece of work rather than to a button. Starts nothing.
+    """
+    manager = _manager(request)
+    try:
+        plan = await run_in_threadpool(plan_pass, _config(request), manager, key)
+    except PassRefused as refusal:
+        raise _refused(refusal) from refusal
+    return plan.as_dict()
+
+
+@router.post("/{key}/transcribe")
+async def transcribe_recording(
+    request: Request, key: str, body: TranscribeRecordingRequest | None = None
+) -> dict[str, Any]:
+    """Transcribe a recording with no transcript. **Only ever called by the user approving it.**
+
+    Loads the speech model if it is not loaded, takes the sound out of the video when that is the
+    only copy, then starts the same batch pass a stopped `recorded` session runs. Progress arrives
+    as the ordinary ``transcription.*`` events; with ``open_when_done`` the recording comes to the
+    main screen when the pass finishes, announced as ``session.viewing``.
+    """
+    manager = _manager(request)
+    config = _config(request)
+    wanted = body or TranscribeRecordingRequest()
+    try:
+        plan = await run_in_threadpool(plan_pass, config, manager, key)
+    except PassRefused as refusal:
+        raise _refused(refusal) from refusal
+    if plan.refusal:
+        status = _REFUSAL_STATUS.get(plan.refusal["code"], 409)
+        raise HTTPException(
+            status_code=status, detail=_error(plan.refusal["code"], plan.refusal["message"])
+        )
+
+    if not manager.asr.is_ready:
+        try:
+            await manager.asr.load(config.asr)
+        except AsrLoadError as exc:
+            raise HTTPException(
+                status_code=409, detail=_error("model-load-failed", str(exc), "critical")
+            ) from exc
+
+    try:
+        await run_in_threadpool(prepare_audio, config, plan)
+        job = start_pass(config, manager, plan, open_when_done=wanted.open_when_done)
+    except PassRefused as refusal:
+        raise _refused(refusal) from refusal
+    return {"started": True, "source": plan.source, "job": job.as_event()}
 
 
 # -- deleting -------------------------------------------------------------------------------------

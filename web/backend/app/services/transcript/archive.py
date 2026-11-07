@@ -23,12 +23,14 @@ from __future__ import annotations
 import logging
 import sqlite3
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from ...config.schema import AppConfig
-from ..recording.layout import resolve_recording
+from ..recording.extract import has_sound
+from ..recording.layout import iter_recordings, resolve_recording
+from ..recording.layout import started_at as started_from_key
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +59,49 @@ class SessionMedia:
     audio_file: bool = False
     #: Bytes in the recording folder. Zero when there is no folder.
     recording_bytes: int = 0
+    #: Whether a video carries sound a pass could read: the muxed file, or a raw video with an audio
+    #: stream. Only worked out when it decides something — a recording with no transcript and no
+    #: WAV — because finding out means opening the video.
+    video_sound: bool = False
+    #: Whether an interrupted pass left a checkpoint it can continue from (D-045).
+    resumable: bool = False
+
+    # -- what can be done with it (D-076) -----------------------------------------------------
+    #
+    # Decided here, once, so the recordings row, the recording window and the main screen's picker
+    # cannot disagree about whether a recording can be brought back or transcribed.
+
+    @property
+    def openable(self) -> bool:
+        """Whether it can be brought to the main screen: the assistant answers from a transcript."""
+        return self.transcript
+
+    @property
+    def transcribe_source(self) -> str:
+        """What a pass would read, when there is no transcript: ``resume``, ``wav``, ``video``, or
+        empty when there is nothing to transcribe or no need to."""
+        if self.transcript:
+            return ""
+        if self.resumable:
+            return "resume"
+        if self.audio_file:
+            return "wav"
+        if self.video_sound:
+            return "video"
+        return ""
+
+    @property
+    def transcribable(self) -> bool:
+        return bool(self.transcribe_source)
+
+    @property
+    def reason(self) -> str:
+        """Why it can be neither opened nor transcribed, in words for the person looking at it."""
+        if self.openable or self.transcribable:
+            return ""
+        if self.video:
+            return "This video has no sound to transcribe."
+        return "There is nothing in this recording to transcribe."
 
     @property
     def exportable(self) -> bool:
@@ -76,6 +121,10 @@ class SessionMedia:
             "audio_file": self.audio_file,
             "recording_bytes": self.recording_bytes,
             "exportable": self.exportable,
+            "openable": self.openable,
+            "transcribable": self.transcribable,
+            "transcribe_source": self.transcribe_source,
+            "reason": self.reason,
         }
 
 
@@ -107,6 +156,10 @@ class ArchivedSession:
     revisions: list[int] = field(default_factory=list)
     #: Empty when the file is readable. Otherwise says what is wrong with it.
     problem: str = ""
+    #: A recording folder with no transcript database at all (D-076) — a recording whose pass
+    #: never ran, or whose database was lost. Listed so it can be transcribed, rather than sitting
+    #: on disk where nothing in the interface can reach it.
+    orphan: bool = False
 
     @property
     def readable(self) -> bool:
@@ -131,6 +184,7 @@ class ArchivedSession:
             "revisions": list(self.revisions),
             "problem": self.problem,
             "readable": self.readable,
+            "orphan": self.orphan,
         }
 
 
@@ -145,20 +199,55 @@ def recording_dir(config: AppConfig) -> Path:
 
 
 def list_sessions(config: AppConfig) -> list[ArchivedSession]:
-    """Describe every session on disk, newest first."""
+    """Describe every session on disk, newest first.
+
+    **Including recording folders with no database (D-076).** A folder of video or audio whose
+    transcript was never written is still a recording, and the only place it can be transcribed
+    from is a row on the recordings page. Both kinds are ordered together by modification time.
+    """
     directory = session_dir(config)
+    recordings = recording_dir(config)
+    rows: list[tuple[float, ArchivedSession]] = []
+    keys: set[str] = set()
     try:
-        files = sorted(
-            (path for path in directory.iterdir() if path.suffix == SESSION_SUFFIX),
-            key=lambda path: path.stat().st_mtime,
-            reverse=True,
-        )
+        files = [path for path in directory.iterdir() if path.suffix == SESSION_SUFFIX]
     except OSError:
         logger.info("No session directory at %s yet", directory)
-        return []
+        files = []
+    for path in files:
+        keys.add(path.stem)
+        rows.append((_mtime_s(path), describe(path, recordings)))
 
-    recordings = recording_dir(config)
-    return [describe(path, recordings) for path in files]
+    for layout in iter_recordings(recordings):
+        if layout.key in keys:
+            continue
+        rows.append((_mtime_s(layout.directory), describe_orphan(layout.key, recordings)))
+
+    rows.sort(key=lambda row: row[0], reverse=True)
+    return [session for _mtime, session in rows]
+
+
+def describe_orphan(key: str, recordings: Path) -> ArchivedSession:
+    """A recording folder that has no transcript database, described from the folder alone."""
+    started = started_from_key(key)
+    started_iso = started.replace(tzinfo=UTC).isoformat() if started else ""
+    media = media_for(key, recordings, has_transcript=False)
+    return ArchivedSession(
+        key=key,
+        path="",
+        title=f"Recording on {started.strftime('%d %b %Y, %H:%M')}" if started else key,
+        started_at=started_iso,
+        ended_at="",
+        segments=0,
+        words=0,
+        duration_seconds=0.0,
+        summaries=0,
+        glossary_terms=0,
+        chat_messages=0,
+        size_bytes=0,
+        media=media,
+        orphan=True,
+    )
 
 
 def newest_with_segments(config: AppConfig) -> Path | None:
@@ -236,6 +325,7 @@ def describe(path: Path, recordings: Path | None = None) -> ArchivedSession:
         # — which is exactly what it did, caught by the test written for the previous instance.
         chat = _count_or_zero(connection, "chat_messages")
         revisions = _revisions(connection)
+        resumable = _has_resumable_pass(connection)
     except sqlite3.Error as exc:
         # A file from an older schema, or one truncated by a crash. Listed with the reason.
         return _unreadable(path, size, f"Not a readable session file ({type(exc).__name__}).")
@@ -257,7 +347,7 @@ def describe(path: Path, recordings: Path | None = None) -> ArchivedSession:
         glossary_terms=int(glossary["n"] or 0),
         chat_messages=chat,
         size_bytes=size,
-        media=media_for(path.stem, recordings, has_transcript=segments > 0),
+        media=media_for(path.stem, recordings, has_transcript=segments > 0, resumable=resumable),
         revisions=revisions,
     )
 
@@ -294,6 +384,19 @@ def _has_table(connection: sqlite3.Connection, table: str) -> bool:
     return row is not None
 
 
+def _has_resumable_pass(connection: sqlite3.Connection) -> bool:
+    """Whether an interrupted pass left a checkpoint — `TranscriptStore.resumable_pass`, read-only.
+
+    Guarded on the table, like every other read here: this connection does not migrate.
+    """
+    if not _has_table(connection, "transcription_passes"):
+        return False
+    row = connection.execute(
+        "SELECT 1 FROM transcription_passes WHERE state IN ('running', 'paused') LIMIT 1"
+    ).fetchone()
+    return row is not None
+
+
 def _revisions(connection: sqlite3.Connection) -> list[int]:
     """Every pass this session holds, in order — guarded like the stats query, because this
     connection is read-only and does not migrate. A database from before the column holds one
@@ -326,7 +429,9 @@ def _stats_query(connection: sqlite3.Connection) -> str:
     return f"{totals} WHERE revision = (SELECT COALESCE(MAX(revision), 0) FROM segments)"
 
 
-def media_for(key: str, recordings: Path | None, *, has_transcript: bool) -> SessionMedia:
+def media_for(
+    key: str, recordings: Path | None, *, has_transcript: bool, resumable: bool = False
+) -> SessionMedia:
     """What the recording folder named ``key`` holds, if there is one.
 
     Never raises. A recordings directory that has been moved, renamed in settings, or deleted
@@ -334,21 +439,30 @@ def media_for(key: str, recordings: Path | None, *, has_transcript: bool) -> Ses
     page that cannot say whether there is a video.
     """
     if recordings is None:
-        return SessionMedia(transcript=has_transcript)
+        return SessionMedia(transcript=has_transcript, resumable=resumable)
     try:
         layout = resolve_recording(recordings, key)
         if layout is None or not layout.exists():
-            return SessionMedia(transcript=has_transcript)
+            return SessionMedia(transcript=has_transcript, resumable=resumable)
+        video = layout.existing_video()
+        muxed = layout.muxed_video() is not None
+        audio_file = layout.has_audio()
+        # Opening a video is the one costly check here, so it is made only when the answer decides
+        # something: no transcript, nothing to resume, no WAV, and no muxed file already known to
+        # carry the sound.
+        needs_probe = not (has_transcript or resumable or audio_file or muxed) and video is not None
         return SessionMedia(
-            video=layout.existing_video() is not None,
+            video=video is not None,
             audio=layout.has_playable_audio(),
             transcript=has_transcript,
-            audio_file=layout.has_audio(),
+            audio_file=audio_file,
             recording_bytes=layout.size_bytes(),
+            video_sound=muxed or (needs_probe and has_sound(video)),
+            resumable=resumable,
         )
     except OSError:
         logger.warning("Could not read the recording folder for %s", key)
-        return SessionMedia(transcript=has_transcript)
+        return SessionMedia(transcript=has_transcript, resumable=resumable)
 
 
 def _unreadable(path: Path, size: int, problem: str) -> ArchivedSession:
@@ -367,6 +481,13 @@ def _unreadable(path: Path, size: int, problem: str) -> ArchivedSession:
         size_bytes=size,
         problem=problem,
     )
+
+
+def _mtime_s(path: Path) -> float:
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return 0.0
 
 
 def _mtime(path: Path) -> str:

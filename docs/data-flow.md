@@ -144,6 +144,13 @@ Three differences from the live flow, each deliberate:
   into that recording's own database. Only a recording with a transcript opens. A new session
   starting, `POST /api/sessions/close`, or deleting that recording ends the view, announced as
   `session.viewing`. The view is not restored after a restart (**D-076**).
+- **A recording without a transcript is transcribed only on approval.** The recordings page lists
+  folders with no database as well as databases, and for any recording with no transcript the
+  approval dialog reads a plan (`GET …/transcribe/plan`) that starts nothing. Approving takes the
+  sound out of the video into `audio.wav` when that is the only copy (PyAV, `recording/extract.py`),
+  creates the database under the folder's own key when there was none, and runs the same batch pass
+  a stopped `recorded` session runs — into the store that shares the folder's name. When the pass
+  finishes, the recording is put on the main screen if the user left that box ticked (**D-076**).
 
 ## Where a recording's pieces end up (D-032)
 

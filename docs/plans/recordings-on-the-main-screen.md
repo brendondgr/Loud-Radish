@@ -1,6 +1,6 @@
 # Recordings on the Main Screen: Ask About Any Past Recording
 
-*Written 2026-11-07, revised the same day with the user's answers. Status: **In progress (3 / 6)**.
+*Written 2026-11-07, revised the same day with the user's answers. Status: **In progress (4 / 6)**.
 Runs **alongside** [unified-record-sheet.md](unified-record-sheet.md), which is being implemented at
 the same time in the main checkout. This plan is built in a separate worktree
 (`../TranscriberPrototype-recordings`, branch `feature/recordings-on-main-screen`), so the two never
@@ -205,6 +205,12 @@ Read before starting: `docs/skills/global-project-rules/SKILL.md`, `docs/archite
   - `services/recording/extract.py` (**new**): `extract_audio(video, wav)` uses the ffmpeg/ffprobe
     helpers in `services/capture/mux.py`. It never raises, and it refuses a video with no audio
     stream.
+  - *As built:* the routes live in `routes/session_actions.py` beside open/close/delete, and the
+    planning and starting in `services/session/past_pass.py`. **ffmpeg is not installed on the
+    development machine**, so extraction and probing use PyAV (already present through
+    `faster-whisper`, now a declared dependency) rather than the `capture/mux.py` helpers. The
+    model is loaded by the approval if it is not loaded. Extraction tests are in
+    `tests/transcription/test_extract_audio.py`, there being no `tests/recording/` area.
   - `routes/sessions.py`, or a new `routes/session_transcribe.py`:
     - `GET /api/sessions/{key}/transcribe/plan` returns the source (`wav`, `video` or `resume`),
       its duration, whether a model is loaded, and any refusal.
