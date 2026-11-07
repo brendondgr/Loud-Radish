@@ -1181,6 +1181,13 @@ approval**. Plan: [plans/recordings-on-the-main-screen.md](plans/recordings-on-t
       (D-075) and left out of it on purpose: a session opens exactly one audio source
       (`services/session/sources.py`), so this needs a mixer, which is a capture change with its own
       timing risks rather than an interface change.
+      **Planned:** [plans/mixed-audio-and-steady-video.md](plans/mixed-audio-and-steady-video.md).
+
+- [ ] **Resizing or moving a window stalls its recording.** Every window capture logs
+      `source 0x0` (the portal reports no size), so `_record_scaler` in
+      `services/capture/pipeline.py` emits no scaler and a resize reaches `vp8enc`/`webmmux`, which
+      cannot change resolution mid-stream. **Planned:** Phase 1 of
+      [plans/mixed-audio-and-steady-video.md](plans/mixed-audio-and-steady-video.md).
 
 - [ ] **Recording folders ignore a test server's `storage.session_dir`.** Recordings go to
       `recording.recording_dir`, default `./data/recordings` in the checkout, so an isolated QA server
