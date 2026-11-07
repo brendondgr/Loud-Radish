@@ -8,15 +8,15 @@
 
 import { on } from "./core/bus.js";
 import { $ } from "./core/dom.js";
-import { ARMING, IDLE, PAUSED, PROCESSING, RECORDING, STOPPING, WINDOW } from "./core/modes.js";
+import { IDLE, PAUSED, PROCESSING, RECORDING, STOPPING, WINDOW } from "./core/modes.js";
 import * as prefs from "./core/storage.js";
 import { Banners } from "./components/banners.js";
 import { ChatPane } from "./components/chat-pane.js";
 import { ExportDialog } from "./components/export-dialog.js";
 import { GlossaryPanel } from "./components/glossary-panel.js";
 import { Header } from "./components/header.js";
-import { ModeSwitcher } from "./components/mode-switcher.js";
 import { RecordSheet } from "./components/record-sheet.js";
+import { arm, armFromUrl } from "./session-start.js";
 import { RecordingMonitor } from "./components/recording-monitor.js";
 import { TranscriptSelection } from "./components/selection.js";
 import { SettingsModal } from "./components/settings-modal.js";
@@ -82,8 +82,6 @@ function boot() {
     },
   });
 
-  new ModeSwitcher($("[data-mode-switcher]"));
-
   const monitor = new RecordingMonitor($("[data-monitor-pane]"), {
     // The timer follows what is actually on screen: in the narrow layout the pane exists but is
     // the inactive tab, and encoding frames for it would be pure waste.
@@ -96,15 +94,14 @@ function boot() {
     },
   });
 
-  const preflight = new RecordSheet($("[data-record-sheet]"), {
+  const sheet = new RecordSheet($("[data-record-sheet]"), {
     onOpenSettings: (section) => settings.show(section),
   });
 
   exportWindow = new ExportDialog($("[data-export]"));
 
   const header = new Header($(".header"), {
-    onStart: (name) => start(name, null, banners, settings),
-    onArm: (name) => arm(name, preflight, banners, settings),
+    onArm: () => arm(sheet, { banners, settings }),
     onStop: ({ armedOnly }) => stop(armedOnly, banners),
     onPause: () => hold(true, banners),
     onResume: () => hold(false, banners),
@@ -141,7 +138,7 @@ function boot() {
   wireChat(chatPane);
 
   socket.connect();
-  hydrate(pane, chatPane, glossary).then(() => armFromUrl(preflight, banners, settings));
+  hydrate(pane, chatPane, glossary).then(() => armFromUrl(sheet, { banners, settings }));
 }
 
 /** Keep the narrow-layout tab badge in step with unread answers. */
@@ -293,7 +290,7 @@ function wireSession(header) {
     capture.reset();
     // The server is authoritative about the mode: a reload mid-recording, or a session started
     // from somewhere other than this tab, must show what is actually being recorded.
-    mode.adoptSession({ running: true, mode: session.mode });
+    mode.adoptSession({ running: true, mode: session.mode, options: session.options });
   });
 
   // The device is released the instant stop is pressed; finalising a video container, remuxing,
@@ -337,7 +334,12 @@ function wireSession(header) {
     session.hydrate(state);
     recording.hydrate(state);
     capture.set(state?.capture);
-    mode.adoptSession({ running: session.running, mode: session.mode, paused: session.paused });
+    mode.adoptSession({
+      running: session.running,
+      mode: session.mode,
+      paused: session.paused,
+      options: session.options,
+    });
     // After adoptSession, which would otherwise reset a reconnecting client to idle while a pass
     // it cannot see is still running.
     if (recording.isTranscribing) {
@@ -383,9 +385,9 @@ function wireControls(pane) {
   }
   showPane(prefs.get("activePane"));
 
-  // The monitor exists only in window mode. Both the pane and its tab follow the selection, and
-  // leaving window mode while looking at the monitor falls back to the transcript rather than to
-  // an empty column.
+  // The monitor exists only for a window recording. Both the pane and its tab follow the mode of the
+  // run in progress or the last one (D-075), and leaving window mode while looking at the monitor
+  // falls back to the transcript rather than to an empty column.
   on(MODE_CHANGED, () => renderMonitorVisibility());
   renderMonitorVisibility();
 
@@ -415,7 +417,7 @@ function applyTextSize(px) {
   document.documentElement.style.setProperty("--transcript-size", `${px}px`);
 }
 
-/** Show or hide the monitor pane and its tab, following the selected capture mode. */
+/** Show or hide the monitor pane and its tab, following the current or last run's mode. */
 function renderMonitorVisibility() {
   const wanted = mode.mode === WINDOW;
   const pane = $("[data-monitor-pane]");
@@ -465,7 +467,7 @@ async function hydrate(pane, chatPane, glossary) {
     session.hydrate(state);
     recording.hydrate(state);
     capture.set(state?.capture);
-    mode.adoptSession({ running: session.running, mode: session.mode });
+    mode.adoptSession({ running: session.running, mode: session.mode, options: session.options });
     if (recording.isTranscribing) mode.setState(PROCESSING);
     if (state.metrics) health.setStatus(state.metrics);
 
@@ -489,45 +491,11 @@ async function hydrate(pane, chatPane, glossary) {
 }
 
 /**
- * Arm a mode: collect this run's options, then start it.
- *
- * Cancelling here has captured nothing and starts nothing, which is why `arming` is a run state of
- * its own rather than the first moment of `recording`.
- */
-async function arm(captureMode, preflight, banners, settings) {
-  if (preflight.isOpen) return;
-
-  mode.setState(ARMING);
-  const options = await preflight.show(captureMode === WINDOW ? { source: WINDOW } : {});
-  if (!options) {
-    mode.setState(IDLE);
-    return;
-  }
-  await start(captureMode, options, banners, settings);
-}
-
-/**
  * Show one transcription pass (D-022).
  *
  * A whole replacement rather than a merge: the two passes cover the same audio with different
  * segment ids, and interleaving them would produce a transcript that says everything twice.
  */
-/**
- * Open the pre-flight sheet because a global shortcut asked for it (Plan 5).
- *
- * `?arm=window` rather than a second native dialog: the browser already has a sheet for those three
- * switches, and building another would mean two implementations to keep in step.
- */
-async function armFromUrl(preflight, banners, settings) {
-  const wanted = new URLSearchParams(window.location.search).get("arm");
-  if (!wanted || !mode.select(wanted)) return;
-
-  // Cleared from the address bar first, so a reload does not re-arm a recording the user has
-  // since cancelled.
-  window.history.replaceState({}, "", window.location.pathname);
-  if (mode.action === "arm") await arm(wanted, preflight, banners, settings);
-}
-
 async function showRevision(pane, revision) {
   try {
     const { segments } = await api.transcriptAt(revision);
@@ -613,31 +581,6 @@ async function refreshRevisions(pane) {
     pane.setRevisions(revisions, latest);
   } catch {
     /* No session, or none yet. The switch simply stays hidden. */
-  }
-}
-
-async function start(captureMode, options, banners, settings) {
-  try {
-    // With options the server derives the mode from them (D-075); sending one beside them only
-    // invites a refusal when the sheet chose a different source from the tab that opened it.
-    await api.startSession(options ? { options } : { mode: captureMode });
-  } catch (error) {
-    mode.fail(error.message);
-
-    // A mode this build does not have is not an audio problem, and sending the user to the audio
-    // settings to fix it would be a wrong instruction confidently given. The banner alone is the
-    // whole remedy: the message names the plan that will deliver it.
-    const unavailable = error.code === "mode-unavailable";
-    banners.show({
-      code: error.code ?? "start-failed",
-      severity: unavailable ? "warning" : (error.severity ?? "critical"),
-      message: error.message,
-      // A failure to start is otherwise nearly always the input source, and the remedy is a
-      // setting. Opening the tab that fixes it beats a message telling the user to go and find it.
-      remedy: unavailable ? undefined : "audio",
-      remedy_label: unavailable ? undefined : "Open audio settings",
-    });
-    if (!unavailable) settings?.show("audio");
   }
 }
 

@@ -1,6 +1,6 @@
 # Component Map
 
-*Last updated: 2026-09-09 (the Rewriting tab — D-068)*
+*Last updated: 2026-11-07 (the record sheet replaces the mode switch — D-075)*
 
 > **Status: implemented.** Update this file in the same change that adds, moves, or renames a
 > component.
@@ -40,6 +40,7 @@ web/frontend/
     │   └── components/         one stylesheet per component
     └── js/
         ├── main.js             the application page's entry point
+        ├── session-start.js    opening the record sheet and starting what it chose (D-075)
         ├── sessions.js         the recordings page's entry point — the list, the media
         │                       chips, the transcript and conversation exports (with a
         │                       Live/Final choice where a session holds two passes, D-066),
@@ -101,29 +102,32 @@ browser owns is genuinely its own — pane widths, text size, which pane is show
 | `RewritingSettings` | The two instruction editors, their Reset controls, and the line saying which text is in force | The one thing the binding layer cannot do: a blank field means the instructions that shipped, so the shipped text is the field's **placeholder** and never its value — seeding it would store a copy on the next change event and freeze this installation on today's wording. Reset writes `""` for the same reason (D-068) |
 | `FocusTrap` | Modal focus containment and restoration | Recomputes candidates per Tab — the dialog changes shape constantly |
 
-### The multi-mode expansion (D-020)
+### The multi-mode expansion (D-020), and the record sheet (D-075)
 
-> **Being superseded by D-075** ([plans/unified-record-sheet.md](plans/unified-record-sheet.md)).
-> `ModeSwitcher` and `Preflight` are replaced by one `RecordSheet` behind *Start recording*; the
-> mode is derived from the sheet's choices. This table describes the tree until that plan's
-> Step 4 lands.
+> The header's `ModeSwitcher` and the window-only `Preflight` were replaced by one `RecordSheet`
+> behind *Start recording* ([plans/unified-record-sheet.md](plans/unified-record-sheet.md)). The
+> mode is derived from the sheet's choices rather than picked. `static/js/session-start.js` connects
+> the two: it opens the sheet, then asks the server to start what it chose.
 
 Specified in `docs/design-system.md` § Capture Modes; built by
 [plans/multi-mode-ui-implementation.md](plans/multi-mode-ui-implementation.md).
 
 | Component | Owns | Notes |
 |---|---|---|
-| `ModeSwitcher` | The three-way capture-mode `radiogroup` | Separate from `Header` so the header stays a renderer rather than a controller. One tab stop for the group; arrows move within and skip unavailable options rather than landing on one and refusing. Disabled whenever the run state is not `idle` |
 | `RecordSheet` | The record sheet: source, microphone or window audio, transcription timing, video | Replaced `Preflight` (D-075). Reuses `FocusTrap` and the modal styling. `show(preset)` returns a promise of the start request's `options`, or `null` on cancel. Opens pre-filled from the last run (`lastRecordOptions`), focuses Confirm, and writes a changed microphone to `audio.device_id` rather than holding a per-run override. A disabled source carries its reason. Refuses nothing-to-record; the server refuses it again |
 | `RecordingMonitor` | The third pane's contents: preview, elapsed, output size, active options | Pulls the preview as a still image on a timer, stopped whenever nobody is looking. The socket never carries video, because transcript events on it are undroppable. Distinguishes its degraded states — no capture, no encoder, window closed, recorder failed — because a black rectangle and a broken capture look identical |
 
 `Header` keeps the record control but no longer derives its appearance from a boolean: it renders
-the six run states from a presentation table and asks `stores/mode.js` what pressing the control
-means. The error message goes to the banner and the `title`, never into the state label — a sentence
+the seven run states from a presentation table and asks `stores/mode.js` what pressing the control
+means — from `idle`, always "arm", which opens the record sheet. Beside the clock it shows what is
+running, for example *Microphone · live + after*, the job the mode tabs used to do by being visibly
+selected. That label is the one element in the row allowed to truncate. The error message goes to the banner and the `title`, never into the state label — a sentence
 there stretches the header until the primary control is pushed off a narrow screen.
 
 `TranscriptPane` grows a mode-specific empty state, because `recorded` mode genuinely has no
-transcript while it records and a blank pane reads as a transcriber that has stopped working. Once a
+transcript while it records and a blank pane reads as a transcriber that has stopped working. It
+keys on the run's *options* as well as its mode: a `recorded` run with live text on says what live
+says, and idle has one message whatever the last run was. Once a
 session can hold two transcription passes it also grows a Live/Final revision switch (Plan 4).
 
 ## Stores
@@ -132,11 +136,11 @@ session can hold two transcription passes it also grows a Live/Final revision sw
 |---|---|---|
 | `transcript` | Committed segments from **one** transcription pass, and the single hypothesis. A segment from another pass is dropped rather than appended — merging the post-capture pass into the live one shows the talk twice (D-022) | `store.transcript.changed` |
 | `polish` | Finished minutes rewritten for reading, and which segments they cover | `store.polish.changed` |
-| `session` | Whether recording, for how long, resolved config | `store.session.changed` |
+| `session` | Whether recording, for how long, resolved config, and the options the server resolved | `store.session.changed` |
 | `health` | Level, speech, RTF, latency, connection | `store.health.changed`, throttled to ~4 Hz |
 | `config` | The backend's resolved configuration | `config:changed` |
 | `chat` | Settled messages plus the streaming one | `store.chat.changed`, `store.chat.stream` |
-| `mode` | Selected capture mode, current run state, per-mode availability, the pending run's options | `store.mode.changed` |
+| `mode` | The current or last run's mode (derived, never selected — D-075), current run state, per-mode availability, and the record sheet's options for that run | `store.mode.changed` |
 | `recording` | Bytes and duration captured, and the post-capture pass's progress. Authoritative from the server, because the pass outlives the page (D-021) | `store.recording.changed` |
 | `capture` | The window recording's state. Also server-authoritative: the recorder is a subprocess the browser has no view of (D-022) | `store.capture.changed` |
 

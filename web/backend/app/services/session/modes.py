@@ -69,13 +69,17 @@ RECORD_STATES: Final[tuple[RecordState, ...]] = (
 
 #: Which run states each mode can actually reach.
 #:
-#: ``live`` never enters ``processing`` — it has nothing left to do when capture stops — and never
-#: enters ``arming``, because it has no options to collect. ``recorded`` always processes: that is
-#: the whole mode. ``window`` may or may not, depending on whether post-process transcription was
-#: switched on, so the state is listed as reachable and simply never entered when it is not.
+#: ``live`` never enters ``processing`` — it has nothing left to do when capture stops.
+#: ``recorded`` always processes: that is the whole mode. ``window`` may or may not, depending on
+#: whether post-process transcription was switched on, so the state is listed as reachable and
+#: simply never entered when it is not.
+#:
+#: **Every mode arms** since the record sheet (D-075): every recording starts by answering it. Only
+#: ``window`` used to, because only it had options; a global shortcut that starts directly still
+#: passes straight from ``idle`` to ``recording``.
 MODE_STATES: Final[dict[CaptureMode, tuple[RecordState, ...]]] = {
-    LIVE: (IDLE, RECORDING, PAUSED, STOPPING, ERROR),
-    RECORDED: (IDLE, RECORDING, PAUSED, STOPPING, PROCESSING, ERROR),
+    LIVE: (IDLE, ARMING, RECORDING, PAUSED, STOPPING, ERROR),
+    RECORDED: (IDLE, ARMING, RECORDING, PAUSED, STOPPING, PROCESSING, ERROR),
     WINDOW: (IDLE, ARMING, RECORDING, PAUSED, STOPPING, PROCESSING, ERROR),
 }
 

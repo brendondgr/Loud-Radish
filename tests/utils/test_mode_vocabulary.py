@@ -160,12 +160,29 @@ def test_live_does_not_process_and_window_does() -> None:
     assert modes.PROCESSING in modes.MODE_STATES[modes.WINDOW]
 
 
-def test_only_window_arms() -> None:
-    # Arming exists to collect options and wait for the desktop's picker. Only window capture has
-    # either, and offering an arming step for the others would be a dialog with nothing in it.
-    assert modes.ARMING in modes.MODE_STATES[modes.WINDOW]
-    assert modes.ARMING not in modes.MODE_STATES[modes.LIVE]
-    assert modes.ARMING not in modes.MODE_STATES[modes.RECORDED]
+def test_every_mode_arms() -> None:
+    # Arming is collecting the record sheet's answers (D-075). Every recording starts there now, so
+    # every mode can be in it; only window used to, because only it had options.
+    for mode in modes.CAPTURE_MODES:
+        assert modes.ARMING in modes.MODE_STATES[mode]
+
+
+def test_capture_sources_match(js: str) -> None:
+    constants = _string_constants(js)
+    assert _resolve(_string_array(js, "CAPTURE_SOURCES"), constants) == list(
+        modes.CAPTURE_SOURCES
+    )
+
+
+def test_derive_mode_is_mirrored(js: str) -> None:
+    """The JavaScript copy is read, not run: its two branches must name the modes Python returns."""
+    body = re.search(r"export function deriveMode\(.*?\n\}", js, re.DOTALL)
+    assert body, "deriveMode is missing from modes.js"
+    assert "WINDOW_SOURCE) return WINDOW" in body.group(0)
+    assert "postTranscription ? RECORDED : LIVE" in body.group(0)
+    assert modes.derive_mode(modes.WINDOW_SOURCE, post_transcription=False) == modes.WINDOW
+    assert modes.derive_mode(modes.MICROPHONE, post_transcription=True) == modes.RECORDED
+    assert modes.derive_mode(modes.SYSTEM, post_transcription=False) == modes.LIVE
 
 
 def test_helpers_agree_with_the_tables() -> None:

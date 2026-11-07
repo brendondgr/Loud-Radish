@@ -47,13 +47,13 @@ export const RECORD_STATES = Object.freeze([
 /**
  * Which run states each mode can actually reach.
  *
- * `live` never processes — nothing is left to do when capture stops — and never arms, having no
- * options to collect. `recorded` always processes. `window` may, depending on whether post-process
- * transcription was switched on before capture began.
+ * `live` never processes — nothing is left to do when capture stops. `recorded` always processes.
+ * `window` may, depending on whether post-process transcription was switched on before capture
+ * began. Every mode arms since the record sheet (D-075): every recording starts by answering it.
  */
 export const MODE_STATES = Object.freeze({
-  live: Object.freeze([IDLE, RECORDING, PAUSED, STOPPING, ERROR]),
-  recorded: Object.freeze([IDLE, RECORDING, PAUSED, STOPPING, PROCESSING, ERROR]),
+  live: Object.freeze([IDLE, ARMING, RECORDING, PAUSED, STOPPING, ERROR]),
+  recorded: Object.freeze([IDLE, ARMING, RECORDING, PAUSED, STOPPING, PROCESSING, ERROR]),
   window: Object.freeze([IDLE, ARMING, RECORDING, PAUSED, STOPPING, PROCESSING, ERROR]),
 });
 
@@ -87,4 +87,24 @@ export function isValidMode(mode) {
 /** Whether a session in `state` is doing something that must not be interrupted. */
 export function isBusy(state) {
   return BUSY_STATES.includes(state);
+}
+
+/** What the record sheet's first question offers (D-075). The mode follows from it. */
+export const MICROPHONE = "microphone";
+/** Everything this machine plays, through a tap. Never the microphone. */
+export const SYSTEM = "system";
+/** A window chosen in the desktop's picker. */
+export const WINDOW_SOURCE = "window";
+
+export const CAPTURE_SOURCES = Object.freeze([MICROPHONE, SYSTEM, WINDOW_SOURCE]);
+
+/**
+ * The mode a set of record-sheet answers runs as — the mirror of `derive_mode` in `modes.py`.
+ *
+ * The server derives it again and is authoritative; this copy exists so the interface can say what
+ * is about to run between pressing Confirm and the server answering.
+ */
+export function deriveMode(source, postTranscription) {
+  if (source === WINDOW_SOURCE) return WINDOW;
+  return postTranscription ? RECORDED : LIVE;
 }

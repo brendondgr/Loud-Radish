@@ -169,7 +169,7 @@ export class RecordingMonitor {
     return {
       title: "Not recording a window",
       body:
-        "Choose Window above and press Start recording. Your desktop will ask which window to " +
+        "Press Start recording and choose A window. Your desktop will ask which window to " +
         "share — this application never sees the others.",
     };
   }

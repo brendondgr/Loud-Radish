@@ -13,81 +13,43 @@
 import { emit } from "../core/bus.js";
 import {
   ARMING,
-  CAPTURE_MODES,
   ERROR,
   IDLE,
   LIVE,
   PAUSED,
   PROCESSING,
   RECORDING,
+  deriveMode,
   isBusy,
   isValidMode,
   statesFor,
 } from "../core/modes.js";
-import * as prefs from "../core/storage.js";
 
 export const MODE_CHANGED = "store.mode.changed";
 
 class ModeStore {
   constructor() {
-    // Restored in `hydrateAvailability`, once we know whether the stored mode can still run.
+    // The mode of the run in progress, or of the last one. Never chosen directly (D-075).
     this.mode = LIVE;
     this.state = IDLE;
     this.message = "";
     /** Per mode: `{available, missing, reason}` as `GET /api/health` reports it. */
     this.availability = {};
-    /** The options the pending run was armed with. Cleared when it ends. */
+    /** What the record sheet asked for: the pending run's, the running one's, or the last one's. */
     this.options = null;
-  }
-
-  // -- mode selection ------------------------------------------------------------
-
-  /**
-   * Choose a capture mode.
-   *
-   * Refused while a session is doing anything: switching mid-run would mean rebuilding the
-   * pipeline underneath a transcript that is still accumulating. Refused for a mode this machine
-   * cannot run, which the selector should already have disabled — this is the second line.
-   *
-   * Returns whether the selection took.
-   */
-  select(mode) {
-    if (!isValidMode(mode)) return false;
-    if (isBusy(this.state)) return false;
-    if (!this.isAvailable(mode)) return false;
-    if (this.mode === mode) return true;
-
-    this.mode = mode;
-    // Selecting a mode does not clear the transcript. That happens on `session.started` and
-    // nowhere else, which is an existing rule worth not breaking.
-    this.state = IDLE;
-    this.message = "";
-    this.options = null;
-    prefs.set("captureMode", mode);
-    emit(MODE_CHANGED, this);
-    return true;
-  }
-
-  /** Whether the mode selector may be operated right now. */
-  get canSelectMode() {
-    return !isBusy(this.state);
   }
 
   // -- availability --------------------------------------------------------------
 
   /**
-   * Adopt the `modes` block from `GET /api/health`, then restore the remembered selection.
+   * Adopt the `modes` block from `GET /api/health`.
    *
-   * The restore happens here rather than in the constructor because a stored mode is only worth
-   * honouring if it can still run — a machine that has lost its capture backend since last time
-   * should open on live, not on a greyed-out button.
+   * There is no selected mode to restore any more (D-075): the record sheet asks what to record
+   * every time, and remembers its own last answers. Availability is what the sheet needs, to
+   * disable a source this machine cannot run and say why.
    */
   hydrateAvailability(availability) {
     this.availability = availability ?? {};
-
-    const remembered = prefs.get("captureMode");
-    this.mode = isValidMode(remembered) && this.isAvailable(remembered) ? remembered : LIVE;
-
     emit(MODE_CHANGED, this);
   }
 
@@ -119,7 +81,6 @@ class ModeStore {
 
     this.state = state;
     this.message = state === ERROR ? message : "";
-    if (state === IDLE) this.options = null;
     emit(MODE_CHANGED, this);
     return true;
   }
@@ -133,47 +94,67 @@ class ModeStore {
   }
 
   /** Adopt the state implied by the session store, without inventing one. */
-  adoptSession({ running, mode, paused = false }) {
-    if (running && isValidMode(mode) && mode !== this.mode) {
-      // The server is authoritative about a session that is already running — a reload during a
-      // recording must show the mode being recorded, not the one this browser last selected.
+  adoptSession({ running, mode, paused = false, options = null }) {
+    if (isValidMode(mode) && mode !== this.mode && (running || !isBusy(this.state))) {
+      // The server is authoritative about the session it is running — a reload during a recording
+      // must show the mode being recorded. When idle, the last session's mode decides which panes
+      // are offered (the monitor follows a window recording) until the next one starts.
       this.mode = mode;
     }
+    if (options) this.options = options;
     if (running) {
       // A reload during a pause must come back paused. `running` stays true while a session is
       // held — it owns its device, its file and its store — so the server's `paused` flag is what
       // separates the two, and without it a reload would silently show a recording that is not
       // advancing as one that is.
       this.setState(paused ? PAUSED : RECORDING);
-    } else if (this.state !== PROCESSING && this.state !== ERROR) {
-      // Everything except those two returns to idle, `stopping` very much included — that is the
+    } else if (this.state !== PROCESSING && this.state !== ERROR && this.state !== ARMING) {
+      // Everything except those three returns to idle, `stopping` very much included — that is the
       // state a stop *passes through*, and an earlier version of this guard listed only
       // `recording`, which left the header reading "Stopping…" with a disabled control for the
       // rest of the session. `processing` is excluded because the post-capture pass owns it and
-      // outlives the session; `error` because the user has not seen it yet.
+      // outlives the session; `error` because the user has not seen it yet; `arming` because the
+      // record sheet is open, and a status message arriving meanwhile must not close the run.
       this.setState(IDLE);
     }
     emit(MODE_CHANGED, this);
   }
 
-  /** The options a window run was armed with. */
+  /** The record sheet is open. Nothing is captured yet, and cancelling costs nothing. */
+  beginArming() {
+    this.options = null;
+    this.state = ARMING;
+    this.message = "";
+    emit(MODE_CHANGED, this);
+  }
+
+  /**
+   * The record sheet was confirmed with `options`.
+   *
+   * The mode is derived here as well as on the server, so the interface can show what is about to
+   * run while the start request is in flight; `session.started` then carries the server's answer,
+   * which wins.
+   */
   arm(options) {
     this.options = options;
+    this.mode = deriveMode(options.source, options.post_transcription);
+    emit(MODE_CHANGED, this);
   }
 
   // -- what the record control does when pressed ---------------------------------
 
   /**
-   * What pressing the primary control means right now: `start`, `arm`, `stop`, or `none`.
+   * What pressing the primary control means right now: `arm`, `stop`, or `none`.
    *
-   * The control asks this rather than checking a boolean, which is what lets one button serve six
-   * states without each component working out the rules for itself.
+   * The control asks this rather than checking a boolean, which is what lets one button serve every
+   * state without each component working out the rules for itself. There is no `start` any more:
+   * every recording begins at the record sheet (D-075).
    */
   get action() {
     switch (this.state) {
       case IDLE:
       case ERROR:
-        return statesFor(this.mode).includes(ARMING) ? "arm" : "start";
+        return "arm";
       case ARMING:
       case RECORDING:
       case PAUSED:
@@ -184,16 +165,6 @@ class ModeStore {
         // discard the only transcript of audio that is about to be deleted.
         return "none";
     }
-  }
-
-  /** Every mode, with what the selector needs to draw it. */
-  get selectable() {
-    return CAPTURE_MODES.map((mode) => ({
-      mode,
-      selected: mode === this.mode,
-      available: this.isAvailable(mode),
-      reason: this.reasonFor(mode),
-    }));
   }
 }
 

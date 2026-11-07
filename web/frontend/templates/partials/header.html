@@ -1,11 +1,11 @@
 {% import "macros/icons.html" as icons %}
 
-{# The header: capture mode, session control, and identity.
+{# The header: session control, what is running, and identity.
 
-   Two controls, not one (D-020). The mode selector answers *what kind of recording this will be*;
-   the record control answers *where this recording has got to*. A single control cycling both
-   changes meaning depending on how many times it has been pressed, so a user cannot know what
-   pressing it does without reading a label that is itself what changes.
+   *What kind of recording this will be* is asked by the record sheet that *Start recording* opens
+   (D-075); the header used to carry a Live / Recorded / Window switch for it, which named
+   implementations rather than choices. The record control answers *where this recording has got
+   to*, and still never cycles through modes (D-020).
 
    Stopping asks first — an accidental stop mid-talk is costly (FE §6.1). The privacy indicator sits
    here rather than in settings because it is what a user checks before pressing record in a room
@@ -16,39 +16,6 @@
     {# The mark is decorative: the page title already carries the name, and a screen reader
        announcing it again at the top of every view is noise rather than identity. #}
     <img class="header__mark" src="/static/{{ logo_path }}" alt="" width="28" height="28" />
-    {# Every mode is always present. An unavailable one is disabled and carries the reason, because
-       a feature that vanishes when its dependency is missing is indistinguishable from one that
-       does not exist. #}
-    <div class="mode-switcher" data-mode-switcher role="radiogroup" aria-label="Capture mode">
-      <button
-        type="button"
-        class="mode-switcher__option"
-        data-mode-option="live"
-        role="radio"
-        aria-checked="true"
-      >
-        Live
-      </button>
-      <button
-        type="button"
-        class="mode-switcher__option"
-        data-mode-option="recorded"
-        role="radio"
-        aria-checked="false"
-      >
-        Recorded
-      </button>
-      <button
-        type="button"
-        class="mode-switcher__option"
-        data-mode-option="window"
-        role="radio"
-        aria-checked="false"
-      >
-        Window
-      </button>
-    </div>
-
     {# The announcement lives here rather than on the button: a live region on a control whose text
        changes announces the new *label* — "Stop" — which describes what pressing it would do, not
        what just happened. #}
@@ -58,6 +25,11 @@
     </div>
 
     <span class="clock numeric" data-clock aria-label="Session duration">00:00:00</span>
+
+    {# What this recording is: its source and when it is transcribed (D-075). The tabs that used to
+       sit here answered "which mode is this?" by being visibly selected; with the mode chosen in
+       the record sheet instead, this says it in words for as long as a run is in progress. #}
+    <span class="run-chip" data-run-chip title="What this recording captures, and when it is transcribed" hidden></span>
 
     {# Pause is its own button, not a seventh meaning for the primary one (D-044). That control
        already serves six states by asking the store what pressing it means; giving it "stop, and

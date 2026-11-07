@@ -1,6 +1,6 @@
 # Unified Record Sheet — One Button, One Sheet, Every Kind of Recording
 
-*Written 2026-11-07. Status: **In progress (3 / 6)**. The next free decision number is **D-075**.*
+*Written 2026-11-07. Status: **In progress (4 / 6)**. The next free decision number is **D-075**.*
 
 ## 1. Introduction
 
@@ -229,6 +229,28 @@ The Confirm promise is checked end to end in Step 4, where it becomes the only s
   record, from which input, when to transcribe, and whether to keep video.*
 
 ### Step 4: Rewire the header and the mode store; retire the mode switch
+
+**Status: Complete (2026-11-07).** As planned, plus:
+- `core/modes.js` mirrors the sources and `deriveMode`, and the vocabulary test checks both.
+- The header label truncates rather than pushing Stop under the privacy badge, which it did at
+  1024 px before that fix. Its full text is on its `title`.
+- `?arm=` handling moved into `session-start.js` along with the start flow, accepting
+  `&source=`; Step 5 points the tray and shortcuts at it.
+- `main.js` went from 729 to 674 lines.
+
+**Browser QA** (isolated server on port 8411, mock model, file source) went through these in order:
+1. Start opens the sheet, with Confirm focused.
+2. "Microphone, both" started a `recorded` session with live text and an audio file, labelled
+   *Microphone · live + after*.
+3. A reload mid-recording restored the label.
+4. Pause and resume.
+5. Stop ran the second pass, giving two revisions, the Live/Final switch, and the export window.
+6. `?arm=window` opened the sheet; the window source was unavailable there, so it fell back to the
+   microphone.
+7. Escape returned to idle with nothing started.
+
+One recording folder written by that QA under `data/recordings` (recording folders ignore
+`session_dir`) was removed. The QA configuration now sets `storage.recording_dir`.
 
 - **Locations**:
   - `web/frontend/templates/partials/header.html`: remove the `data-mode-switcher` radiogroup and

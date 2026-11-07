@@ -248,7 +248,8 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   └── static/
 │   │       ├── brand/radish.svg   # The mark — tab icon, header, export, desktop entry (D-038)
 │   │       ├── css/               # tokens, base, layout + one file per component
-│   │       └── js/                # main + core/, transport/, stores/, components/, a11y/
+│   │       └── js/                # main, session-start (the record sheet → start request,
+│   │                              #   D-075) + core/, transport/, stores/, components/, a11y/
 │   │           └── core/modes.js  # Mirror of services/session/modes.py; kept identical by test
 │   └── shared/contracts/          # Generated: openapi.json, ws-events.json
 │
