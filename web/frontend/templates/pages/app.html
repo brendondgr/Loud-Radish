@@ -10,11 +10,8 @@
   {% include "partials/header.html" %}
   {% include "partials/banners.html" %}
 
-  {# Below 900px the panes become tabs rather than a vertical stack: both need their own vertical
-     scroll, and stacking makes both unusable (FE §3.3).
-
-     The monitor tab is present only in window mode. Three permanent tabs at 320 px would spend
-     scarce width on a pane that is empty in two modes out of three (D-020). #}
+  {# Below 1060px the details column becomes a tab, and below 900px the panes are one at a time:
+     each needs its own vertical scroll, and stacking makes them unusable (FE §3.3, D-086). #}
   <nav class="tabs" data-pane-tabs aria-label="Panes">
     <button type="button" class="tabs__tab" data-pane-tab="transcript" aria-selected="true">
       Transcript
@@ -23,22 +20,15 @@
       Assistant
       <span class="badge badge--muted" data-chat-badge hidden>0</span>
     </button>
-    <button
-      type="button"
-      class="tabs__tab"
-      data-pane-tab="monitor"
-      data-monitor-tab
-      aria-selected="false"
-      hidden
-    >
-      Monitor
+    <button type="button" class="tabs__tab" data-pane-tab="details" aria-selected="false">
+      Details
     </button>
   </nav>
 
   <main class="app__main" data-active-pane="transcript">
+    {% include "partials/details/pane.html" %}
     {% include "partials/transcript/pane.html" %}
     {% include "partials/chat/pane.html" %}
-    {% include "partials/monitor/pane.html" %}
   </main>
 </div>
 

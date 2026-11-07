@@ -1,0 +1,27 @@
+{# The glossary, in the details column (D-086).
+
+   Terms the speaker introduced, defined as *they* used them — reference material you glance at,
+   not a conversation. It was a panel that opened over the transcript's right edge; it is now a
+   section that is always there, and the Glossary buttons in the transcript's toolbar and the
+   assistant's header scroll to it (and open the Details tab on a narrow screen).
+
+   Each term carries the moment it was introduced, so "when did they define this?" is one click. #}
+
+<section
+  class="details__section glossary-panel"
+  id="glossary-panel"
+  data-glossary-panel
+  aria-labelledby="glossary-title"
+  tabindex="-1"
+>
+  <header class="details__head">
+    <h3 class="details__heading" id="glossary-title">Glossary</h3>
+    <span class="badge badge--muted" data-glossary-count>0</span>
+  </header>
+
+  <div class="glossary-panel__list" data-glossary-list></div>
+
+  <p class="glossary-panel__empty" data-glossary-empty>
+    Terms appear here as the speaker introduces them. Nothing yet.
+  </p>
+</section>

@@ -158,11 +158,11 @@
   --pane-header-height: 44px;
   --chat-width: 400px;
   --chat-collapsed-width: 46px;
-  --glossary-width: 250px;
   --transcript-min-width: 420px;
-  /* The recording monitor (D-020). Narrower than the chat: it holds a 16:9 preview and four
-     figures, where the chat holds a conversation that has to be readable. */
-  --monitor-width: 300px;
+  /* The details column (D-086): the video, this recording, capture and the glossary. Narrower
+     than the chat: it holds a 16:9 preview and figures, where the chat holds a conversation that
+     has to be readable. 250px below 1280px (layout.css). */
+  --details-width: 300px;
 
   /* -- motion --------------------------------------------------------------------------
    * Almost none, by design. Every element here is on screen for two hours, so anything that

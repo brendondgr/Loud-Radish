@@ -1,0 +1,83 @@
+{% import "macros/icons.html" as icons %}
+
+{# The details column (D-086): the video, this recording, how it is captured, and the glossary.
+
+   A column of its own on the left of the transcript, with the assistant as the other column — the
+   owner's note on the main-screen lab ("video feed, settings and so on should be their own
+   column"). It replaces the recording monitor, which existed only in window mode (D-020), and the
+   glossary panel, which hid inside the transcript. Below 1060px it leaves the row and becomes the
+   Details tab.
+
+   Still a pane, not a modal or a floating window: transcription and the assistant must keep working
+   beside it. It keeps the monitor's hooks, so `recording-monitor.js` drives the video section
+   unchanged. #}
+
+<aside class="pane-details" data-details-pane data-monitor-pane aria-labelledby="details-title">
+  <h2 class="visually-hidden" id="details-title">Details</h2>
+
+  <section class="details__section" aria-labelledby="details-video-title">
+    <header class="details__head">
+      <h3 class="details__heading" id="details-video-title">Video</h3>
+      <span class="monitor__clock numeric" data-monitor-clock aria-label="Recording duration">
+        00:00:00
+      </span>
+    </header>
+
+    <div class="monitor__preview" data-monitor-preview>
+      {% include "partials/details/monitor_empty.html" %}
+    </div>
+
+    <dl class="monitor__stats" data-monitor-stats hidden>
+      <div class="monitor__stat">
+        <dt>Window</dt>
+        <dd data-monitor-window>—</dd>
+      </div>
+      <div class="monitor__stat">
+        <dt>Output</dt>
+        <dd data-monitor-output>—</dd>
+      </div>
+      <div class="monitor__stat">
+        <dt>Size</dt>
+        <dd class="numeric" data-monitor-size>—</dd>
+      </div>
+      <div class="monitor__stat">
+        <dt>Capturing</dt>
+        <dd data-monitor-options>—</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section class="details__section" aria-labelledby="details-recording-title">
+    <header class="details__head">
+      <h3 class="details__heading" id="details-recording-title">This recording</h3>
+    </header>
+    <dl class="details__facts">
+      <div><dt>Started</dt><dd data-details-started>—</dd></div>
+      <div><dt>Length</dt><dd class="numeric" data-details-length>—</dd></div>
+      <div><dt>Words</dt><dd class="numeric" data-details-words>—</dd></div>
+      <div><dt>Questions</dt><dd class="numeric" data-details-questions>—</dd></div>
+    </dl>
+  </section>
+
+  <section class="details__section" aria-labelledby="details-capture-title">
+    <header class="details__head">
+      <h3 class="details__heading" id="details-capture-title">Capture</h3>
+      <button
+        type="button"
+        class="button button--icon button--quiet details__gear"
+        data-details-settings
+        aria-label="Capture settings"
+        title="Capture settings"
+      >
+        <span class="icon">{{ icons.icon("gear", 15) }}</span>
+      </button>
+    </header>
+    <dl class="details__rows">
+      <div><dt>Source</dt><dd data-details-source>—</dd></div>
+      <div><dt>Transcribes</dt><dd data-details-timing>—</dd></div>
+      <div><dt>Model</dt><dd data-details-model>—</dd></div>
+    </dl>
+  </section>
+
+  {% include "partials/details/glossary.html" %}
+</aside>

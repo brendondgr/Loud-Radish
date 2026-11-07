@@ -1,38 +1,8 @@
-/* The recording monitor — the third pane (D-020).
+/* The recording monitor (D-020, D-022): the video section of the details column (D-086).
  *
- * A fixed column beside the transcript, like the chat pane, rather than a share of the flexible
- * space. The transcript is the document and both side panes are tools; giving the monitor flexible
- * width would take it from the one region that is actually being read.
- *
- * Its contents arrive with Plan 4. What is here is the frame, the idle and degraded states, and
- * the responsive behaviour — verified once, on its own, rather than inside the plan that also has
- * to negotiate a desktop portal.
+ * The column itself is in details.css; this is the preview, its idle and degraded states, and the
+ * capture's figures.
  */
-
-.pane-monitor {
-  flex: 0 0 var(--monitor-width);
-  width: var(--monitor-width);
-  min-width: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  border-left: 1px solid var(--border-default);
-  background: var(--surface-panel);
-}
-
-.pane-monitor[hidden] {
-  display: none;
-}
-
-.monitor__body {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-7);
-  padding: var(--space-7);
-  overflow-y: auto;
-}
 
 .monitor__clock {
   font-size: var(--text-base);
@@ -46,6 +16,7 @@
  */
 
 .monitor__preview {
+  width: 100%;
   position: relative;
   flex: 0 0 auto;
   aspect-ratio: 16 / 9;
@@ -123,15 +94,13 @@
   overflow-wrap: anywhere;
 }
 
-/* -- narrow layout ----------------------------------------------------------------------------
- * Below 900px the monitor becomes the third tab rather than a third column, matching the two panes
- * it sits beside. Lives here rather than in layout.css: component stylesheets load later, a media
- * query adds no specificity, and a responsive rule written there is silently overridden.
- */
-@media (max-width: 900px) {
-  .pane-monitor {
-    flex: 1 1 auto;
-    width: auto;
-    border-left: none;
-  }
+/* A past recording's picture, when one is on the main screen and nothing is being captured. */
+.monitor__poster {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.monitor__poster[hidden] {
+  display: none;
 }

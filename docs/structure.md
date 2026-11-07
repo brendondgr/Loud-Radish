@@ -263,7 +263,7 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   │   │                      #   (the recordings lab), main.html (the main screen) (D-082)
 │   │   │   ├── macros/icons.html  # Inline SVG icons, inheriting currentColor
 │   │   │   └── partials/          # header (with the health chips), banners, record_sheet,
-│   │   │                          #   transcript/, chat/, monitor/, settings/
+│   │   │                          #   transcript/, chat/, details/ (D-086), settings/
 │   │   └── static/
 │   │       ├── brand/radish.svg   # The mark — tab icon, header, export, desktop entry (D-038)
 │   │       ├── css/               # tokens, base, layout + one file per component; labs/

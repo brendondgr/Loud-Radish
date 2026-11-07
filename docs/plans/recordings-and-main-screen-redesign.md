@@ -1,6 +1,6 @@
 # Recordings and Main Screen Redesign: From the Labs to the Real Pages
 
-*Written 2026-11-07. Status: **In progress (6 / 9)**. Source of truth for the target design: the
+*Written 2026-11-07. Status: **In progress (7 / 9)**. Source of truth for the target design: the
 two labs, `/labs/sessions/` and `/labs/main/` (D-082), at commit `e76a389` on branch
 `labs/sessions-cards`, and the owner's three rounds of exported feedback quoted below. This plan
 takes decisions **D-083 to D-086**. `feature/mixed-audio-steady-video` already holds D-080 and
@@ -475,6 +475,18 @@ available until Step 9 so every step can be compared against them side by side. 
 - *Action: Undergo the verification/tests/validation process for this phase. Once validated, push
   changes to GitHub stating: Recordings and Main Screen Redesign (7 / 9) Complete: The video,
   the recording's facts, capture settings and the glossary sit in a column of their own.*
+
+> **Status: ✅ Complete.** Differences from the plan: the gear opens **Settings → Audio**, not the
+> record sheet (the sheet's confirm starts a recording); the glossary buttons **jump** to the
+> section rather than scrolling smoothly, which this browser does not animate and the motion rule
+> does not want; the tab bar appears at 1060px with the transcript and assistant still side by side
+> above 900px; a container query trims the transcript's toolbar when its column is narrow; the
+> monitor's empty state now reads "No video". `recording-monitor.js` gained `showPoster`;
+> `glossary-panel.js` lost its open/closed state and gained `reveal`. QA: three columns at 1440px
+> and 1100px with no overlap, the Details tab at 1000px and 900px, the viewed recording's picture
+> and facts (35:27, 5,586 words, 6 questions), the glossary terms in the column, and the toolbar's
+> Glossary button opening the tab and jumping to it. Window mode's live preview could not be shown
+> here — the sandbox has no GStreamer — and its code path is unchanged.
 
 #### Step 8: The assistant — bubbles, quick questions in a pop-up, an icon Ask
 

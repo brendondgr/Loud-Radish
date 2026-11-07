@@ -286,15 +286,16 @@ until they did. The controls are never what gets pushed off the screen.
 
 ### The recording monitor
 
-Window capture gets a **third pane**, peer to the transcript and the assistant, shown only in that
-mode. Not a modal and not a floating window: live transcription and asking the assistant questions
-must keep working *during* the recording, and anything overlaying the other two panes prevents
-exactly that.
+> Since D-086 the monitor is the **Video** section of the always-present details column (see *The
+> Main Screen → The details column*), and its tab is the Details tab. What follows about the
+> preview and its degraded states still holds.
+
+Window capture gets a **third pane**, peer to the transcript and the assistant. Not a modal and not
+a floating window: live transcription and asking the assistant questions must keep working *during*
+the recording, and anything overlaying the other two panes prevents exactly that.
 
 It shows the preview, the elapsed clock, the output file and its growing size, and which of the three
-options are active. In the narrow layout it joins the existing tab set as a third tab — **present
-only in window mode**, because three permanent tabs at 320 px spends scarce width on a pane that is
-empty in two modes out of three.
+options are active.
 
 **Its degraded state is specified up front**: when no preview is available, the pane shows a static
 card naming the captured window and the reason. A black rectangle and a broken preview look
@@ -557,6 +558,30 @@ primary control is never pushed off the edge.
   and the glossary — a book with its count as a badge, named "Glossary *N*".
 - **Viewing a past recording is a card at the top of the pane** it names: a raised graphite card
   with a radish left edge, under the toolbar, above the scroller. It was a strip under the header.
+- On a narrow transcript column (three columns on a small laptop) the pane's label and segment count
+  give way first, then the search field's shortcut hint — a container query on the pane, since its
+  width, not the window's, is what runs out.
+
+### The details column (D-086)
+
+**Three columns: details, transcript, assistant.** The owner's note: the video and the settings in a
+column of their own, with the assistant as the other. 300px wide, 250px below 1280px, scrolling on
+its own, in four sections, each a heading over its contents:
+
+1. **Video** — the live preview while a window is recorded (the monitor, unchanged); the picture of
+   the past recording on the main screen when one is; otherwise *No video* and how to record one.
+   The clock shows only while something is captured.
+2. **This recording** — started, length, words, questions: the session being or last recorded, or
+   the recording being viewed.
+3. **Capture** — source, when it transcribes, and the speech model, with a gear for the capture
+   settings. At rest it describes what the last recording was set up to do.
+4. **Glossary** — the terms, always there. The Glossary buttons in the transcript's toolbar and the
+   assistant's header jump to it and outline it for a moment; they no longer open anything.
+
+**Below 1060px the column folds into a Details tab** in place of the old Monitor tab: the tab bar
+appears, the transcript and the assistant stay side by side, and the Details tab shows the column
+across the width in their place. Below 900px it is one pane per tab, as before. A Glossary button on
+a narrow screen opens the Details tab first.
 
 ## Quality Brief
 

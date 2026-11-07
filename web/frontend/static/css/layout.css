@@ -31,6 +31,9 @@
   display: flex;
   flex-direction: column;
   background: var(--surface-document);
+  /* Its toolbar responds to the pane's own width, which three columns make narrow long before
+   * the window is (transcript.css). */
+  container: transcript / inline-size;
 }
 
 .pane-transcript__body {
@@ -84,14 +87,23 @@
 }
 
 /* -- narrow layout -------------------------------------------------------------------------
- * One pane at a time, chosen by a tab. The inactive tab carries an indicator when new content
- * arrives, so a user reading the chat still knows the transcript is moving.
+ * Three columns need room (D-086). Below 1280px the details column slims; below 1060px it leaves
+ * the row and becomes the Details tab — the transcript and the assistant stay side by side, and the
+ * tab shows the details in their place; below 900px it is one pane at a time, chosen by a tab. The
+ * inactive tab carries an indicator when new content arrives, so a user reading the chat still knows
+ * the transcript is moving.
  */
 .tabs {
   display: none;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1280px) {
+  :root {
+    --details-width: 250px;
+  }
+}
+
+@media (max-width: 1060px) {
   .tabs {
     display: flex;
     flex: 0 0 auto;
@@ -99,14 +111,16 @@
     background: var(--surface-raised);
   }
 
-  /* One pane at a time. The monitor joins the set as a third tab in window mode; when it is
-     hidden entirely the `[hidden]` rule in its own stylesheet already wins. */
+  .app__main:not([data-active-pane="details"]) .pane-details,
+  .app__main[data-active-pane="details"] .pane-transcript,
+  .app__main[data-active-pane="details"] .pane-chat {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
   .app__main[data-active-pane="transcript"] .pane-chat,
-  .app__main[data-active-pane="transcript"] .pane-monitor,
-  .app__main[data-active-pane="chat"] .pane-transcript,
-  .app__main[data-active-pane="chat"] .pane-monitor,
-  .app__main[data-active-pane="monitor"] .pane-transcript,
-  .app__main[data-active-pane="monitor"] .pane-chat {
+  .app__main[data-active-pane="chat"] .pane-transcript {
     display: none;
   }
 
@@ -118,12 +132,6 @@
 
   .pane-transcript__scroller-wrap {
     min-width: 0;
-  }
-
-  .glossary-panel {
-    position: absolute;
-    inset: 0;
-    z-index: 5;
   }
 }
 

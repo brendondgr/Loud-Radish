@@ -10,7 +10,6 @@ const PREFIX = "seminar.";
 
 export const DEFAULTS = {
   chatCollapsed: false,
-  glossaryOpen: false,
   // The owner's "smaller" from the main-screen lab (redesign Step 6); it was 19.
   transcriptSize: 16.5,
   activePane: "transcript",

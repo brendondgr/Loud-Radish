@@ -556,3 +556,19 @@
 .revision-switch__option:hover:not([aria-pressed="true"]) {
   color: var(--text-primary);
 }
+
+/* A narrow transcript column — three columns on a small laptop (D-086). The pane's label and its
+ * segment count go first (the pane is still named "Transcript" for a screen reader), then the
+ * search field gives up its shortcut hint, so the version switch and the glossary stay clear. */
+@container transcript (max-width: 560px) {
+  .pane-transcript .pane-header .label,
+  [data-segment-count],
+  .search-field .kbd {
+    display: none;
+  }
+
+  .search-field {
+    min-width: 0;
+    flex-basis: 150px;
+  }
+}

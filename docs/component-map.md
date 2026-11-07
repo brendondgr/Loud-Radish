@@ -31,7 +31,8 @@ web/frontend/
 │       │                       presets on one face and the pipeline's stages on another
 │       ├── transcript/         pane, toolbar, hypothesis, empty state, glossary panel…
 │       ├── chat/               pane, composer, quick actions, empty state
-│       ├── monitor/            the recording monitor pane and its states
+│       ├── details/            the details column: pane (video, this recording, capture),
+│       │                       the monitor's empty state, and the glossary section (D-086)
 │       └── settings/           modal, nav, and one file per tab, including
 │                               rewriting.html — the two instruction editors (D-068)
 └── static/
@@ -137,7 +138,8 @@ Specified in `docs/design-system.md` § Capture Modes; built by
 | Component | Owns | Notes |
 |---|---|---|
 | `RecordSheet` | The record sheet: source, microphone or window audio, transcription timing, video | Replaced `Preflight` (D-075). Reuses `FocusTrap` and the modal styling. `show(preset)` returns a promise of the start request's `options`, or `null` on cancel. Opens pre-filled from the last run (`lastRecordOptions`), focuses Confirm, and writes a changed microphone to `audio.device_id` rather than holding a per-run override. A disabled source carries its reason. Refuses nothing-to-record; the server refuses it again |
-| `RecordingMonitor` | The third pane's contents: preview, elapsed, output size, active options | Pulls the preview as a still image on a timer, stopped whenever nobody is looking. The socket never carries video, because transcript events on it are undroppable. Distinguishes its degraded states — no capture, no encoder, window closed, recorder failed — because a black rectangle and a broken capture look identical |
+| `DetailsPane` | The details column's "This recording" and "Capture" sections (D-086) | Drawn from the stores, so it says what the header and the transcript say; told the viewed recording by `wireViewing`'s `onChange`, and hands its picture to the monitor. The gear opens Settings → Audio. Below 1060px the column is the Details tab |
+| `RecordingMonitor` | The details column's Video section: preview, elapsed, output size, active options, and a viewed recording's picture (`showPoster`) | Pulls the preview as a still image on a timer, stopped whenever nobody is looking. The socket never carries video, because transcript events on it are undroppable. Distinguishes its degraded states — no capture, no encoder, window closed, recorder failed — because a black rectangle and a broken capture look identical |
 
 `Header` keeps the record control but no longer derives its appearance from a boolean: it renders
 the seven run states from a presentation table and asks `stores/mode.js` what pressing the control

@@ -1,54 +1,16 @@
-/* The glossary panel.
+/* The glossary, as a section of the details column (D-086).
  *
- * Reference material beside the transcript, not part of the conversation. It overlays the
- * transcript's right edge rather than displacing it: the transcript's measure is tuned for reading
- * and shrinking it mid-talk would reflow every line the user is looking at.
+ * It was a panel that overlaid the transcript's right edge; the column now scrolls it, so the list
+ * has no scroller of its own.
  */
 
-.glossary-panel {
-  flex: 0 0 var(--glossary-width);
-  width: var(--glossary-width);
+.glossary-panel__list {
   display: flex;
   flex-direction: column;
-  background: var(--surface-raised);
-  border-left: 1px solid var(--border-default);
-  overflow: hidden;
-}
-
-.glossary-panel[hidden] {
-  display: none;
-}
-
-.glossary-panel__header {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-5);
-  height: var(--pane-header-height);
-  padding: 0 var(--space-6);
-  border-bottom: 1px solid var(--border-subtle);
-}
-
-.glossary-panel__title {
-  font-family: var(--font-ui);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: var(--tracking-label);
-  text-transform: uppercase;
-  color: var(--text-faint);
-  margin: 0;
-}
-
-.glossary-panel__list {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  padding: var(--space-6);
 }
 
 .glossary-panel__empty {
-  padding: 0 var(--space-6) var(--space-8);
+  padding: 0;
   font-size: var(--text-sm);
   line-height: 1.55;
   color: var(--text-faint);

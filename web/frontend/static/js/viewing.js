@@ -28,14 +28,17 @@ import { SESSION_VIEWING } from "./transport/events.js";
  * @param {object} options
  * @param {() => Promise<void>} options.reload - re-read the transcript, chat and glossary.
  * @param {(message: string) => void} options.report - show a refusal to the user.
+ * @param {(viewing: object|null) => void} [options.onChange] - told what is on screen, e.g. so the
+ *   details column can show the recording's picture and facts (D-086).
  */
-export function wireViewing({ reload, report }) {
+export function wireViewing({ reload, report, onChange }) {
   const banner = $("[data-viewing-banner]");
   const name = $("[data-viewing-name]", banner ?? document);
   const date = $("[data-viewing-date]", banner ?? document);
   let current = null;
 
   const render = () => {
+    onChange?.(current);
     toggle(banner, Boolean(current));
     if (!current) return;
     setText(name, current.title || "a recording");

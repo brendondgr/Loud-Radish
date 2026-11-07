@@ -9,7 +9,7 @@
 import { on } from "./core/bus.js";
 import { $, $$ } from "./core/dom.js";
 import { applyTextSize, textSize } from "./core/text-size.js";
-import { IDLE, PAUSED, PROCESSING, RECORDING, STOPPING, WINDOW } from "./core/modes.js";
+import { IDLE, PAUSED, PROCESSING, RECORDING, STOPPING } from "./core/modes.js";
 import * as prefs from "./core/storage.js";
 import { Banners } from "./components/banners.js";
 import { ChatPane } from "./components/chat-pane.js";
@@ -18,6 +18,7 @@ import { GlossaryPanel } from "./components/glossary-panel.js";
 import { Header } from "./components/header.js";
 import { RecordSheet } from "./components/record-sheet.js";
 import { arm, armFromUrl } from "./session-start.js";
+import { DetailsPane } from "./components/details-pane.js";
 import { RecordingMonitor } from "./components/recording-monitor.js";
 import { TranscriptSelection } from "./components/selection.js";
 import { SettingsModal } from "./components/settings-modal.js";
@@ -57,7 +58,7 @@ import { TranscriptSocket } from "./transport/socket.js";
 import { CHAT_CHANGED, chat } from "./stores/chat.js";
 import { config } from "./stores/config.js";
 import { health } from "./stores/health.js";
-import { MODE_CHANGED, mode } from "./stores/mode.js";
+import { mode } from "./stores/mode.js";
 import { polish } from "./stores/polish.js";
 import { capture } from "./stores/capture.js";
 import { exportJob } from "./stores/export.js";
@@ -86,15 +87,13 @@ function boot() {
   });
 
   const monitor = new RecordingMonitor($("[data-monitor-pane]"), {
-    // The timer follows what is actually on screen: in the narrow layout the pane exists but is
-    // the inactive tab, and encoding frames for it would be pure waste.
-    isVisible: () => {
-      const pane = $("[data-monitor-pane]");
-      if (!pane || pane.hidden) return false;
-      const main = $(".app__main");
-      const narrow = window.matchMedia("(max-width: 900px)").matches;
-      return !narrow || main?.dataset.activePane === "monitor";
-    },
+    // The timer follows what is actually on screen: below 1060px the details column is a tab, and
+    // encoding frames for it while another tab is showing would be pure waste (D-086).
+    isVisible: () => !detailsFolded() || $(".app__main")?.dataset.activePane === "details",
+  });
+  const details = new DetailsPane($("[data-details-pane]"), {
+    onOpenSettings: (section) => settings.show(section),
+    monitor,
   });
 
   const sheet = new RecordSheet($("[data-record-sheet]"), {
@@ -121,6 +120,10 @@ function boot() {
     toggleButtons: $$("[data-glossary-toggle]"),
     countBadges: $$("[data-glossary-count]"),
     onSeek: (seconds) => pane.scrollToTime(seconds),
+    // The glossary is in the details column; below 1060px that is a tab, so show it first.
+    onReveal: () => {
+      if (detailsFolded()) showPane("details", { persist: false });
+    },
   });
 
   new TranscriptSelection($("[data-transcript-pane]"), {
@@ -146,6 +149,7 @@ function boot() {
   viewing = wireViewing({
     reload: () => reloadForView(pane, chatPane, glossary),
     report: (message) => banners.show({ code: "viewing", message }),
+    onChange: (current) => details.setViewing(current),
   });
 
   socket.connect();
@@ -405,12 +409,6 @@ function wireControls(pane) {
   }
   showPane(prefs.get("activePane"));
 
-  // The monitor exists only for a window recording. Both the pane and its tab follow the mode of the
-  // run in progress or the last one (D-075), and leaving window mode while looking at the monitor
-  // falls back to the transcript rather than to an empty column.
-  on(MODE_CHANGED, () => renderMonitorVisibility());
-  renderMonitorVisibility();
-
   // Search highlights rather than filters, so the transcript keeps its shape and the live stream
   // keeps accumulating behind it.
   const searchInput = $("[data-transcript-search]");
@@ -433,17 +431,12 @@ function wireControls(pane) {
   });
 }
 
-/** Show or hide the monitor pane and its tab, following the current or last run's mode. */
-function renderMonitorVisibility() {
-  const wanted = mode.mode === WINDOW;
-  const pane = $("[data-monitor-pane]");
-  const tab = $("[data-monitor-tab]");
-  if (pane) pane.hidden = !wanted;
-  if (tab) tab.hidden = !wanted;
-
-  // Leaving window mode while the monitor is the active pane would otherwise show nothing at all.
-  if (!wanted && $(".app__main")?.dataset.activePane === "monitor") showPane("transcript");
+/** Whether the details column has folded into a tab (D-086). */
+function detailsFolded() {
+  return window.matchMedia("(max-width: 1060px)").matches;
 }
+
+const PANES = new Set(["transcript", "chat", "details"]);
 
 /**
  * Show one pane in the narrow layout.
@@ -456,6 +449,9 @@ function renderMonitorVisibility() {
  * only one pane fits, the transcript is the thing it exists to show.
  */
 function showPane(name, { persist = true } = {}) {
+  // "monitor" was a tab until the details column replaced it (D-086); a stored one is the details.
+  if (name === "monitor") name = "details";
+  if (!PANES.has(name)) name = "transcript";
   const main = $(".app__main");
   main?.setAttribute("data-active-pane", name);
   if (persist) prefs.set("activePane", name);

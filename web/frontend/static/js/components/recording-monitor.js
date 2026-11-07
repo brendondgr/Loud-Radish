@@ -1,5 +1,5 @@
 /**
- * The recording monitor — the third pane's contents (D-022).
+ * The recording monitor — the details column's video section (D-022, D-086).
  *
  * **The preview is pulled, never pushed.** The socket's backpressure policy makes transcript events
  * undroppable, and video frames sharing that channel are the one thing that could delay a committed
@@ -38,6 +38,9 @@ export class RecordingMonitor {
 
     this.image = null;
     this.timer = null;
+    /** A past recording's picture, shown while one is on the main screen and nothing captures. */
+    this.poster = null;
+    this.posterSrc = null;
     //: Whether a preview frame has ever decoded for *this* recording. An `<img>` with an
     //: unresolved src is a blank rectangle, indistinguishable from a dead capture.
     this.hasFrame = false;
@@ -58,11 +61,34 @@ export class RecordingMonitor {
     this.render();
   }
 
+  /** Show a viewed recording's picture when nothing is being captured; `null` takes it away. */
+  showPoster(src) {
+    this.posterSrc = src;
+    if (!src) {
+      this.poster?.remove();
+      this.poster = null;
+    } else {
+      if (!this.poster) {
+        this.poster = new Image();
+        this.poster.className = "monitor__poster";
+        this.poster.alt = "The recording on the main screen";
+        // No picture — the recording has no video — is the empty state, not a broken image.
+        this.poster.addEventListener("error", () => this.showPoster(null));
+        this.poster.addEventListener("load", () => this._renderPreview());
+        this.previewWrap?.append(this.poster);
+      }
+      this.poster.src = src;
+    }
+    this._renderPreview();
+  }
+
   render() {
     if (!this.root) return;
 
     const active = capture.recording || capture.bytes > 0;
     toggle(this.stats, active);
+    // Only while there is a capture to time; at rest the column has nothing to count.
+    toggle(this.clock, active);
     setText(this.clock, timestamp(capture.durationSeconds));
     setText(this.windowLabel, capture.recording ? "Shared window" : "—");
     setText(this.output, capture.fileName || "—");
@@ -123,6 +149,10 @@ export class RecordingMonitor {
     }
 
     toggle(this.image, showImage);
+
+    const showPoster = !wanted && Boolean(this.poster?.complete && this.poster.naturalWidth);
+    toggle(this.poster, showPoster);
+    if (showPoster) toggle(this.empty, false);
   }
 
   _emptyCopy() {
@@ -167,10 +197,10 @@ export class RecordingMonitor {
       };
     }
     return {
-      title: "Not recording a window",
+      title: "No video",
       body:
-        "Press Start recording and choose A window. Your desktop will ask which window to " +
-        "share — this application never sees the others.",
+        "Press Start recording and choose A window to record one. Your desktop will ask which " +
+        "window to share — this application never sees the others.",
     };
   }
 

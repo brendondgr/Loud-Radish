@@ -39,7 +39,8 @@ def test_the_text_size_buttons_are_gone_and_settings_has_the_size(page) -> None:
 def test_every_glossary_button_drives_the_panel_and_shows_a_count(page) -> None:
     toggles = [e for e in page if "data-glossary-toggle" in e.attrs]
     badges = [e for e in page if "data-glossary-count" in e.attrs]
-    assert len(toggles) == 2 and len(badges) == 2
+    # The toolbar's and the assistant's buttons, and a count on each and on the glossary itself.
+    assert len(toggles) == 2 and len(badges) == 3
     assert all(e.attrs.get("aria-controls") == "glossary-panel" for e in toggles)
     assert not [e for e in page if "data-toggle-glossary" in e.attrs], "the dead hook is back"
     main = (FRONTEND / "static/js/main.js").read_text(encoding="utf-8")
