@@ -146,7 +146,7 @@
 .sound-row__meter-fill {
   display: block;
   height: 100%;
-  background: var(--accent);
+  background: var(--success);
   transform: scaleX(0);
   transform-origin: left center;
   transition: transform 120ms linear;

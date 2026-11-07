@@ -124,3 +124,34 @@ def test_the_transcript_is_the_most_readable_pairing_on_the_page() -> None:
     secondary = contrast(palette["--text-secondary"], palette["--surface-panel"])
 
     assert transcript > secondary
+
+
+# -- the radish accent (D-083) -----------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("foreground", "background"),
+    [
+        ("--on-accent", "--accent"),
+        ("--accent", "--surface-panel"),
+        ("--accent", "--surface-control"),
+        ("--accent-dim", "--surface-panel"),
+        ("--accent-bright", "--surface-control"),
+        ("--success", "--surface-panel"),
+    ],
+)
+def test_the_accent_meets_the_aa_threshold(foreground, background) -> None:
+    """The primary button's label on its radish fill, and radish used as text on a panel."""
+    palette = tokens()
+    ratio = contrast(palette[foreground], palette[background])
+
+    assert ratio >= AA_TEXT, f"{foreground} on {background} is {ratio:.2f}:1, below {AA_TEXT}"
+
+
+def test_healthy_is_not_the_accent() -> None:
+    """`--success` was once `var(--accent)`; with a radish accent that would draw a healthy input in
+    a red beside the danger red. It has a value of its own, and a different hue."""
+    palette = tokens()
+
+    assert "--success" in palette, "--success must be a colour of its own, not an alias"
+    assert palette["--success"].lower() != palette["--accent"].lower()

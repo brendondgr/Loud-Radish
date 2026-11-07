@@ -55,7 +55,7 @@ def test_the_recordings_lab_has_somewhere_to_draw_each_part(pages) -> None:
 
 def test_every_layout_has_styles_and_a_toolbar_icon() -> None:
     options = (LABS / "options.js").read_text(encoding="utf-8")
-    icons = (LABS / "icons.js").read_text(encoding="utf-8")
+    icons = (STATIC / "js" / "core" / "icons.js").read_text(encoding="utf-8")
     css = "".join(
         path.read_text(encoding="utf-8") for path in (STATIC / "css" / "labs").glob("*.css")
     )

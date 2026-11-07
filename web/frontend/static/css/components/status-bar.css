@@ -57,7 +57,7 @@
 .level-meter__bar {
   width: 3px;
   height: 3px;
-  background: var(--accent);
+  background: var(--success);
   opacity: 0.25;
   transition:
     height 180ms linear,
@@ -76,7 +76,7 @@
 }
 
 .status-dot[data-state="active"] {
-  background: var(--accent);
+  background: var(--success);
 }
 
 .status-dot[data-state="warning"] {
@@ -93,7 +93,7 @@
 }
 
 .status-item--rtf .status-item__value[data-health="good"] {
-  color: var(--accent-dim);
+  color: var(--success-dim);
 }
 
 .status-item__warning-icon {

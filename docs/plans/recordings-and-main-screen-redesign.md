@@ -1,6 +1,6 @@
 # Recordings and Main Screen Redesign: From the Labs to the Real Pages
 
-*Written 2026-11-07. Status: **Not started (0 / 9)**. Source of truth for the target design: the
+*Written 2026-11-07. Status: **In progress (1 / 9)**. Source of truth for the target design: the
 two labs, `/labs/sessions/` and `/labs/main/` (D-082), at commit `e76a389` on branch
 `labs/sessions-cards`, and the owner's three rounds of exported feedback quoted below. This plan
 takes decisions **D-083 to D-086**. `feature/mixed-audio-steady-video` already holds D-080 and
@@ -180,6 +180,14 @@ available until Step 9 so every step can be compared against them side by side. 
 - *Action: Undergo the verification/tests/validation process for this phase. Once validated, push
   changes to GitHub stating: Recordings and Main Screen Redesign (1 / 9) Complete: Radish is the
   accent and only the accent, with rounder raised panels and one shared icon set.*
+
+> **Status: ✅ Complete.** Built on `feature/redesign-from-labs`, cut from `labs/sessions-cards`
+> with `feature/mixed-audio-steady-video` merged in (rather than waiting on `main`, which serves the
+> owner's live instance). Beyond the plan: the healthy indicators that read `--accent` directly
+> (level meters, the live dot, a good realtime factor, the sound panel's meters, local-only privacy)
+> now read `--success`; every `.button` takes `--radius-control`; Stop keeps the danger treatment
+> over the radish fill; and `tests/frontend/test_shared_icons.py` keeps the macro and the module
+> identical.
 
 #### Step 2: What a card needs from the sessions API
 

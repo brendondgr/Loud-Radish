@@ -340,8 +340,9 @@ Its palette ships as `--brand-*` tokens:
 | `--brand-blush` | `#d9868a` | The lower body's highlight |
 | `--brand-ink` | `#080808` | Outline and limbs |
 
-**These are not the accent, and must not be used as one.** `--accent` is a teal and is also aliased
-as `--success`; painting the interface crimson would make "healthy" and "danger" the same colour.
+**These are not the accent, and must not be used as one.** The accent is a lighter radish
+(`#e8687f`, D-083) chosen for contrast on graphite; the logo's crimson is darker than the AA floor
+allows for text there.
 The brand tokens exist so the mark's own treatment does not hard-code hex values.
 
 **The mark always sits on a cream disc in application chrome.** The logo is drawn for a light
@@ -372,15 +373,26 @@ conspicuous to everyone sitting behind you.
 | Polished blocks | *(no new tokens)* | Same face, size, and colour as a raw segment — it is the same speech. No rule, no heading, no extra gap: one minute is one paragraph and consecutive minutes read as consecutive paragraphs. On a working setup nearly the whole page is polished, so any per-block treatment is a break on every paragraph |
 | Inline timestamps in polished text | `--text-faint`, `--text-xs`, `--font-mono` | 5.56:1 on the transcript surface, above the 4.5:1 small-text floor. Not interactive: unlike a chat citation, which points elsewhere, a timestamp in the transcript is already at the moment it names |
 | Borders | `--border-subtle` → `--border-strong` | Four weights |
-| Accent | `--accent`, `--accent-bright`, `--accent-dim`, `--accent-wash{,-strong}`, `--accent-border` | One hue. The wash variants are translucent and composite over whatever is behind them |
-| Semantic | `--danger`, `--warning`, each with `-text`, `-wash`, `-border` | Never used alone — see the colour rule below |
+| Accent | `--accent`, `--accent-bright`, `--accent-dim`, `--accent-wash{,-strong}`, `--accent-border`, `--accent-line`, `--on-accent` | Radish (D-083), and **only** the accent: the primary action, controls that are on, focus, links, a card's edge. Never a surface — a radish-tinted page was tried in the labs and rejected. The wash variants are translucent and composite over whatever is behind them. `--on-accent` is the dark label on a filled accent |
+| Semantic | `--danger`, `--warning`, each with `-text`, `-wash`, `-border`; `--success`, `--success-dim` | Never used alone — see the colour rule below. `--success` is a teal of its own ("healthy": a live input, the level meters, a good realtime factor, local-only privacy); it was the accent's alias until the accent became radish. `--danger` is close to radish, so a destructive control always carries a word and the trash icon |
 | Type | `--font-ui`, `--font-transcript`, `--font-mono` | Local stacks only. A webfont that fails to load would change the transcript's measure mid-session |
 | Type scale | `--text-xs` (10.5px) → `--text-lg` (17px), plus `--transcript-size` | The transcript's size is user-adjustable independently of the chrome |
 | Spacing | `--space-1` (2px) → `--space-12` (30px) | One scale, used everywhere |
-| Radii | `--radius-sm` → `--radius-xl`, `--radius-pill` | |
-| Elevation | `--shadow-pill`, `--shadow-panel`, `--shadow-popover` | |
+| Radii | `--radius-sm` → `--radius-xl`, `--radius-pill`; `--radius-card` (18px), `--radius-control` (10px) | The redesign's round shapes (D-083): cards and panels, and the buttons and fields inside them |
+| Elevation | `--shadow-pill`, `--shadow-panel`, `--shadow-popover`, `--shadow-raised` | `--shadow-raised` lifts a card: a hairline of light on its top edge and a soft drop |
 | Layout | `--header-height`, `--chat-width`, `--glossary-width`, `--transcript-min-width`, … | The frame's fixed dimensions |
 | Motion | `--duration-fast` (120ms), `--duration` (180ms), `--duration-slow` (260ms), `--ease` | Almost none by design — see below |
+
+### Icons
+
+Drawn icons come from one set (D-083): the `icon(name, size)` macro in
+`templates/macros/icons.html` for templates, and `static/js/core/icons.js` (`icon`, `iconNode`) for
+components that draw from JavaScript. A test keeps the two path lists identical. Every icon is
+decorative (`aria-hidden`); the control around it carries the accessible name.
+
+**An icon sits in a `.icon` box** — `display: inline-flex; line-height: 0` around a block SVG. As
+a plain inline box it was a line tall with the SVG at its top, so an icon beside a label sat a pixel
+or two high; the dot in *Start recording* was measured 1.5px off in the main-screen lab.
 
 ### Rules
 

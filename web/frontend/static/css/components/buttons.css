@@ -18,7 +18,7 @@
   color: var(--text-secondary);
   background: var(--surface-control);
   border: 1px solid var(--border-control);
-  border-radius: var(--radius);
+  border-radius: var(--radius-control);
   cursor: pointer;
   white-space: nowrap;
   transition:
@@ -38,20 +38,37 @@
   cursor: not-allowed;
 }
 
+/* The one filled control on a screen: radish, with dark text on it (D-083). */
 .button--primary {
-  color: var(--text-primary);
-  background: #1e2425;
-  border-color: #333b3d;
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 600;
 }
 
 .button--primary:hover {
-  background: #262d2e;
+  color: var(--on-accent);
+  background: var(--accent-bright);
+  border-color: var(--accent-bright);
 }
 
 .button--danger {
   color: var(--danger-text);
   background: var(--danger-wash);
   border-color: var(--danger-border);
+}
+
+/* Stop is the primary button turned danger while recording, so its hover must outrank the
+ * primary's or it would flash radish. */
+.button--danger:hover,
+.button--primary.button--danger:hover {
+  color: var(--danger-text);
+  background: rgba(217, 86, 75, 0.16);
+  border-color: var(--danger);
+}
+
+.button--primary.button--danger {
+  font-weight: 500;
 }
 
 /* The pause control. Quieter than the primary one on purpose: pausing is free and reversible, and
@@ -152,7 +169,7 @@
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
   color: var(--accent-dim);
-  background: rgba(111, 176, 166, 0.12);
+  background: var(--accent-wash);
   border-radius: var(--radius-pill);
   padding: 1px var(--space-3);
 }
@@ -168,4 +185,17 @@
   font-size: var(--text-xs);
   color: var(--text-dim);
   white-space: nowrap;
+}
+
+/* An icon's box is the icon, not a line of text (D-083). As an inline box it was a line tall and
+ * held the SVG at its top, so an icon beside a label sat a pixel or two high — the dot in
+ * "Start recording" most visibly (measured in the main-screen lab, third round). */
+.icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  line-height: 0;
+}
+
+.icon svg {
+  display: block;
 }
