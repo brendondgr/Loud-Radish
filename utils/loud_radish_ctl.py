@@ -106,15 +106,18 @@ def cmd_stop(args: argparse.Namespace) -> int:
 
 
 def cmd_arm(args: argparse.Namespace) -> int:
-    """Open the interface with the pre-flight sheet already up.
+    """Open the interface with the record sheet already up.
 
-    Video and window captures need options answering *before* anything is captured, so a keystroke
-    cannot simply start one. Rather than build a second native dialog that would have to be kept in
-    step with the browser's, this raises the browser at a URL the page understands.
+    Every recording starts by answering the record sheet (D-075), so a keystroke that wants one to
+    be chosen cannot simply start it. Rather than build a second native dialog that would have to be
+    kept in step with the browser's, this raises the browser at a URL the page understands.
+    `--source` preselects what to record; without it the sheet opens as it was last left.
     """
     import webbrowser
 
     url = f"{_base(args)}/?arm={args.mode}"
+    if getattr(args, "source", None):
+        url += f"&source={args.source}"
     webbrowser.open(url)
     print(f"opened {url}")
     return 0
@@ -154,6 +157,12 @@ def main(argv: list[str] | None = None) -> int:
         command.set_defaults(handler=handler)
         if needs_mode:
             command.add_argument("--mode", default="live", choices=["live", "recorded", "window"])
+        if name == "arm":
+            command.add_argument(
+                "--source",
+                choices=["microphone", "system", "window"],
+                help="what the record sheet opens with chosen",
+            )
 
     args = parser.parse_args(argv)
     try:

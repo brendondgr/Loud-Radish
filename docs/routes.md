@@ -15,7 +15,7 @@ Server-rendered from `web/frontend/templates/` by `web/backend/app/routes/pages.
 
 | Path | Purpose | Template | Status |
 |---|---|---|---|
-| `/` | The live application — transcript pane, header, status bar | `pages/app.html` | **Implemented** |
+| `/` | The live application — transcript pane, header, status bar. `?arm=<mode>` opens the record sheet on load, and `&source=microphone\|system\|window` preselects what it records (D-075). `?arm=window` alone also preselects a window. The query is cleared at once, so a reload does not reopen it | `pages/app.html` | **Implemented** |
 | `/sessions` | Recordings — every past session, what it holds, and its exports | `pages/sessions.html` | **Implemented** |
 
 ## WebSocket

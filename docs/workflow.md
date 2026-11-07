@@ -413,8 +413,9 @@ uv run utils/loud_radish_ctl.py toggle
 ```
 
 `toggle` starts if idle and stops if running — one command, because a keystroke cannot know which.
-`--mode recorded` and `--mode window` pick the others; `arm --mode window` opens the options sheet
-rather than starting, since window capture has three switches to answer first.
+`--mode recorded` and `--mode window` pick the others. `arm` opens the record sheet in the browser
+rather than starting (D-075); `--source microphone|system|window` preselects what it records, so
+`arm --mode window --source window` is what the "Record a window" shortcut runs.
 
 Shortcuts are registered with **your desktop's own service** and are revocable from its settings.
 This application never reads input devices. Settings → Shortcuts shows whether they are actually

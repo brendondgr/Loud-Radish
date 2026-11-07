@@ -112,7 +112,12 @@ VISUALS: Final[dict[str, VisualState]] = {
 
 
 def visual_for(
-    mode: str, state: str, *, running_pass: bool = False, dictation: str = ""
+    mode: str,
+    state: str,
+    *,
+    running_pass: bool = False,
+    dictation: str = "",
+    live_text: bool | None = None,
 ) -> VisualState:
     """The picture for one (capture mode, run state) pair.
 
@@ -127,6 +132,11 @@ def visual_for(
     is listening; if the icon does not show it, **there is no way to tell whether the microphone is
     live**. Reported exactly that way. The two cannot overlap — the service refuses to start a
     dictation while a session is running — so this steals nothing from the session states.
+
+    ``live_text`` is the running session's own answer to "is this being read as it goes?", from
+    its record-sheet options (D-075). It wins over the mode, because the mode no longer settles it:
+    a microphone transcribed both live and afterwards is ``recorded``, and drawing it as merely
+    *listening* would say no text is appearing when it is.
     """
     if state == modes.ERROR:
         return VISUALS[FAULT]
@@ -143,6 +153,8 @@ def visual_for(
     if state in (modes.RECORDING, modes.STOPPING):
         # The distinction the specification is built around. `live` mode and a window capture that
         # is transcribing as it goes are *reading*; a recorded capture is only *listening*.
+        if live_text is not None:
+            return VISUALS[LIVE] if live_text else VISUALS[RECORDING]
         if mode == modes.LIVE:
             return VISUALS[LIVE]
         if mode == modes.WINDOW:

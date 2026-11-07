@@ -35,12 +35,19 @@ class Snapshot:
     #: ``state`` because a dictation is not a capture session (D-049) — it has its own lifecycle
     #: and the two cannot run at once.
     dictation: str = ""
+    #: Whether the running session transcribes as it goes, from its record-sheet options (D-075).
+    #: ``None`` when the server did not say, and the mode decides as it always did.
+    live_text: bool | None = None
 
     def visual(self) -> VisualState:
         if not self.reachable:
             return VISUALS[SERVER_DOWN]
         return visual_for(
-            self.mode, self.state, running_pass=self.running_pass, dictation=self.dictation
+            self.mode,
+            self.state,
+            running_pass=self.running_pass,
+            dictation=self.dictation,
+            live_text=self.live_text,
         )
 
 

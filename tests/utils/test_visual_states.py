@@ -84,3 +84,12 @@ def test_every_visual_names_its_leds() -> None:
     """The redundant signal that keeps hue from being the only one."""
     for name, visual in vs.VISUALS.items():
         assert len(visual.leds) == 3, name
+
+
+def test_a_recorded_session_transcribing_live_is_drawn_as_live() -> None:
+    """Microphone, both passes derives to `recorded`, but its text is appearing as it is spoken
+    (D-075). The session's own options decide, not the mode."""
+    assert vs.visual_for(modes.RECORDED, modes.RECORDING, live_text=True).name == vs.LIVE
+    assert vs.visual_for(modes.WINDOW, modes.RECORDING, live_text=False).name == vs.RECORDING
+    # Unstated, the mode decides exactly as it did before.
+    assert vs.visual_for(modes.RECORDED, modes.RECORDING).name == vs.RECORDING

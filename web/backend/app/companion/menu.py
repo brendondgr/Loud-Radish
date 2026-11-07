@@ -86,9 +86,9 @@ def build(
     else:
         items.append(MenuItem("start-live", "Start live transcription", enabled=not busy))
         items.append(MenuItem("start-recorded", "Start recording only", enabled=not busy))
-        # Window capture needs its three options answered before anything is captured, so it opens
-        # the browser's own sheet rather than starting. Building a second native dialog would mean
-        # two implementations of the same three toggles to keep in step.
+        # A window recording needs its choices answered before anything is captured, so it opens
+        # the browser's record sheet with a window chosen rather than starting (D-075). Building a
+        # second native dialog would mean two implementations of the same sheet to keep in step.
         items.append(MenuItem("arm-window", "Record a window…", enabled=not busy))
 
     items.append(MenuItem("sep-2", "", kind="separator"))

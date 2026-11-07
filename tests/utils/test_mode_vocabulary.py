@@ -169,9 +169,7 @@ def test_every_mode_arms() -> None:
 
 def test_capture_sources_match(js: str) -> None:
     constants = _string_constants(js)
-    assert _resolve(_string_array(js, "CAPTURE_SOURCES"), constants) == list(
-        modes.CAPTURE_SOURCES
-    )
+    assert _resolve(_string_array(js, "CAPTURE_SOURCES"), constants) == list(modes.CAPTURE_SOURCES)
 
 
 def test_derive_mode_is_mirrored(js: str) -> None:

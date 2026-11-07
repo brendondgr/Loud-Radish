@@ -1,6 +1,6 @@
 # Unified Record Sheet — One Button, One Sheet, Every Kind of Recording
 
-*Written 2026-11-07. Status: **In progress (4 / 6)**. The next free decision number is **D-075**.*
+*Written 2026-11-07. Status: **In progress (5 / 6)**. The next free decision number is **D-075**.*
 
 ## 1. Introduction
 
@@ -284,6 +284,20 @@ One recording folder written by that QA under `data/recordings` (recording folde
   sheet for every kind of recording, and the three-way mode switch is gone.*
 
 ### Step 5: Shortcuts, tray and control script
+
+**Status: Complete (2026-11-07).** The page side had already landed in Step 4 (`session-start.js`
+reads `?arm=` and `&source=`). This step:
+- added `--source` to `loud_radish_ctl.py arm`;
+- pointed the "Record a window" key and tray item at `--source window`;
+- taught the tray icon to draw a session from its own `options.live_transcription`, so
+  "microphone, both" shows *live* rather than *listening*;
+- updated the shortcut help text and the comments that still said "three switches".
+
+`toggle_live` and `toggle_recorded` are unchanged and still start immediately.
+
+**Not done:** pressing the real global key on the desktop. That needs the companion and the server
+on 8395 running this branch, and that instance was left alone. The URL the key opens was checked
+in the browser in Step 4, and the arguments the key runs are checked by tests.
 
 - **Locations**: `web/backend/app/companion/shortcuts.py` (`ACTIONS`),
   `web/backend/app/companion/menu.py` (`arm-window`), `web/backend/app/companion/main.py`

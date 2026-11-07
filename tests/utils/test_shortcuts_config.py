@@ -132,3 +132,9 @@ def test_an_empty_key_is_reported_rather_than_registered(monkeypatch) -> None:
     stop = next(entry for entry in results if entry.action == "stop")
     assert stop.registered is False
     assert "No key set" in stop.reason
+
+
+def test_the_window_key_opens_the_record_sheet_with_a_window_chosen() -> None:
+    """D-075: one sheet for every recording, so the key says which source it meant."""
+    args = shortcuts.ACTIONS["arm_window"][1]
+    assert args[args.index("--source") + 1] == "window"
