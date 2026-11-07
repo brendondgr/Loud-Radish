@@ -100,6 +100,9 @@ class SessionResponse(_Model):
     recording: dict[str, Any] | None = None
     #: The window capture, when `window` mode is recording video (D-022).
     capture: dict[str, Any] | None = None
+    #: The past recording the main screen is showing — ``{key, title, started_at}`` — when the user
+    #: brought one back from Recordings (D-076). ``None`` otherwise, including after a restart.
+    viewing: dict[str, Any] | None = None
 
 
 class SessionStoppedResponse(_Model):
@@ -301,3 +304,11 @@ class QuickActionsResponse(_Model):
     """The configured one-tap prompts."""
 
     actions: list[dict[str, Any]]
+
+
+class TranscribeRecordingRequest(_Model):
+    """The user's approval to transcribe a past recording that has no transcript (D-076)."""
+
+    #: Bring the recording to the main screen once the pass finishes with a transcript. The
+    #: approval dialog's checkbox, on by default — opening it is the user's choice too.
+    open_when_done: bool = True

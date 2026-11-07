@@ -349,6 +349,11 @@ def test_the_media_block_reaches_the_api(client, sessions_dir) -> None:
         "audio_file": False,
         "recording_bytes": 0,
         "exportable": False,
+        # What can be done with it (D-076): a transcript opens; nothing needs transcribing.
+        "openable": True,
+        "transcribable": False,
+        "transcribe_source": "",
+        "reason": "",
     }
 
 

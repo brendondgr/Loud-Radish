@@ -611,29 +611,3 @@ async def resume_transcription(request: Request, key: str) -> dict[str, Any]:
 
     logger.info("Resuming %s from %.1f s", key, job.next_start_s)
     return {"resumed": True, "from_seconds": job.next_start_s, "job": job.as_event()}
-
-
-@router.delete("/{key}")
-async def delete_session(request: Request, key: str) -> dict[str, Any]:
-    """Delete a past session file.
-
-    Refuses the session that is currently recording: deleting the file out from under an open
-    connection loses the talk in progress, which is the one thing this application must not do.
-    """
-    manager = getattr(request.app.state, "session_manager", None)
-    if key and key == _running_key(manager):
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "error": {
-                    "code": "session-running",
-                    "message": "That session is still recording. Stop it before deleting it.",
-                }
-            },
-        )
-
-    path = archive.find(_config(request), key)
-    if path is None:
-        return {"deleted": False}
-    path.unlink()
-    return {"deleted": True}

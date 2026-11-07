@@ -217,6 +217,9 @@ export class TranscriptPane {
 
   _onTranscriptChanged({ segments, batch, added, reset }) {
     if (reset) {
+      // The count too: closing a recording on the main screen (D-076) resets to nothing, and with
+      // no segment arriving afterwards a stale "5 segments" would describe a pane that is empty.
+      setText(this.countLabel, pluralise(segments.length, "segment"));
       this.list.replaceChildren();
       this.polishedList?.replaceChildren();
       this.lastTimestampShown = -Infinity;

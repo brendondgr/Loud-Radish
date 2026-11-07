@@ -6,70 +6,14 @@
  * cannot open when the pipeline is unhealthy — exactly when someone wants to retrieve a transcript.
  */
 
-import { ExportDialog } from "./components/export-dialog.js";
+import { actionButton, primaryAction, reasonLine } from "./components/recording-picker.js";
+import { RecordingWindow } from "./components/recording-window.js";
+import { TranscribeConsent } from "./components/transcribe-consent.js";
 import { $, el, setText, toggle } from "./core/dom.js";
 import { duration as formatDuration } from "./core/format.js";
+import { deletionWarning, mediaChips, size, when } from "./core/recording-facts.js";
 import { exportJob } from "./stores/export.js";
-import { api } from "./transport/api.js";
-
-
-/**
- * Named the way the transcript pane names them: "Final" means something to a reader and
- * "revision 1" does not. Anything beyond the two the application produces today falls back to a
- * number rather than being hidden.
- */
-const REVISION_LABELS = { 0: "Live", 1: "Final" };
-const revisionLabel = (revision) => REVISION_LABELS[revision] ?? `Version ${revision}`;
-
-const FORMATS = [
-  ["markdown", "Markdown"],
-  ["text", "Plain text"],
-  ["srt", "SRT"],
-  ["vtt", "WebVTT"],
-  ["json", "JSON"],
-];
-
-function when(iso) {
-  if (!iso) return "";
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime())
-    ? ""
-    : date.toLocaleString(undefined, {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-}
-
-/** The three things a recording can hold, in a fixed order so a column of rows scans. */
-const MEDIA = [
-  ["video", "Video"],
-  ["audio", "Audio"],
-  ["transcript", "Transcript"],
-];
-
-/**
- * What a chip's tooltip says.
- *
- * Audio gets a sentence of its own because "yes" has two meanings worth telling apart: the
- * separate recording is still on disk, or a successful transcription pass deleted it and the sound
- * now lives in the video. Both are audio; only one of them can be transcribed again.
- */
-function chipTitle(key, label, present, media) {
-  if (!present) return `No ${label.toLowerCase()}`;
-  if (key !== "audio") return `${label} is available`;
-  return media.audio_file
-    ? "The recorded audio is still on disk and can be transcribed again"
-    : "The audio is in the video — the separate recording was removed once it was transcribed";
-}
-
-function size(bytes) {
-  return bytes >= 1024 * 1024
-    ? `${(bytes / 1024 / 1024).toFixed(1)} MB`
-    : `${Math.max(1, Math.round(bytes / 1024))} KB`;
-}
+import { api, ApiError } from "./transport/api.js";
 
 class SessionsPage {
   constructor() {
@@ -79,12 +23,76 @@ class SessionsPage {
     this.directory = $("[data-sessions-directory]");
     this.runningKey = "";
     // The same window that opens when a recording stops, reached from the other end. This page has
-    // no socket, so it polls while an export runs — see `openExport`.
-    this.exportDialog = new ExportDialog($("[data-export]"));
+    // no socket, so it polls while an export runs — see `openWindow`.
+    this.window = new RecordingWindow($("[data-recording-window]"));
+    this.window.ask = (session) => this.askSection(session);
+    this.consent = new TranscribeConsent($("[data-transcribe-consent]"));
+    /** The recording the main screen is showing, so its row can say so (D-076). */
+    this.viewingKey = "";
+    /** Why nothing can be opened or transcribed right now — a recording or a pass running. */
+    this.busy = "";
+  }
+
+  // -- bringing a recording back to the main screen (D-076) -------------------------------
+
+  handlers() {
+    return {
+      onOpen: (session) => void this.bringBack(session),
+      onTranscribe: (session) => void this.transcribe(session),
+    };
+  }
+
+  /** Open it on the main screen, then go there — that is where it can be asked about. */
+  async bringBack(session) {
+    try {
+      await api.openRecording(session.key);
+      window.location.href = "/";
+    } catch (error) {
+      this.report(error instanceof ApiError ? error.message : "That recording could not be opened.");
+    }
   }
 
   /**
-   * Open the export window for one session, and keep it fed.
+   * Ask, and only on approval transcribe it — then go to the main screen, where the pass shows its
+   * progress and, if the box was left ticked, the recording opens when it finishes.
+   */
+  async transcribe(session) {
+    this.window.close();
+    const started = await this.consent.show(session.key);
+    if (started) window.location.href = "/";
+  }
+
+  /** The recording window's "Ask about it" section. */
+  askSection(session) {
+    if (session.key === this.viewingKey) {
+      return el("p", { className: "overview__hint", text: "On the main screen now." });
+    }
+    const action = primaryAction(session, { busy: this.busy });
+    const hint =
+      action.kind === "open"
+        ? "Bring it back to the main screen and ask the assistant about it. Your earlier " +
+          "questions come back with it."
+        : action.kind === "transcribe"
+          ? "It has no transcript yet, so there is nothing to ask about. Transcribing it is " +
+            "your choice — nothing runs until you approve it."
+          : "";
+    return el("div", {
+      className: "overview__row overview__row--stack",
+      children: [
+        hint ? el("p", { className: "overview__hint", text: hint }) : null,
+        actionButton(session, this.handlers(), { busy: this.busy }),
+        reasonLine(session, this.busy),
+      ],
+    });
+  }
+
+  report(message) {
+    toggle(this.error, Boolean(message));
+    setText(this.error, message);
+  }
+
+  /**
+   * Open the recording window for one session, and keep it fed.
    *
    * **This page deliberately has no WebSocket** — its own header says so: loading the transport,
    * the stores and the transcript machinery to render a list would mean a page that cannot open
@@ -92,9 +100,9 @@ class SessionsPage {
    * So an export's progress is polled here rather than pushed, which for a job that reports about
    * once a second is a difference nobody can see.
    */
-  async openExport(session) {
+  async openWindow(session) {
     const poll = setInterval(async () => {
-      if (!this.exportDialog.isOpen) return;
+      if (!this.window.isOpen) return;
       try {
         const body = await api.exportStatus(session.key);
         if (body.job) exportJob.set(body.job);
@@ -104,17 +112,29 @@ class SessionsPage {
     }, 1000);
 
     try {
-      await this.exportDialog.show(session.key, { title: session.title });
+      await this.window.show(session.key, {
+        session: { ...session, running: session.key === this.runningKey },
+      });
     } finally {
       clearInterval(poll);
       await this.load();
+      // The list is re-rendered on close, which replaces the button the focus trap would have
+      // returned to. Put focus back on the same row's, so a keyboard user is where they were.
+      const row = this.list.querySelector(`[data-session-key="${CSS.escape(session.key)}"]`);
+      row?.querySelector("button")?.focus();
     }
   }
 
   async load() {
     try {
-      const body = await api.sessions();
+      const [body, state] = await Promise.all([api.sessions(), api.session().catch(() => null)]);
       this.runningKey = body.running_key ?? "";
+      this.viewingKey = state?.viewing?.key ?? "";
+      this.busy = state?.running
+        ? "Stop the current recording first."
+        : state?.transcription?.state === "running"
+          ? "Wait for the running transcription to finish."
+          : "";
       setText(this.directory, `Stored in ${body.directory}`);
       this.render(body.sessions ?? []);
       toggle(this.error, false);
@@ -155,7 +175,7 @@ class SessionsPage {
         ],
       }),
       el("p", { className: "session__meta", text: meta.join(" · ") }),
-      this.media(media),
+      mediaChips(media),
     ];
 
     if (session.problem) {
@@ -172,130 +192,46 @@ class SessionsPage {
   }
 
   /**
-   * What this recording holds — video, audio, transcript — as three chips.
+   * The row's controls: open the recording's window, or delete it (D-077).
    *
-   * All three are always drawn, present or not. A row that showed only what it had would need
-   * reading rather than scanning, because "video · transcript" and "video · audio" have the same
-   * shape and different meanings.
+   * Every export used to sit here — a format select, an "Export" link for the transcript, a
+   * "Conversation" link and an "Export…" button for the web app — and two controls named Export
+   * that did different things was reported as confusing. They are sections of the window now.
    */
-  media(media) {
-    return el("div", {
-      className: "session__media",
-      attrs: { "aria-label": "What this recording holds" },
-      children: MEDIA.map(([key, label]) => {
-        const present = Boolean(media[key]);
-        return el("span", {
-          className: "media-chip",
-          text: label,
-          attrs: { "data-present": String(present), title: chipTitle(key, label, present, media) },
-        });
-      }),
-    });
-  }
-
   actions(session, running) {
-    const format = el("select", {
-      className: "field__control field__control--compact",
-      attrs: { "aria-label": `Export format for ${session.title}` },
-      children: FORMATS.map(([value, label]) =>
-        el("option", { text: label, attrs: { value } })
-      ),
-    });
+    // The one thing this recording is for — bring it back, or transcribe it first — and why not
+    // when it can be neither. The same answer the window and the main screen's picker give.
+    const primary =
+      session.key === this.viewingKey
+        ? el("span", { className: "badge", text: "on the main screen" })
+        : actionButton(session, this.handlers(), { busy: this.busy });
 
-    // **Only where there is a choice (D-066).** A session that transcribed live and again
-    // afterwards holds two passes, and the export used to ship the newest with no way to ask for
-    // the other. The control is drawn only for those sessions — a select with one option is
-    // chrome that explains nothing, the same rule the transcript pane's Live/Final switch follows.
-    const revisions = Array.isArray(session.revisions) ? session.revisions : [];
-    const latest = revisions.length ? revisions[revisions.length - 1] : undefined;
-    const version =
-      revisions.length > 1
-        ? el("select", {
-            className: "field__control field__control--compact",
-            attrs: { "aria-label": `Transcript version to export for ${session.title}` },
-            children: revisions.map((revision) =>
-              el("option", {
-                text: revisionLabel(revision),
-                attrs: { value: String(revision), ...(revision === latest ? { selected: "" } : {}) },
-              })
-            ),
-          })
-        : null;
-    const chosenRevision = () => (version ? Number(version.value) : undefined);
-
-    const download = el("a", {
+    const open = el("button", {
       className: "button",
-      text: "Export",
+      text: "Open…",
       attrs: {
-        href: api.sessionExportUrl(session.key, "markdown", chosenRevision()),
-        download: "",
+        type: "button",
+        title: "What this recording holds, and every way to export it",
+        "aria-label": `Open ${session.title}`,
       },
     });
-    // The link's href follows both dropdowns, so the browser handles the download itself and the
-    // filename comes from the server's own header rather than being invented here.
-    const follow = () => {
-      download.href = api.sessionExportUrl(session.key, format.value, chosenRevision());
-    };
-    format.addEventListener("change", follow);
-    version?.addEventListener("change", follow);
-
-    // **Its own button, and only where there is one.** The transcript export deliberately no
-    // longer carries the conversation: a transcript is usually being handed to somebody else, and
-    // one person's questions are not part of the record of the talk. They are still the user's,
-    // and this is how they get them.
-    const chat = session.chat_messages
-      ? el("a", {
-          className: "button button--quiet",
-          text: "Conversation",
-          attrs: {
-            href: api.sessionChatUrl(session.key, "markdown"),
-            download: "",
-            title:
-              `The ${session.chat_messages} messages you exchanged with the assistant during ` +
-              "this recording, on their own. Not included in the transcript or the web app.",
-          },
-        })
-      : null;
+    open.addEventListener("click", () => void this.openWindow(session));
 
     const remove = el("button", {
       className: "button button--quiet",
       text: "Delete",
-      attrs: { type: "button", disabled: running },
+      attrs: { type: "button", disabled: running, "aria-label": `Delete ${session.title}` },
     });
     remove.addEventListener("click", () => this.remove(session));
 
-    // Offered only when the session holds video, audio, and a transcript. The export *is* those
-    // three — a player, a transcript that follows it, and questions asked against both — so a
-    // button that produced two of them under the same name would disappoint quietly.
-    //
-    // **A button rather than a link, since D-037.** It used to be an `<a download>` that fetched
-    // hundreds of megabytes with no options and no idea what it would produce. It opens the export
-    // window now: the same window that opens when a recording stops, reached from the other end.
-    let webapp = null;
-    if (session.media?.exportable) {
-      webapp = el("button", {
-        className: "button button--primary",
-        text: "Export…",
-        attrs: {
-          type: "button",
-          title:
-            "Preview the recording, choose its size and quality, and watch the export run. " +
-            "Your own conversation is not included unless you ask for it.",
-        },
-      });
-      webapp.addEventListener("click", () => void this.openExport(session));
-    }
-
     return el("div", {
       className: "session__actions",
-      children: [version, format, download, chat, webapp, remove].filter(Boolean),
+      children: [primary, open, remove, reasonLine(session, this.busy)],
     });
   }
 
   async remove(session) {
-    const confirmed = window.confirm(
-      `Delete "${session.title}"? The transcript, summaries, and glossary all go with it, and this cannot be undone.`
-    );
+    const confirmed = window.confirm(deletionWarning(session));
     if (!confirmed) return;
 
     try {

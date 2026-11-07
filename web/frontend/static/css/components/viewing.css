@@ -1,0 +1,163 @@
+/* A past recording on the main screen (D-076): the banner that names it, the picker that chooses
+ * one, the dialog that asks before transcribing one, and the reason a row cannot do either.
+ *
+ * The banner is accent-washed rather than warning-coloured: viewing a recording is a state the
+ * user chose, not a problem, and it must not read like the error banners directly above it. */
+
+.viewing {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+  padding: var(--space-5) var(--space-8);
+  background: var(--accent-wash);
+  border-bottom: 1px solid var(--accent-border);
+}
+
+.viewing[hidden] {
+  display: none;
+}
+
+.viewing__title {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.viewing__date {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.viewing__hint {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.viewing__actions {
+  display: flex;
+  gap: var(--space-4);
+}
+
+/* -- the picker ------------------------------------------------------------------------------- */
+
+.picker__dialog {
+  width: min(620px, 100%);
+  max-height: min(720px, 100%);
+}
+
+.picker__body {
+  overflow-y: auto;
+}
+
+.picker__status:empty {
+  display: none;
+}
+
+.picker__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.picker__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+  padding: var(--space-6) 0;
+  border-top: 1px solid var(--border-default);
+}
+
+.picker__item:first-child {
+  border-top: 0;
+}
+
+.picker__title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.picker__meta {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.picker__text .session__media {
+  margin-top: var(--space-3);
+}
+
+/* Why a recording can be neither opened nor transcribed. Text, not only a tooltip: a disabled
+ * button cannot take focus, so its title is out of reach of a keyboard or a screen reader. */
+.picker__reason {
+  flex-basis: 100%;
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.overview__row--stack {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* -- the approval dialog ---------------------------------------------------------------------- */
+
+.consent__dialog {
+  width: min(520px, 100%);
+}
+
+/* The shell's body is a row (it holds the settings tabs beside their panel); this one reads top to
+ * bottom. */
+.consent__body,
+.picker__body {
+  flex-direction: column;
+  padding: var(--space-8) var(--space-9);
+}
+
+.consent__lead {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.consent__steps {
+  margin: var(--space-5) 0;
+  padding-left: var(--space-9);
+  line-height: 1.6;
+  color: var(--text-primary);
+}
+
+.consent__open {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 44px;
+}
+
+.consent__refusal {
+  margin: var(--space-5) 0 0;
+  color: var(--warning-text);
+}
+
+.consent__refusal[hidden] {
+  display: none;
+}
+
+.transcript-empty__action {
+  margin-top: var(--space-8);
+}
+
+@media (max-width: 600px) {
+  .picker__item {
+    flex-wrap: wrap;
+  }
+}

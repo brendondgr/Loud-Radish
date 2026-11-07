@@ -40,6 +40,7 @@ conventions in [../skills/planner/SKILL.md](../skills/planner/SKILL.md).
 | [pause-aligned-batch-and-open-items.md](pause-aligned-batch-and-open-items.md) | Six checklist items closed by code: the batch pass cut at pauses with a pause-aligned checkpoint, a dictation whose tidy overlaps its transcription, a bootstrap so a bare `uv run` cannot break the GPU wheel, single-pass range and search reads, and an export that names its revision | **Complete (7 / 7)** |
 | [editable-rewrite-instructions.md](editable-rewrite-instructions.md) | Both instruction lists that rewrite transcribed speech become settings, with a blank field meaning the text that shipped, and every output guard exposed so an edit is not silently reversed | **Complete (7 / 7)** |
 | [gpu-fault-isolation.md](gpu-fault-isolation.md) | Two recordings killed by a GPU memory fault: the speech model in its own supervised process, turns on a GPU shared with a local language model, no reasoning on any request, and a video recorder that finalises when the server dies | **Complete (5 / 5)** |
+| [recordings-on-the-main-screen.md](recordings-on-the-main-screen.md) | Bring a past recording back to the main screen to ask about it; transcribe audio- or video-only recordings (and media folders with no database) only on the user's approval; one recording window in place of several Export buttons | **Complete (6 / 6)** |
 
 ## The multi-mode expansion
 

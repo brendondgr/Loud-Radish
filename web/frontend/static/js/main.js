@@ -12,7 +12,7 @@ import { ARMING, IDLE, PAUSED, PROCESSING, RECORDING, STOPPING, WINDOW } from ".
 import * as prefs from "./core/storage.js";
 import { Banners } from "./components/banners.js";
 import { ChatPane } from "./components/chat-pane.js";
-import { ExportDialog } from "./components/export-dialog.js";
+import { RecordingWindow } from "./components/recording-window.js";
 import { GlossaryPanel } from "./components/glossary-panel.js";
 import { Header } from "./components/header.js";
 import { ModeSwitcher } from "./components/mode-switcher.js";
@@ -23,6 +23,7 @@ import { SettingsModal } from "./components/settings-modal.js";
 import { StatusBar } from "./components/status-bar.js";
 import { TranscriptPane } from "./components/transcript-pane.js";
 import { ApiError, api } from "./transport/api.js";
+import { wireViewing } from "./viewing.js";
 import {
   ASR_PROGRESS,
   AUDIO_LEVEL,
@@ -100,7 +101,7 @@ function boot() {
     onOpenSettings: (section) => settings.show(section),
   });
 
-  exportWindow = new ExportDialog($("[data-export]"));
+  exportWindow = new RecordingWindow($("[data-recording-window]"));
 
   const header = new Header($(".header"), {
     onStart: (name) => start(name, null, banners, settings),
@@ -140,8 +141,32 @@ function boot() {
   wireControls(pane);
   wireChat(chatPane);
 
+  // A past recording on the main screen (D-076). Showing one is a reload with another store
+  // loaded, so it is handed the same re-read the page does on load.
+  viewing = wireViewing({
+    reload: () => reloadForView(pane, chatPane, glossary),
+    report: (message) => banners.show({ code: "viewing", message }),
+  });
+
   socket.connect();
   hydrate(pane, chatPane, glossary).then(() => armFromUrl(preflight, banners, settings));
+}
+
+let viewing = null;
+
+/**
+ * Re-read everything a recording puts on the main screen, after the server changed which one.
+ *
+ * Emptied first: the loaders below *add* to what is shown, and the recording being replaced must
+ * not leave a transcript, an answer or a term behind in the one that replaces it.
+ */
+async function reloadForView(pane, chatPane, glossary) {
+  transcript.reset(0);
+  polish.reset();
+  pane.setRevisions([], 0);
+  chat.hydrate([]);
+  glossary.clear();
+  await hydrate(pane, chatPane, glossary);
 }
 
 /** Keep the narrow-layout tab badge in step with unread answers. */
@@ -463,6 +488,7 @@ async function hydrate(pane, chatPane, glossary) {
   try {
     const state = await api.session();
     session.hydrate(state);
+    viewing?.hydrate(state.viewing);
     recording.hydrate(state);
     capture.set(state?.capture);
     mode.adoptSession({ running: session.running, mode: session.mode });

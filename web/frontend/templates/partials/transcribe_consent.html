@@ -1,0 +1,37 @@
+{# Approving a transcription (D-076).
+
+   A recording with no transcript cannot be asked about, and **nothing transcribes it without the
+   user agreeing first**. This says exactly what pressing Transcribe will do — take the sound out of
+   the video when that is the only copy, then transcribe so many minutes with this model — and
+   nothing else runs. The checkbox decides whether the recording then comes to the main screen. #}
+
+<div class="modal consent" data-transcribe-consent hidden>
+  <div class="modal__scrim" data-consent-cancel aria-hidden="true"></div>
+  <div
+    class="modal__dialog consent__dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="consent-title"
+    aria-describedby="consent-steps"
+    data-consent-dialog
+  >
+    <header class="modal__header">
+      <h2 class="modal__title" id="consent-title">Transcribe this recording?</h2>
+      <p class="modal__subtitle" data-consent-subtitle></p>
+    </header>
+    <div class="modal__body consent__body">
+      <p class="consent__lead">It has no transcript yet, so the assistant has nothing to answer from.
+        Transcribing it will:</p>
+      <ol class="consent__steps" id="consent-steps" data-consent-steps></ol>
+      <label class="consent__open">
+        <input type="checkbox" data-consent-open checked />
+        <span>Open it on the main screen when it finishes</span>
+      </label>
+      <p class="consent__refusal" data-consent-refusal role="alert" hidden></p>
+    </div>
+    <footer class="modal__footer">
+      <button type="button" class="button" data-consent-cancel>Cancel</button>
+      <button type="button" class="button button--primary" data-consent-confirm>Transcribe</button>
+    </footer>
+  </div>
+</div>

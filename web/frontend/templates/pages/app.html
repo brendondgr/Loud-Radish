@@ -9,6 +9,7 @@
   <h1 class="visually-hidden">{{ app_title }}</h1>
   {% include "partials/header.html" %}
   {% include "partials/banners.html" %}
+  {% include "partials/viewing_banner.html" %}
 
   {# Below 900px the panes become tabs rather than a vertical stack: both need their own vertical
      scroll, and stacking makes both unusable (FE §3.3).
@@ -47,5 +48,7 @@
 {# Outside `.app` so the dialogs are not constrained by the grid the application layout sets up. #}
 {% include "partials/settings/modal.html" %}
 {% include "partials/preflight.html" %}
-{% include "partials/export.html" %}
+{% include "partials/recording_window.html" %}
+{% include "partials/recording_picker.html" %}
+{% include "partials/transcribe_consent.html" %}
 {% endblock %}

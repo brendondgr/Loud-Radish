@@ -17,6 +17,7 @@ from . import (
     pages,
     recordings,
     session,
+    session_actions,
     sessions,
     transcript,
 )
@@ -32,6 +33,7 @@ def build_router() -> APIRouter:
     router.include_router(llm.router)
     router.include_router(chat.router)
     router.include_router(sessions.router)
+    router.include_router(session_actions.router)
     router.include_router(recordings.router)
     router.include_router(capture.router)
     router.include_router(dictation.router)

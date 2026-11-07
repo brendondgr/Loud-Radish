@@ -108,10 +108,23 @@ minutes ago.
 | `GET` | `/api/sessions/{key}/export/status` | The current or most recent export — the reconciliation path after a reload | **Implemented** |
 | `POST` | `/api/sessions/{key}/export/cancel` | Stop a running export. The partial output is removed | **Implemented** |
 | `GET` | `/api/sessions/{key}/export/result` | Download what the export produced | **Implemented** |
-| `DELETE` | `/api/sessions/{key}` | Delete a session file. Refuses the one still recording. | **Implemented** |
+| `POST` | `/api/sessions/{key}/open` | Put a past recording with a transcript on the main screen, so the assistant reads it (D-076) | **Implemented** |
+| `POST` | `/api/sessions/close` | Stop showing it; the main screen is empty afterwards (D-076) | **Implemented** |
+| `GET` | `/api/sessions/{key}/transcribe/plan` | What approving a transcription would do — source, length, model — or why it cannot. Starts nothing (D-076) | **Implemented** |
+| `POST` | `/api/sessions/{key}/transcribe` | The user's approval: transcribe a recording with no transcript, taking a video's sound out first, and optionally open it when done (D-076) | **Implemented** |
+| `DELETE` | `/api/sessions/{key}` | Delete a recording — its database **and** its recording folder (D-076). Refuses the one still recording, and one a pass or an export is reading | **Implemented** |
 
 `{key}` is the database file's stem, which is also the name of the recording's folder (D-032) — that
-equality is how a session reaches its own video without a second identifier.
+equality is how a session reaches its own video without a second identifier. Since D-076 the listing
+also includes recording folders with **no** database (`orphan: true`), so a recording whose
+transcript was never written can be transcribed from the page; the transcription creates the
+database under the folder's key.
+
+**A past recording comes back to the main screen through the retained-store slot (D-076).** The
+main page's "Open recording…" picker, a row's *Bring to main screen*, and the recording window all
+call `POST /{key}/open`; the page then re-reads the transcript, conversation and glossary exactly as
+on a reload. A recording with no transcript is offered *Transcribe…* instead, which shows the plan
+and runs nothing until the user approves it.
 
 **A shared export carries the talk, not the conversation about it (D-037).** The questions the user
 put to the assistant *during* a recording used to ride in `transcript.json`, in the `bundle.js`

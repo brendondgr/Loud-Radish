@@ -73,7 +73,9 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   │   ├── session.py         # Start/stop, devices, model loading, prompts
 │   │   │   ├── transcript.py      # Replay, ranges, search, summaries, export
 │   │   │   ├── recordings.py      # List, re-run, and delete captured audio (D-021)
-│   │   │   ├── sessions.py        # Past sessions: list, read, export, web-app export, delete
+│   │   │   ├── sessions.py        # Past sessions: list, read, export, web-app export
+│   │   │   ├── session_actions.py # One past recording: open on the main screen, close, delete,
+│   │   │   │                      #   and transcribe on the user's approval (D-076)
 │   │   │   ├── chat.py            # Ask, cancel, history, the read mark
 │   │   │   ├── llm.py             # Language-model probing and credentials
 │   │   │   ├── capture.py         # The window capture's preview frame and state (D-022)
@@ -135,6 +137,7 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   │       │                  #   agreement, checkpoints on every chunk (D-021, D-045, D-062)
 │   │   │       ├── chunks.py      # Cuts a finished file into pieces that each end in a pause,
 │   │   │       │                  #   so no boundary falls mid-word (D-061)
+│   │   │       ├── extract.py     # A video's sound out to the WAV the pass reads, via PyAV (D-076)
 │   │   │       ├── job.py         # One pass's state, progress, and the one-at-a-time rule
 │   │   │       └── runner.py      # Runs it on a thread, outliving the session that made the file
 │   │   │   └── polish/            # The minute-by-minute clean-up pass (D-018)
@@ -159,7 +162,9 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   │       ├── frames.py      # What happens to one captured frame, on both threads
 │   │   │       ├── background.py  # The status ticker, the context worker, the polish worker
 │   │   │       ├── window_capture.py  # The portal, the recorder, the resume, the join
-│   │   │       ├── passes.py      # Starting a pass over a finished recording; store retention
+│   │   │       ├── passes.py      # Starting a pass over a finished recording; store retention,
+│   │   │       │                  #   and a chosen past recording put in that slot (D-076)
+│   │   │       ├── past_pass.py   # Planning and starting an approved pass over a past recording
 │   │   │       ├── sources.py     # What a session listens to, and proving it is listening
 │   │   │       └── manager.py     # capture → VAD → engine → store → transport. Owns the
 │   │   │                          #   lifecycle; the five modules above are the rest of this one

@@ -42,6 +42,7 @@ Every frame is `{"event": "<name>", "data": { … }}`.
 | `session.paused` | `session_id`, `at_seconds` | Capture is **held** (D-044). The recording stops growing and the clock stops with it — a pause removes time from the recording rather than adding silence to it, so nine seconds of wall clock across a three-second hold produce six seconds of audio. **Retracts nothing**: unlike a stop, a hold ends nothing, so the tentative tail and the recording figure are both still true |
 | `session.resumed` | `session_id`, `at_seconds` | Capture continues, in the same session, the same file and the same store |
 | `session.cancelled` | `session_id`, `kept` | The session ended and **nothing will be transcribed**. Every artefact it produced is kept — the difference from a stop is exactly one thing, whether the post-capture pass runs |
+| `session.viewing` | `viewing` — `{key, title, started_at}` or `null` | The main screen now shows a past recording the user brought back, or stopped showing one (D-076). Re-read the transcript, the conversation and the glossary, as on a reload. **Critical**: a client that missed it would keep a banner naming a recording the assistant no longer reads |
 | `transcript.committed` | `id`, `text`, `start`, `end`, `wall_clock`, `confidence`, `model_id`, `speaker` | Append permanently |
 | `transcript.hypothesis` | `text` (may be empty), `start` | Replace the tentative tail |
 | `transcript.polished` | `id`, `start`, `end`, `text`, `source_ids` | A finished minute rewritten for reading, as one continuous paragraph. Append the block and stop drawing the segments in `source_ids` — do **not** delete them. `text` carries inline `[MM:SS]` markers, in the same format the assistant cites, so a passage can be traced back to when it was said |
@@ -243,6 +244,62 @@ Refusals:
 | The key is not a recording key | `404` | `no-recording` |
 | The session file is gone | `404` | `no-such-session` |
 | No video, or no transcript | `409` | `not-exportable` |
+
+### `POST /api/sessions/{key}/open` and `POST /api/sessions/close` (D-076)
+
+Open puts a past recording on the main screen: its store becomes the one every transcript, chat and
+session route reads. Returns the same body as `GET /api/session`, whose `viewing` is then
+`{key, title, started_at}`. Close releases it and returns that body with `viewing: null` — the main
+screen is empty afterwards. Both are announced to every client as `session.viewing`.
+
+| Condition | Status | Code |
+|---|---|---|
+| A session is recording | `409` | `session-running` |
+| A transcription is running | `409` | `transcription-running` |
+| The recording has no transcript database | `404` | `no-such-session` |
+| The database holds no segments | `409` | `needs-transcription` |
+| The database cannot be read | `422` | `unreadable` |
+
+### `GET /api/sessions/{key}/transcribe/plan` and `POST /api/sessions/{key}/transcribe` (D-076)
+
+For a recording with no transcript. **The plan starts nothing**; it is what the approval dialog
+shows: `{key, title, source, seconds, model, model_ready, orphan, refusal}`, where `source` is
+`resume` (an interrupted pass's checkpoint), `wav` (the folder's `audio.wav`) or `video` (the sound
+will be taken out of the video first), and `refusal` is `{code, message}` or `null`. A key that
+names no database and no folder is `404 no-such-recording`.
+
+`POST` is the user's approval, body `{"open_when_done": true}` (the default). It loads the speech
+model if needed, extracts the video's sound when that is the source, creates `<key>.db` for a
+folder that had none, and starts the ordinary batch pass. Returns `{started, source, job}`;
+progress is the usual `transcription.*` events, and with `open_when_done` the recording is put on
+the main screen when the pass finishes (`session.viewing`). Nothing else is run.
+
+| Condition | Status | Code |
+|---|---|---|
+| It already has a transcript | `409` | `already-transcribed` |
+| No WAV, no checkpoint, no video with sound | `409` | `nothing-to-transcribe` |
+| A session is recording / a pass is running | `409` | `session-running` / `transcription-running` |
+| The model would not load | `409` | `model-load-failed` |
+| The video's sound could not be read | `422` | `no-sound` |
+| The checkpoint's audio is gone | `410` | `audio-gone` |
+
+`GET /api/sessions` rows gain `orphan` (a recording folder with no database, listed so it can be
+transcribed) and `media` gains `openable`, `transcribable`, `transcribe_source` and `reason`, the
+one answer the row, the window and the picker all read.
+
+### `DELETE /api/sessions/{key}`
+
+Removes the transcript database **and** the recording folder (since D-076; it used to leave the
+folder, which would now be listed as an untranscribed recording). A key with only a folder deletes
+the folder. If the recording is the one held open for the main screen, it is released first.
+`{"deleted": true}`, or `false` when there was nothing to delete.
+
+| Condition | Status | Code |
+|---|---|---|
+| It is the session recording now | `409` | `session-running` |
+| A transcription pass is reading it | `409` | `recording-in-use` |
+| An export is reading it | `409` | `export-running` |
+| The folder could not be removed | `422` | `delete-failed` |
 
 ## Agreed shapes, not yet implemented
 

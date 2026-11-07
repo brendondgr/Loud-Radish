@@ -92,6 +92,10 @@ Three consequences worth stating separately, because each is a constraint on eve
   assistant refusing every question, a reload showing an empty transcript, and the session clock
   reading zero — one line, and all three read to the user as separate bugs. The record on disk was
   never at risk; what was missing was a handle to read it through. See **D-031**.
+- **That slot is also how a past recording comes back.** Opening one from Recordings retains *its*
+  store instead (`TranscriptionPassMixin.view_recording`), and the manager remembers which
+  recording the user chose so the page can say so. Nothing that reads a transcript knows the
+  difference, which is the point: one slot and one precedence rule rather than two. See **D-076**.
 
 ## The pipeline
 
