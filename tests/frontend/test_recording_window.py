@@ -29,9 +29,17 @@ def pages(tmp_path_factory) -> dict[str, list[Element]]:
 
 
 def _window(elements: list[Element]) -> list[Element]:
-    """The elements from the recording window's root to the end of its markup."""
+    """The elements from the recording window's root to the next dialog's, or the page's end."""
     start = next(i for i, e in enumerate(elements) if "data-recording-window" in e.attrs)
-    return elements[start:]
+    end = next(
+        (
+            i
+            for i, e in enumerate(elements[start + 1 :], start + 1)
+            if e.tag == "div" and "modal" in e.attrs.get("class", "").split()
+        ),
+        len(elements),
+    )
+    return elements[start:end]
 
 
 @pytest.mark.parametrize("path", ["/", "/sessions"])

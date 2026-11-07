@@ -1,0 +1,23 @@
+{# A past recording on the main screen (D-076).
+
+   Shown when the user brought a recording back from Recordings, so the transcript and the
+   conversation on screen are visibly *that* recording's rather than a talk that seems to have
+   just happened. Not a run state and not in the header: the record control stays idle, and
+   starting a new recording simply ends the view — which the second line says, so nobody has to
+   find out by losing the banner. #}
+
+<section class="viewing" data-viewing-banner aria-labelledby="viewing-title" hidden>
+  <div class="viewing__text">
+    <h2 class="viewing__title" id="viewing-title">
+      Viewing <span data-viewing-name></span><span class="viewing__date" data-viewing-date></span>
+    </h2>
+    <p class="viewing__hint">
+      Ask the assistant about it — your earlier questions are below. Starting a new recording
+      closes this view; the recording stays in Recordings.
+    </p>
+  </div>
+  <div class="viewing__actions">
+    <button type="button" class="button button--quiet" data-open-recording>Open another…</button>
+    <button type="button" class="button" data-viewing-close>Close</button>
+  </div>
+</section>

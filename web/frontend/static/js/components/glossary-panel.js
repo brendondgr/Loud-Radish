@@ -43,6 +43,12 @@ export class GlossaryPanel {
     }
   }
 
+  /** Forget every term — the recording they came from is no longer the one on screen (D-076). */
+  clear() {
+    this.terms.clear();
+    this.render();
+  }
+
   add(term, { isNew = false } = {}) {
     this.terms.set(term.term.toLowerCase(), term);
     this.render();

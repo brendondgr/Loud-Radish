@@ -177,6 +177,16 @@ export const api = {
   sessions: () => get("/api/sessions"),
   pastSession: (key) => get(`/api/sessions/${encodeURIComponent(key)}`),
   deleteSession: (key) => del(`/api/sessions/${encodeURIComponent(key)}`),
+  // -- a past recording on the main screen (D-076) -----------------------------------
+  /** Put a past recording with a transcript on the main screen. Returns the session state. */
+  openRecording: (key) => post(`/api/sessions/${encodeURIComponent(key)}/open`),
+  /** Stop showing it. The main screen is empty afterwards. */
+  closeRecording: () => post("/api/sessions/close"),
+  /** What approving a transcription would do. Starts nothing. */
+  transcribePlan: (key) => get(`/api/sessions/${encodeURIComponent(key)}/transcribe/plan`),
+  /** The user's approval: transcribe a recording that has no transcript. */
+  transcribeRecording: (key, openWhenDone = true) =>
+    post(`/api/sessions/${encodeURIComponent(key)}/transcribe`, { open_when_done: openWhenDone }),
   sessionExportUrl: (key, fmt, revision) =>
     `/api/sessions/${encodeURIComponent(key)}/export?fmt=${encodeURIComponent(fmt)}` +
     revisionQuery(revision),

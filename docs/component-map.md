@@ -41,8 +41,10 @@ web/frontend/
     └── js/
         ├── main.js             the application page's entry point
         ├── sessions.js         the recordings page's entry point — the list, the media
-        │                       chips, and each row's Open… and Delete; everything else is in
-        │                       the recording window (polled, since this page has no socket)
+        │                       chips, and each row's action (bring back / transcribe), Open…
+        │                       and Delete; everything else is in the recording window
+        ├── viewing.js          a past recording on the main screen: banner, picker, approval
+        │                       (D-076)
         ├── core/               DOM helpers, the event bus, formatting, preferences, modes,
         │                       export presets — the last two mirrored from the backend and
         │                       held identical by a test
@@ -100,6 +102,9 @@ browser owns is genuinely its own — pane widths, text size, which pane is show
 | `RewritingSettings` | The two instruction editors, their Reset controls, and the line saying which text is in force | The one thing the binding layer cannot do: a blank field means the instructions that shipped, so the shipped text is the field's **placeholder** and never its value — seeding it would store a copy on the next change event and freeze this installation on today's wording. Reset writes `""` for the same reason (D-068) |
 | `FocusTrap` | Modal focus containment and restoration | Recomputes candidates per Tab — the dialog changes shape constantly |
 | `RecordingWindow` | One past recording: the overview (`recording-overview.js`) and the web-app export's choosing and watching faces | One modal on both pages, opened from a row's Open… and on its own when a recording with media stops. The overview is built from the same `GET /api/sessions` row the list draws, through `core/recording-facts.js`, so the two cannot describe a recording differently. Each export is a labelled section shown only where the recording has what it exports; a row used to carry two controls named Export (D-077) |
+| `wireViewing` (`viewing.js`) | The main screen's view of a past recording: the banner, and the glue between the picker, the approval dialog and a reload | Opening a recording is a reload with another store loaded, so `main.js` hands it `reloadForView`, which empties the transcript, conversation and glossary and re-runs `hydrate()`. Every change of view arrives as `session.viewing`; the HTTP response is adopted too and a repeat is ignored. Not a run state and not in the header (D-076) |
+| `RecordingPicker` | "Open a recording…": recordings with the one action each can take | Opened by any `[data-open-recording]` control — the transcript toolbar, the empty state, the banner. The action and its refusal come from `media.openable` / `.transcribable` / `.reason`, through `primaryAction`, which the Recordings rows and the recording window's Ask section use too. A refusal is shown as text, not only as a disabled button's title (D-076) |
+| `TranscribeConsent` | Approving a transcription of a recording with no transcript | Reads `GET …/transcribe/plan` and lists exactly what will run; nothing starts until Transcribe. One checkbox: open it on the main screen when it finishes, on by default. Used on both pages (D-076) |
 
 ### The multi-mode expansion (D-020)
 

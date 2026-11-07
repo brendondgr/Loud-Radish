@@ -229,13 +229,18 @@ def list_sessions(config: AppConfig) -> list[ArchivedSession]:
 
 def describe_orphan(key: str, recordings: Path) -> ArchivedSession:
     """A recording folder that has no transcript database, described from the folder alone."""
-    started = started_from_key(key)
-    started_iso = started.replace(tzinfo=UTC).isoformat() if started else ""
+    # The key's stamp is UTC (sessions start on `datetime.now(UTC)`); the title is read by a
+    # person, so it is said in their own time, as every other date on the page is.
+    stamp = started_from_key(key)
+    started = stamp.replace(tzinfo=UTC) if stamp else None
+    started_iso = started.isoformat() if started else ""
     media = media_for(key, recordings, has_transcript=False)
     return ArchivedSession(
         key=key,
         path="",
-        title=f"Recording on {started.strftime('%d %b %Y, %H:%M')}" if started else key,
+        title=(
+            f"Recording on {started.astimezone().strftime('%d %b %Y, %H:%M')}" if started else key
+        ),
         started_at=started_iso,
         ended_at="",
         segments=0,
@@ -503,4 +508,7 @@ def _default_title(started: str) -> str:
         when = datetime.fromisoformat(started)
     except ValueError:
         return "Untitled session"
+    # Stored in UTC; said in the reader's own time, like every other date on the page.
+    if when.tzinfo is not None:
+        when = when.astimezone()
     return f"Session on {when.strftime('%d %b %Y, %H:%M')}"

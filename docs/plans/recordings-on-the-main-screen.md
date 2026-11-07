@@ -1,6 +1,6 @@
 # Recordings on the Main Screen: Ask About Any Past Recording
 
-*Written 2026-11-07, revised the same day with the user's answers. Status: **In progress (4 / 6)**.
+*Written 2026-11-07, revised the same day with the user's answers. Status: **In progress (5 / 6)**.
 Runs **alongside** [unified-record-sheet.md](unified-record-sheet.md), which is being implemented at
 the same time in the main checkout. This plan is built in a separate worktree
 (`../TranscriberPrototype-recordings`, branch `feature/recordings-on-main-screen`), so the two never
@@ -241,8 +241,14 @@ Read before starting: `docs/skills/global-project-rules/SKILL.md`, `docs/archite
   - `main.js`, which constructs these and re-runs `hydrate()` after an open or a close, and on a
     `session.viewing` event.
   - `sessions.js` and `recording-overview.js`, which wire up the row and window buttons.
-- **Tests**: `tests/frontend/` checks the banner and consent markup: a named Close, a dialog
-  heading, and the checkbox label.
+- **Tests**: `tests/frontend/test_viewing_markup.py` checks the banner and consent markup: a named
+  Close, a dialog heading, and the checkbox label.
+- **Done (2026-11-07)**: the main-screen wiring is its own module, `static/js/viewing.js`, so
+  `main.js` (which URS Step 4 splits) gains only a `reloadForView` and one call. "Open recording…"
+  is a template button in the transcript toolbar and the empty state, wired by the picker without
+  touching `transcript-pane.js`. The pane's reset now also resets its segment count, which had
+  stayed at the old figure after Close. Default and media-only titles are now in local time, as
+  every other date on the page is. Styles in `static/css/components/viewing.css`.
 - **Verification**: `uv run pytest`, `uv run ruff check .`. Then browser QA with the mock ASR:
   1. Open a recording from the row, the window and the picker. Check the old chat is shown, then
      ask a question.
