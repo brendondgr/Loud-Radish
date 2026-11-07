@@ -1198,7 +1198,12 @@ as text to paste back.
       look-only, from the owner's busiest recording. Radish is the accent only (a radish-tinted
       background was tried and rejected). Each round ends with an approve / changes / not-yet
       decision in the export.
-- [ ] **The owner's decision on round two**, for both labs. Then the chosen designs replace
+- [x] **Third round, main screen (2026-11-07):** the owner's "PReferences" — classic, header chips,
+      smaller serif text, timestamps in the margin, icon toolbar, viewing card in the transcript —
+      plus their notes: the record button's dot centred (every lab icon was a line box tall),
+      no text-size button, the glossary's count inside its button, the video and details in a
+      column of their own, quick questions in a pop-up, Ask as an icon.
+- [ ] **The owner's decision on round two/three**, for both labs. Then the chosen designs replace
       `/sessions` and the main screen, and the labs are deleted rather than kept beside them.
 - [ ] **Short titles from the model.** The lab's titles are keywords or opening words — the
       stand-in. The real version asks the language model for four to six words when a transcription

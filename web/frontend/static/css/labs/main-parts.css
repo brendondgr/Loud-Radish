@@ -1,0 +1,94 @@
+/* The main-screen lab (D-080), third round: the details column and the question box, added at
+ * the owner's notes. Kept apart from main.css, which is the frame and the four arrangements.
+ */
+
+/* -- the details column ------------------------------------------------------------------------------ */
+
+.lm-info .lm-monitor { margin: 12px; }
+.lm-info__section { padding: 12px 14px; border-top: 1px solid var(--lab-line-subtle); }
+.lm-info__head { display: flex; align-items: center; justify-content: space-between; min-height: 24px; margin-bottom: 8px; }
+.lm-info__head h3 {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.lm-info .lm-health { flex-wrap: wrap; gap: 8px 14px; }
+.lm-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; margin: 0; }
+.lm-facts dt { color: var(--text-faint); font-size: 10.5px; }
+.lm-facts dd { margin: 2px 0 0; color: var(--text-primary); font-size: 13px; }
+.lm-facts--rows { grid-template-columns: 1fr; gap: 7px; }
+.lm-facts--rows > div { display: flex; justify-content: space-between; gap: 12px; }
+.lm-facts--rows dd { margin: 0; color: var(--text-secondary); font-size: 12px; text-align: right; }
+.lm-terms { display: flex; flex-direction: column; gap: 9px; margin: 0; padding: 0; list-style: none; }
+.lm-terms li { display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.lm-terms strong { color: var(--text-primary); font-weight: 600; }
+.lm-terms span {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--text-muted);
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.lm-muted { margin: 0; color: var(--text-faint); font-size: 12px; }
+
+/* A count inside a button: how many glossary terms there are. */
+.lm-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--lab-accent);
+  color: var(--lab-on-accent);
+  font: 600 10.5px var(--font-mono);
+}
+.lm-btn--counted { gap: 5px; padding: 0 6px 0 8px; }
+
+/* -- the question box and its quick questions --------------------------------------------------- */
+
+.lm-composer { position: relative; }
+.lm-quick-toggle { width: 38px; height: 38px; color: var(--lab-accent); }
+.lm-quick-toggle[aria-expanded="true"] { background: var(--lab-control-hover); }
+.lm-btn--send { width: 38px; padding: 0; }
+.lm-quick-menu {
+  position: absolute;
+  left: 12px;
+  bottom: calc(100% - 2px);
+  z-index: 30;
+  width: min(330px, calc(100% - 24px));
+  padding: 6px;
+  border: 1px solid var(--lab-line-control);
+  border-radius: min(var(--r), 12px);
+  background: var(--lab-panel);
+  box-shadow: var(--shadow-popover);
+}
+.lm-quick-menu__title {
+  margin: 4px 10px 6px;
+  color: var(--text-faint);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.lm-quick-menu__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-secondary);
+  font: 12.5px var(--font-ui);
+  text-align: left;
+  cursor: pointer;
+}
+.lm-quick-menu__item:hover { background: var(--lab-control-hover); color: var(--text-primary); }
+.lm-quick-menu__item kbd { color: var(--text-faint); font: 10.5px var(--font-mono); }

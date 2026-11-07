@@ -19,6 +19,14 @@ const mock = (label, { icon, text, className = "lm-btn", title } = {}) =>
     children: [icon ? iconNode(icon, { size: 15 }) : null, text ? el("span", { text }) : null],
   });
 
+/** The glossary, with how many terms it holds inside the button (owner's note, third round). */
+function glossaryButton(count, { compact = false } = {}) {
+  const button = mock("Glossary", { icon: "book", text: compact ? null : "Glossary", className: compact ? "lm-btn lm-btn--quiet lm-btn--counted" : "lm-btn lm-btn--quiet" });
+  button.setAttribute("aria-label", `Glossary, ${count} terms`);
+  button.append(el("span", { className: "lm-badge", text: String(count) }));
+  return button;
+}
+
 function clock(seconds) {
   const total = Math.round(seconds || 0);
   const pad = (n) => String(n).padStart(2, "0");
@@ -146,10 +154,7 @@ function transcriptToolbar(content, settings) {
       compact
         ? mock("Search the transcript", { icon: "search", className: "lm-btn lm-btn--icon" })
         : el("label", { className: "lm-search", children: [iconNode("search", { size: 13 }), el("span", { text: "Search transcript" })] }),
-      mock("Text size", { icon: "text", className: "lm-btn lm-btn--icon" }),
-      compact
-        ? mock("Glossary", { icon: "book", className: "lm-btn lm-btn--icon" })
-        : mock("Glossary", { icon: "book", text: `Glossary ${content.detail.glossary.length}`, className: "lm-btn lm-btn--quiet" }),
+      glossaryButton(content.detail.glossary.length, { compact }),
     ],
   });
 }
@@ -195,6 +200,85 @@ export function monitor(content) {
   });
 }
 
+function fact(term, value) {
+  return el("div", { children: [el("dt", { text: term }), el("dd", { text: value })] });
+}
+
+function section(title, children, action) {
+  return el("section", {
+    className: "lm-info__section",
+    children: [
+      el("div", { className: "lm-info__head", children: [el("h3", { text: title }), action ?? null] }),
+      ...children,
+    ],
+  });
+}
+
+/**
+ * The details column: the video, what this recording is, how it was captured, and its glossary —
+ * everything that is not the transcript or the conversation, where it can all be seen at once
+ * (owner's note, third round).
+ */
+export function infoPane(content, settings) {
+  const { session, detail } = content;
+  const model = (detail.segments.find((s) => s.model_id)?.model_id ?? "").split(":").filter(Boolean).join(" · ");
+  const modes = { live: "Live, as it is said", recorded: "After the recording", window: "Live, and again after" };
+  const glossary = detail.glossary ?? [];
+  return el("aside", {
+    className: "lm-pane lm-info lm-region",
+    attrs: { "aria-label": "Video and details" },
+    children: [
+      el("div", { className: "lm-pane__head", children: [el("span", { className: "lm-pane__title", text: "Recording" })] }),
+      el("div", {
+        className: "lm-scroll",
+        children: [
+          monitor(content),
+          settings.health === "column" ? section("Now", [health(content)]) : null,
+          section("This recording", [
+            el("dl", {
+              className: "lm-facts",
+              children: [
+                fact("Started", formatDate(startedAt(session), "smart")),
+                fact("Length", duration(session.duration_seconds)),
+                fact("Words", (session.words ?? 0).toLocaleString()),
+                fact("Questions", String(session.chat_messages ?? 0)),
+              ],
+            }),
+          ]),
+          section(
+            "Capture",
+            [
+              el("dl", {
+                className: "lm-facts lm-facts--rows",
+                children: [
+                  fact("Source", session.media?.video ? "A window, with its sound" : "Microphone"),
+                  fact("Transcribed", modes[detail.session?.mode] ?? "Live"),
+                  fact("Model", model || "—"),
+                ],
+              }),
+            ],
+            mock("Capture settings", { icon: "gear", className: "lm-btn lm-btn--icon" }),
+          ),
+          section(
+            "Glossary",
+            glossary.length
+              ? [
+                  el("ul", {
+                    className: "lm-terms",
+                    children: glossary.slice(0, 8).map((term) =>
+                      el("li", { children: [el("strong", { text: term.term }), el("span", { text: term.definition })] }),
+                    ),
+                  }),
+                ]
+              : [el("p", { className: "lm-muted", text: "No terms yet." })],
+            el("span", { className: "lm-badge", text: String(glossary.length) }),
+          ),
+        ],
+      }),
+    ],
+  });
+}
+
 function messages(content, settings) {
   const chat = content.detail.chat ?? [];
   if (!chat.length) {
@@ -221,12 +305,57 @@ function messages(content, settings) {
 }
 
 function quickQuestions(content, style) {
-  if (style === "hidden") return null;
+  if (style === "hidden" || style === "menu") return null;
   return el("div", {
     className: `lm-quick lm-quick--${style}`,
     children: content.quick.slice(0, 5).map((action) =>
       mock(action.label, { text: action.label, className: "lm-quick__item", title: action.prompt }),
     ),
+  });
+}
+
+/**
+ * The question box. With quick questions as a pop-up, a button beside it opens them; both it and
+ * Ask are icons only (owner's note, third round).
+ */
+function composer(content, settings, hooks) {
+  let menu = null;
+  let toggle = null;
+  if (settings.quick === "menu") {
+    toggle = el("button", {
+      className: "lm-btn lm-btn--icon lm-quick-toggle",
+      attrs: { type: "button", "aria-label": "Quick questions", title: "Quick questions", "aria-expanded": String(hooks.quickOpen), "aria-haspopup": "menu" },
+      children: [iconNode("spark", { size: 15 })],
+    });
+    toggle.addEventListener("click", (event) => {
+      event.stopPropagation();
+      hooks.onToggleQuick();
+    });
+    if (hooks.quickOpen) {
+      menu = el("div", {
+        className: "lm-quick-menu",
+        attrs: { role: "menu" },
+        children: [
+          el("p", { className: "lm-quick-menu__title", text: "Quick questions" }),
+          ...content.quick.map((action) =>
+            el("button", {
+              className: "lm-quick-menu__item",
+              attrs: { type: "button", role: "menuitem", "data-mock": action.label, title: action.prompt },
+              children: [el("span", { text: action.label }), action.hint ? el("kbd", { text: action.hint }) : null],
+            }),
+          ),
+        ],
+      });
+    }
+  }
+  return el("div", {
+    className: "lm-composer",
+    children: [
+      menu,
+      toggle,
+      el("span", { className: "lm-composer__input", text: "Ask about the talk…" }),
+      mock("Ask", { icon: "send", className: "lm-btn lm-btn--primary lm-btn--send" }),
+    ],
   });
 }
 
@@ -244,20 +373,14 @@ export function assistantPane(content, settings, hooks) {
         children: [
           el("span", { className: "lm-pane__title", text: "Assistant" }),
           el("span", { className: "lm-spacer" }),
-          mock("Glossary", { icon: "book", text: String(content.detail.glossary.length), className: "lm-btn lm-btn--quiet" }),
+          glossaryButton(content.detail.glossary.length, { compact: true }),
           mock("Clear the conversation", { icon: "trash", className: "lm-btn lm-btn--icon" }),
           close ?? mock("Collapse", { icon: "chevron", className: "lm-btn lm-btn--icon" }),
         ],
       }),
       el("div", { className: "lm-scroll", children: [messages(content, settings)] }),
       quickQuestions(content, settings.quick),
-      el("div", {
-        className: "lm-composer",
-        children: [
-          el("span", { className: "lm-composer__input", text: "Ask about the talk…" }),
-          mock("Ask", { icon: "send", text: "Ask", className: "lm-btn lm-btn--primary" }),
-        ],
-      }),
+      composer(content, settings, hooks),
     ],
   });
 }

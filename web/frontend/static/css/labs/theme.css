@@ -49,3 +49,9 @@
 
 .lab[data-radius="sharp"] { --r: 3px; }
 .lab[data-radius="round"] { --r: 18px; }
+
+/* An icon's box is the icon, not a line of text. As an inline box it was a line tall and held the
+ * SVG at its top, so every icon beside a label sat a pixel or two high — most visibly the dot in
+ * "Start recording" (owner's note, third round). */
+.lab .lab-icon { display: inline-flex; line-height: 0; }
+.lab .lab-icon svg { display: block; }

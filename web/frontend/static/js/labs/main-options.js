@@ -54,7 +54,8 @@ export const SECTIONS = [
       choice("health", "Microphone level, speed, lag", [
         c("bar", "A status bar at the bottom"),
         c("header", "Chips in the header"),
-      ], { hint: "In the dock arrangement they are always in the dock." }),
+        c("column", "In the details column"),
+      ], { hint: "In the dock arrangement they are always in the dock; without a details column, in the header." }),
     ],
   },
   {
@@ -79,10 +80,23 @@ export const SECTIONS = [
         c("bubbles", "Your questions in bubbles"),
         c("plain", "Plain, like a document"),
       ]),
-      choice("quick", "Quick questions", [c("chips", "Chips"), c("list", "A list"), c("hidden", "Hidden")]),
-      choice("monitor", "Video of the recording", [
-        c("card", "A card above the assistant"),
-        c("pip", "Picture-in-picture over the transcript"),
+      choice("quick", "Quick questions", [
+        c("menu", "A pop-up from a button by Ask"),
+        c("chips", "Chips"),
+        c("list", "A list"),
+        c("hidden", "Hidden"),
+      ]),
+    ],
+  },
+  {
+    id: "details",
+    label: "Video & details",
+    options: [
+      choice("monitor", "Video, recording details, capture settings, glossary", [
+        c("left", "Their own column, left of the transcript"),
+        c("middle", "Their own column, between transcript and assistant"),
+        c("card", "Just the video, as a card above the assistant"),
+        c("pip", "Just the video, picture-in-picture over the transcript"),
         c("hidden", "Hidden"),
       ]),
     ],
@@ -109,20 +123,24 @@ export const SECTIONS = [
   },
 ];
 
+/**
+ * The owner's second-round choice ("PReferences", 2026-11-07), plus what their notes asked for: the
+ * video and details in a column of their own, and the quick questions behind a button.
+ */
 export const DEFAULTS = {
-  layout: "panels",
+  layout: "classic",
   assistWidth: "medium",
   density: "airy",
   record: "pill",
-  health: "bar",
+  health: "header",
   font: "serif",
-  textSize: "m",
-  stamps: "above",
-  toolbar: "full",
+  textSize: "s",
+  stamps: "margin",
+  toolbar: "compact",
   bubbles: "bubbles",
-  quick: "chips",
-  monitor: "card",
-  banner: "strip",
+  quick: "menu",
+  monitor: "left",
+  banner: "card",
   accent: "radish",
   surface: "raised",
   radius: "round",

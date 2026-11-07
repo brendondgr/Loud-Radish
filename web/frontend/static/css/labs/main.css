@@ -7,10 +7,12 @@
 
 .lm {
   --assist-w: 400px;
+  --info-w: 300px;
   --gap: 10px;
   --lm-text: 19px;
 
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
 }
@@ -40,6 +42,7 @@
 .lm-stage {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   min-height: 0;
 }
 .lm-body {
@@ -114,6 +117,15 @@
 }
 .lm[data-layout="dock"][data-panel="true"] { --lab-panel-offset: var(--lab-panel-w); }
 
+/* The details column, left of the transcript or between it and the assistant. */
+.lm[data-monitor="left"] .lm-body { grid-template-columns: var(--info-w) minmax(0, 1fr) var(--assist-w); }
+.lm[data-monitor="left"] .lm-info { order: -1; }
+.lm[data-monitor="middle"] .lm-body { grid-template-columns: minmax(0, 1fr) var(--info-w) var(--assist-w); }
+.lm[data-layout="focus"][data-monitor="left"] .lm-body { grid-template-columns: var(--info-w) minmax(0, 1fr); }
+.lm[data-layout="focus"][data-monitor="middle"] .lm-body { grid-template-columns: minmax(0, 1fr) var(--info-w); }
+.lm[data-layout="classic"][data-monitor="left"] .lm-info { border-right: 1px solid var(--lab-line); }
+.lm[data-layout="classic"][data-monitor="middle"] .lm-info { border-left: 1px solid var(--lab-line); }
+
 /* -- header ----------------------------------------------------------------------------------------- */
 
 .lm-head {
@@ -148,6 +160,10 @@
 }
 .lm-clock { color: var(--text-primary); font: 500 15px var(--font-mono); letter-spacing: 0.02em; }
 .lm-spacer { flex: 1; }
+.lm-state,
+.lm-record,
+.lm-local,
+.lm-health__item { white-space: nowrap; }
 .lm-local {
   display: inline-flex;
   align-items: center;
@@ -398,6 +414,18 @@
 .lm-meter__bar[data-on="true"] { background: var(--lab-accent); }
 .lm-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); }
 .lm-dot--idle { background: var(--text-faint); }
+
+/* Three columns need room. Narrower, they slim down; narrower still, the details column steps
+ * aside rather than squeezing the transcript into a column of single words. */
+@media (max-width: 1280px) {
+  .lm { --info-w: 250px; --assist-w: 340px; }
+}
+@media (max-width: 1060px) {
+  .lm[data-monitor="left"] .lm-body,
+  .lm[data-monitor="middle"] .lm-body { grid-template-columns: minmax(0, 1fr) var(--assist-w); }
+  .lm-info { display: none; }
+  .lm-head { flex-wrap: wrap; }
+}
 
 @media (max-width: 860px) {
   .lm-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }

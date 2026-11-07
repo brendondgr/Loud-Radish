@@ -12,7 +12,7 @@ import { api, ApiError, get } from "../transport/api.js";
 import { renderCustomizer, verdictButtons } from "./customizer.js";
 import { cardTitle } from "./describe.js";
 import { DEFAULTS, LAYOUTS, SECTIONS } from "./main-options.js";
-import { assistantPane, banner, header, health, monitor, transcriptPane } from "./main-view.js";
+import { assistantPane, banner, header, health, infoPane, monitor, transcriptPane } from "./main-view.js";
 import { createReview } from "./review.js";
 
 const review = createReview({
@@ -31,7 +31,7 @@ const panel = $("[data-lab-panel]");
 const status = $("[data-lab-status]");
 const labBar = $("[data-lab-bar]");
 
-const view = { content: null, error: "", panelOpen: false, assistantOpen: false };
+const view = { content: null, error: "", panelOpen: false, assistantOpen: false, quickOpen: false };
 
 let statusTimer = 0;
 function report(message) {
@@ -88,7 +88,7 @@ function applySettingsToRoot() {
     assist: s.assistWidth,
     density: s.density,
     record: s.record,
-    health: s.layout === "dock" ? "header" : s.health,
+    health: s.health,
     font: s.font,
     textSize: s.textSize,
     stamps: s.stamps,
@@ -108,6 +108,11 @@ const hooks = () => ({
   logo: root.dataset.logo,
   panelOpen: view.panelOpen,
   onTogglePanel: togglePanel,
+  quickOpen: view.quickOpen,
+  onToggleQuick: () => {
+    view.quickOpen = !view.quickOpen;
+    render();
+  },
   onToggleAssistant: () => {
     view.assistantOpen = !view.assistantOpen;
     render();
@@ -122,8 +127,10 @@ function render() {
     stage.replaceChildren(el("p", { className: "lm-loading", text: view.error || "Loading a recording…" }));
     return;
   }
-  // The dock carries the level, speed and lag itself.
-  const settings = { ...lab.settings, health: lab.settings.layout === "dock" ? "header" : lab.settings.health };
+  // The dock carries the level, speed and lag itself; without a details column they go up top.
+  const column = lab.settings.monitor === "left" || lab.settings.monitor === "middle";
+  const healthAt = lab.settings.layout === "dock" || (lab.settings.health === "column" && !column) ? "header" : lab.settings.health;
+  const settings = { ...lab.settings, health: healthAt };
   const { content } = view;
   const transcript = transcriptPane(content, settings);
   if (settings.monitor === "pip") transcript.append(el("div", { className: "lm-pip", children: [monitor(content)] }));
@@ -131,7 +138,10 @@ function render() {
   const parts = [
     header(content, settings, hooks()),
     settings.banner === "strip" ? banner(content) : null,
-    el("div", { className: "lm-body", children: [transcript, assistantPane(content, settings, hooks())] }),
+    el("div", {
+      className: "lm-body",
+      children: [transcript, column ? infoPane(content, settings) : null, assistantPane(content, settings, hooks())],
+    }),
     settings.health === "bar" ? el("footer", { className: "lm-statusbar lm-region", children: [health(content)] }) : null,
   ];
   stage.replaceChildren(...parts.filter(Boolean));
@@ -182,6 +192,12 @@ review.subscribe((changed) => {
   render();
 });
 
+document.addEventListener("click", () => {
+  if (!view.quickOpen) return;
+  view.quickOpen = false;
+  render();
+});
+
 stage.addEventListener("click", (event) => {
   const control = event.target.closest("[data-mock]");
   if (control) report(`Look-only: "${control.dataset.mock}" is drawn here, not wired. It works on the real main screen.`);
@@ -193,6 +209,11 @@ document.addEventListener("keydown", (event) => {
   const index = Number(event.key) - 1;
   if (index >= 0 && index < LAYOUTS.length) review.setSetting("layout", LAYOUTS[index].id);
   if (event.key === "c") togglePanel();
+  if (event.key === "Escape" && view.quickOpen) {
+    view.quickOpen = false;
+    render();
+    return;
+  }
   if (event.key === "Escape" && view.assistantOpen) {
     view.assistantOpen = false;
     render();
