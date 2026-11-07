@@ -253,6 +253,37 @@ promised.
 The sheet also states, in text, that **a window's audio is captured separately from its picture**:
 the screen-cast portal carries video only. A user who assumes per-window audio and records the wrong
 source has lost the recording, and that sentence is the entire defence against it.
+### Sound controls (D-081)
+
+A **Sound** button sits beside Pause while a recording is running or held, and opens a popover
+under it. A popover rather than a pane, because the header is on screen in every layout and every
+run and the monitor pane is not. It also leaves the header as wide as it was. The button carries
+`aria-expanded` and `aria-controls`; the popover is a `role="dialog"` labelled *Sound*.
+
+One row per sound the recording has: *The window's sound*, *This computer's sound*, *Your
+microphone*. Each row has:
+
+- **The name, and its volume in words** (`80 %`, or *Muted* in the warning colour).
+- **A mute button** (`aria-pressed`, named "Mute your microphone" / "Unmute …"). It shows a speaker
+  with waves while the sound is heard, and crossed out on the warning wash while muted.
+- **A 0–100 % slider** in steps of 5, labelled "<sound> volume", whose `aria-valuetext` is "80
+  percent" or "muted".
+- **A thin meter** of that sound's own level, before its volume. A turned-down or muted microphone
+  still shows whether it hears anything, which is how someone knows it is safe to unmute. Muted, the
+  meter dims rather than disappearing.
+- **One line of status when it matters:** *Muted — not being recorded.*, or *Stopped — this sound
+  is no longer arriving.* (the slider and button are then disabled).
+
+**Keyboard:** opening focuses the first slider; arrows move 5 %; **M** mutes the row the focus is
+in; **Escape** closes and returns focus to the button. A click outside closes it. A change applies
+at once on screen and reaches the server within 100 ms; every other open page follows
+`mix.changed`. Each sound's volume is remembered in the browser and the next recording starts
+there. Nothing here is a setting, so closing a recording hides the button.
+
+**The header makes room by shortening the model names**, which ellipsise with the full text on
+their title. With Pause, Sound and Stop all showing, the header measured 89 px too wide at 1024 px
+until they did. The controls are never what gets pushed off the screen.
+
 ### The recording monitor
 
 Window capture gets a **third pane**, peer to the transcript and the assistant, shown only in that

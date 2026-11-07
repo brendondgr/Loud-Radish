@@ -1,6 +1,6 @@
 # Mixed Audio and Steady Video
 
-**Status:** In progress (5 / 7 phases). Branch: `feature/mixed-audio-steady-video`.
+**Status:** In progress (6 / 7 phases). Branch: `feature/mixed-audio-steady-video`.
 
 ## 1. Introduction
 
@@ -382,6 +382,21 @@ recording; the set of inputs is fixed when recording starts.
   > window's sound and the microphone together.*
 
 ### Phase 6 — The sound controls while recording
+
+> **Status: ✅ Complete.** Differences from the plan:
+> - **The panel's template is its own partial**, `partials/sound_panel.html`, included from
+>   `header.html`. It is created by `wireMix`, so `main.js` gained no lines.
+> - **The header overflowed.** With Pause, Sound and Stop showing it measured 89 px too wide at
+>   1024 px. Fixed by letting the model names shrink with an ellipsis, with the full text on the
+>   button's title.
+> - **M no longer changes a sound that has stopped arriving**, matching its disabled button.
+> - **Checked in the browser (:8412):**
+>   - the panel opened from Sound, and the computer-sound meter moved;
+>   - clicking the slider gave 50 %, three right arrows gave 65 %, and M muted it; the server
+>     agreed each time, and 65 % was remembered;
+>   - Escape closed it and returned focus to the button;
+>   - a second tab followed a mute made in the first and read "Muted — not being recorded.";
+>   - at 375 px the popover stayed on screen (10–330 px) with no sideways scroll.
 
 - **Locations:**
   - New `web/frontend/templates/partials/sound_panel.html` and

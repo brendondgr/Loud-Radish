@@ -185,6 +185,13 @@ export class Header {
     const llm = session.config?.llm;
     const llmModel = llm?.mode === "api" ? llm?.api?.model : llm?.local?.model;
     setText(this.llmName, session.llmConfigured ? llmModel : "Assistant not set up");
+    // The names ellipsise when a recording's controls need the room, so the whole of them is on
+    // the button's title as well.
+    setAttr(
+      this.modelName?.closest(".model-identity"),
+      "title",
+      `${this.modelName?.textContent ?? ""} · ${this.llmName?.textContent ?? ""}`
+    );
 
     const local = session.fullyLocal;
     setAttr(this.privacy, "data-state", local ? "local" : "remote");

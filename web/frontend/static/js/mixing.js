@@ -1,8 +1,8 @@
 /**
  * Routing the server's word about the mix into the mix store (D-081).
  *
- * Split out of `main.js`, which is near its cap, the way `viewing.js` is: everything here is wiring,
- * and none of it is needed by anything else at boot.
+ * Split out of `main.js`, which is near its cap, the way `viewing.js` is: everything here is wiring
+ * for the mix and its one view, the sound panel, and none of it is needed by anything else at boot.
  *
  * **Reconciled on every connect.** The socket is a latency optimisation and `GET /api/session/mix`
  * is the answer; a page that only learned the mix from events it may have missed would show a
@@ -10,6 +10,8 @@
  */
 
 import { on } from "./core/bus.js";
+import { $ } from "./core/dom.js";
+import { SoundPanel } from "./components/sound-panel.js";
 import { mix } from "./stores/mix.js";
 import { api } from "./transport/api.js";
 import {
@@ -22,7 +24,9 @@ import {
   SESSION_STATE,
 } from "./transport/events.js";
 
+/** Route the mix's events into its store, and put the sound panel in the header. */
 export function wireMix() {
+  const panel = new SoundPanel($("[data-sound-panel]"));
   on(MIX_CHANGED, (payload) => mix.set(payload));
   on(MIX_LEVELS, (payload) => mix.setLevels(payload?.levels));
   on(SESSION_STARTED, (payload) => mix.set(payload?.mix));
@@ -33,6 +37,7 @@ export function wireMix() {
   on(CONNECTION_CHANGED, ({ state }) => {
     if (state === CONNECTED) void reconcile();
   });
+  return panel;
 }
 
 async function reconcile() {

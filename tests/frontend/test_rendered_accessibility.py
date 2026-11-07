@@ -303,3 +303,28 @@ def test_the_window_sound_scope_is_a_named_radio_group(pages) -> None:
     assert group.attrs.get("role") == "radiogroup" and group.attrs.get("aria-label")
     assert {e.attrs["value"] for e in scopes} == {"application", "system"}
     assert all(e.attrs.get("type") == "radio" and e.label and e.label.named for e in scopes)
+
+
+def test_the_sound_panel_is_a_labelled_popover_its_button_controls(pages) -> None:
+    """D-081. The button says whether the panel is open and which element it opens."""
+    elements = pages["/"]
+    [button] = [e for e in elements if "data-sound-toggle" in e.attrs]
+    [popover] = [e for e in elements if "data-sound-popover" in e.attrs]
+
+    assert button.tag == "button" and button.attrs.get("aria-expanded") == "false"
+    assert button.attrs.get("aria-controls") == popover.attrs.get("id")
+    assert popover.attrs.get("role") == "dialog" and popover.attrs.get("aria-label")
+
+
+def test_each_sound_row_has_a_named_slider_and_a_mute_toggle(pages) -> None:
+    """The row template every input is cloned from: a slider with a name, a mute that says
+    whether it is on, and a meter that is hidden from the reader (its level is not a control)."""
+    elements = pages["/"]
+    [slider] = [e for e in elements if "data-sound-slider" in e.attrs]
+    [mute] = [e for e in elements if "data-sound-mute" in e.attrs]
+    [meter] = [e for e in elements if "sound-row__meter" in e.attrs.get("class", "").split()]
+
+    assert slider.attrs.get("type") == "range" and slider.named
+    assert (slider.attrs.get("min"), slider.attrs.get("max")) == ("0", "100")
+    assert mute.tag == "button" and mute.attrs.get("aria-pressed") == "false" and mute.named
+    assert meter.attrs.get("aria-hidden") == "true"
