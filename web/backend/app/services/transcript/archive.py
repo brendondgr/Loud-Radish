@@ -164,6 +164,9 @@ class ArchivedSession:
     #: never ran, or whose database was lost. Listed so it can be transcribed, rather than sitting
     #: on disk where nothing in the interface can reach it.
     orphan: bool = False
+    #: Whether the title was given — by the user or the model (D-084) — rather than made up from
+    #: the start time. The Recordings page shows keywords in place of a made-up title.
+    named: bool = False
 
     @property
     def readable(self) -> bool:
@@ -189,6 +192,7 @@ class ArchivedSession:
             "problem": self.problem,
             "readable": self.readable,
             "orphan": self.orphan,
+            "named": self.named,
         }
 
 
@@ -358,6 +362,7 @@ def describe(path: Path, recordings: Path | None = None) -> ArchivedSession:
         size_bytes=size,
         media=media_for(path.stem, recordings, has_transcript=segments > 0, resumable=resumable),
         revisions=revisions,
+        named=bool(meta and (meta["title"] or "").strip()),
     )
 
 

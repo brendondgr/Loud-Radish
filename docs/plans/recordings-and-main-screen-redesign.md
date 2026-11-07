@@ -1,6 +1,6 @@
 # Recordings and Main Screen Redesign: From the Labs to the Real Pages
 
-*Written 2026-11-07. Status: **In progress (2 / 9)**. Source of truth for the target design: the
+*Written 2026-11-07. Status: **In progress (3 / 9)**. Source of truth for the target design: the
 two labs, `/labs/sessions/` and `/labs/main/` (D-082), at commit `e76a389` on branch
 `labs/sessions-cards`, and the owner's three rounds of exported feedback quoted below. This plan
 takes decisions **D-083 to D-086**. `feature/mixed-audio-steady-video` already holds D-080 and
@@ -269,6 +269,13 @@ available until Step 9 so every step can be compared against them side by side. 
   changes to GitHub stating: Recordings and Main Screen Redesign (3 / 9) Complete: A finished
   transcript is given a four-to-six-word title by the model, older ones are named on approval,
   and any title can be renamed.*
+
+> **Status: ✅ Complete.** Two departures from the plan, both recorded in D-084: the trigger is a
+> server-side hub listener on `session.stopped` and `transcription.done` rather than code inside
+> `manager.py` and `runner.py`; and background naming also requires rolling summaries to be on, as
+> the owner's existing consent for background model work. `suggest_title` takes the text rather than
+> the store, so reading the database stays off the event loop. The routes are in
+> `routes/session_titles.py`; the new events are `session.titled`, `titles.progress`, `titles.done`.
 
 #### Step 4: The Recordings page, rebuilt as wide cards
 

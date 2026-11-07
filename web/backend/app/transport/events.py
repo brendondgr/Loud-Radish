@@ -70,6 +70,16 @@ MIX_CHANGED: Final = "mix.changed"
 #: Each mix input's meter, a few times a second. Coalescing: only the newest reading means anything.
 MIX_LEVELS: Final = "mix.levels"
 
+# -- titles (D-084) ---------------------------------------------------------------------
+#: A recording was given a title — by the model after its transcript finished, by the backfill,
+#: or by the user renaming it. ``{key, title}``. Critical: a card left showing keywords after its
+#: title arrived would stay that way until a reload.
+SESSION_TITLED: Final = "session.titled"
+#: How far naming the untitled recordings has got. Coalescing.
+TITLES_PROGRESS: Final = "titles.progress"
+#: Naming the untitled recordings finished. Critical, and it retracts the progress frame.
+TITLES_DONE: Final = "titles.done"
+
 # -- export (D-037) ---------------------------------------------------------------------
 #: One export's stages, weighted progress, and estimated time. Coalescing: only the newest frame
 #: means anything, exactly as `transcription.progress` is.
@@ -116,6 +126,9 @@ ALL_EVENTS: Final[tuple[str, ...]] = (
     CAPTURE_STATE,
     MIX_CHANGED,
     MIX_LEVELS,
+    SESSION_TITLED,
+    TITLES_PROGRESS,
+    TITLES_DONE,
     EXPORT_PROGRESS,
     EXPORT_DONE,
     EXPORT_FAILED,
@@ -142,6 +155,7 @@ COALESCING_EVENTS: Final[frozenset[str]] = frozenset(
         RECORDING_PROGRESS,
         TRANSCRIPTION_PROGRESS,
         EXPORT_PROGRESS,
+        TITLES_PROGRESS,
     }
 )
 
@@ -172,6 +186,8 @@ CRITICAL_EVENTS: Final[frozenset[str]] = frozenset(
         # with no way to reach the file it produced.
         EXPORT_DONE,
         EXPORT_FAILED,
+        SESSION_TITLED,
+        TITLES_DONE,
         CHAT_DELTA,
         CHAT_DONE,
         ERROR,
@@ -194,6 +210,7 @@ CRITICAL_EVENTS: Final[frozenset[str]] = frozenset(
 #: clock that kept climbing. One stale frame, two bug reports.
 INVALIDATES: Final[dict[str, frozenset[str]]] = {
     TRANSCRIPTION_DONE: frozenset({TRANSCRIPTION_PROGRESS}),
+    TITLES_DONE: frozenset({TITLES_PROGRESS}),
     TRANSCRIPTION_FAILED: frozenset({TRANSCRIPTION_PROGRESS}),
     # **These two retract, where `session.paused` does not, and the difference is real.** A held
     # *capture* is still capturing nothing but still true; a held *pass* has a last progress frame

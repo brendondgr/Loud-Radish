@@ -52,6 +52,13 @@ export const MIX_CHANGED = "mix.changed";
 /** Each mix input's meter, a few times a second. Coalescing. */
 export const MIX_LEVELS = "mix.levels";
 
+/** A recording was given a title, by the model or by the user (D-084). `{key, title}`. */
+export const SESSION_TITLED = "session.titled";
+/** How far naming the untitled recordings has got. Coalescing. */
+export const TITLES_PROGRESS = "titles.progress";
+/** Naming the untitled recordings finished. */
+export const TITLES_DONE = "titles.done";
+
 /** One export's stages and weighted progress (D-037). Coalescing, like transcription progress. */
 export const EXPORT_PROGRESS = "export.progress";
 /** The export finished and there is a file to collect. */

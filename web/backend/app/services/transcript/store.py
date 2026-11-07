@@ -155,6 +155,17 @@ class TranscriptStore:
             config=json.loads(row["config_json"] or "{}"),
         )
 
+    def set_title(self, title: str, *, replace: bool = True) -> bool:
+        """Name the session (D-084). With ``replace=False`` an existing title is never overwritten —
+        a model-written title must not replace one the user chose. Whether it was written."""
+        with self._lock:
+            query = "UPDATE session SET title = ? WHERE id = 1"
+            if not replace:
+                query += " AND COALESCE(title, '') = ''"
+            changed = self._connection.execute(query, (title.strip(),)).rowcount
+            self._connection.commit()
+        return changed > 0
+
     def mark_ended(self, when: datetime | None = None) -> None:
         """Record that the session has stopped."""
         with self._lock:

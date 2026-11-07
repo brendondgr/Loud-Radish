@@ -35,7 +35,9 @@ from .services.llm import build_llm
 from .services.polish import PolishWorker
 from .services.recording import migrate_flat_recordings
 from .services.session import SessionManager
+from .services.transcript.titles import TitleService
 from .transport import EventHub, ws_router
+from .transport.events import SESSION_STOPPED, TRANSCRIPTION_DONE
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +75,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # The hub needs the running loop so the pipeline's worker threads can hand it events. This is
     # the only place asyncio and the audio path meet.
     app.state.hub.bind_loop(asyncio.get_running_loop())
+    app.state.titles.bind_loop(asyncio.get_running_loop())
 
     # The last talk stays on the page across a restart (D-041). D-031 keeps a finished session
     # readable until the next one starts, but it holds it in an attribute, so a new process began
@@ -160,6 +163,16 @@ def _wire_assistant(app: FastAPI) -> None:
         emit=app.state.hub.emit,
         clock=lambda: manager.session_seconds,
     )
+
+    # A recording is named once its transcript is complete (D-084): when a session stops — a
+    # recorded-mode one has no transcript yet then, and is skipped — and when a pass finishes.
+    app.state.titles = TitleService(
+        config_provider=lambda: app.state.config.resolve(),
+        backend_factory=backend_factory,
+        emit=app.state.hub.emit,
+    )
+    for finished in (SESSION_STOPPED, TRANSCRIPTION_DONE):
+        app.state.hub.on(finished, lambda data: app.state.titles.request(data.get("key", "")))
 
     manager.context_worker_factory = lambda store, config: ContextWorker(
         store=store,

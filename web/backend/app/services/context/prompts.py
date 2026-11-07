@@ -76,6 +76,14 @@ TERM :: definition in one sentence
 If the passage introduces no such terms, reply with nothing at all."""
 
 
+#: A recording's name on the Recordings page (D-084). Asked once, after the transcript is finished.
+TITLE_PROMPT = """\
+Name this recording in four to six words, the way a person would label it in a list of their \
+recordings: the subject, not the occasion. Use the speaker's own terms.
+
+Write only the name. No quotes, no full stop, no preamble, no "Title:"."""
+
+
 def quick_action_prompt(prompt: str, since_last_read: bool = False) -> str:
     """Adjust a quick action's prompt for the context it will be given.
 

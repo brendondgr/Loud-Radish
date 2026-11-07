@@ -42,6 +42,7 @@ Do NOT:
 Reply with the corrected text alone. If the input is empty or is not speech, reply with the input
 unchanged."""
 
+
 def resolve(config: AppConfig) -> str:
     """The instructions this dictation tidy should follow. Whitespace counts as blank."""
     written = (config.dictation.instructions or "").strip()

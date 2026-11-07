@@ -59,6 +59,9 @@ Every frame is `{"event": "<name>", "data": { … }}`.
 | `vad.state` | `speaking` (bool) | Drives the speaking indicator |
 | `status` | `rtf`, `queue_depth`, `commit_latency_s`, `model_id`, `device`, `dropped_frames`, `suppressed` | Health telemetry. `suppressed` counts passes discarded as invented speech |
 | `summary.added` | `start`, `end`, `text` | A new rolling summary |
+| `session.titled` | `key`, `title` | A recording was named — by the model once its transcript finished, by the backfill, or by a rename (D-084). Critical |
+| `titles.progress` | `running`, `total`, `done`, `named`, `current` | How far naming the untitled recordings has got. Coalescing |
+| `titles.done` | as `titles.progress` | The backfill finished. Critical; retracts `titles.progress` |
 | `glossary.added` | `term`, `definition`, `first_seen` | A new term identified |
 | `chat.delta` | `request_id`, `text` | A streaming answer fragment |
 | `chat.done` | `request_id`, `usage`, `context_timestamp`, `cites` | The answer is complete |
@@ -289,6 +292,19 @@ the main screen when the pass finishes (`session.viewing`). Nothing else is run.
 `GET /api/sessions` rows gain `orphan` (a recording folder with no database, listed so it can be
 transcribed) and `media` gains `openable`, `transcribable`, `transcribe_source` and `reason`, the
 one answer the row, the window and the picker all read.
+
+### Titles (D-084)
+
+`GET /api/sessions` rows carry `named`: whether the title was given (by the user or the model)
+rather than made up from the start time.
+
+- `GET /api/sessions/untitled/plan` → `{count, model, configured, backfill}`. Starts nothing.
+  `count` is finished, readable recordings with at least 40 words and no title.
+- `POST /api/sessions/untitled/name` → the `backfill` object (`running`, `total`, `done`, `named`,
+  `current`). `409 no-model` when no language model is chosen. Recordings are named one at a time.
+- `PATCH /api/sessions/{key}` with `{"title": "…"}` (at most 120 characters, whitespace collapsed)
+  → `{key, title}`, replacing any title and announcing `session.titled`. `422 empty-title`,
+  `404 unknown-session`, `409 still-recording` for the session being recorded now.
 
 ### `DELETE /api/sessions/{key}`
 

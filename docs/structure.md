@@ -76,6 +76,7 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   │   ├── sessions.py        # Past sessions: list, read, export, web-app export
 │   │   │   ├── session_media.py   # A recording's picture or frame, named downloads, opening its
 │   │   │   │                      #   folder, and glances — what a card needs (D-082)
+│   │   │   ├── session_titles.py  # Naming untitled recordings on approval, and renaming (D-084)
 │   │   │   ├── session_actions.py # One past recording: open on the main screen, close, delete,
 │   │   │   │                      #   and transcribe on the user's approval (D-076)
 │   │   │   ├── chat.py            # Ask, cancel, history, the read mark
@@ -159,6 +160,8 @@ TranscriberPrototype/                # this checkout keeps the old name; the pro
 │   │   │                          #   transcription pass got to (D-045)
 │   │   │       ├── store.py       # Append-only writes, the four queries, search
 │   │   │       ├── glance.py      # Opening words, first summary and keywords, for a card (D-082)
+│   │   │       ├── titles.py      # Four-to-six-word titles from the model, once a transcript is
+│   │   │       │                  #   finished, and the approval-gated backfill (D-084)
 │   │   │       └── export.py      # Text, Markdown, SRT, VTT, JSON
 │   │   │   └── session/           # Wiring, workers, health, degradation
 │   │   │       ├── modes.py       # Capture modes, run states and sources (D-020, D-075); mirrored

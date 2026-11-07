@@ -164,6 +164,14 @@ Three differences from the live flow, each deliberate:
   creates the database under the folder's own key when there was none, and runs the same batch pass
   a stopped `recorded` session runs — into the store that shares the folder's name. When the pass
   finishes, the recording is put on the main screen if the user left that box ticked (**D-076**).
+- **A finished transcript is named once (D-084).** The hub calls `TitleService.request(key)` on
+  `session.stopped` and `transcription.done` (`EventHub.on`, a server-side listener). Unless the
+  recording already has a title, has under 40 words, has no model chosen, or rolling summaries are
+  off, the service reads the summaries (or the transcript's opening), asks the model for four to six
+  words through the same client as everything else — which takes its GPU turn (D-072) — writes the
+  title with `TranscriptStore.set_title(replace=False)`, and emits `session.titled`. One title at a
+  time. A `recorded`-mode session has no transcript when it stops, so it is named when its pass
+  finishes. Recordings from before are named only through the approval-gated backfill.
 
 ## Where a recording's pieces end up (D-032)
 
@@ -310,7 +318,9 @@ configurable fallback.
 
 Two paths can send data off the machine, and both are explicit:
 
-1. **A hosted LLM provider** — transcript excerpts, when `llm.mode` is `api`.
+1. **A hosted LLM provider** — transcript excerpts, when `llm.mode` is `api`. That includes the
+   summaries or opening words sent to name a finished recording (D-084), which happens only while
+   rolling summaries are on.
 2. **A hosted ASR backend** — room audio. Deferred to v2; the interface accommodates it.
 
 When both the ASR model and the LLM provider are local, nothing leaves. The frontend derives its

@@ -1809,14 +1809,14 @@
         }
       }
     },
-    "/api/sessions": {
+    "/api/sessions/untitled/plan": {
       "get": {
         "tags": [
           "sessions"
         ],
-        "summary": "List Sessions",
-        "description": "Every session on disk, newest first.\n\nIncludes files that cannot be read, each with its reason. A session the user can see and cannot\nopen is more useful than one that has silently vanished from the list.",
-        "operationId": "list_sessions_api_sessions_get",
+        "summary": "Untitled Plan",
+        "description": "How many finished recordings have no title, and which model would name them. Starts\nnothing \u2014 naming them is the owner's call.",
+        "operationId": "untitled_plan_api_sessions_untitled_plan_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -1825,7 +1825,31 @@
                 "schema": {
                   "additionalProperties": true,
                   "type": "object",
-                  "title": "Response List Sessions Api Sessions Get"
+                  "title": "Response Untitled Plan Api Sessions Untitled Plan Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions/untitled/name": {
+      "post": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Name Untitled",
+        "description": "Name every untitled recording, one at a time, in the background.\n\nProgress arrives as ``titles.progress`` and ``titles.done``, and each title as\n``session.titled``.",
+        "operationId": "name_untitled_api_sessions_untitled_name_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Name Untitled Api Sessions Untitled Name Post"
                 }
               }
             }
@@ -1834,6 +1858,59 @@
       }
     },
     "/api/sessions/{key}": {
+      "patch": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "Rename Session",
+        "description": "Give a recording the title the owner chose. Replaces whatever it had.",
+        "operationId": "rename_session_api_sessions__key__patch",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Rename"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Rename Session Api Sessions  Key  Patch"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "get": {
         "tags": [
           "sessions"
@@ -1943,6 +2020,30 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sessions": {
+      "get": {
+        "tags": [
+          "sessions"
+        ],
+        "summary": "List Sessions",
+        "description": "Every session on disk, newest first.\n\nIncludes files that cannot be read, each with its reason. A session the user can see and cannot\nopen is more useful than one that has silently vanished from the list.",
+        "operationId": "list_sessions_api_sessions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response List Sessions Api Sessions Get"
                 }
               }
             }
@@ -3679,6 +3780,20 @@
         ],
         "title": "QuickActionsResponse",
         "description": "The configured one-tap prompts."
+      },
+      "Rename": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "Rename"
       },
       "SearchResponse": {
         "properties": {

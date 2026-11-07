@@ -82,6 +82,7 @@ around the whole passage, no markup of any kind.
 changed.
 """
 
+
 def resolve(config: AppConfig) -> str:
     """The instructions this polish pass should follow.
 

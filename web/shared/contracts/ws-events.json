@@ -103,6 +103,18 @@
       "critical": false,
       "coalescing": true
     },
+    "session.titled": {
+      "critical": true,
+      "coalescing": false
+    },
+    "titles.progress": {
+      "critical": false,
+      "coalescing": true
+    },
+    "titles.done": {
+      "critical": true,
+      "coalescing": false
+    },
     "export.progress": {
       "critical": false,
       "coalescing": true

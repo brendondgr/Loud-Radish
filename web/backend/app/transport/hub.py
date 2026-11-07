@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import deque
+from collections.abc import Callable
 from typing import Any
 
 from .events import CRITICAL_EVENTS, envelope, invalidated_by, is_coalescing
@@ -124,6 +125,8 @@ class EventHub:
         #: The most recent instance of each coalescing event, replayed to a client on connect so it
         #: paints a correct screen immediately rather than waiting for the next tick.
         self._latest: dict[str, dict[str, Any]] = {}
+        #: Server-side listeners, by event name (D-084). Called on the emitting thread.
+        self._listeners: dict[str, list[Callable[[dict[str, Any]], None]]] = {}
 
     def bind_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         """Record the event loop that pipeline events must be marshalled onto."""
@@ -158,6 +161,15 @@ class EventHub:
         """
         return list(self._latest.values())
 
+    def on(self, event: str, listener: Callable[[dict[str, Any]], None]) -> None:
+        """Call ``listener(data)`` whenever ``event`` is emitted, on the emitting thread.
+
+        For work that follows an event on the server — naming a recording once it has stopped —
+        without the emitter knowing about it. A listener must be quick and must not raise; one that
+        does is logged and the event is delivered regardless.
+        """
+        self._listeners.setdefault(event, []).append(listener)
+
     def forget(self, *events: str) -> None:
         """Drop retained coalescing events by name. Used when a new session starts."""
         for event in events:
@@ -172,6 +184,11 @@ class EventHub:
         so that nothing in the audio path has to know an event loop exists.
         """
         frame = envelope(event, data)
+        for listener in self._listeners.get(event, ()):
+            try:
+                listener(data)
+            except Exception:  # noqa: BLE001 - a listener must never stop an event reaching clients
+                logger.exception("A listener for %s failed", event)
         if is_coalescing(event):
             self._latest[event] = frame
         # A terminal event retracts the progress it terminates, so the replay set never carries a

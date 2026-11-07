@@ -127,6 +127,9 @@ minutes ago.
 | `GET` | `/api/sessions/{key}/file/{video\|audio}` | The video, or the WAV while it still exists, as a download named `<key>-<kind><suffix>` | **Implemented** |
 | `POST` | `/api/sessions/{key}/reveal` | Open the recording's folder in the system file manager. Returns `{path, opened}`, so a page can offer to copy the path when nothing answered | **Implemented** |
 | `GET` | `/api/sessions/glance?keys=` | For up to 60 recordings: opening words, first summary sentence, and the transcript's most-used words — what a card shows until a title is written. Registered before `/{key}` so "glance" is never read as a key | **Implemented** |
+| `GET` | `/api/sessions/untitled/plan` | How many finished recordings have no title, and which model would name them. Starts nothing (D-084) | **Implemented** |
+| `POST` | `/api/sessions/untitled/name` | Name them one at a time in the background, on the owner's approval; progress as `titles.progress`/`titles.done`. `409 no-model` | **Implemented** |
+| `PATCH` | `/api/sessions/{key}` | Rename: `{"title"}`, replacing any title. `409` for the session recording now. `routes/session_titles.py` | **Implemented** |
 | `GET` | `/api/sessions/{key}/webapp?include_chat=` | The recording as a self-contained web application, as a ZIP. `include_chat` defaults to **false** | **Implemented** |
 | `GET` | `/api/sessions/{key}/media` | The recording itself, with range support, for the export window's preview | **Implemented** |
 | `POST` | `/api/sessions/{key}/transcribe/resume` | Pick up a transcription pass this session was in the middle of — held on purpose, or interrupted by the process ending (D-045). Everything it needs is in the session's own checkpoint | **Implemented** |
