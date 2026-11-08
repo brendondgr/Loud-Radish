@@ -63,3 +63,4 @@ supplied 2026-08-15. Two things are recorded as outstanding rather than claimed:
 StatusNotifierItem export, and the CPU-contention measurement, both in
 [../checklist.md](../checklist.md).
 | [recordings-and-main-screen-redesign.md](recordings-and-main-screen-redesign.md) | The designs chosen in the two labs built into the real pages: radish accent only, model-written titles, the Recordings page as wide cards, and a main screen with header health chips, a details column and a pop-up for quick questions — then the labs removed | ✅ Complete (9 / 9) |
+| [readme-overhaul.md](readme-overhaul.md) | The README brought up to date after the redesign: shorter, the features grouped by use, and five new screenshots of made-up talks read by a speech synthesiser | ✅ Complete (4 / 4) |

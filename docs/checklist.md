@@ -1035,14 +1035,9 @@ source file moved.
 
 **Open, and needing you rather than an agent.**
 
-- [ ] **Replace the two remaining drafted paragraphs in the README.** The Why section and the status
-      line are still marked with `DRAFT` HTML comments in the README source. They were inferred from
-      the code and the decision log, which is not the same as being true about your reasons. An
-      invented motivation on a front page is a claim that has to be defended by whoever reads it, so
-      this is the highest-value edit left in the repository. **The opening paragraph is done** — it
-      is yours as of 2026-09-10 and now covers the whole application rather than only the talk it
-      started as (D-070). Its two-line condensation lives in `TAGLINE` in
-      `docs/assets/make_header.py`, so changing it means editing that and re-running the script.
+- [x] **Replace the two remaining drafted paragraphs in the README.** Resolved 2026-11-08 (D-087)
+      by removal: the *Why* section is gone rather than left as an inferred motivation, and the
+      status line is rewritten from checkable facts. A real *Why* is still welcome if you want one.
 - [ ] **Decide whether `LICENSE` should carry your legal name** rather than `brendondgr`. Left as
       the git identity because guessing a legal name into a licence file is not an audit's call.
 - [ ] **Make the repository public.** It is **private** as of 2026-09-10, checked via the API.
@@ -1051,7 +1046,7 @@ source file moved.
       unauthenticated, which is worth knowing before mistaking that for a broken path.
 - [ ] **Set the GitHub topics and the social preview.** Neither can be set from a file. The
       description is already set and is a good one. Topics are empty; unset, a shared link renders
-      as generic grey, and `docs/assets/live-transcript.png` is the obvious preview image.
+      as generic grey, and `docs/assets/main-screen.png` is the obvious preview image.
 - [x] **Watch the first CI run.** Done. The `documented-commands` job passed — `uv sync` and
       `uv run app.py` answering on 8395 both work on a runner with no audio device. **The `checks`
       job failed, and it was right to.** Three tests asserted on things that depend on the
@@ -1136,12 +1131,8 @@ and tangled *what am I recording* with *when should it be transcribed*. Plan:
 - [ ] **Record a real window from the sheet.** Window capture was unavailable on the isolated QA
       server (no GStreamer in its environment), so the window branch was walked with availability
       forced on, and only up to the point where the desktop's picker would open.
-- [ ] **Recapture the README screenshots.** All five still show the old tabs in the header, and
-      `window-mode.png` is built around them. `docs/assets/capture.py` now shoots
-      `record-sheet.png` in place of `window-mode.png`; swap the README's image when it exists. It
-      could not be taken here: the sandbox the work ran in has neither GStreamer nor PortAudio, so
-      the sheet showed install errors instead of the normal choices. Needs a real session on this
-      machine, with the language-model endpoint from the recipe so the hero shot has its answer.
+- [x] **Recapture the README screenshots.** Done 2026-11-08 (Part 13, D-087): five new images of
+      the redesigned pages, taken on the host so the record sheet shows its real choices.
 - [ ] **Decide whether the header needs a one-click "start with last settings".** Asked in the
       plan and not yet answered. Today it takes the sheet plus Enter, because Confirm has focus.
 
@@ -1228,6 +1219,20 @@ as text to paste back.
       it local. The owner's instance on :8395 is a process from before that, so it still shows
       "17:11" for a 12:11 PM recording; a restart corrects it. (Corrected 2026-11-07: an earlier
       line here said the titles were stored in UTC.)
+
+## Part 13 — The README brought up to date (D-087)
+
+Done 2026-11-08, [plans/readme-overhaul.md](plans/readme-overhaul.md).
+
+- [x] README rewritten shorter (248 lines to about 140), with the features grouped by use and
+      everything added on 2026-11-07 described.
+- [x] Five fictional talks in `docs/assets/talks/`, voiced with `espeak-ng` and recorded through a
+      throwaway instance on port 8412; nothing written to `data/`, port 8395 left alone.
+- [x] `main-screen.png`, `recordings.png`, `recording-window.png`, `record-sheet.png` and
+      `settings-rewriting.png` captured; the four unused September images deleted.
+- [x] `docs/assets/capture.py` and `docs/assets/README.md` describe the new set and the recipe.
+- [ ] **Set the social preview to `docs/assets/main-screen.png`** (Part 7's item, still open: it
+      cannot be set from a file).
 
 ## Discovered work
 
